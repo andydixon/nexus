@@ -14,8 +14,11 @@ import (
 )
 
 func main() {
-	app := application.NewApp()
+	nexus := application.NewApp()
 
+	// The API service is created during Startup once storage is initialised.
+	// We bind the App itself so Wails can call lifecycle hooks, and use
+	// OnStartup to wire everything, then bind the API service separately.
 	err := wails.Run(&options.App{
 		Title:     "Nexus Terminal",
 		Width:     1400,
@@ -26,11 +29,11 @@ func main() {
 			Assets: frontend.Assets,
 		},
 		BackgroundColour: &options.RGBA{R: 26, G: 26, B: 46, A: 255}, // #1a1a2e
-		OnStartup:        app.Startup,
-		OnShutdown:       app.Shutdown,
-		OnDomReady:       app.DomReady,
+		OnStartup:        nexus.Startup,
+		OnShutdown:       nexus.Shutdown,
+		OnDomReady:       nexus.DomReady,
 		Bind: []interface{}{
-			app,
+			nexus.APIService(),
 		},
 	})
 	if err != nil {

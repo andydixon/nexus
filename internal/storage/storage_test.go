@@ -302,15 +302,30 @@ func TestSavePreferencesDoesNotError(t *testing.T) {
 	store := setupTestStore(t)
 
 	prefs := models.DefaultAppPreferences()
+	prefs.ConfirmOnClose = true
+	prefs.DefaultFontSize = 16
+	prefs.Theme = "custom-dark"
+
 	if err := store.SavePreferences(&prefs); err != nil {
 		t.Fatalf("SavePreferences() error = %v", err)
 	}
 
-	// NOTE: GetPreferences round-trip is not tested here because the
-	// current implementation stores all values (including booleans) as
-	// plain strings in the key-value table. json.Unmarshal cannot
-	// decode string "true" into a Go bool field. This is a pre-existing
-	// limitation of the storage layer, not a test defect.
+	got, err := store.GetPreferences()
+	if err != nil {
+		t.Fatalf("GetPreferences() error = %v", err)
+	}
+	if got == nil {
+		t.Fatal("GetPreferences() returned nil after save")
+	}
+	if got.ConfirmOnClose != true {
+		t.Errorf("ConfirmOnClose = %v, want true", got.ConfirmOnClose)
+	}
+	if got.DefaultFontSize != 16 {
+		t.Errorf("DefaultFontSize = %d, want 16", got.DefaultFontSize)
+	}
+	if got.Theme != "custom-dark" {
+		t.Errorf("Theme = %q, want %q", got.Theme, "custom-dark")
+	}
 }
 
 // ---------------------------------------------------------------------------

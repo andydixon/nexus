@@ -5,34 +5,20 @@ package app
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"sync"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
+	"github.com/copilot-ssh-client/app/internal/api"
+	"github.com/copilot-ssh-client/app/internal/audit"
 	"github.com/copilot-ssh-client/app/internal/config"
+	"github.com/copilot-ssh-client/app/internal/knownhosts"
+	"github.com/copilot-ssh-client/app/internal/preferences"
 	"github.com/copilot-ssh-client/app/internal/secrets"
+	"github.com/copilot-ssh-client/app/internal/sessions"
+	"github.com/copilot-ssh-client/app/internal/storage"
 )
-
-// Storage abstracts the persistent data layer (SQLite).
-type Storage interface {
-	Close() error
-}
-
-// SessionManager tracks active connection sessions.
-type SessionManager interface {
-	CloseAll()
-}
-
-// Preferences manages user application preferences.
-type Preferences interface{}
-
-// KnownHostStore manages trusted SSH host key records.
-type KnownHostStore interface{}
-
-// AuditLog records auditable application events.
-type AuditLog interface{}
 
 // App is the central application struct. Wails binds its lifecycle methods
 // (Startup, Shutdown, DomReady) and it holds references to every subsystem.
@@ -41,18 +27,31 @@ type App struct {
 	mu  sync.Mutex
 
 	Config         *config.AppConfig
-	Storage        Storage
+	Store          *storage.Store
 	SecretStore    *secrets.SecretStore
-	SessionManager SessionManager
-	Preferences    Preferences
-	KnownHostStore KnownHostStore
-	AuditLog       AuditLog
+	KeychainStore  *secrets.KeychainStore
+	SessionManager *sessions.Manager
+	Prefs          *preferences.Manager
+	KnownHosts     *knownhosts.Store
+	AuditLog       *audit.Logger
+	Service        *api.Service
 }
 
 // NewApp creates a new App instance. Subsystems are not initialised until
-// Startup is called by the Wails runtime.
+// Startup is called by the Wails runtime. The API service is pre-created
+// so it can be bound by Wails before Startup runs.
 func NewApp() *App {
-	return &App{}
+	a := &App{}
+	// The API service is created eagerly so Wails can bind it. Its backing
+	// stores are nil at this point; they are wired during Startup.
+	a.Service = &api.Service{}
+	return a
+}
+
+// APIService returns the Wails-bound API service instance. This must be
+// called before wails.Run so the binding is registered.
+func (a *App) APIService() *api.Service {
+	return a.Service
 }
 
 // Startup is called by Wails when the application starts. It loads
@@ -64,6 +63,7 @@ func (a *App) Startup(ctx context.Context) {
 
 	a.ctx = ctx
 
+	// Load platform-specific configuration paths.
 	cfg, err := config.Load()
 	if err != nil {
 		log.Fatalf("failed to load configuration: %v", err)
@@ -74,12 +74,37 @@ func (a *App) Startup(ctx context.Context) {
 		log.Fatalf("failed to create application directories: %v", err)
 	}
 
-	// Initialise the encrypted secret store.
-	a.SecretStore = secrets.NewSecretStore(cfg.SecretPath)
+	// Initialise SQLite storage (migrations run automatically on open).
+	store, err := storage.NewStore(cfg.DBPath)
+	if err != nil {
+		log.Fatalf("failed to open storage: %v", err)
+	}
+	a.Store = store
 
-	// Storage, session manager, preferences, known host store and audit log
-	// will be wired in when their implementations are available.
-	// For now we log successful initialisation.
+	// Initialise secret stores (keychain preferred, encrypted file fallback).
+	a.SecretStore = secrets.NewSecretStore(cfg.SecretPath)
+	a.KeychainStore = secrets.NewKeychainStore("NexusTerminal")
+
+	// Initialise the audit logger backed by SQLite.
+	a.AuditLog = audit.NewLogger(store)
+
+	// Initialise known hosts store.
+	a.KnownHosts = knownhosts.NewStore(store)
+
+	// Initialise preferences manager.
+	a.Prefs = preferences.NewManager(store)
+	if err := a.Prefs.Load(); err != nil {
+		log.Printf("warning: failed to load preferences, using defaults: %v", err)
+	}
+
+	// Initialise the session manager.
+	a.SessionManager = sessions.NewManager(store, a.SecretStore, a.KeychainStore, a.AuditLog)
+	a.SessionManager.SetContext(ctx)
+
+	// Wire the API service with all backing stores now that they exist.
+	*a.Service = *api.NewService(store, a.SecretStore, a.KeychainStore, a.SessionManager, a.AuditLog, a.Prefs)
+	a.Service.SetContext(ctx)
+
 	log.Printf("Nexus Terminal initialised – data directory: %s", cfg.DataDir)
 }
 
@@ -93,8 +118,8 @@ func (a *App) Shutdown(ctx context.Context) {
 		a.SessionManager.CloseAll()
 	}
 
-	if a.Storage != nil {
-		if err := a.Storage.Close(); err != nil {
+	if a.Store != nil {
+		if err := a.Store.Close(); err != nil {
 			log.Printf("warning: error closing storage: %v", err)
 		}
 	}
@@ -113,5 +138,5 @@ func (a *App) DomReady(ctx context.Context) {
 	runtime.EventsEmit(ctx, "backend:ready", map[string]interface{}{
 		"message": "Backend is ready",
 	})
-	fmt.Println("DOM ready – backend:ready event emitted")
+	log.Println("DOM ready – backend:ready event emitted")
 }
