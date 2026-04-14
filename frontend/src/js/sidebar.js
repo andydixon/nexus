@@ -170,6 +170,17 @@ class Sidebar {
         textWrapper.appendChild(subEl);
         item.appendChild(textWrapper);
 
+        // Edit button (visible on hover)
+        const editBtn = createElement('button', 'sidebar-item-edit', {
+            textContent: '✎',
+            title: 'Edit profile',
+        });
+        editBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.app.profileEditor.openEdit(profile.id);
+        });
+        item.appendChild(editBtn);
+
         // Favourite star
         if (profile.favourite) {
             const star = createElement('span', 'sidebar-item-star is-favourite', { textContent: '★' });

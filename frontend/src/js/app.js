@@ -134,6 +134,10 @@ class App {
         window.runtime.EventsOn('session:state', (payload) => {
             this.tabs.updateSessionState(payload.sessionID, payload.state, payload.error);
             this.updateStatusBar();
+            // Re-fit the terminal once connected so it picks up the final container size
+            if (payload.state === 'connected') {
+                setTimeout(() => this.terminals.fitActive(), 50);
+            }
         });
 
         // Session closed by backend

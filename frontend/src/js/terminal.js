@@ -67,8 +67,14 @@ class TerminalManager {
         const container = document.getElementById(containerId);
         term.open(container);
 
-        // Initial fit
-        requestAnimationFrame(() => fitAddon.fit());
+        // Fit the terminal once the container has had time to lay out.
+        // A single requestAnimationFrame is not enough — the panel may
+        // still be transitioning from display:none, so we retry briefly.
+        const doFit = () => { try { fitAddon.fit(); } catch (_) { /* noop */ } };
+        requestAnimationFrame(doFit);
+        setTimeout(doFit, 50);
+        setTimeout(doFit, 150);
+        setTimeout(doFit, 400);
 
         // Forward user keystrokes to the backend
         term.onData((data) => {
