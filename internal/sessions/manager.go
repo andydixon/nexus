@@ -456,9 +456,10 @@ func (m *Manager) connectSSH(sess *Session, getSecret func(prompt string) (strin
 		},
 	)
 
-	// Build credential callbacks that check keychain/store before prompting.
-	getPassword := m.buildSecretCallback(profile.ID, "password", getSecret)
-	getPassphrase := m.buildSecretCallback(profile.ID, "passphrase", getSecret)
+	// Build credential callbacks that respect the profile's secret mode.
+	sshConf := profile.SSH
+	getPassword := m.buildSecretCallback(profile.ID, "password", sshConf.SecretMode, getSecret)
+	getPassphrase := m.buildSecretCallback(profile.ID, "passphrase", sshConf.KeySecretMode, getSecret)
 
 	if err := client.Connect(getPassword, getPassphrase); err != nil {
 		return err
@@ -561,35 +562,75 @@ func (m *Manager) connectRAW(sess *Session) error {
 // Internal: helpers
 // ---------------------------------------------------------------------------
 
-// buildSecretCallback returns a func() (string, error) that first checks the
-// OS keychain, then the encrypted vault, then prompts the user via getSecret.
-func (m *Manager) buildSecretCallback(profileID string, secretType string, getSecret func(prompt string) (string, error)) func() (string, error) {
+// buildSecretCallback returns a func() (string, error) that resolves a
+// credential according to the profile's SecretMode:
+//   - "saved": check keychain/vault first, prompt if missing, then persist
+//   - "session-only": check an in-memory session cache, prompt once per session
+//   - "ask-every-time" (or any other value): always prompt the user
+func (m *Manager) buildSecretCallback(profileID string, secretType string, mode models.SecretMode, getSecret func(prompt string) (string, error)) func() (string, error) {
+	secretKey := fmt.Sprintf("profile:%s:%s", profileID, secretType)
+
+	// Session-local cache for "session-only" mode. The closure captures this
+	// variable so it survives across multiple calls within the same connection.
+	var sessionCached string
+	var sessionCachedSet bool
+
 	return func() (string, error) {
-		secretKey := fmt.Sprintf("profile:%s:%s", profileID, secretType)
+		// ── "saved" mode: try persistent stores first ────────────────────
+		if mode == models.SecretModeSaved {
+			// Try the OS keychain first.
+			if m.keychainStore != nil {
+				if val, err := m.keychainStore.GetSecret(secretKey); err == nil && val != "" {
+					m.auditLog.LogSecretAccess(profileID, secretType)
+					return val, nil
+				}
+			}
 
-		// Try the OS keychain first.
-		if m.keychainStore != nil {
-			if val, err := m.keychainStore.GetSecret(secretKey); err == nil && val != "" {
-				m.auditLog.LogSecretAccess(profileID, secretType)
-				return val, nil
+			// Try the encrypted file store.
+			if m.secretStore != nil && m.secretStore.IsUnlocked() {
+				if val, err := m.secretStore.GetSecret(secretKey); err == nil && val != "" {
+					m.auditLog.LogSecretAccess(profileID, secretType)
+					return val, nil
+				}
 			}
 		}
 
-		// Try the encrypted file store.
-		if m.secretStore != nil && m.secretStore.IsUnlocked() {
-			if val, err := m.secretStore.GetSecret(secretKey); err == nil && val != "" {
-				m.auditLog.LogSecretAccess(profileID, secretType)
-				return val, nil
-			}
+		// ── "session-only" mode: return cached value if we already asked ─
+		if mode == models.SecretModeSessionOnly && sessionCachedSet {
+			return sessionCached, nil
 		}
 
-		// Prompt the user via the callback.
+		// ── Prompt the user ──────────────────────────────────────────────
 		if getSecret == nil {
 			return "", fmt.Errorf("no %s available and no prompt callback provided", secretType)
 		}
 
 		prompt := fmt.Sprintf("Enter %s:", secretType)
-		return getSecret(prompt)
+		val, err := getSecret(prompt)
+		if err != nil {
+			return "", err
+		}
+
+		// ── Persist according to mode ────────────────────────────────────
+		switch mode {
+		case models.SecretModeSaved:
+			// Prefer OS keychain, fall back to encrypted vault.
+			stored := false
+			if m.keychainStore != nil {
+				if sErr := m.keychainStore.SetSecret(secretKey, val); sErr == nil {
+					stored = true
+				}
+			}
+			if !stored && m.secretStore != nil && m.secretStore.IsUnlocked() {
+				_ = m.secretStore.SetSecret(secretKey, val)
+			}
+
+		case models.SecretModeSessionOnly:
+			sessionCached = val
+			sessionCachedSet = true
+		}
+
+		return val, nil
 	}
 }
 

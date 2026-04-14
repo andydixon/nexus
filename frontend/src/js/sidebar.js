@@ -117,6 +117,9 @@ class Sidebar {
             <span>${escapeHtml(title)}</span>
             <span class="section-count">${profiles.length}</span>
         `;
+        // Prevent mousedown from starting a text selection gesture in WKWebView,
+        // which would swallow the first click and require a double-click.
+        header.addEventListener('mousedown', (e) => e.preventDefault());
         header.addEventListener('click', () => this.toggleSection(key));
         section.appendChild(header);
 
@@ -305,7 +308,9 @@ class Sidebar {
      * @private
      */
     async _deleteProfile(profile) {
-        const ok = confirm(`Delete "${profile.displayName || profile.host}"?\nThis cannot be undone.`);
+        // Use a custom confirmation modal — window.confirm() is silently
+        // blocked in WKWebView and always returns false.
+        const ok = await this._confirmDelete(profile);
         if (!ok) return;
 
         try {
@@ -316,6 +321,52 @@ class Sidebar {
         } catch (err) {
             this.app.notifications.error('Failed to delete profile: ' + err);
         }
+    }
+
+    /**
+     * Shows a confirmation modal for profile deletion.
+     * @param {Object} profile
+     * @returns {Promise<boolean>}
+     * @private
+     */
+    _confirmDelete(profile) {
+        return new Promise((resolve) => {
+            const backdrop = createElement('div', 'modal-backdrop');
+            const modal = createElement('div', 'modal modal-sm');
+            const label = escapeHtml(profile.displayName || profile.host || 'Untitled');
+            modal.innerHTML = `
+                <div class="modal-header">
+                    <h3 class="modal-title">Delete Profile</h3>
+                    <button class="btn btn-icon btn-xs modal-close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p style="font-size:var(--text-sm);color:var(--text-secondary)">
+                        Delete <strong>${label}</strong>? This cannot be undone.
+                    </p>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-sm confirm-cancel">Cancel</button>
+                    <button class="btn btn-sm btn-danger confirm-ok">Delete</button>
+                </div>
+            `;
+            backdrop.appendChild(modal);
+            document.body.appendChild(backdrop);
+            requestAnimationFrame(() => {
+                backdrop.classList.add('is-visible');
+                modal.classList.add('is-visible');
+            });
+
+            const close = (val) => {
+                backdrop.classList.remove('is-visible');
+                modal.classList.remove('is-visible');
+                setTimeout(() => backdrop.remove(), 200);
+                resolve(val);
+            };
+            modal.querySelector('.modal-close').addEventListener('click', () => close(false));
+            modal.querySelector('.confirm-cancel').addEventListener('click', () => close(false));
+            modal.querySelector('.confirm-ok').addEventListener('click', () => close(true));
+            backdrop.addEventListener('click', (e) => { if (e.target === backdrop) close(false); });
+        });
     }
 
     // ── Filtering ────────────────────────────────────────────────────

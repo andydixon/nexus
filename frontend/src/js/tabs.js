@@ -172,10 +172,14 @@ class TabManager {
             `;
             backdrop.appendChild(modal);
             document.body.appendChild(backdrop);
-            requestAnimationFrame(() => backdrop.classList.add('is-visible'));
+            requestAnimationFrame(() => {
+                backdrop.classList.add('is-visible');
+                modal.classList.add('is-visible');
+            });
 
             const close = (val) => {
                 backdrop.classList.remove('is-visible');
+                modal.classList.remove('is-visible');
                 setTimeout(() => backdrop.remove(), 200);
                 resolve(val);
             };

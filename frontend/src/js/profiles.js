@@ -16,8 +16,8 @@ const DEFAULTS = {
         protocol: 'ssh',
         ssh: {
             authMethods: ['publickey', 'password', 'keyboard-interactive'],
-            secretMode: 'ask-every-time',
-            keySecretMode: 'ask-every-time',
+            secretMode: 'saved',
+            keySecretMode: 'saved',
             hostKeyPolicy: 'ask',
             terminalType: 'xterm-256color',
             keepaliveInterval: 30,
@@ -459,6 +459,9 @@ class ProfileEditor {
             }
         }
 
+        // Prevent mousedown from starting a text selection gesture in WKWebView,
+        // which would swallow the first click and require a double-click.
+        header.addEventListener('mousedown', (e) => e.preventDefault());
         header.addEventListener('click', () => {
             collapsed = !collapsed;
             content.style.display = collapsed ? 'none' : 'block';

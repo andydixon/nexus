@@ -72,8 +72,8 @@ func NewProfile(protocol Protocol) Profile {
 		p.Port = DefaultSSHPort
 		p.SSH = &SSHConfig{
 			AuthMethods:       []string{"publickey", "password", "keyboard-interactive"},
-			SecretMode:        SecretModeAskEveryTime,
-			KeySecretMode:     SecretModeAskEveryTime,
+			SecretMode:        SecretModeSaved,
+			KeySecretMode:     SecretModeSaved,
 			HostKeyPolicy:     HostKeyAsk,
 			TerminalType:      DefaultTerminalType,
 			KeepaliveInterval: DefaultKeepaliveInterval,
