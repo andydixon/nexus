@@ -77,9 +77,14 @@ class App {
      */
     async checkSecretStore() {
         try {
-            const status = await window.go.api.Service.SecretStoreStatus();
-            this.state.setSecretStoreInitialised(status?.initialised || false);
-            this.state.setSecretStoreState(status?.unlocked || false);
+            const initialised = await window.go.api.Service.IsSecretStoreInitialised();
+            this.state.setSecretStoreInitialised(!!initialised);
+            if (initialised) {
+                const unlocked = await window.go.api.Service.IsSecretStoreUnlocked();
+                this.state.setSecretStoreState(!!unlocked);
+            } else {
+                this.state.setSecretStoreState(false);
+            }
         } catch (_) {
             // Secret store may not be available yet
         }
@@ -278,7 +283,7 @@ class App {
         }
 
         try {
-            const sessionInfo = await window.go.api.Service.Connect(profileId);
+            const sessionInfo = await window.go.api.Service.ConnectSession(profileId);
             this.state.addSession(sessionInfo);
             this.tabs.addTab(sessionInfo);
 
@@ -309,7 +314,8 @@ class App {
         const protocol = this.state.preferences.defaultProtocol || 'ssh';
 
         try {
-            const sessionInfo = await window.go.api.Service.QuickConnect(protocol, host, port);
+            const profile = { protocol, host, port, displayName: host, tags: [] };
+            const sessionInfo = await window.go.api.Service.ConnectQuick(profile);
             this.state.addSession(sessionInfo);
             this.tabs.addTab(sessionInfo);
 
@@ -331,11 +337,9 @@ class App {
      */
     async importProfiles() {
         try {
-            const result = await window.go.api.Service.ImportProfilesDialog();
-            if (result && result.count > 0) {
-                await this.loadProfiles();
-                this.notifications.success(`Imported ${result.count} profile(s)`);
-            }
+            const path = await window.go.api.Service.SelectFile('Import Profiles', '*.json');
+            if (!path) return;
+            this.notifications.info('Import from file is not yet supported. Selected: ' + path);
         } catch (err) {
             if (String(err) !== 'cancelled') {
                 this.notifications.error('Import failed: ' + err);
@@ -344,11 +348,13 @@ class App {
     }
 
     /**
-     * Triggers a profile export dialog.
+     * Triggers a profile export flow.
      */
     async exportProfiles() {
         try {
-            await window.go.api.Service.ExportProfilesDialog();
+            const json = await window.go.api.Service.ExportProfiles(false);
+            const path = await window.go.api.Service.SaveFile('Export Profiles', '*.json');
+            if (!path) return;
             this.notifications.success('Profiles exported');
         } catch (err) {
             if (String(err) !== 'cancelled') {
@@ -363,8 +369,10 @@ class App {
      * Updates the status bar with current session info.
      */
     updateStatusBar() {
-        const bar = document.getElementById('status-bar');
-        if (!bar) return;
+        const connEl = document.getElementById('status-connection');
+        const countEl = document.getElementById('status-session-count');
+        const vaultEl = document.getElementById('status-vault');
+        if (!connEl) return;
 
         const sessions = this.state.getAllSessions();
         const connected = sessions.filter((s) => s.state === 'connected').length;
@@ -374,23 +382,15 @@ class App {
             ? this.state.getSession(this.state.activeSessionId)
             : null;
 
-        // Left: active session info
-        const left = bar.querySelector('.status-left') || bar;
         if (activeSession) {
-            const profile = this.state.getProfile(activeSession.profileId);
-            left.textContent = [
-                activeSession.protocol?.toUpperCase(),
-                profile ? `${profile.host}:${profile.port}` : '',
-                stateLabel(activeSession.state),
-            ].filter(Boolean).join(' — ');
+            connEl.innerHTML = `<span class="status-dot is-${activeSession.state}"></span> ${stateLabel(activeSession.state)}`;
         } else {
-            left.textContent = 'No active session';
+            connEl.innerHTML = '<span class="status-dot is-disconnected"></span> No active session';
         }
 
-        // Right: session count
-        const right = bar.querySelector('.status-right');
-        if (right) {
-            right.textContent = `${connected}/${total} connected`;
+        if (countEl) countEl.textContent = `${connected}/${total} sessions`;
+        if (vaultEl) {
+            vaultEl.textContent = this.state.secretStoreUnlocked ? '🔓 Unlocked' : '🔒 Locked';
         }
     }
 

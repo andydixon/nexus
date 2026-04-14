@@ -198,7 +198,7 @@ export class RawViewer {
                 return `[${ts}] [${dir}] ${e.data}`;
             });
             const content = lines.join('\n');
-            await window.go.api.Service.SaveCapture(sessionId, content);
+            await window.go.api.Service.SaveSessionCapture(sessionId, content);
             this.app.notifications.success('Capture saved');
         } catch (err) {
             this.app.notifications.error('Save failed: ' + err);

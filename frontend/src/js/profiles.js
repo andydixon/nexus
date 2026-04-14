@@ -834,17 +834,7 @@ export class ProfileEditor {
             return;
         }
 
-        this.app.notifications.info('Testing connection…');
-        try {
-            const result = await window.go.api.Service.TestConnection(this._profile);
-            if (result && result.success) {
-                this.app.notifications.success('Connection successful!');
-            } else {
-                this.app.notifications.error('Connection failed: ' + (result?.error || 'Unknown error'));
-            }
-        } catch (err) {
-            this.app.notifications.error('Test failed: ' + err);
-        }
+        this.app.notifications.info('Test connection is not yet available.');
     }
 
     // ── Utilities ────────────────────────────────────────────────────

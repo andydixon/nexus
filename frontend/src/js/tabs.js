@@ -128,7 +128,7 @@ export class TabManager {
         }
 
         try {
-            await window.go.api.Service.CloseSession(sessionId);
+            await window.go.api.Service.DisconnectSession(sessionId);
         } catch (_) {
             // Session may already be closed — carry on
         }
