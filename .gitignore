@@ -5,8 +5,6 @@ dist/
 # Dependencies
 vendor/
 frontend/node_modules/
-frontend/src/js/lib/
-frontend/src/css/lib/
 
 # IDE
 .idea/
