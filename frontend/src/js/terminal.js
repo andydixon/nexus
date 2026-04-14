@@ -172,8 +172,15 @@ class TerminalManager {
      */
     fitActive() {
         const id = this.app.state.activeSessionId;
-        if (!id) return;
-        const entry = this.terminals.get(id);
+        if (id) this.fitSession(id);
+    }
+
+    /**
+     * Re-fits a specific session's terminal to its container.
+     * @param {string} sessionId
+     */
+    fitSession(sessionId) {
+        const entry = this.terminals.get(sessionId);
         if (entry) {
             requestAnimationFrame(() => {
                 try { entry.fitAddon.fit(); } catch (_) { /* noop */ }
@@ -266,21 +273,21 @@ class TerminalManager {
      */
     _buildTheme() {
         return {
-            background: '#1a1a2e',
-            foreground: '#e8e8f0',
+            background: '#1c1c1c',
+            foreground: '#e4e4e4',
             cursor: '#4ecdc4',
-            cursorAccent: '#1a1a2e',
+            cursorAccent: '#1c1c1c',
             selectionBackground: 'rgba(78, 205, 196, 0.3)',
             selectionForeground: '#ffffff',
-            black: '#1a1a2e',
+            black: '#1c1c1c',
             red: '#ef5350',
             green: '#66bb6a',
             yellow: '#ffa726',
             blue: '#42a5f5',
             magenta: '#ab47bc',
             cyan: '#4ecdc4',
-            white: '#e8e8f0',
-            brightBlack: '#464670',
+            white: '#e4e4e4',
+            brightBlack: '#555555',
             brightRed: '#ff7043',
             brightGreen: '#81c784',
             brightYellow: '#ffcc02',

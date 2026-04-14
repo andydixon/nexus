@@ -8,38 +8,38 @@
     /* -----------------------------------------------------------------------
        Colour palette — dark charcoal theme
        ----------------------------------------------------------------------- */
-    --bg-base:      #1a1a2e;   /* deepest background                        */
-    --bg-surface:   #1f1f35;   /* primary surface (sidebar, bars)            */
-    --bg-elevated:  #252540;   /* elevated panels, cards                     */
-    --bg-overlay:   #2a2a4a;   /* overlays, dropdowns                       */
-    --bg-hover:     #30304f;   /* hover state backgrounds                   */
-    --bg-active:    #353560;   /* active / pressed state                    */
-    --bg-input:     #1c1c32;   /* input field backgrounds                   */
+    --bg-base:      #1c1c1c;   /* deepest background                        */
+    --bg-surface:   #232323;   /* primary surface (sidebar, bars)            */
+    --bg-elevated:  #2a2a2a;   /* elevated panels, cards                     */
+    --bg-overlay:   #303030;   /* overlays, dropdowns                       */
+    --bg-hover:     #363636;   /* hover state backgrounds                   */
+    --bg-active:    #3c3c3c;   /* active / pressed state                    */
+    --bg-input:     #1e1e1e;   /* input field backgrounds                   */
 
     /* -----------------------------------------------------------------------
        Border colours
        ----------------------------------------------------------------------- */
-    --border-subtle:  rgba(255, 255, 255, 0.06);
-    --border-default: rgba(255, 255, 255, 0.10);
-    --border-strong:  rgba(255, 255, 255, 0.16);
+    --border-subtle:  rgba(255, 255, 255, 0.07);
+    --border-default: rgba(255, 255, 255, 0.12);
+    --border-strong:  rgba(255, 255, 255, 0.18);
     --border-focus:   var(--accent);
 
     /* -----------------------------------------------------------------------
        Text colours
        ----------------------------------------------------------------------- */
-    --text-primary:   #e8e8f0;
-    --text-secondary: #a0a0b8;
-    --text-tertiary:  #6e6e88;
-    --text-disabled:  #4a4a60;
-    --text-inverse:   #1a1a2e;
+    --text-primary:   #e4e4e4;
+    --text-secondary: #a0a0a0;
+    --text-tertiary:  #707070;
+    --text-disabled:  #4a4a4a;
+    --text-inverse:   #1c1c1c;
 
     /* -----------------------------------------------------------------------
        Accent colours — teal / cyan
        ----------------------------------------------------------------------- */
     --accent:        #4ecdc4;
     --accent-hover:  #45b7af;
-    --accent-muted:  rgba(78, 205, 196, 0.15);
-    --accent-strong: rgba(78, 205, 196, 0.25);
+    --accent-muted:  rgba(78, 205, 196, 0.12);
+    --accent-strong: rgba(78, 205, 196, 0.22);
 
     /* -----------------------------------------------------------------------
        Status colours

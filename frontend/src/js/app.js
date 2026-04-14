@@ -134,9 +134,13 @@ class App {
         window.runtime.EventsOn('session:state', (payload) => {
             this.tabs.updateSessionState(payload.sessionID, payload.state, payload.error);
             this.updateStatusBar();
-            // Re-fit the terminal once connected so it picks up the final container size
+            // Re-fit the terminal once connected so it picks up the final container size.
+            // Use multiple delays because the panel layout may still be settling.
             if (payload.state === 'connected') {
-                setTimeout(() => this.terminals.fitActive(), 50);
+                const fit = () => this.terminals.fitSession(payload.sessionID);
+                setTimeout(fit, 30);
+                setTimeout(fit, 150);
+                setTimeout(fit, 500);
             }
         });
 
