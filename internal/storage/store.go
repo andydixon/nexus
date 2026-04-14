@@ -323,6 +323,78 @@ func (s *Store) SetFavourite(id string, favourite bool) error {
 	return nil
 }
 
+// UpdateLastConnected sets the last_connected timestamp for the given profile
+// to the current time.
+func (s *Store) UpdateLastConnected(id string) error {
+	now := time.Now().Format(time.RFC3339)
+	res, err := s.db.Exec("UPDATE profiles SET last_connected = ?, updated_at = ? WHERE id = ?",
+		now, now, id)
+	if err != nil {
+		return fmt.Errorf("storage: failed to update last_connected: %w", err)
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return fmt.Errorf("storage: profile %q not found", id)
+	}
+	return nil
+}
+
+// ExportProfiles serialises all profiles as JSON. If includeSecrets is false
+// the export omits credential-related fields (currently a placeholder — all
+// secrets live in the SecretStore, not in profiles).
+func (s *Store) ExportProfiles(includeSecrets bool) ([]byte, error) {
+	profiles, err := s.ListProfiles()
+	if err != nil {
+		return nil, fmt.Errorf("storage: export failed: %w", err)
+	}
+	return json.MarshalIndent(profiles, "", "  ")
+}
+
+// ImportProfiles deserialises profiles from JSON and inserts them according to
+// the given strategy: "skip" ignores duplicates, "overwrite" replaces them,
+// and "duplicate" creates new entries with fresh IDs. Returns the number of
+// profiles imported.
+func (s *Store) ImportProfiles(data []byte, strategy string) (int, error) {
+	var profiles []*models.Profile
+	if err := json.Unmarshal(data, &profiles); err != nil {
+		return 0, fmt.Errorf("storage: invalid import data: %w", err)
+	}
+
+	imported := 0
+	for _, p := range profiles {
+		existing, _ := s.GetProfile(p.ID)
+
+		switch strategy {
+		case "skip":
+			if existing != nil {
+				continue
+			}
+		case "overwrite":
+			if existing != nil {
+				if err := s.UpdateProfile(p); err != nil {
+					return imported, err
+				}
+				imported++
+				continue
+			}
+		case "duplicate":
+			if existing != nil {
+				p.ID = uuid.New().String()
+				p.CreatedAt = time.Now()
+				p.UpdatedAt = time.Now()
+			}
+		default:
+			return 0, fmt.Errorf("storage: unknown import strategy %q", strategy)
+		}
+
+		if err := s.CreateProfile(p); err != nil {
+			return imported, err
+		}
+		imported++
+	}
+	return imported, nil
+}
+
 // ---------------------------------------------------------------------------
 // Known hosts
 // ---------------------------------------------------------------------------
@@ -448,71 +520,37 @@ func (s *Store) ListAuditEntries(limit int) ([]*models.AuditEntry, error) {
 // Preferences (key-value)
 // ---------------------------------------------------------------------------
 
-// GetPreferences reads all preference keys and deserialises them into an
-// AppPreferences struct.
+// GetPreferences reads the stored preferences JSON blob and deserialises it
+// into an AppPreferences struct. Returns nil if no preferences have been saved.
 func (s *Store) GetPreferences() (*models.AppPreferences, error) {
-	rows, err := s.db.Query("SELECT key, value FROM preferences")
+	var value string
+	err := s.db.QueryRow("SELECT value FROM preferences WHERE key = ?", "_all").Scan(&value)
 	if err != nil {
-		return nil, fmt.Errorf("storage: failed to read preferences: %w", err)
-	}
-	defer rows.Close()
-
-	kv := make(map[string]string)
-	for rows.Next() {
-		var k, v string
-		if err := rows.Scan(&k, &v); err != nil {
-			return nil, fmt.Errorf("storage: failed to scan preference: %w", err)
-		}
-		kv[k] = v
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-
-	// If no preferences stored yet, return nil to signal defaults should be used.
-	if len(kv) == 0 {
+		// No preferences saved yet — return nil to signal defaults should be used.
 		return nil, nil
 	}
 
-	data, err := json.Marshal(kv)
-	if err != nil {
-		return nil, fmt.Errorf("storage: failed to marshal preference map: %w", err)
-	}
-
 	prefs := &models.AppPreferences{}
-	if err := json.Unmarshal(data, prefs); err != nil {
+	if err := json.Unmarshal([]byte(value), prefs); err != nil {
 		return nil, fmt.Errorf("storage: failed to unmarshal preferences: %w", err)
 	}
 	return prefs, nil
 }
 
-// SavePreferences serialises the AppPreferences into key-value pairs and
-// persists them to the preferences table.
+// SavePreferences serialises the AppPreferences as a JSON blob and persists
+// it to the preferences table under a single key.
 func (s *Store) SavePreferences(prefs *models.AppPreferences) error {
 	data, err := json.Marshal(prefs)
 	if err != nil {
 		return fmt.Errorf("storage: failed to marshal preferences: %w", err)
 	}
 
-	var kv map[string]interface{}
-	if err := json.Unmarshal(data, &kv); err != nil {
-		return fmt.Errorf("storage: failed to unmarshal preferences map: %w", err)
-	}
-
-	tx, err := s.db.Begin()
+	_, err = s.db.Exec(`INSERT INTO preferences (key, value) VALUES (?, ?)
+		ON CONFLICT(key) DO UPDATE SET value = excluded.value`, "_all", string(data))
 	if err != nil {
-		return fmt.Errorf("storage: failed to begin transaction: %w", err)
+		return fmt.Errorf("storage: failed to save preferences: %w", err)
 	}
-
-	for k, v := range kv {
-		valStr := fmt.Sprintf("%v", v)
-		if _, err := tx.Exec(`INSERT INTO preferences (key, value) VALUES (?, ?)
-			ON CONFLICT(key) DO UPDATE SET value = excluded.value`, k, valStr); err != nil {
-			tx.Rollback()
-			return fmt.Errorf("storage: failed to save preference %q: %w", k, err)
-		}
-	}
-	return tx.Commit()
+	return nil
 }
 
 // ---------------------------------------------------------------------------
