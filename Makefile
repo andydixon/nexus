@@ -1,5 +1,8 @@
 .PHONY: all build dev clean test test-cover lint install deps frontend-deps run package help
 
+# Resolve the Wails binary. Prefer wails on PATH; fall back to GOPATH/bin.
+WAILS := $(or $(shell which wails 2>/dev/null),$(shell go env GOPATH)/bin/wails)
+
 # Default target
 all: build
 
@@ -13,11 +16,11 @@ frontend-deps:
 
 # Development mode with hot reload
 dev: deps
-	wails dev
+	$(WAILS) dev
 
 # Production build
 build: deps
-	wails build
+	$(WAILS) build
 
 # Run tests
 test:
