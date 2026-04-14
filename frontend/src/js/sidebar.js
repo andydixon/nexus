@@ -113,16 +113,16 @@ class Sidebar {
         // Section header
         const header = createElement('div', 'sidebar-section-header');
         header.innerHTML = `
-            <span class="sidebar-section-chevron ${isCollapsed ? 'collapsed' : ''}">${isCollapsed ? '▸' : '▾'}</span>
-            <span class="sidebar-section-title">${escapeHtml(title)}</span>
-            <span class="sidebar-section-count">${profiles.length}</span>
+            <span class="section-chevron ${isCollapsed ? 'collapsed' : ''}">${isCollapsed ? '▸' : '▾'}</span>
+            <span>${escapeHtml(title)}</span>
+            <span class="section-count">${profiles.length}</span>
         `;
         header.addEventListener('click', () => this.toggleSection(key));
         section.appendChild(header);
 
         // Items
         if (!isCollapsed) {
-            const list = createElement('div', 'sidebar-section-list');
+            const list = createElement('div', 'sidebar-list');
             for (const profile of profiles) {
                 list.appendChild(this.renderProfileItem(profile));
             }

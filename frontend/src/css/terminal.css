@@ -69,7 +69,9 @@
 /* xterm.js overrides for consistent look */
 .terminal-container .xterm,
 .session-panel .xterm {
+    flex: 1;
     height: 100%;
+    min-height: 0;
     padding: var(--space-1);
 }
 

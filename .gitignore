@@ -1,36 +1,60 @@
-# Build output
-build/
+# ==========================================================================
+# Nexus Terminal — .gitignore
+# ==========================================================================
+
+# ── Build output ──────────────────────────────────────────────────────────
+build/bin/
+build/darwin/
+build/windows/
+build/linux/
 dist/
 
-# Dependencies
+# ── Go ────────────────────────────────────────────────────────────────────
 vendor/
-frontend/node_modules/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+__debug_bin*
+coverage.out
+coverage.html
 
-# IDE
+# ── Frontend ──────────────────────────────────────────────────────────────
+frontend/node_modules/
+frontend/src/js/lib/
+
+# ── Wails auto-generated bindings (recreated on every build) ──────────────
+frontend/wailsjs/
+
+# ── IDE / editor ──────────────────────────────────────────────────────────
 .idea/
 .vscode/
 *.swp
 *.swo
 *~
+*.sublime-project
+*.sublime-workspace
+.project
+.classpath
+.settings/
 
-# OS
+# ── OS metadata ───────────────────────────────────────────────────────────
 .DS_Store
+.DS_Store?
+._*
 Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
 
-# Test
-coverage.out
-coverage.html
-
-# Binaries
-*.exe
-*.dll
-*.so
-*.dylib
-
-# Debug
-__debug_bin*
-
-# Application data (never commit)
+# ── Application data (never commit user data or secrets) ──────────────────
 *.db
 *.sqlite
+*.sqlite3
 vault.json
+*.pem
+*.key
+!build/appicon.png
