@@ -65,6 +65,9 @@
     font-size: var(--text-sm);
     font-weight: var(--weight-semibold);
     color: var(--text-primary);
+    cursor: pointer;
+    user-select: none;
+    -webkit-user-select: none;
     background: var(--bg-elevated);
     border: none;
     cursor: pointer;
