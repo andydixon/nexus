@@ -8,7 +8,7 @@ const { createElement, escapeHtml, protocolColour, stateLabel, dismissContextMen
 
 class TabManager {
     /**
-     * @param {import('./app.js').App} app
+     * @param {App} app
      */
     constructor(app) {
         this.app = app;

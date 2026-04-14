@@ -11,7 +11,7 @@ const RECENT_LIMIT = 5;
 
 class Sidebar {
     /**
-     * @param {import('./app.js').App} app
+     * @param {App} app
      */
     constructor(app) {
         this.app = app;

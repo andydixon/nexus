@@ -8,7 +8,7 @@ const { createElement, escapeHtml } = window.NexusTerminal;
 
 class SecretPrompt {
     constructor(app) {
-        /** @type {import('./app.js').App} */
+        /** @type {App} */
         this.app = app;
 
         /** @type {HTMLElement|null} Currently open overlay. */

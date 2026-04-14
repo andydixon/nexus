@@ -14,7 +14,7 @@ const MAX_BUFFER_ENTRIES = 5000;
 
 class RawViewer {
     /**
-     * @param {import('./app.js').App} app
+     * @param {App} app
      */
     constructor(app) {
         this.app = app;
