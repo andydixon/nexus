@@ -1,0 +1,19 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "nexus-terminal",
+  "outputfilename": "NexusTerminal",
+  "frontend:install": "npm install",
+  "frontend:build": "npm run build",
+  "frontend:dev:watcher": "npm run dev",
+  "frontend:dev:serverUrl": "auto",
+  "author": {
+    "name": "Nexus Terminal Contributors"
+  },
+  "info": {
+    "companyName": "Nexus Terminal",
+    "productName": "Nexus Terminal",
+    "productVersion": "0.1.0",
+    "copyright": "Copyright © 2024 Nexus Terminal Contributors",
+    "comments": "A premium desktop SSH, Telnet, and RAW TCP client"
+  }
+}
