@@ -8,7 +8,7 @@
  * @param {string} selector - CSS selector.
  * @returns {Element|null}
  */
-export function $(selector) {
+function $(selector) {
     return document.querySelector(selector);
 }
 
@@ -17,7 +17,7 @@ export function $(selector) {
  * @param {string} selector - CSS selector.
  * @returns {NodeListOf<Element>}
  */
-export function $$(selector) {
+function $$(selector) {
     return document.querySelectorAll(selector);
 }
 
@@ -28,7 +28,7 @@ export function $$(selector) {
  * @param {Object} [attrs] - Attribute key/value pairs.
  * @returns {HTMLElement}
  */
-export function createElement(tag, className, attrs = {}) {
+function createElement(tag, className, attrs = {}) {
     const el = document.createElement(tag);
     if (className) {
         el.className = className;
@@ -56,7 +56,7 @@ export function createElement(tag, className, attrs = {}) {
  * @param {string} str - Raw string.
  * @returns {string} Escaped string safe for innerHTML.
  */
-export function escapeHtml(str) {
+function escapeHtml(str) {
     if (!str) return '';
     const map = {
         '&': '&amp;',
@@ -73,7 +73,7 @@ export function escapeHtml(str) {
  * @param {Date|string} date
  * @returns {string} e.g. "14:32:07" or "2 Jan 14:32".
  */
-export function formatTimestamp(date) {
+function formatTimestamp(date) {
     if (!date) return '';
     const d = date instanceof Date ? date : new Date(date);
     if (isNaN(d.getTime())) return '';
@@ -98,7 +98,7 @@ export function formatTimestamp(date) {
  * @param {number} ms - Delay in milliseconds.
  * @returns {Function}
  */
-export function debounce(fn, ms) {
+function debounce(fn, ms) {
     let timer = null;
     return function (...args) {
         clearTimeout(timer);
@@ -113,7 +113,7 @@ export function debounce(fn, ms) {
  * @param {string} query
  * @returns {{ match: boolean, score: number }}
  */
-export function fuzzyMatch(text, query) {
+function fuzzyMatch(text, query) {
     if (!query) return { match: true, score: 1 };
     const lowerText = text.toLowerCase();
     const lowerQuery = query.toLowerCase();
@@ -146,7 +146,7 @@ export function fuzzyMatch(text, query) {
  * @param {string} str
  * @returns {string}
  */
-export function base64Encode(str) {
+function base64Encode(str) {
     return btoa(str);
 }
 
@@ -155,7 +155,7 @@ export function base64Encode(str) {
  * @param {string} str
  * @returns {string}
  */
-export function base64Decode(str) {
+function base64Decode(str) {
     return atob(str);
 }
 
@@ -163,7 +163,7 @@ export function base64Decode(str) {
  * Generates a new UUID v4 using the browser crypto API.
  * @returns {string}
  */
-export function generateId() {
+function generateId() {
     return crypto.randomUUID();
 }
 
@@ -172,7 +172,7 @@ export function generateId() {
  * @param {number} bytes
  * @returns {string} e.g. "1.23 KB"
  */
-export function formatBytes(bytes) {
+function formatBytes(bytes) {
     if (bytes === 0) return '0 B';
     const units = ['B', 'KB', 'MB', 'GB', 'TB'];
     const k = 1024;
@@ -187,7 +187,7 @@ export function formatBytes(bytes) {
  * @param {number} len
  * @returns {string}
  */
-export function truncate(str, len) {
+function truncate(str, len) {
     if (!str || str.length <= len) return str || '';
     return str.slice(0, len) + '…';
 }
@@ -195,7 +195,7 @@ export function truncate(str, len) {
 /**
  * Removes any open context menus from the DOM.
  */
-export function dismissContextMenus() {
+function dismissContextMenus() {
     document.querySelectorAll('.context-menu').forEach((m) => m.remove());
 }
 
@@ -204,7 +204,7 @@ export function dismissContextMenus() {
  * @param {string} protocol - 'ssh', 'telnet', or 'raw'.
  * @returns {string}
  */
-export function protocolColour(protocol) {
+function protocolColour(protocol) {
     switch (protocol) {
         case 'ssh': return 'protocol-ssh';
         case 'telnet': return 'protocol-telnet';
@@ -218,7 +218,7 @@ export function protocolColour(protocol) {
  * @param {string} state
  * @returns {string}
  */
-export function stateLabel(state) {
+function stateLabel(state) {
     switch (state) {
         case 'connecting': return 'Connecting';
         case 'connected': return 'Connected';
@@ -227,3 +227,6 @@ export function stateLabel(state) {
         default: return state || 'Unknown';
     }
 }
+
+window.NexusTerminal = window.NexusTerminal || {};
+Object.assign(window.NexusTerminal, { $, $$, createElement, escapeHtml, formatTimestamp, debounce, fuzzyMatch, base64Encode, base64Decode, generateId, formatBytes, truncate, dismissContextMenus, protocolColour, stateLabel });

@@ -4,12 +4,12 @@
  * and context menus.
  */
 
-import { createElement, escapeHtml, fuzzyMatch, protocolColour, dismissContextMenus, truncate } from './utils.js';
+const { createElement, escapeHtml, fuzzyMatch, protocolColour, dismissContextMenus, truncate } = window.NexusTerminal;
 
 /** Maximum number of profiles shown in the "Recent" section. */
 const RECENT_LIMIT = 5;
 
-export class Sidebar {
+class Sidebar {
     /**
      * @param {import('./app.js').App} app
      */
@@ -333,3 +333,6 @@ export class Sidebar {
             .map((r) => r.profile);
     }
 }
+
+window.NexusTerminal = window.NexusTerminal || {};
+window.NexusTerminal.Sidebar = Sidebar;

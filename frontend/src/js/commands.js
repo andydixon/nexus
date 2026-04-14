@@ -4,9 +4,9 @@
  * profile connections, and utility actions.
  */
 
-import { createElement, escapeHtml, fuzzyMatch, $ } from './utils.js';
+const { createElement, escapeHtml, fuzzyMatch, $ } = window.NexusTerminal;
 
-export class CommandPalette {
+class CommandPalette {
     /**
      * @param {import('./app.js').App} app
      */
@@ -379,3 +379,6 @@ export class CommandPalette {
         }
     }
 }
+
+window.NexusTerminal = window.NexusTerminal || {};
+window.NexusTerminal.CommandPalette = CommandPalette;

@@ -6,7 +6,7 @@
 
 /* global Terminal, FitAddon, SearchAddon, WebLinksAddon */
 
-export class TerminalManager {
+class TerminalManager {
     /**
      * @param {import('./app.js').App} app
      */
@@ -284,3 +284,6 @@ export class TerminalManager {
         };
     }
 }
+
+window.NexusTerminal = window.NexusTerminal || {};
+window.NexusTerminal.TerminalManager = TerminalManager;

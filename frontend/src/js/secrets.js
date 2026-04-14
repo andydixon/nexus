@@ -4,9 +4,9 @@
  * and SSH host-key verification confirmations.
  */
 
-import { createElement, escapeHtml } from './utils.js';
+const { createElement, escapeHtml } = window.NexusTerminal;
 
-export class SecretPrompt {
+class SecretPrompt {
     constructor(app) {
         /** @type {import('./app.js').App} */
         this.app = app;
@@ -298,3 +298,6 @@ export class SecretPrompt {
         }
     }
 }
+
+window.NexusTerminal = window.NexusTerminal || {};
+window.NexusTerminal.SecretPrompt = SecretPrompt;

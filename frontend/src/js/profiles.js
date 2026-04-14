@@ -4,7 +4,7 @@
  * Dynamically switches form sections based on the selected protocol.
  */
 
-import { createElement, escapeHtml, generateId, $ } from './utils.js';
+const { createElement, escapeHtml, generateId, $ } = window.NexusTerminal;
 
 /**
  * Default values mirroring the Go backend defaults.
@@ -53,7 +53,7 @@ const DEFAULTS = {
     },
 };
 
-export class ProfileEditor {
+class ProfileEditor {
     /**
      * @param {import('./app.js').App} app
      */
@@ -886,3 +886,6 @@ export class ProfileEditor {
         return Object.entries(envVars).map(([k, v]) => `${k}=${v}`).join('\n');
     }
 }
+
+window.NexusTerminal = window.NexusTerminal || {};
+window.NexusTerminal.ProfileEditor = ProfileEditor;

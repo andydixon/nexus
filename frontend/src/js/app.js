@@ -3,17 +3,7 @@
  * Initialises the application shell, loads profiles, and sets up event listeners.
  */
 
-import { State } from './state.js';
-import { Sidebar } from './sidebar.js';
-import { TabManager } from './tabs.js';
-import { TerminalManager } from './terminal.js';
-import { ProfileEditor } from './profiles.js';
-import { RawViewer } from './raw.js';
-import { Notifications } from './notifications.js';
-import { Settings } from './settings.js';
-import { CommandPalette } from './commands.js';
-import { SecretPrompt } from './secrets.js';
-import { stateLabel } from './utils.js';
+const { State, Sidebar, TabManager, TerminalManager, ProfileEditor, RawViewer, Notifications, Settings, CommandPalette, SecretPrompt, stateLabel } = window.NexusTerminal;
 
 class App {
     constructor() {
@@ -31,16 +21,49 @@ class App {
 
     /**
      * Bootstraps the application after the DOM is ready.
+     * UI event binding happens synchronously so buttons always work.
+     * Backend data loading waits for the Wails runtime to be available.
      */
     async init() {
+        // Phase 1 — bind all UI event handlers immediately (DOM-only, no backend).
+        this.setupUI();
+        this.setupKeyboard();
+        this.updateStatusBar();
+
+        // Phase 2 — wait for the Wails runtime, then load backend data and bind events.
+        await this._waitForWailsRuntime();
+        this.setupEvents();
+
         await this.loadProfiles();
         await this.loadPreferences();
         await this.checkSecretStore();
-
-        this.setupEvents();
-        this.setupKeyboard();
-        this.setupUI();
         this.updateStatusBar();
+    }
+
+    /**
+     * Polls for `window.go` and `window.runtime` to become available.
+     * Wails injects these into the webview; on fast machines they are
+     * present before DOMContentLoaded, but on slower starts there may
+     * be a brief delay.
+     * @returns {Promise<void>}
+     * @private
+     */
+    _waitForWailsRuntime() {
+        return new Promise((resolve) => {
+            const maxWait = 5000;
+            const start = Date.now();
+            const check = () => {
+                if (window.go && window.runtime) {
+                    resolve();
+                } else if (Date.now() - start < maxWait) {
+                    setTimeout(check, 50);
+                } else {
+                    console.warn('Wails runtime not detected after ' + maxWait + 'ms — proceeding anyway');
+                    resolve();
+                }
+            };
+            check();
+        });
     }
 
     // ── Data loading ─────────────────────────────────────────────────
@@ -94,8 +117,13 @@ class App {
 
     /**
      * Registers listeners for backend events emitted via the Wails runtime.
+     * Guarded: silently skips if the runtime is unavailable.
      */
     setupEvents() {
+        if (!window.runtime || typeof window.runtime.EventsOn !== 'function') {
+            console.warn('window.runtime not available — Wails event listeners not bound');
+            return;
+        }
         // Incoming session data (terminal output)
         window.runtime.EventsOn('session:data', (payload) => {
             this.terminals.handleData(payload.sessionID, payload.data);

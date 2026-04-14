@@ -4,7 +4,7 @@
  * along with a send bar, pause/resume, and capture saving.
  */
 
-import { createElement, escapeHtml, formatTimestamp, formatBytes } from './utils.js';
+const { createElement, escapeHtml, formatTimestamp, formatBytes } = window.NexusTerminal;
 
 /**
  * Maximum number of data entries retained in the scrollback buffer.
@@ -12,7 +12,7 @@ import { createElement, escapeHtml, formatTimestamp, formatBytes } from './utils
  */
 const MAX_BUFFER_ENTRIES = 5000;
 
-export class RawViewer {
+class RawViewer {
     /**
      * @param {import('./app.js').App} app
      */
@@ -562,3 +562,6 @@ export class RawViewer {
         });
     }
 }
+
+window.NexusTerminal = window.NexusTerminal || {};
+window.NexusTerminal.RawViewer = RawViewer;

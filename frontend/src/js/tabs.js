@@ -4,16 +4,19 @@
  * pinning tabs, and context menus.
  */
 
-import { createElement, escapeHtml, protocolColour, stateLabel, dismissContextMenus } from './utils.js';
+const { createElement, escapeHtml, protocolColour, stateLabel, dismissContextMenus } = window.NexusTerminal;
 
-export class TabManager {
+class TabManager {
     /**
      * @param {import('./app.js').App} app
      */
     constructor(app) {
         this.app = app;
 
-        /** @type {HTMLElement} The tab bar container. */
+        /** @type {HTMLElement} The inner tab list where tab elements are inserted. */
+        this.tabList = document.getElementById('tab-list');
+
+        /** @type {HTMLElement} The outer tab bar wrapper (used for drag-and-drop). */
         this.tabBar = document.getElementById('tab-bar');
 
         /** @type {HTMLElement} The container for terminal/viewer panels. */
@@ -56,7 +59,7 @@ export class TabManager {
         if (idx !== -1) this.order.splice(idx, 1);
 
         // Remove tab element
-        const tabEl = this.tabBar.querySelector(`[data-session-id="${sessionId}"]`);
+        const tabEl = this.tabList.querySelector(`[data-session-id="${sessionId}"]`);
         if (tabEl) tabEl.remove();
 
         // Remove panel
@@ -86,7 +89,7 @@ export class TabManager {
         this.app.state.setActiveSession(sessionId);
 
         // Highlight active tab
-        this.tabBar.querySelectorAll('.tab').forEach((t) => {
+        this.tabList.querySelectorAll('.tab').forEach((t) => {
             t.classList.toggle('tab-active', t.dataset.sessionId === sessionId);
         });
 
@@ -146,7 +149,7 @@ export class TabManager {
      */
     renameTab(sessionId, name) {
         this.app.state.updateSession(sessionId, { tabName: name });
-        const tabEl = this.tabBar.querySelector(`[data-session-id="${sessionId}"]`);
+        const tabEl = this.tabList.querySelector(`[data-session-id="${sessionId}"]`);
         if (tabEl) {
             tabEl.querySelector('.tab-name').textContent = name;
         }
@@ -216,7 +219,7 @@ export class TabManager {
     updateSessionState(sessionId, state, error) {
         this.app.state.updateSession(sessionId, { state, error: error || '' });
 
-        const tabEl = this.tabBar.querySelector(`[data-session-id="${sessionId}"]`);
+        const tabEl = this.tabList.querySelector(`[data-session-id="${sessionId}"]`);
         if (!tabEl) return;
 
         const dot = tabEl.querySelector('.tab-status');
@@ -383,7 +386,7 @@ export class TabManager {
             this.showContextMenu(sessionInfo.id, e.clientX, e.clientY);
         });
 
-        this.tabBar.appendChild(tab);
+        this.tabList.appendChild(tab);
     }
 
     // ── Internal helpers ─────────────────────────────────────────────
@@ -405,8 +408,8 @@ export class TabManager {
         });
 
         for (const id of sorted) {
-            const el = this.tabBar.querySelector(`[data-session-id="${id}"]`);
-            if (el) this.tabBar.appendChild(el);
+            const el = this.tabList.querySelector(`[data-session-id="${id}"]`);
+            if (el) this.tabList.appendChild(el);
         }
     }
 
@@ -417,7 +420,7 @@ export class TabManager {
      */
     _updateTabStyles(sessionId) {
         const session = this.app.state.getSession(sessionId);
-        const tabEl = this.tabBar.querySelector(`[data-session-id="${sessionId}"]`);
+        const tabEl = this.tabList.querySelector(`[data-session-id="${sessionId}"]`);
         if (tabEl && session) {
             tabEl.classList.toggle('tab-pinned', !!session.pinned);
         }
@@ -484,11 +487,11 @@ export class TabManager {
      * @private
      */
     _setupDragAndDrop() {
-        if (!this.tabBar) return;
+        if (!this.tabList) return;
 
         let draggedId = null;
 
-        this.tabBar.addEventListener('dragstart', (e) => {
+        this.tabList.addEventListener('dragstart', (e) => {
             const tab = e.target.closest('.tab');
             if (!tab) return;
             draggedId = tab.dataset.sessionId;
@@ -496,7 +499,7 @@ export class TabManager {
             e.dataTransfer.effectAllowed = 'move';
         });
 
-        this.tabBar.addEventListener('dragover', (e) => {
+        this.tabList.addEventListener('dragover', (e) => {
             e.preventDefault();
             e.dataTransfer.dropEffect = 'move';
 
@@ -509,14 +512,14 @@ export class TabManager {
             target.classList.toggle('tab-drop-after', e.clientX >= midX);
         });
 
-        this.tabBar.addEventListener('dragleave', (e) => {
+        this.tabList.addEventListener('dragleave', (e) => {
             const target = e.target.closest('.tab');
             if (target) {
                 target.classList.remove('tab-drop-before', 'tab-drop-after');
             }
         });
 
-        this.tabBar.addEventListener('drop', (e) => {
+        this.tabList.addEventListener('drop', (e) => {
             e.preventDefault();
             const target = e.target.closest('.tab');
             if (!target || !draggedId) return;
@@ -536,11 +539,14 @@ export class TabManager {
             this._reorderDOM();
         });
 
-        this.tabBar.addEventListener('dragend', () => {
-            this.tabBar.querySelectorAll('.tab').forEach((t) => {
+        this.tabList.addEventListener('dragend', () => {
+            this.tabList.querySelectorAll('.tab').forEach((t) => {
                 t.classList.remove('tab-dragging', 'tab-drop-before', 'tab-drop-after');
             });
             draggedId = null;
         });
     }
 }
+
+window.NexusTerminal = window.NexusTerminal || {};
+window.NexusTerminal.TabManager = TabManager;

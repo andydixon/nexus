@@ -4,7 +4,7 @@
  * terminal defaults, security, known-hosts management, and about info.
  */
 
-import { createElement, escapeHtml, formatTimestamp, $ } from './utils.js';
+const { createElement, escapeHtml, formatTimestamp, $ } = window.NexusTerminal;
 
 /** Settings tab definitions. */
 const TABS = [
@@ -15,7 +15,7 @@ const TABS = [
     { key: 'about', label: 'About' },
 ];
 
-export class Settings {
+class Settings {
     /**
      * @param {import('./app.js').App} app
      */
@@ -461,3 +461,6 @@ export class Settings {
         }
     }
 }
+
+window.NexusTerminal = window.NexusTerminal || {};
+window.NexusTerminal.Settings = Settings;

@@ -4,7 +4,7 @@
  * emitting change events so the UI stays in sync.
  */
 
-export class State {
+class State {
     constructor() {
         /** @type {Array<Object>} */
         this.profiles = [];
@@ -223,3 +223,6 @@ export class State {
         this.emit('secretStore:init', initialised);
     }
 }
+
+window.NexusTerminal = window.NexusTerminal || {};
+window.NexusTerminal.State = State;

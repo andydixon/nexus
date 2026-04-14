@@ -4,7 +4,7 @@
  * in the top-right corner of the viewport.
  */
 
-import { createElement, escapeHtml } from './utils.js';
+const { createElement, escapeHtml } = window.NexusTerminal;
 
 /** Map of notification type to SVG icon path data. */
 const ICONS = {
@@ -14,7 +14,7 @@ const ICONS = {
     info: 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
 };
 
-export class Notifications {
+class Notifications {
     constructor() {
         /** @type {HTMLElement} */
         this.container = document.getElementById('notifications');
@@ -122,3 +122,6 @@ export class Notifications {
         }, 500);
     }
 }
+
+window.NexusTerminal = window.NexusTerminal || {};
+window.NexusTerminal.Notifications = Notifications;
