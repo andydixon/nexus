@@ -1,3 +1,4 @@
+(function() {
 /**
  * Nexus Terminal — command palette (Ctrl+K).
  * Provides a searchable overlay for quick access to application commands,
@@ -382,3 +383,5 @@ class CommandPalette {
 
 window.NexusTerminal = window.NexusTerminal || {};
 window.NexusTerminal.CommandPalette = CommandPalette;
+
+})();

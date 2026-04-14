@@ -1,3 +1,4 @@
+(function() {
 /**
  * Nexus Terminal — tab management.
  * Handles the tab bar: adding, removing, reordering, renaming,
@@ -550,3 +551,5 @@ class TabManager {
 
 window.NexusTerminal = window.NexusTerminal || {};
 window.NexusTerminal.TabManager = TabManager;
+
+})();

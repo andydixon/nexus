@@ -1,3 +1,4 @@
+(function() {
 /**
  * Nexus Terminal — application state management.
  * Provides a centralised store for profiles, sessions, and preferences,
@@ -226,3 +227,5 @@ class State {
 
 window.NexusTerminal = window.NexusTerminal || {};
 window.NexusTerminal.State = State;
+
+})();

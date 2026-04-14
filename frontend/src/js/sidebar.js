@@ -1,3 +1,4 @@
+(function() {
 /**
  * Nexus Terminal — sidebar module.
  * Renders the profile list with search, sections (favourites, recent, all),
@@ -336,3 +337,5 @@ class Sidebar {
 
 window.NexusTerminal = window.NexusTerminal || {};
 window.NexusTerminal.Sidebar = Sidebar;
+
+})();

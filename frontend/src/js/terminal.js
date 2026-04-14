@@ -1,3 +1,4 @@
+(function() {
 /**
  * Nexus Terminal — xterm.js terminal manager.
  * Creates, manages, and destroys xterm.js instances for SSH and Telnet sessions.
@@ -287,3 +288,5 @@ class TerminalManager {
 
 window.NexusTerminal = window.NexusTerminal || {};
 window.NexusTerminal.TerminalManager = TerminalManager;
+
+})();

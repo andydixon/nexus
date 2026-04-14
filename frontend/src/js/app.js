@@ -1,3 +1,4 @@
+(function() {
 /**
  * Nexus Terminal — main application entry point.
  * Initialises the application shell, loads profiles, and sets up event listeners.
@@ -281,6 +282,7 @@ class App {
      * Binds click handlers to static UI elements.
      */
     setupUI() {
+        var btnEl = document.getElementById('btn-new-connection');
         this._bindClick('btn-new-connection', () => this.profileEditor.openNew());
         this._bindClick('btn-settings', () => this.settings.open());
         this._bindClick('btn-import', () => this.importProfiles());
@@ -509,7 +511,16 @@ class App {
 
 // ── Bootstrap ────────────────────────────────────────────────────────
 
+
 document.addEventListener('DOMContentLoaded', () => {
-    const app = new App();
-    app.init().catch((err) => console.error('App initialisation failed:', err));
+    try {
+        const app = new App();
+        app.init().catch((err) => {
+            console.error('App initialisation failed:', err);
+        });
+    } catch (err) {
+        console.error('App constructor failed:', err);
+    }
 });
+
+})();

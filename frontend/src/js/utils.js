@@ -1,3 +1,4 @@
+(function() {
 /**
  * Nexus Terminal — utility functions.
  * General-purpose helpers used throughout the application.
@@ -230,3 +231,5 @@ function stateLabel(state) {
 
 window.NexusTerminal = window.NexusTerminal || {};
 Object.assign(window.NexusTerminal, { $, $$, createElement, escapeHtml, formatTimestamp, debounce, fuzzyMatch, base64Encode, base64Decode, generateId, formatBytes, truncate, dismissContextMenus, protocolColour, stateLabel });
+
+})();

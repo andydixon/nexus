@@ -1,3 +1,4 @@
+(function() {
 /**
  * Nexus Terminal — connection profile editor.
  * Renders a slide-out drawer for creating and editing connection profiles.
@@ -889,3 +890,5 @@ class ProfileEditor {
 
 window.NexusTerminal = window.NexusTerminal || {};
 window.NexusTerminal.ProfileEditor = ProfileEditor;
+
+})();

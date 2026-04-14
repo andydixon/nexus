@@ -1,3 +1,4 @@
+(function() {
 /**
  * Nexus Terminal — secret/passphrase prompt dialogs.
  * Provides modal prompts for collecting passwords, master-vault passphrases,
@@ -301,3 +302,5 @@ class SecretPrompt {
 
 window.NexusTerminal = window.NexusTerminal || {};
 window.NexusTerminal.SecretPrompt = SecretPrompt;
+
+})();

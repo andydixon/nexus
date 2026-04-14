@@ -1,3 +1,4 @@
+(function() {
 /**
  * Nexus Terminal — RAW TCP data viewer.
  * Provides text, hex, and split display modes for raw socket data,
@@ -565,3 +566,5 @@ class RawViewer {
 
 window.NexusTerminal = window.NexusTerminal || {};
 window.NexusTerminal.RawViewer = RawViewer;
+
+})();

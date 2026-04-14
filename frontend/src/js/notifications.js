@@ -1,3 +1,4 @@
+(function() {
 /**
  * Nexus Terminal — toast notification system.
  * Provides non-blocking, auto-dismissing notifications that stack
@@ -125,3 +126,5 @@ class Notifications {
 
 window.NexusTerminal = window.NexusTerminal || {};
 window.NexusTerminal.Notifications = Notifications;
+
+})();

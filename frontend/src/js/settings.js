@@ -1,3 +1,4 @@
+(function() {
 /**
  * Nexus Terminal — settings modal.
  * Renders a tabbed settings dialog for application-wide preferences,
@@ -464,3 +465,5 @@ class Settings {
 
 window.NexusTerminal = window.NexusTerminal || {};
 window.NexusTerminal.Settings = Settings;
+
+})();
