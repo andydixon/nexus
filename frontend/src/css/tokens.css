@@ -1,0 +1,140 @@
+/* ==========================================================================
+   Nexus Terminal — Design Tokens
+   Central palette, spacing, typography, and layout constants.
+   All values consumed via var(--token-name) throughout the application.
+   ========================================================================== */
+
+:root {
+    /* -----------------------------------------------------------------------
+       Colour palette — dark charcoal theme
+       ----------------------------------------------------------------------- */
+    --bg-base:      #1a1a2e;   /* deepest background                        */
+    --bg-surface:   #1f1f35;   /* primary surface (sidebar, bars)            */
+    --bg-elevated:  #252540;   /* elevated panels, cards                     */
+    --bg-overlay:   #2a2a4a;   /* overlays, dropdowns                       */
+    --bg-hover:     #30304f;   /* hover state backgrounds                   */
+    --bg-active:    #353560;   /* active / pressed state                    */
+    --bg-input:     #1c1c32;   /* input field backgrounds                   */
+
+    /* -----------------------------------------------------------------------
+       Border colours
+       ----------------------------------------------------------------------- */
+    --border-subtle:  rgba(255, 255, 255, 0.06);
+    --border-default: rgba(255, 255, 255, 0.10);
+    --border-strong:  rgba(255, 255, 255, 0.16);
+    --border-focus:   var(--accent);
+
+    /* -----------------------------------------------------------------------
+       Text colours
+       ----------------------------------------------------------------------- */
+    --text-primary:   #e8e8f0;
+    --text-secondary: #a0a0b8;
+    --text-tertiary:  #6e6e88;
+    --text-disabled:  #4a4a60;
+    --text-inverse:   #1a1a2e;
+
+    /* -----------------------------------------------------------------------
+       Accent colours — teal / cyan
+       ----------------------------------------------------------------------- */
+    --accent:        #4ecdc4;
+    --accent-hover:  #45b7af;
+    --accent-muted:  rgba(78, 205, 196, 0.15);
+    --accent-strong: rgba(78, 205, 196, 0.25);
+
+    /* -----------------------------------------------------------------------
+       Status colours
+       ----------------------------------------------------------------------- */
+    --success: #66bb6a;
+    --warning: #ffa726;
+    --error:   #ef5350;
+    --info:    #42a5f5;
+
+    /* -----------------------------------------------------------------------
+       Protocol badge colours
+       ----------------------------------------------------------------------- */
+    --protocol-ssh:    #4ecdc4;
+    --protocol-telnet: #ffa726;
+    --protocol-raw:    #ab47bc;
+
+    /* -----------------------------------------------------------------------
+       Spacing scale (4 px base unit)
+       ----------------------------------------------------------------------- */
+    --space-1:   4px;
+    --space-2:   8px;
+    --space-3:  12px;
+    --space-4:  16px;
+    --space-5:  20px;
+    --space-6:  24px;
+    --space-8:  32px;
+    --space-10: 40px;
+    --space-12: 48px;
+    --space-16: 64px;
+
+    /* -----------------------------------------------------------------------
+       Typography
+       ----------------------------------------------------------------------- */
+    --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI',
+                 system-ui, sans-serif;
+    --font-mono: 'JetBrains Mono', 'Fira Code', 'SF Mono', Monaco,
+                 'Cascadia Code', monospace;
+
+    --text-xs:   11px;
+    --text-sm:   12px;
+    --text-base: 13px;
+    --text-md:   14px;
+    --text-lg:   16px;
+    --text-xl:   18px;
+    --text-2xl:  22px;
+
+    --leading-tight:   1.25;
+    --leading-normal:  1.5;
+    --leading-relaxed: 1.625;
+
+    --weight-normal:   400;
+    --weight-medium:   500;
+    --weight-semibold: 600;
+
+    /* -----------------------------------------------------------------------
+       Border radius
+       ----------------------------------------------------------------------- */
+    --radius-sm:   3px;
+    --radius-md:   5px;
+    --radius-lg:   8px;
+    --radius-xl:  12px;
+    --radius-full: 9999px;
+
+    /* -----------------------------------------------------------------------
+       Shadows
+       ----------------------------------------------------------------------- */
+    --shadow-sm: 0 1px 2px  rgba(0, 0, 0, 0.30);
+    --shadow-md: 0 2px 8px  rgba(0, 0, 0, 0.40);
+    --shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.50);
+    --shadow-xl: 0 8px 32px rgba(0, 0, 0, 0.60);
+
+    /* -----------------------------------------------------------------------
+       Transitions
+       ----------------------------------------------------------------------- */
+    --transition-fast:   100ms ease;
+    --transition-normal: 200ms ease;
+    --transition-slow:   300ms ease;
+
+    /* -----------------------------------------------------------------------
+       Z-index layers
+       ----------------------------------------------------------------------- */
+    --z-base:            0;
+    --z-sticky:        100;
+    --z-dropdown:      200;
+    --z-modal-backdrop: 300;
+    --z-modal:         400;
+    --z-notification:  500;
+    --z-tooltip:       600;
+
+    /* -----------------------------------------------------------------------
+       Layout
+       ----------------------------------------------------------------------- */
+    --sidebar-width:           260px;
+    --sidebar-width-collapsed:  48px;
+    --tab-bar-height:           36px;
+    --toolbar-height:           40px;
+    --status-bar-height:        24px;
+}

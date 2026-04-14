@@ -1,0 +1,137 @@
+/* ==========================================================================
+   Nexus Terminal — Application Layout
+   Grid shell, sidebar, tab bar, workspace, and status bar structure.
+   ========================================================================== */
+
+/* -----------------------------------------------------------------------
+   Main application grid
+   ----------------------------------------------------------------------- */
+.app {
+    display: grid;
+    grid-template-columns: var(--sidebar-width) 1fr;
+    grid-template-rows: var(--tab-bar-height) 1fr var(--status-bar-height);
+    height: 100vh;
+    overflow: hidden;
+    background: var(--bg-base);
+}
+
+/* Collapsed sidebar variant */
+.app.sidebar-collapsed {
+    grid-template-columns: var(--sidebar-width-collapsed) 1fr;
+}
+
+/* -----------------------------------------------------------------------
+   Sidebar
+   ----------------------------------------------------------------------- */
+.sidebar {
+    grid-row: 1 / -1;
+    grid-column: 1;
+    background: var(--bg-surface);
+    border-right: 1px solid var(--border-subtle);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    z-index: var(--z-sticky);
+}
+
+/* -----------------------------------------------------------------------
+   Tab bar
+   ----------------------------------------------------------------------- */
+.tab-bar {
+    grid-column: 2;
+    grid-row: 1;
+    background: var(--bg-surface);
+    border-bottom: 1px solid var(--border-subtle);
+    display: flex;
+    align-items: center;
+    min-height: var(--tab-bar-height);
+    overflow: hidden;
+}
+
+.tab-list {
+    display: flex;
+    align-items: center;
+    flex: 1;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;          /* Firefox */
+}
+.tab-list::-webkit-scrollbar {
+    display: none;
+}
+
+/* -----------------------------------------------------------------------
+   Workspace
+   ----------------------------------------------------------------------- */
+.workspace {
+    grid-column: 2;
+    grid-row: 2;
+    position: relative;
+    overflow: hidden;
+    background: var(--bg-base);
+}
+
+/* Terminal container — fills workspace */
+.terminal-container {
+    position: absolute;
+    inset: 0;
+    padding: var(--space-1);
+}
+
+/* -----------------------------------------------------------------------
+   Status bar
+   ----------------------------------------------------------------------- */
+.status-bar {
+    grid-column: 2;
+    grid-row: 3;
+    background: var(--bg-surface);
+    border-top: 1px solid var(--border-subtle);
+    display: flex;
+    align-items: center;
+    padding: 0 var(--space-3);
+    font-size: var(--text-xs);
+    color: var(--text-tertiary);
+    gap: var(--space-4);
+    white-space: nowrap;
+    overflow: hidden;
+}
+
+.status-bar span {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+}
+
+.status-spacer {
+    flex: 1;
+}
+
+/* Status bar indicator dots */
+.status-bar .status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    display: inline-block;
+}
+.status-dot.is-connected    { background: var(--success); }
+.status-dot.is-connecting   { background: var(--warning); }
+.status-dot.is-error        { background: var(--error); }
+.status-dot.is-disconnected { background: var(--text-tertiary); }
+
+/* -----------------------------------------------------------------------
+   Resize handle (between sidebar and workspace)
+   ----------------------------------------------------------------------- */
+.resize-handle {
+    position: absolute;
+    top: 0;
+    right: -3px;
+    width: 6px;
+    height: 100%;
+    cursor: col-resize;
+    z-index: var(--z-sticky);
+}
+.resize-handle:hover,
+.resize-handle.is-dragging {
+    background: var(--accent-muted);
+}
