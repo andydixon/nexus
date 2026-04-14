@@ -127,7 +127,7 @@ class TabManager {
 
         // Ask for confirmation if connected and the preference is set
         if (session && session.state === 'connected' && this.app.state.preferences.confirmOnDisconnect) {
-            const ok = confirm('Disconnect and close this session?');
+            const ok = await this._confirmClose(sessionId);
             if (!ok) return;
         }
 
@@ -141,6 +141,49 @@ class TabManager {
         this.app.rawViewer.destroyViewer(sessionId);
         this.app.state.removeSession(sessionId);
         this.removeTab(sessionId);
+    }
+
+    /**
+     * Shows a confirmation modal before closing a connected session.
+     * @param {string} sessionId
+     * @returns {Promise<boolean>}
+     * @private
+     */
+    _confirmClose(sessionId) {
+        const createElement = window.NexusTerminal.createElement;
+        const label = this._tabLabel(sessionId);
+        return new Promise((resolve) => {
+            const backdrop = createElement('div', 'modal-backdrop');
+            const modal = createElement('div', 'modal modal-sm');
+            modal.innerHTML = `
+                <div class="modal-header">
+                    <h3 class="modal-title">Close Session</h3>
+                    <button class="btn btn-icon btn-xs modal-close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p style="font-size:var(--text-sm);color:var(--text-secondary)">
+                        Disconnect and close <strong>${label}</strong>?
+                    </p>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-sm confirm-cancel">Cancel</button>
+                    <button class="btn btn-sm btn-danger confirm-ok">Disconnect</button>
+                </div>
+            `;
+            backdrop.appendChild(modal);
+            document.body.appendChild(backdrop);
+            requestAnimationFrame(() => backdrop.classList.add('is-visible'));
+
+            const close = (val) => {
+                backdrop.classList.remove('is-visible');
+                setTimeout(() => backdrop.remove(), 200);
+                resolve(val);
+            };
+            modal.querySelector('.modal-close').addEventListener('click', () => close(false));
+            modal.querySelector('.confirm-cancel').addEventListener('click', () => close(false));
+            modal.querySelector('.confirm-ok').addEventListener('click', () => close(true));
+            backdrop.addEventListener('click', (e) => { if (e.target === backdrop) close(false); });
+        });
     }
 
     /**
