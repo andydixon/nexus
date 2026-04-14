@@ -7,7 +7,9 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"net"
 	"runtime"
+	"sync"
 	"time"
 
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
@@ -33,6 +35,10 @@ type Service struct {
 	auditLog      *audit.Logger
 	prefs         *preferences.Manager
 	ctx           context.Context
+
+	// secretChans maps request IDs to channels awaiting user secret input.
+	secretMu    sync.Mutex
+	secretChans map[string]chan secretResponse
 }
 
 // NewService creates a Service wired to the given backing components.
@@ -54,9 +60,10 @@ func NewService(
 	}
 }
 
-// SetContext stores the Wails runtime context.
+// SetContext stores the Wails runtime context and registers event listeners.
 func (s *Service) SetContext(ctx context.Context) {
 	s.ctx = ctx
+	s.RegisterSecretResponseListener()
 }
 
 // ---------------------------------------------------------------------------
@@ -93,13 +100,13 @@ func (s *Service) GetProfile(id string) (models.Profile, error) {
 }
 
 // UpdateProfile persists changes to an existing profile.
-func (s *Service) UpdateProfile(profile models.Profile) error {
+func (s *Service) UpdateProfile(profile models.Profile) (models.Profile, error) {
 	profile.UpdatedAt = time.Now()
 	if err := s.store.UpdateProfile(&profile); err != nil {
-		return fmt.Errorf("failed to update profile: %w", err)
+		return models.Profile{}, fmt.Errorf("failed to update profile: %w", err)
 	}
 	s.auditLog.LogProfileUpdate(profile.ID, profile.DisplayName)
-	return nil
+	return profile, nil
 }
 
 // DeleteProfile removes a profile and its associated secrets.
@@ -212,16 +219,18 @@ func (s *Service) NewProfile(protocol string) models.Profile {
 // Session operations
 // ---------------------------------------------------------------------------
 
-// ConnectSession loads a profile by ID and opens a session.
-func (s *Service) ConnectSession(profileID string) (string, error) {
+// ConnectSession loads a profile by ID and starts a session asynchronously.
+// Returns immediately with session info in "connecting" state; the frontend
+// should listen for session:state events for status updates.
+func (s *Service) ConnectSession(profileID string) (models.SessionInfo, error) {
 	profile, err := s.store.GetProfile(profileID)
 	if err != nil {
-		return "", fmt.Errorf("profile not found: %w", err)
+		return models.SessionInfo{}, fmt.Errorf("profile not found: %w", err)
 	}
 
 	sessionID, err := s.sessions.Connect(profile, s.promptSecret)
 	if err != nil {
-		return "", err
+		return models.SessionInfo{}, err
 	}
 
 	// Update last-connected timestamp.
@@ -230,15 +239,27 @@ func (s *Service) ConnectSession(profileID string) (string, error) {
 	profile.UpdatedAt = now
 	_ = s.store.UpdateProfile(profile)
 
-	return sessionID, nil
+	info := s.sessions.GetSessionInfo(sessionID)
+	if info == nil {
+		return models.SessionInfo{}, fmt.Errorf("session created but info not found")
+	}
+	return *info, nil
 }
 
 // ConnectQuick opens a session from an ad-hoc (unsaved) profile.
-func (s *Service) ConnectQuick(profile models.Profile) (string, error) {
+func (s *Service) ConnectQuick(profile models.Profile) (models.SessionInfo, error) {
 	if profile.ID == "" {
 		profile.ID = uuid.New().String()
 	}
-	return s.sessions.Connect(&profile, s.promptSecret)
+	sessionID, err := s.sessions.Connect(&profile, s.promptSecret)
+	if err != nil {
+		return models.SessionInfo{}, err
+	}
+	info := s.sessions.GetSessionInfo(sessionID)
+	if info == nil {
+		return models.SessionInfo{}, fmt.Errorf("session created but info not found")
+	}
+	return *info, nil
 }
 
 // DisconnectSession closes a session by ID.
@@ -597,15 +618,118 @@ func (s *Service) GetAppInfo() map[string]string {
 	}
 }
 
+// TestConnection performs a basic TCP reachability check to the given host and port.
+// This verifies the network path without establishing a full protocol session.
+func (s *Service) TestConnection(host string, port int) (map[string]interface{}, error) {
+	if host == "" {
+		return nil, fmt.Errorf("host is required")
+	}
+	if port <= 0 || port > 65535 {
+		return nil, fmt.Errorf("port must be between 1 and 65535")
+	}
+
+	addr := fmt.Sprintf("%s:%d", host, port)
+	start := time.Now()
+
+	conn, err := net.DialTimeout("tcp", addr, 10*time.Second)
+	elapsed := time.Since(start)
+
+	if err != nil {
+		return nil, fmt.Errorf("connection to %s failed after %dms: %w", addr, elapsed.Milliseconds(), err)
+	}
+	conn.Close()
+
+	return map[string]interface{}{
+		"success":    true,
+		"host":       host,
+		"port":       port,
+		"latencyMs":  elapsed.Milliseconds(),
+		"remoteAddr": addr,
+	}, nil
+}
+
 // ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
 
-// promptSecret is a placeholder secret prompt that returns an error when
-// called outside of an interactive context. In production this would be
-// replaced by a Wails dialog event.
+// promptSecret emits a Wails event to request a secret from the user, then
+// blocks until the frontend responds via the session:secret:response event.
+// This bridges the synchronous Go SSH auth callback with the asynchronous
+// frontend prompt UI.
 func (s *Service) promptSecret(prompt string) (string, error) {
-	return "", fmt.Errorf("interactive secret prompt not available: %s", prompt)
+	if s.ctx == nil {
+		return "", fmt.Errorf("application context not available")
+	}
+
+	// Generate a unique request ID so we can correlate the response.
+	requestID := uuid.New().String()
+	ch := make(chan secretResponse, 1)
+
+	// Register a one-shot listener for the response.
+	s.secretMu.Lock()
+	if s.secretChans == nil {
+		s.secretChans = make(map[string]chan secretResponse)
+	}
+	s.secretChans[requestID] = ch
+	s.secretMu.Unlock()
+
+	// Emit the prompt event to the frontend.
+	wailsRuntime.EventsEmit(s.ctx, "session:secret:prompt", map[string]interface{}{
+		"requestID": requestID,
+		"message":   prompt,
+		"title":     "Credentials Required",
+	})
+
+	// Block until we receive a response (with a generous timeout).
+	select {
+	case resp := <-ch:
+		s.secretMu.Lock()
+		delete(s.secretChans, requestID)
+		s.secretMu.Unlock()
+		if resp.cancelled {
+			return "", fmt.Errorf("user cancelled secret prompt")
+		}
+		return resp.value, nil
+	case <-time.After(5 * time.Minute):
+		s.secretMu.Lock()
+		delete(s.secretChans, requestID)
+		s.secretMu.Unlock()
+		return "", fmt.Errorf("secret prompt timed out")
+	}
+}
+
+// secretResponse carries the result of a frontend secret prompt.
+type secretResponse struct {
+	value     string
+	cancelled bool
+}
+
+// RegisterSecretResponseListener sets up the Wails event listener that receives
+// secrets entered by the user. Must be called after SetContext.
+func (s *Service) RegisterSecretResponseListener() {
+	if s.ctx == nil {
+		return
+	}
+	wailsRuntime.EventsOn(s.ctx, "session:secret:response", func(optionalData ...interface{}) {
+		if len(optionalData) == 0 {
+			return
+		}
+		data, ok := optionalData[0].(map[string]interface{})
+		if !ok {
+			return
+		}
+		requestID, _ := data["requestID"].(string)
+		value, _ := data["value"].(string)
+		cancelled, _ := data["cancelled"].(bool)
+
+		s.secretMu.Lock()
+		ch, exists := s.secretChans[requestID]
+		s.secretMu.Unlock()
+
+		if exists {
+			ch <- secretResponse{value: value, cancelled: cancelled}
+		}
+	})
 }
 
 // derefProfiles converts a slice of profile pointers to values.

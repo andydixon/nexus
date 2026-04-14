@@ -94,43 +94,48 @@ func (m *Manager) Connect(profile *models.Profile, getSecret func(prompt string)
 		"state":     string(models.SessionConnecting),
 	})
 
-	var err error
-	switch profile.Protocol {
-	case models.ProtocolSSH:
-		err = m.connectSSH(sess, getSecret)
-	case models.ProtocolTelnet:
-		err = m.connectTelnet(sess)
-	case models.ProtocolRAW:
-		err = m.connectRAW(sess)
-	default:
-		err = fmt.Errorf("unsupported protocol %q", profile.Protocol)
-	}
+	// Perform the actual protocol handshake in a goroutine so we do not
+	// block the Wails event loop — secret prompts require the UI thread.
+	go func() {
+		var err error
+		switch profile.Protocol {
+		case models.ProtocolSSH:
+			err = m.connectSSH(sess, getSecret)
+		case models.ProtocolTelnet:
+			err = m.connectTelnet(sess)
+		case models.ProtocolRAW:
+			err = m.connectRAW(sess)
+		default:
+			err = fmt.Errorf("unsupported protocol %q", profile.Protocol)
+		}
 
-	if err != nil {
+		if err != nil {
+			m.mu.Lock()
+			sess.Info.State = models.SessionError
+			sess.Info.Error = err.Error()
+			m.mu.Unlock()
+
+			m.emitEvent("session:state", map[string]interface{}{
+				"sessionID": sessionID,
+				"state":     string(models.SessionError),
+				"error":     err.Error(),
+			})
+			return
+		}
+
 		m.mu.Lock()
-		sess.Info.State = models.SessionError
-		sess.Info.Error = err.Error()
+		sess.Info.State = models.SessionConnected
+		sess.Info.ConnectedAt = time.Now()
 		m.mu.Unlock()
 
 		m.emitEvent("session:state", map[string]interface{}{
 			"sessionID": sessionID,
-			"state":     string(models.SessionError),
-			"error":     err.Error(),
+			"state":     string(models.SessionConnected),
 		})
-		return "", fmt.Errorf("sessions: connection failed: %w", err)
-	}
 
-	m.mu.Lock()
-	sess.Info.State = models.SessionConnected
-	sess.Info.ConnectedAt = time.Now()
-	m.mu.Unlock()
+		m.auditLog.LogConnect(profile.ID, sessionID, string(profile.Protocol), profile.Host)
+	}()
 
-	m.emitEvent("session:state", map[string]interface{}{
-		"sessionID": sessionID,
-		"state":     string(models.SessionConnected),
-	})
-
-	m.auditLog.LogConnect(profile.ID, sessionID, string(profile.Protocol), profile.Host)
 	return sessionID, nil
 }
 
@@ -238,6 +243,19 @@ func (m *Manager) GetSession(sessionID string) (*models.SessionInfo, error) {
 	}
 	info := sess.Info
 	return &info, nil
+}
+
+// GetSessionInfo returns session metadata or nil if the session does not exist.
+func (m *Manager) GetSessionInfo(sessionID string) *models.SessionInfo {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	sess, ok := m.sessions[sessionID]
+	if !ok {
+		return nil
+	}
+	info := sess.Info
+	return &info
 }
 
 // ListSessions returns all active session info.

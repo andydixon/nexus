@@ -126,6 +126,10 @@ export function ReconnectSession(arg1) {
   return window['go']['api']['Service']['ReconnectSession'](arg1);
 }
 
+export function RegisterSecretResponseListener() {
+  return window['go']['api']['Service']['RegisterSecretResponseListener']();
+}
+
 export function RenameSession(arg1, arg2) {
   return window['go']['api']['Service']['RenameSession'](arg1, arg2);
 }
@@ -168,6 +172,10 @@ export function SetFavourite(arg1, arg2) {
 
 export function SetProfileSecret(arg1, arg2, arg3) {
   return window['go']['api']['Service']['SetProfileSecret'](arg1, arg2, arg3);
+}
+
+export function TestConnection(arg1, arg2) {
+  return window['go']['api']['Service']['TestConnection'](arg1, arg2);
 }
 
 export function UnlockSecretStore(arg1) {

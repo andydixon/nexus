@@ -7,9 +7,9 @@ export function ClearSessionHistory(arg1:string):Promise<void>;
 
 export function CloseAllSessions():Promise<void>;
 
-export function ConnectQuick(arg1:models.Profile):Promise<string>;
+export function ConnectQuick(arg1:models.Profile):Promise<models.SessionInfo>;
 
-export function ConnectSession(arg1:string):Promise<string>;
+export function ConnectSession(arg1:string):Promise<models.SessionInfo>;
 
 export function CreateProfile(arg1:models.Profile):Promise<models.Profile>;
 
@@ -65,6 +65,8 @@ export function PinSession(arg1:string,arg2:boolean):Promise<void>;
 
 export function ReconnectSession(arg1:string):Promise<void>;
 
+export function RegisterSecretResponseListener():Promise<void>;
+
 export function RenameSession(arg1:string,arg2:string):Promise<void>;
 
 export function ResizeSession(arg1:string,arg2:number,arg3:number):Promise<void>;
@@ -87,9 +89,11 @@ export function SetFavourite(arg1:string,arg2:boolean):Promise<void>;
 
 export function SetProfileSecret(arg1:string,arg2:string,arg3:string):Promise<void>;
 
+export function TestConnection(arg1:string,arg2:number):Promise<Record<string, any>>;
+
 export function UnlockSecretStore(arg1:string):Promise<void>;
 
-export function UpdateProfile(arg1:models.Profile):Promise<void>;
+export function UpdateProfile(arg1:models.Profile):Promise<models.Profile>;
 
 export function WriteSession(arg1:string,arg2:string):Promise<void>;
 

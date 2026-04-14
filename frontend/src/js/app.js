@@ -185,12 +185,12 @@ class App {
                     payload.message || 'Enter your password or passphrase.',
                 );
                 window.runtime.EventsEmit('session:secret:response', {
-                    sessionID: payload.sessionID,
+                    requestID: payload.requestID,
                     value,
                 });
             } catch (_) {
                 window.runtime.EventsEmit('session:secret:response', {
-                    sessionID: payload.sessionID,
+                    requestID: payload.requestID,
                     value: '',
                     cancelled: true,
                 });

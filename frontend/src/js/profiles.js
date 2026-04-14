@@ -163,16 +163,19 @@ class ProfileEditor {
         // ── Footer ──────────────────────────────────────────────
         const footer = createElement('div', 'drawer-footer');
         const cancelBtn = createElement('button', 'btn btn-secondary', { textContent: 'Cancel' });
-        const testBtn = createElement('button', 'btn btn-outline', { textContent: 'Test Connection' });
+        const testBtn = createElement('button', 'btn btn-outline', { textContent: 'Test' });
         const saveBtn = createElement('button', 'btn btn-primary', { textContent: isNew ? 'Create' : 'Save' });
+        const connectBtn = createElement('button', 'btn btn-accent', { textContent: isNew ? 'Create & Connect' : 'Save & Connect' });
 
         cancelBtn.addEventListener('click', () => this.close());
         testBtn.addEventListener('click', () => this._testConnection());
-        saveBtn.addEventListener('click', () => this._handleSave());
+        saveBtn.addEventListener('click', () => this._handleSave(false));
+        connectBtn.addEventListener('click', () => this._handleSave(true));
 
         footer.appendChild(cancelBtn);
         footer.appendChild(testBtn);
         footer.appendChild(saveBtn);
+        footer.appendChild(connectBtn);
         drawer.appendChild(footer);
 
         // ── Events ──────────────────────────────────────────────
@@ -807,7 +810,7 @@ class ProfileEditor {
     // ── Actions ──────────────────────────────────────────────────────
 
     /** @private */
-    async _handleSave() {
+    async _handleSave(andConnect = false) {
         this._collectFormValues();
         const errors = this._validate(this._profile);
         if (errors.length > 0) {
@@ -816,17 +819,22 @@ class ProfileEditor {
         }
 
         try {
+            let saved;
             if (this._isNew) {
-                const saved = await window.go.api.Service.CreateProfile(this._profile);
+                saved = await window.go.api.Service.CreateProfile(this._profile);
                 this.app.state.addProfile(saved);
                 this.app.notifications.success('Profile created');
             } else {
-                const saved = await window.go.api.Service.UpdateProfile(this._profile);
+                saved = await window.go.api.Service.UpdateProfile(this._profile);
                 this.app.state.updateProfile(saved);
                 this.app.notifications.success('Profile updated');
             }
             this.app.sidebar.render();
             this.close();
+
+            if (andConnect && saved && saved.id) {
+                this.app.connectProfile(saved.id);
+            }
         } catch (err) {
             this.app.notifications.error('Save failed: ' + err);
         }
@@ -841,7 +849,16 @@ class ProfileEditor {
             return;
         }
 
-        this.app.notifications.info('Test connection is not yet available.');
+        const host = this._profile.host;
+        const port = this._profile.port;
+        this.app.notifications.info(`Testing connection to ${host}:${port}…`);
+
+        try {
+            const result = await window.go.api.Service.TestConnection(host, port);
+            this.app.notifications.success(`Reachable — ${result.latencyMs}ms latency`);
+        } catch (err) {
+            this.app.notifications.error('Test failed: ' + err);
+        }
     }
 
     // ── Utilities ────────────────────────────────────────────────────

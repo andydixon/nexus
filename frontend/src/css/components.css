@@ -50,6 +50,21 @@
     border-color: #3da69f;
 }
 
+/* Accent — success-tinted action, e.g. "Save & Connect" */
+.btn-accent {
+    background: var(--success);
+    color: var(--text-inverse);
+    border-color: var(--success);
+}
+.btn-accent:hover {
+    background: #57a85c;
+    border-color: #57a85c;
+}
+.btn-accent:active {
+    background: #4a9a4e;
+    border-color: #4a9a4e;
+}
+
 /* Secondary — subtle border */
 .btn-secondary {
     background: transparent;
