@@ -132,6 +132,18 @@
 .btn-group {
     display: inline-flex;
 }
+
+/* Outline button — transparent background, subtle border */
+.btn-outline {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+}
+.btn-outline:hover {
+    background: var(--surface-2);
+    color: var(--text-primary);
+}
+
 .btn-group .btn {
     border-radius: 0;
 }

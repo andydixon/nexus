@@ -97,12 +97,14 @@
     color: var(--text-tertiary);
 }
 
-.form-section-body {
+.form-section-body,
+.form-section-content {
     padding: var(--space-4);
     display: none;
 }
 
-.form-section.is-open .form-section-body {
+.form-section.is-open .form-section-body,
+.form-section.is-open .form-section-content {
     display: block;
 }
 
@@ -436,4 +438,77 @@
     font-size: var(--text-xs);
     color: var(--text-tertiary);
     flex: 1;
+}
+
+/* -----------------------------------------------------------------------
+   Form hint — inline help text below fields
+   ----------------------------------------------------------------------- */
+.form-hint {
+    font-size: var(--text-xs);
+    color: var(--text-tertiary);
+    margin-top: var(--space-1);
+    line-height: var(--leading-relaxed);
+}
+
+.form-hint.secret-error {
+    color: var(--danger);
+}
+
+/* -----------------------------------------------------------------------
+   Toggle wrapper — label + toggle switch in a row
+   ----------------------------------------------------------------------- */
+.form-toggle-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding: var(--space-1) 0;
+}
+
+.form-toggle-label {
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+    flex: 1;
+}
+
+/* -----------------------------------------------------------------------
+   Jump host rows
+   ----------------------------------------------------------------------- */
+.jump-hosts-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+}
+
+.jump-host-row {
+    display: grid;
+    grid-template-columns: 1fr 80px 1fr auto;
+    gap: var(--space-2);
+    align-items: center;
+}
+
+/* -----------------------------------------------------------------------
+   Payload preset rows
+   ----------------------------------------------------------------------- */
+.payload-presets-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+}
+
+.preset-row {
+    display: grid;
+    grid-template-columns: 120px 1fr 100px auto;
+    gap: var(--space-2);
+    align-items: center;
+}
+
+/* -----------------------------------------------------------------------
+   Small / compact form controls — used inside repeater rows
+   ----------------------------------------------------------------------- */
+.form-input-sm,
+.form-select-sm {
+    font-size: var(--text-xs);
+    padding: var(--space-1) var(--space-2);
+    height: 30px;
 }

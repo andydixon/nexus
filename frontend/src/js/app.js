@@ -335,7 +335,7 @@ class App {
      * Prompts the user for a host/port and opens a quick connection.
      */
     async quickConnect() {
-        const input = prompt('Quick connect (host[:port]):');
+        const input = await this._inputPrompt('Quick Connect', 'Enter host[:port]', 'e.g. 192.168.1.1:22');
         if (!input || !input.trim()) return;
 
         const parts = input.trim().split(':');
@@ -505,7 +505,69 @@ class App {
      */
     _bindClick(id, handler) {
         const el = document.getElementById(id);
-        if (el) el.addEventListener('click', handler);
+        if (el) {
+            el.addEventListener('click', (e) => {
+                try {
+                    handler(e);
+                } catch (err) {
+                    console.error('Click handler error for', id, err);
+                }
+            });
+        }
+    }
+
+    /**
+     * Shows a simple text-input prompt modal (replaces window.prompt which
+     * is unavailable in WKWebView).
+     * @param {string} title - Modal heading.
+     * @param {string} label - Label above the input.
+     * @param {string} [placeholder] - Placeholder text.
+     * @returns {Promise<string|null>} Resolves with the value or null if cancelled.
+     * @private
+     */
+    _inputPrompt(title, label, placeholder) {
+        const createElement = window.NexusTerminal.createElement;
+        return new Promise((resolve) => {
+            const backdrop = createElement('div', 'modal-backdrop');
+            const modal = createElement('div', 'modal modal-sm');
+            modal.innerHTML = `
+                <div class="modal-header">
+                    <h3 class="modal-title">${title}</h3>
+                    <button class="btn btn-icon btn-xs modal-close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label class="form-label">${label}</label>
+                        <input class="form-input" type="text" placeholder="${placeholder || ''}" autofocus />
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-sm prompt-cancel">Cancel</button>
+                    <button class="btn btn-sm btn-primary prompt-ok">Connect</button>
+                </div>
+            `;
+            backdrop.appendChild(modal);
+            document.body.appendChild(backdrop);
+            requestAnimationFrame(() => backdrop.classList.add('is-visible'));
+
+            const input = modal.querySelector('input');
+            const close = (value) => {
+                backdrop.classList.remove('is-visible');
+                setTimeout(() => backdrop.remove(), 200);
+                resolve(value);
+            };
+
+            modal.querySelector('.modal-close').addEventListener('click', () => close(null));
+            modal.querySelector('.prompt-cancel').addEventListener('click', () => close(null));
+            modal.querySelector('.prompt-ok').addEventListener('click', () => close(input.value));
+            backdrop.addEventListener('click', (e) => { if (e.target === backdrop) close(null); });
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') close(input.value);
+                if (e.key === 'Escape') close(null);
+            });
+
+            setTimeout(() => input.focus(), 50);
+        });
     }
 }
 

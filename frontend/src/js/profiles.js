@@ -107,7 +107,7 @@ class ProfileEditor {
     render(profile, isNew) {
         this.close();
 
-        const overlay = createElement('div', 'drawer-overlay');
+        const overlay = createElement('div', 'drawer-backdrop');
         const drawer = createElement('div', 'drawer');
 
         // ── Header ──────────────────────────────────────────────
@@ -182,6 +182,12 @@ class ProfileEditor {
         overlay.appendChild(drawer);
         document.body.appendChild(overlay);
         this.drawer = overlay;
+
+        // Trigger visibility after append so CSS transitions animate
+        requestAnimationFrame(() => {
+            overlay.classList.add('is-visible');
+            drawer.classList.add('is-visible');
+        });
 
         // Prevent overlay click from reaching through the drawer
         drawer.addEventListener('click', (e) => e.stopPropagation());

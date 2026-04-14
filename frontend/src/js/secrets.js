@@ -29,7 +29,7 @@ class SecretPrompt {
         return new Promise((resolve, reject) => {
             this._close(); // dismiss any existing prompt
 
-            const overlay = createElement('div', 'modal-overlay');
+            const overlay = createElement('div', 'modal-backdrop');
             const modal = createElement('div', 'modal modal-secret');
 
             // Header
@@ -62,6 +62,11 @@ class SecretPrompt {
             overlay.appendChild(modal);
             document.body.appendChild(overlay);
             this._overlay = overlay;
+
+            requestAnimationFrame(() => {
+                overlay.classList.add('is-visible');
+                modal.classList.add('is-visible');
+            });
 
             const input = modal.querySelector('.secret-input');
             input.focus();
@@ -103,7 +108,7 @@ class SecretPrompt {
         return new Promise((resolve, reject) => {
             this._close();
 
-            const overlay = createElement('div', 'modal-overlay');
+            const overlay = createElement('div', 'modal-backdrop');
             const modal = createElement('div', 'modal modal-secret');
 
             const title = isNew ? 'Create Master Password' : 'Unlock Secret Store';
@@ -150,6 +155,11 @@ class SecretPrompt {
             overlay.appendChild(modal);
             document.body.appendChild(overlay);
             this._overlay = overlay;
+
+            requestAnimationFrame(() => {
+                overlay.classList.add('is-visible');
+                modal.classList.add('is-visible');
+            });
 
             const passInput = modal.querySelector('.master-password');
             const confirmInput = modal.querySelector('.master-confirm');
@@ -211,7 +221,7 @@ class SecretPrompt {
         return new Promise((resolve) => {
             this._close();
 
-            const overlay = createElement('div', 'modal-overlay');
+            const overlay = createElement('div', 'modal-backdrop');
             const modal = createElement('div', 'modal modal-secret modal-hostkey');
 
             const header = createElement('div', 'modal-header');

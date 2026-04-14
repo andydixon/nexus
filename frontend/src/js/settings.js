@@ -86,7 +86,7 @@ class Settings {
     _render() {
         this.close();
 
-        const overlay = createElement('div', 'modal-overlay');
+        const overlay = createElement('div', 'modal-backdrop');
         const modal = createElement('div', 'modal modal-settings');
 
         // Header
@@ -136,6 +136,12 @@ class Settings {
         modal.addEventListener('click', (e) => e.stopPropagation());
         document.body.appendChild(overlay);
         this._overlay = overlay;
+
+        // Trigger visibility after append so CSS transitions animate
+        requestAnimationFrame(() => {
+            overlay.classList.add('is-visible');
+            modal.classList.add('is-visible');
+        });
     }
 
     /**
