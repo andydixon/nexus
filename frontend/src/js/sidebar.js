@@ -151,7 +151,7 @@ class Sidebar {
         }
 
         // Protocol colour dot
-        const dot = createElement('span', `sidebar-dot ${protocolColour(profile.protocol)}`);
+        const dot = createElement('span', `protocol-indicator ${protocolColour(profile.protocol)}`);
         item.appendChild(dot);
 
         // Text content
@@ -164,7 +164,7 @@ class Sidebar {
         const subtitle = profile.host
             ? `${profile.host}:${profile.port}`
             : profile.protocol.toUpperCase();
-        const subEl = createElement('span', 'sidebar-item-sub', {
+        const subEl = createElement('span', 'sidebar-item-host', {
             textContent: truncate(subtitle, 30),
         });
         textWrapper.appendChild(subEl);
@@ -172,7 +172,7 @@ class Sidebar {
 
         // Favourite star
         if (profile.favourite) {
-            const star = createElement('span', 'sidebar-star', { textContent: '★' });
+            const star = createElement('span', 'sidebar-item-star is-favourite', { textContent: '★' });
             item.appendChild(star);
         }
 

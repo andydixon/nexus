@@ -207,9 +207,9 @@ function dismissContextMenus() {
  */
 function protocolColour(protocol) {
     switch (protocol) {
-        case 'ssh': return 'protocol-ssh';
-        case 'telnet': return 'protocol-telnet';
-        case 'raw': return 'protocol-raw';
+        case 'ssh': return 'proto-ssh';
+        case 'telnet': return 'proto-telnet';
+        case 'raw': return 'proto-raw';
         default: return '';
     }
 }

@@ -295,8 +295,9 @@ class App {
             searchInput.addEventListener('input', (e) => this.sidebar.search(e.target.value));
         }
 
-        // Window resize → re-fit active terminal
-        window.addEventListener('resize', () => this.terminals.fitActive());
+        // Window resize → re-fit active terminal (debounced)
+        const { debounce } = window.NexusTerminal;
+        window.addEventListener('resize', debounce(() => this.terminals.fitActive(), 100));
     }
 
     // ── Connection lifecycle ─────────────────────────────────────────

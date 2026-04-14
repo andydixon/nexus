@@ -67,37 +67,50 @@
 }
 
 /* xterm.js overrides for consistent look */
-.terminal-container .xterm {
+.terminal-container .xterm,
+.session-panel .xterm {
     height: 100%;
-    padding: 0;
+    padding: var(--space-1);
 }
 
-.terminal-container .xterm-viewport {
+.terminal-container .xterm-screen,
+.session-panel .xterm-screen {
+    height: 100%;
+}
+
+.terminal-container .xterm-viewport,
+.session-panel .xterm-viewport {
     /* Allow xterm's own scrollbar to work */
     overflow-y: auto !important;
 }
 
-.terminal-container .xterm-viewport::-webkit-scrollbar {
+.terminal-container .xterm-viewport::-webkit-scrollbar,
+.session-panel .xterm-viewport::-webkit-scrollbar {
     width: 6px;
 }
-.terminal-container .xterm-viewport::-webkit-scrollbar-track {
+.terminal-container .xterm-viewport::-webkit-scrollbar-track,
+.session-panel .xterm-viewport::-webkit-scrollbar-track {
     background: transparent;
 }
-.terminal-container .xterm-viewport::-webkit-scrollbar-thumb {
+.terminal-container .xterm-viewport::-webkit-scrollbar-thumb,
+.session-panel .xterm-viewport::-webkit-scrollbar-thumb {
     background: var(--border-strong);
     border-radius: var(--radius-full);
 }
-.terminal-container .xterm-viewport::-webkit-scrollbar-thumb:hover {
+.terminal-container .xterm-viewport::-webkit-scrollbar-thumb:hover,
+.session-panel .xterm-viewport::-webkit-scrollbar-thumb:hover {
     background: var(--text-tertiary);
 }
 
 /* Ensure cursor blink is visible */
-.terminal-container .xterm-cursor-layer {
+.terminal-container .xterm-cursor-layer,
+.session-panel .xterm-cursor-layer {
     z-index: 1;
 }
 
 /* Selection styling within terminal */
-.terminal-container .xterm .xterm-selection div {
+.terminal-container .xterm .xterm-selection div,
+.session-panel .xterm .xterm-selection div {
     background: var(--accent-strong) !important;
 }
 

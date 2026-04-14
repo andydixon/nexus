@@ -446,10 +446,12 @@ class TabManager {
     _promptRename(sessionId) {
         const session = this.app.state.getSession(sessionId);
         const current = session?.tabName || '';
-        const name = prompt('Tab name:', current);
-        if (name !== null && name.trim()) {
-            this.renameTab(sessionId, name.trim());
-        }
+        // Use the app's custom prompt modal (window.prompt is unavailable in WKWebView)
+        this.app._inputPrompt('Rename Tab', 'Tab name', current).then((name) => {
+            if (name !== null && name.trim()) {
+                this.renameTab(sessionId, name.trim());
+            }
+        });
     }
 
     /**

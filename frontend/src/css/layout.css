@@ -70,6 +70,24 @@
     position: relative;
     overflow: hidden;
     background: var(--bg-base);
+    display: flex;
+    flex-direction: column;
+}
+
+/* Panel container — fills workspace, holds session panels */
+.panel-container {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+}
+
+/* Individual session panel — one per tab, fills the panel container */
+.session-panel {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
 }
 
 /* Terminal container — fills workspace */
