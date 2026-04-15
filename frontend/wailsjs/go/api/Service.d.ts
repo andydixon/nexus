@@ -3,6 +3,8 @@
 import {models} from '../models';
 import {context} from '../models';
 
+export function CheckForUpdates():Promise<Record<string, any>>;
+
 export function ClearSessionHistory(arg1:string):Promise<void>;
 
 export function CloseAllSessions():Promise<void>;
@@ -42,6 +44,8 @@ export function GetSessionHistory(arg1:string):Promise<Array<Record<string, any>
 export function ImportProfiles(arg1:string,arg2:string):Promise<number>;
 
 export function ImportProfilesEncrypted(arg1:string,arg2:string):Promise<number>;
+
+export function ImportSSHConfig(arg1:string,arg2:string):Promise<number>;
 
 export function InitialiseSecretStore(arg1:string):Promise<void>;
 
@@ -86,6 +90,20 @@ export function RegisterSecretResponseListener():Promise<void>;
 export function RenameSession(arg1:string,arg2:string):Promise<void>;
 
 export function ResizeSession(arg1:string,arg2:number,arg3:number):Promise<void>;
+
+export function SFTPDownload(arg1:string,arg2:string):Promise<void>;
+
+export function SFTPList(arg1:string,arg2:string):Promise<Array<Record<string, any>>>;
+
+export function SFTPMkdir(arg1:string,arg2:string):Promise<void>;
+
+export function SFTPPwd(arg1:string):Promise<string>;
+
+export function SFTPRemove(arg1:string,arg2:string):Promise<void>;
+
+export function SFTPRename(arg1:string,arg2:string,arg3:string):Promise<void>;
+
+export function SFTPUpload(arg1:string,arg2:string):Promise<void>;
 
 export function SaveFile(arg1:string,arg2:string):Promise<string>;
 

@@ -19,6 +19,7 @@ import (
 	"github.com/copilot-ssh-client/app/internal/rawclient"
 	"github.com/copilot-ssh-client/app/internal/recording"
 	"github.com/copilot-ssh-client/app/internal/secrets"
+	"github.com/copilot-ssh-client/app/internal/sftpclient"
 	"github.com/copilot-ssh-client/app/internal/sshclient"
 	"github.com/copilot-ssh-client/app/internal/storage"
 	"github.com/copilot-ssh-client/app/internal/telnetclient"
@@ -32,6 +33,7 @@ type Session struct {
 	rawClient    *rawclient.Client
 	githubClient *githubclient.Client
 	githubCancel context.CancelFunc // stops the auto-refresh goroutine
+	sftpClient   *sftpclient.Client // SFTP subsystem, nil until requested
 	profile      *models.Profile
 	recorder     *recording.Recorder // active recording, nil if not recording
 }
@@ -827,6 +829,137 @@ func (m *Manager) DeleteRecording(id string) error {
 }
 
 // ---------------------------------------------------------------------------
+// SFTP file browser
+// ---------------------------------------------------------------------------
+
+// getSFTP returns or lazily creates the SFTP client for an SSH session.
+func (m *Manager) getSFTP(sessionID string) (*sftpclient.Client, error) {
+	m.mu.Lock()
+	sess, ok := m.sessions[sessionID]
+	if !ok {
+		m.mu.Unlock()
+		return nil, fmt.Errorf("sessions: session %q not found", sessionID)
+	}
+	if sess.sshClient == nil {
+		m.mu.Unlock()
+		return nil, fmt.Errorf("sessions: session %q is not an SSH connection", sessionID)
+	}
+
+	// Return existing SFTP client if already open.
+	if sess.sftpClient != nil {
+		c := sess.sftpClient
+		m.mu.Unlock()
+		return c, nil
+	}
+	m.mu.Unlock()
+
+	// Create a new SFTP subsystem.
+	sshConn := sess.sshClient.SSHConn()
+	if sshConn == nil {
+		return nil, fmt.Errorf("sessions: SSH connection is not established")
+	}
+
+	sc, err := sftpclient.NewClient(sshConn)
+	if err != nil {
+		return nil, err
+	}
+
+	m.mu.Lock()
+	sess.sftpClient = sc
+	m.mu.Unlock()
+
+	return sc, nil
+}
+
+// SFTPList lists the contents of a remote directory.
+func (m *Manager) SFTPList(sessionID, remotePath string) ([]sftpclient.FileEntry, error) {
+	sc, err := m.getSFTP(sessionID)
+	if err != nil {
+		return nil, err
+	}
+	return sc.List(remotePath)
+}
+
+// SFTPStat returns information about a remote path.
+func (m *Manager) SFTPStat(sessionID, remotePath string) (*sftpclient.FileEntry, error) {
+	sc, err := m.getSFTP(sessionID)
+	if err != nil {
+		return nil, err
+	}
+	return sc.Stat(remotePath)
+}
+
+// SFTPMkdir creates a remote directory.
+func (m *Manager) SFTPMkdir(sessionID, remotePath string) error {
+	sc, err := m.getSFTP(sessionID)
+	if err != nil {
+		return err
+	}
+	return sc.MkdirAll(remotePath)
+}
+
+// SFTPRemove deletes a remote file or empty directory.
+func (m *Manager) SFTPRemove(sessionID, remotePath string) error {
+	sc, err := m.getSFTP(sessionID)
+	if err != nil {
+		return err
+	}
+	return sc.Remove(remotePath)
+}
+
+// SFTPRename moves or renames a remote file/directory.
+func (m *Manager) SFTPRename(sessionID, oldPath, newPath string) error {
+	sc, err := m.getSFTP(sessionID)
+	if err != nil {
+		return err
+	}
+	return sc.Rename(oldPath, newPath)
+}
+
+// SFTPDownload downloads a remote file to a local path.
+func (m *Manager) SFTPDownload(sessionID, remotePath, localPath string) error {
+	sc, err := m.getSFTP(sessionID)
+	if err != nil {
+		return err
+	}
+	return sc.Download(remotePath, localPath, func(p sftpclient.TransferProgress) {
+		m.emitEvent("session:sftp:progress", map[string]interface{}{
+			"sessionID":   sessionID,
+			"transferred": p.Transferred,
+			"total":       p.Total,
+			"path":        p.Path,
+			"done":        p.Done,
+		})
+	})
+}
+
+// SFTPUpload uploads a local file to a remote path.
+func (m *Manager) SFTPUpload(sessionID, localPath, remotePath string) error {
+	sc, err := m.getSFTP(sessionID)
+	if err != nil {
+		return err
+	}
+	return sc.Upload(localPath, remotePath, func(p sftpclient.TransferProgress) {
+		m.emitEvent("session:sftp:progress", map[string]interface{}{
+			"sessionID":   sessionID,
+			"transferred": p.Transferred,
+			"total":       p.Total,
+			"path":        p.Path,
+			"done":        p.Done,
+		})
+	})
+}
+
+// SFTPPwd returns the current working directory on the remote host.
+func (m *Manager) SFTPPwd(sessionID string) (string, error) {
+	sc, err := m.getSFTP(sessionID)
+	if err != nil {
+		return "", err
+	}
+	return sc.Pwd()
+}
+
+// ---------------------------------------------------------------------------
 // Port-forwarding management
 // ---------------------------------------------------------------------------
 
@@ -990,6 +1123,12 @@ func (m *Manager) closeSession(sess *Session) {
 	if sess.recorder != nil {
 		sess.recorder.Close()
 		sess.recorder = nil
+	}
+
+	// Close SFTP subsystem if open.
+	if sess.sftpClient != nil {
+		sess.sftpClient.Close()
+		sess.sftpClient = nil
 	}
 
 	if sess.sshClient != nil {

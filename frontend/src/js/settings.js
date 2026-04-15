@@ -367,9 +367,58 @@ class Settings {
                     <p>AES-256-GCM encrypted credential vault</p>
                     <p>Platform-native keychain integration</p>
                     <p>xterm.js terminal emulation</p>
+                    <p>SFTP file browser and transfer</p>
+                    <p>Session recording and playback</p>
                 </div>
+                <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap;">
+                    <button class="btn btn-sm btn-primary" id="settings-check-update">Check for Updates</button>
+                    <button class="btn btn-sm btn-outline" id="settings-import-sshconfig">Import ~/.ssh/config</button>
+                </div>
+                <div id="settings-update-result" style="margin-top:8px;font-size:12px;"></div>
             </div>
         `;
+
+        const updateBtn = body.querySelector('#settings-check-update');
+        if (updateBtn) {
+            updateBtn.addEventListener('click', async () => {
+                updateBtn.disabled = true;
+                updateBtn.textContent = 'Checking…';
+                try {
+                    const info = await window.go.api.Service.CheckForUpdates();
+                    const resultEl = body.querySelector('#settings-update-result');
+                    if (info.available) {
+                        resultEl.innerHTML = `<span style="color:var(--accent)">Update available: <strong>${info.latestVersion}</strong></span>` +
+                            (info.releaseURL ? ` — <a href="#" onclick="window.runtime.BrowserOpenURL('${info.releaseURL}');return false;" style="color:var(--accent)">View release</a>` : '');
+                    } else {
+                        resultEl.textContent = 'You are running the latest version.';
+                    }
+                } catch (err) {
+                    const resultEl = body.querySelector('#settings-update-result');
+                    resultEl.textContent = 'Update check failed: ' + err;
+                } finally {
+                    updateBtn.disabled = false;
+                    updateBtn.textContent = 'Check for Updates';
+                }
+            });
+        }
+
+        const importBtn = body.querySelector('#settings-import-sshconfig');
+        if (importBtn) {
+            importBtn.addEventListener('click', async () => {
+                importBtn.disabled = true;
+                importBtn.textContent = 'Importing…';
+                try {
+                    const count = await window.go.api.Service.ImportSSHConfig('', 'SSH Config');
+                    this.app.notifications.success(`Imported ${count} host(s) from ~/.ssh/config`);
+                    await this.app.loadProfiles();
+                } catch (err) {
+                    this.app.notifications.error('SSH config import failed: ' + err);
+                } finally {
+                    importBtn.disabled = false;
+                    importBtn.textContent = 'Import ~/.ssh/config';
+                }
+            });
+        }
     }
 
     // ── Form helpers ─────────────────────────────────────────────────

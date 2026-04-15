@@ -21,7 +21,9 @@ import (
 	"github.com/copilot-ssh-client/app/internal/preferences"
 	"github.com/copilot-ssh-client/app/internal/secrets"
 	"github.com/copilot-ssh-client/app/internal/sessions"
+	"github.com/copilot-ssh-client/app/internal/sshconfig"
 	"github.com/copilot-ssh-client/app/internal/storage"
+	"github.com/copilot-ssh-client/app/internal/updater"
 	"github.com/google/uuid"
 )
 
@@ -850,6 +852,144 @@ func (s *Service) ImportProfilesEncrypted(password string, strategy string) (int
 
 	s.auditLog.LogImport(imported)
 	return imported, nil
+}
+
+// ---------------------------------------------------------------------------
+// SFTP file browser
+// ---------------------------------------------------------------------------
+
+// SFTPList lists the contents of a remote directory.
+func (s *Service) SFTPList(sessionID string, remotePath string) ([]map[string]interface{}, error) {
+	entries, err := s.sessions.SFTPList(sessionID, remotePath)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]map[string]interface{}, len(entries))
+	for i, e := range entries {
+		result[i] = map[string]interface{}{
+			"name":       e.Name,
+			"path":       e.Path,
+			"size":       e.Size,
+			"isDir":      e.IsDir,
+			"mode":       e.Mode,
+			"modifiedAt": e.ModifiedAt,
+		}
+	}
+	return result, nil
+}
+
+// SFTPMkdir creates a remote directory (including parents).
+func (s *Service) SFTPMkdir(sessionID string, remotePath string) error {
+	return s.sessions.SFTPMkdir(sessionID, remotePath)
+}
+
+// SFTPRemove deletes a remote file or empty directory.
+func (s *Service) SFTPRemove(sessionID string, remotePath string) error {
+	return s.sessions.SFTPRemove(sessionID, remotePath)
+}
+
+// SFTPRename moves or renames a remote file/directory.
+func (s *Service) SFTPRename(sessionID string, oldPath string, newPath string) error {
+	return s.sessions.SFTPRename(sessionID, oldPath, newPath)
+}
+
+// SFTPDownload downloads a remote file. Opens a native save dialog for the
+// local destination.
+func (s *Service) SFTPDownload(sessionID string, remotePath string) error {
+	if s.ctx == nil {
+		return fmt.Errorf("application context not set")
+	}
+
+	localPath, err := wailsRuntime.SaveFileDialog(s.ctx, wailsRuntime.SaveDialogOptions{
+		Title:           "Save File",
+		DefaultFilename: filepath.Base(remotePath),
+	})
+	if err != nil {
+		return fmt.Errorf("save dialog failed: %w", err)
+	}
+	if localPath == "" {
+		return fmt.Errorf("download cancelled")
+	}
+
+	return s.sessions.SFTPDownload(sessionID, remotePath, localPath)
+}
+
+// SFTPUpload uploads a local file to a remote directory. Opens a native file
+// dialog to select the local file.
+func (s *Service) SFTPUpload(sessionID string, remotePath string) error {
+	if s.ctx == nil {
+		return fmt.Errorf("application context not set")
+	}
+
+	localPath, err := wailsRuntime.OpenFileDialog(s.ctx, wailsRuntime.OpenDialogOptions{
+		Title: "Select File to Upload",
+	})
+	if err != nil {
+		return fmt.Errorf("open dialog failed: %w", err)
+	}
+	if localPath == "" {
+		return fmt.Errorf("upload cancelled")
+	}
+
+	destPath := remotePath + "/" + filepath.Base(localPath)
+	return s.sessions.SFTPUpload(sessionID, localPath, destPath)
+}
+
+// SFTPPwd returns the current working directory on the remote host.
+func (s *Service) SFTPPwd(sessionID string) (string, error) {
+	return s.sessions.SFTPPwd(sessionID)
+}
+
+// ---------------------------------------------------------------------------
+// OpenSSH config import
+// ---------------------------------------------------------------------------
+
+// ImportSSHConfig parses the given SSH config file (or the default
+// ~/.ssh/config if path is empty) and imports the Host blocks as profiles.
+func (s *Service) ImportSSHConfig(configPath string, folder string) (int, error) {
+	if configPath == "" {
+		configPath = sshconfig.DefaultConfigPath()
+	}
+
+	blocks, err := sshconfig.ParseFile(configPath)
+	if err != nil {
+		return 0, err
+	}
+
+	profiles := sshconfig.ToProfiles(blocks, folder)
+	imported := 0
+	for _, p := range profiles {
+		if err := s.store.CreateProfile(&p); err != nil {
+			continue // skip duplicates or errors
+		}
+		imported++
+	}
+
+	s.auditLog.LogImport(imported)
+	return imported, nil
+}
+
+// ---------------------------------------------------------------------------
+// Automatic update checking
+// ---------------------------------------------------------------------------
+
+// CheckForUpdates queries GitHub Releases for a newer version.
+func (s *Service) CheckForUpdates() (map[string]interface{}, error) {
+	checker := updater.NewChecker(appVersion)
+	info, err := checker.Check(context.Background())
+	if err != nil {
+		return nil, err
+	}
+
+	return map[string]interface{}{
+		"available":      info.Available,
+		"currentVersion": info.CurrentVersion,
+		"latestVersion":  info.LatestVersion,
+		"releaseURL":     info.ReleaseURL,
+		"releaseName":    info.ReleaseName,
+		"releaseNotes":   info.ReleaseNotes,
+		"publishedAt":    info.PublishedAt,
+	}, nil
 }
 
 // TestConnection performs a basic TCP reachability check to the given host and port.

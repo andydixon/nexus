@@ -4,7 +4,7 @@
  * Initialises the application shell, loads profiles, and sets up event listeners.
  */
 
-const { State, Sidebar, TabManager, TerminalManager, ProfileEditor, RawViewer, Notifications, Settings, CommandPalette, SecretPrompt, SplitPaneManager, RecordingManager, ExportImportUI, stateLabel } = window.NexusTerminal;
+const { State, Sidebar, TabManager, TerminalManager, ProfileEditor, RawViewer, Notifications, Settings, CommandPalette, SecretPrompt, SplitPaneManager, RecordingManager, ExportImportUI, SFTPBrowser, stateLabel } = window.NexusTerminal;
 
 class App {
     constructor() {
@@ -21,6 +21,7 @@ class App {
         this.splitPanes = new SplitPaneManager(this);
         this.recordings = new RecordingManager(this);
         this.exportImport = new ExportImportUI(this);
+        this.sftp = new SFTPBrowser(this);
     }
 
     /**
@@ -160,6 +161,7 @@ class App {
 
         // Session closed by backend
         window.runtime.EventsOn('session:closed', (payload) => {
+            this.sftp.close(payload.sessionID);
             this.tabs.handleSessionClosed(payload.sessionID);
             this.updateStatusBar();
         });
@@ -355,6 +357,18 @@ class App {
                 e.preventDefault();
                 if (this.state.activeSessionId) {
                     this.recordings.toggle(this.state.activeSessionId);
+                }
+                return;
+            }
+
+            // Ctrl/Cmd+Shift+F — toggle SFTP file browser on active SSH session
+            if (mod && e.shiftKey && e.key === 'F') {
+                e.preventDefault();
+                if (this.state.activeSessionId) {
+                    var session = this.state.getSession(this.state.activeSessionId);
+                    if (session && session.protocol === 'ssh') {
+                        this.sftp.toggle(this.state.activeSessionId);
+                    }
                 }
                 return;
             }

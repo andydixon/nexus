@@ -304,6 +304,14 @@ func (c *Client) Forwards() *ForwardManager {
 	return c.forwards
 }
 
+// SSHConn returns the underlying ssh.Client for use by subsystems such as
+// SFTP. Returns nil if not connected.
+func (c *Client) SSHConn() *ssh.Client {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.sshClient
+}
+
 // buildAuthMethods constructs the SSH authentication method list from the
 // profile's SSHConfig and the provided credential callbacks.
 func (c *Client) buildAuthMethods(sc models.SSHConfig, getPassword func() (string, error), getPassphrase func() (string, error)) ([]ssh.AuthMethod, error) {
