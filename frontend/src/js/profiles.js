@@ -52,6 +52,16 @@ const DEFAULTS = {
             payloadPresets: [],
         },
     },
+    github: {
+        port: 443,
+        protocol: 'github',
+        host: 'github.com',
+        github: {
+            baseURL: 'https://api.github.com',
+            secretMode: 'saved',
+            refreshIntervalSecs: 300,
+        },
+    },
 };
 
 class ProfileEditor {
@@ -119,11 +129,12 @@ class ProfileEditor {
         drawer.appendChild(header);
 
         // ── Protocol selector tabs ──────────────────────────────
-        const protocols = ['ssh', 'telnet', 'raw'];
+        const protocols = ['ssh', 'telnet', 'raw', 'github'];
         const tabBar = createElement('div', 'drawer-protocol-tabs');
         for (const proto of protocols) {
+            const label = proto === 'github' ? 'GitHub' : proto.toUpperCase();
             const btn = createElement('button', `drawer-proto-tab ${profile.protocol === proto ? 'active' : ''}`, {
-                textContent: proto.toUpperCase(),
+                textContent: label,
                 dataset: { proto },
             });
             btn.addEventListener('click', () => this.handleProtocolChange(proto));
@@ -148,10 +159,13 @@ class ProfileEditor {
             case 'raw':
                 this._renderRAWSections(profile).forEach((s) => body.appendChild(s));
                 break;
+            case 'github':
+                this._renderGitHubSections(profile).forEach((s) => body.appendChild(s));
+                break;
         }
 
         // Terminal section (SSH and Telnet only)
-        if (profile.protocol !== 'raw') {
+        if (profile.protocol !== 'raw' && profile.protocol !== 'github') {
             body.appendChild(this._renderTerminalSection(profile));
         }
 
@@ -237,14 +251,24 @@ class ProfileEditor {
 
     /** @private */
     _renderGeneralSection(profile) {
-        return this._renderSection('General', [
+        const fields = [
             this._field('text', 'displayName', 'Display Name', profile.displayName, { placeholder: 'My Server' }),
-            this._field('text', 'host', 'Host', profile.host, { placeholder: '192.168.1.1 or example.com', required: true }),
-            this._field('number', 'port', 'Port', profile.port, { min: 1, max: 65535, required: true }),
-            this._field('text', 'username', 'Username', profile.username, { placeholder: 'root' }),
-            this._renderGroupField(profile),
-            this._field('text', 'description', 'Description', profile.description, { placeholder: 'Optional description' }),
-        ]);
+            this._field('text', 'host', 'Host', profile.host, {
+                placeholder: profile.protocol === 'github' ? 'github.com' : '192.168.1.1 or example.com',
+                required: true,
+            }),
+        ];
+
+        // Port and username not relevant for GitHub connections
+        if (profile.protocol !== 'github') {
+            fields.push(this._field('number', 'port', 'Port', profile.port, { min: 1, max: 65535, required: true }));
+            fields.push(this._field('text', 'username', 'Username', profile.username, { placeholder: 'root' }));
+        }
+
+        fields.push(this._renderGroupField(profile));
+        fields.push(this._field('text', 'description', 'Description', profile.description, { placeholder: 'Optional description' }));
+
+        return this._renderSection('General', fields);
     }
 
     /**
@@ -446,6 +470,33 @@ class ProfileEditor {
             this._field('number', 'connectTimeout', 'Connect Timeout (s)', profile.connectTimeout, { min: 0 }),
             this._field('number', 'readTimeout', 'Read Timeout (s)', profile.readTimeout, { min: 0 }),
             this._field('toggle', 'raw.autoReconnect', 'Auto-reconnect', raw.autoReconnect),
+        ]));
+
+        return sections;
+    }
+
+    /** @private */
+    _renderGitHubSections(profile) {
+        const sections = [];
+        const gh = profile.github || DEFAULTS.github.github;
+
+        sections.push(this._renderSection('API', [
+            this._field('text', 'github.baseURL', 'API Base URL', gh.baseURL, {
+                placeholder: 'https://api.github.com',
+            }),
+            this._field('select', 'github.secretMode', 'Token Storage', gh.secretMode, {
+                options: [
+                    { value: 'saved', label: 'Save to keychain' },
+                    { value: 'session-only', label: 'Remember for session' },
+                    { value: 'ask-every-time', label: 'Ask every time' },
+                ],
+            }),
+        ]));
+
+        sections.push(this._renderSection('Refresh', [
+            this._field('number', 'github.refreshIntervalSecs', 'Refresh Interval (seconds)', gh.refreshIntervalSecs, {
+                min: 60, max: 3600,
+            }),
         ]));
 
         return sections;
@@ -842,6 +893,14 @@ class ProfileEditor {
                 pi++;
             }
             p.raw.payloadPresets = presets;
+        }
+
+        // GitHub-specific
+        if (p.protocol === 'github') {
+            if (!p.github) p.github = {};
+            p.github.baseURL = val('github.baseURL') || 'https://api.github.com';
+            p.github.secretMode = val('github.secretMode') || 'saved';
+            p.github.refreshIntervalSecs = val('github.refreshIntervalSecs') || 300;
         }
     }
 

@@ -166,6 +166,20 @@ class App {
             this.rawViewer.handleData(payload);
         });
 
+        // GitHub repository data
+        window.runtime.EventsOn('session:github:repos', (payload) => {
+            window.NexusTerminal.GitHubViewer.updateRepos(
+                payload.sessionID, payload.login, payload.repos
+            );
+        });
+
+        // GitHub refresh errors
+        window.runtime.EventsOn('session:github:error', (payload) => {
+            window.NexusTerminal.GitHubViewer.showError(
+                payload.sessionID, payload.error
+            );
+        });
+
         // Telnet negotiation debug messages
         window.runtime.EventsOn('session:debug', (payload) => {
             console.debug('[session:debug]', payload);
@@ -341,6 +355,13 @@ class App {
             const panelId = `panel-${sessionInfo.id}`;
             if (profile.protocol === 'raw') {
                 this.rawViewer.createViewer(sessionInfo.id, panelId, profile);
+            } else if (profile.protocol === 'github') {
+                const container = document.getElementById(panelId);
+                if (container) {
+                    window.NexusTerminal.GitHubViewer.createViewer(
+                        sessionInfo.id, container, profile.displayName || profile.host
+                    );
+                }
             } else {
                 this.terminals.createTerminal(sessionInfo.id, panelId, profile);
             }

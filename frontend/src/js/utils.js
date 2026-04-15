@@ -202,7 +202,7 @@ function dismissContextMenus() {
 
 /**
  * Returns the protocol badge colour class.
- * @param {string} protocol - 'ssh', 'telnet', or 'raw'.
+ * @param {string} protocol - 'ssh', 'telnet', 'raw', or 'github'.
  * @returns {string}
  */
 function protocolColour(protocol) {
@@ -210,8 +210,35 @@ function protocolColour(protocol) {
         case 'ssh': return 'proto-ssh';
         case 'telnet': return 'proto-telnet';
         case 'raw': return 'proto-raw';
+        case 'github': return 'proto-github';
         default: return '';
     }
+}
+
+/**
+ * Returns a human-friendly relative time string for an ISO date.
+ * @param {string} isoDate - ISO 8601 date string.
+ * @returns {string} e.g. "3 hours ago", "2 days ago".
+ */
+function relativeTime(isoDate) {
+    if (!isoDate) return '';
+    const d = new Date(isoDate);
+    if (isNaN(d.getTime())) return '';
+
+    const now = Date.now();
+    const diff = now - d.getTime();
+    const secs = Math.floor(diff / 1000);
+    if (secs < 60) return 'just now';
+    const mins = Math.floor(secs / 60);
+    if (mins < 60) return mins === 1 ? '1 minute ago' : `${mins} minutes ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return hrs === 1 ? '1 hour ago' : `${hrs} hours ago`;
+    const days = Math.floor(hrs / 24);
+    if (days < 30) return days === 1 ? '1 day ago' : `${days} days ago`;
+    const months = Math.floor(days / 30);
+    if (months < 12) return months === 1 ? '1 month ago' : `${months} months ago`;
+    const years = Math.floor(months / 12);
+    return years === 1 ? '1 year ago' : `${years} years ago`;
 }
 
 /**
@@ -230,6 +257,6 @@ function stateLabel(state) {
 }
 
 window.NexusTerminal = window.NexusTerminal || {};
-Object.assign(window.NexusTerminal, { $, $$, createElement, escapeHtml, formatTimestamp, debounce, fuzzyMatch, base64Encode, base64Decode, generateId, formatBytes, truncate, dismissContextMenus, protocolColour, stateLabel });
+Object.assign(window.NexusTerminal, { $, $$, createElement, escapeHtml, formatTimestamp, debounce, fuzzyMatch, base64Encode, base64Decode, generateId, formatBytes, truncate, dismissContextMenus, protocolColour, stateLabel, relativeTime });
 
 })();

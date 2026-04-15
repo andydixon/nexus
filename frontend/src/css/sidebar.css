@@ -185,6 +185,7 @@
 .sidebar-item .protocol-indicator.proto-ssh    { background: var(--protocol-ssh); }
 .sidebar-item .protocol-indicator.proto-telnet { background: var(--protocol-telnet); }
 .sidebar-item .protocol-indicator.proto-raw    { background: var(--protocol-raw); }
+.sidebar-item .protocol-indicator.proto-github { background: var(--protocol-github); }
 
 /* Text block (name + host) */
 .sidebar-item-text {

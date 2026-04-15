@@ -11,6 +11,7 @@ const (
 	DefaultSSHPort    = 22
 	DefaultTelnetPort = 23
 	DefaultRAWPort    = 23
+	DefaultGitHubPort = 443
 )
 
 // Default timeout values (in seconds).
@@ -95,6 +96,14 @@ func NewProfile(protocol Protocol) Profile {
 			LineEnding:     LineEndingCRLF,
 			Encoding:       "utf-8",
 			PayloadPresets: []PayloadPreset{},
+		}
+	case ProtocolGitHub:
+		p.Port = DefaultGitHubPort
+		p.Host = "github.com"
+		p.GitHub = &GitHubConfig{
+			BaseURL:             "https://api.github.com",
+			SecretMode:          SecretModeSaved,
+			RefreshIntervalSecs: 300,
 		}
 	}
 

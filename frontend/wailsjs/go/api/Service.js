@@ -126,6 +126,10 @@ export function ReconnectSession(arg1) {
   return window['go']['api']['Service']['ReconnectSession'](arg1);
 }
 
+export function RefreshGitHubRepos(arg1) {
+  return window['go']['api']['Service']['RefreshGitHubRepos'](arg1);
+}
+
 export function RegisterSecretResponseListener() {
   return window['go']['api']['Service']['RegisterSecretResponseListener']();
 }

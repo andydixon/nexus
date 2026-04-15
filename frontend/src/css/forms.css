@@ -148,14 +148,16 @@
 
 .protocol-ssh .proto-only-ssh,
 .protocol-telnet .proto-only-telnet,
-.protocol-raw .proto-only-raw {
+.protocol-raw .proto-only-raw,
+.protocol-github .proto-only-github {
     display: flex;
 }
 
 /* For block-level protocol fields */
 .protocol-ssh .proto-only-ssh.form-section,
 .protocol-telnet .proto-only-telnet.form-section,
-.protocol-raw .proto-only-raw.form-section {
+.protocol-raw .proto-only-raw.form-section,
+.protocol-github .proto-only-github.form-section {
     display: block;
 }
 

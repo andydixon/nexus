@@ -141,6 +141,7 @@ class TabManager {
 
         this.app.terminals.destroyTerminal(sessionId);
         this.app.rawViewer.destroyViewer(sessionId);
+        window.NexusTerminal.GitHubViewer.destroyViewer(sessionId);
         this.app.state.removeSession(sessionId);
         this.removeTab(sessionId);
     }
@@ -394,8 +395,9 @@ class TabManager {
         });
 
         // Protocol badge
-        const badge = createElement('span', `tab-badge ${protocolColour(sessionInfo.protocol)}`, {
-            textContent: sessionInfo.protocol.toUpperCase(),
+        const protoLabel = sessionInfo.protocol === 'github' ? 'GitHub' : sessionInfo.protocol.toUpperCase();
+        const badge = createElement('span', `tab-badge badge-${sessionInfo.protocol}`, {
+            textContent: protoLabel,
         });
         tab.appendChild(badge);
 
@@ -515,6 +517,7 @@ class TabManager {
         // Close the current tab, then open a fresh connection
         this.app.terminals.destroyTerminal(sessionId);
         this.app.rawViewer.destroyViewer(sessionId);
+        window.NexusTerminal.GitHubViewer.destroyViewer(sessionId);
         this.app.state.removeSession(sessionId);
         this.removeTab(sessionId);
 

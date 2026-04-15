@@ -71,6 +71,56 @@ export namespace models {
 		    return a;
 		}
 	}
+	export class GitHubConfig {
+	    baseURL: string;
+	    secretMode: string;
+	    refreshIntervalSecs: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new GitHubConfig(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.baseURL = source["baseURL"];
+	        this.secretMode = source["secretMode"];
+	        this.refreshIntervalSecs = source["refreshIntervalSecs"];
+	    }
+	}
+	export class GitHubRepo {
+	    fullName: string;
+	    name: string;
+	    owner: string;
+	    description: string;
+	    htmlURL: string;
+	    private: boolean;
+	    fork: boolean;
+	    archived: boolean;
+	    language: string;
+	    stars: number;
+	    pushedAt: string;
+	    updatedAt: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new GitHubRepo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.fullName = source["fullName"];
+	        this.name = source["name"];
+	        this.owner = source["owner"];
+	        this.description = source["description"];
+	        this.htmlURL = source["htmlURL"];
+	        this.private = source["private"];
+	        this.fork = source["fork"];
+	        this.archived = source["archived"];
+	        this.language = source["language"];
+	        this.stars = source["stars"];
+	        this.pushedAt = source["pushedAt"];
+	        this.updatedAt = source["updatedAt"];
+	    }
+	}
 	export class JumpHost {
 	    host: string;
 	    port: number;
@@ -301,6 +351,7 @@ export namespace models {
 	    ssh?: SSHConfig;
 	    telnet?: TelnetConfig;
 	    raw?: RAWConfig;
+	    github?: GitHubConfig;
 	
 	    static createFrom(source: any = {}) {
 	        return new Profile(source);
@@ -332,6 +383,7 @@ export namespace models {
 	        this.ssh = this.convertValues(source["ssh"], SSHConfig);
 	        this.telnet = this.convertValues(source["telnet"], TelnetConfig);
 	        this.raw = this.convertValues(source["raw"], RAWConfig);
+	        this.github = this.convertValues(source["github"], GitHubConfig);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

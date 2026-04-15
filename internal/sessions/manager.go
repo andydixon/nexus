@@ -1,9 +1,10 @@
-// Package sessions orchestrates multiple simultaneous SSH, Telnet, and RAW TCP
-// sessions. It coordinates between protocol clients, the storage layer, the
-// secret store, and the Wails runtime for event emission.
+// Package sessions orchestrates multiple simultaneous SSH, Telnet, RAW TCP,
+// and GitHub sessions. It coordinates between protocol clients, the storage
+// layer, the secret store, and the Wails runtime for event emission.
 package sessions
 
 import (
+	"context"
 	"encoding/base64"
 	"fmt"
 	"sync"
@@ -13,14 +14,13 @@ import (
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"github.com/copilot-ssh-client/app/internal/audit"
+	"github.com/copilot-ssh-client/app/internal/githubclient"
 	"github.com/copilot-ssh-client/app/internal/models"
 	"github.com/copilot-ssh-client/app/internal/rawclient"
 	"github.com/copilot-ssh-client/app/internal/secrets"
 	"github.com/copilot-ssh-client/app/internal/sshclient"
 	"github.com/copilot-ssh-client/app/internal/storage"
 	"github.com/copilot-ssh-client/app/internal/telnetclient"
-
-	"context"
 )
 
 // Session wraps a protocol client with metadata and state.
@@ -29,6 +29,8 @@ type Session struct {
 	sshClient    *sshclient.Client
 	telnetClient *telnetclient.Client
 	rawClient    *rawclient.Client
+	githubClient *githubclient.Client
+	githubCancel context.CancelFunc // stops the auto-refresh goroutine
 	profile      *models.Profile
 }
 
@@ -105,6 +107,8 @@ func (m *Manager) Connect(profile *models.Profile, getSecret func(prompt string)
 			err = m.connectTelnet(sess)
 		case models.ProtocolRAW:
 			err = m.connectRAW(sess)
+		case models.ProtocolGitHub:
+			err = m.connectGitHub(sess, getSecret)
 		default:
 			err = fmt.Errorf("unsupported protocol %q", profile.Protocol)
 		}
@@ -558,6 +562,112 @@ func (m *Manager) connectRAW(sess *Session) error {
 	return nil
 }
 
+// connectGitHub validates the token and performs the initial repository fetch.
+// It also starts a background goroutine for periodic refresh.
+func (m *Manager) connectGitHub(sess *Session, getSecret func(prompt string) (string, error)) error {
+	profile := sess.profile
+	ghConf := profile.GitHub
+	if ghConf == nil {
+		return fmt.Errorf("GitHub configuration missing on profile %q", profile.ID)
+	}
+
+	// Resolve the access token using the standard secret flow.
+	getToken := m.buildSecretCallback(profile.ID, "github-token", ghConf.SecretMode, getSecret)
+	token, err := getToken()
+	if err != nil {
+		return fmt.Errorf("obtaining GitHub token: %w", err)
+	}
+	if token == "" {
+		return fmt.Errorf("GitHub token cannot be empty")
+	}
+
+	client := githubclient.New(ghConf.BaseURL, token)
+
+	// Validate the token.
+	login, err := client.ValidateToken(context.Background())
+	if err != nil {
+		return fmt.Errorf("GitHub authentication failed: %w", err)
+	}
+
+	sess.githubClient = client
+
+	// Perform the initial fetch.
+	repos, err := client.FetchRepos(context.Background())
+	if err != nil {
+		return fmt.Errorf("fetching repositories: %w", err)
+	}
+
+	// Emit the initial repo list.
+	m.emitEvent("session:github:repos", map[string]interface{}{
+		"sessionID": sess.Info.ID,
+		"login":     login,
+		"repos":     repos,
+	})
+
+	// Start the periodic refresh goroutine.
+	interval := time.Duration(ghConf.RefreshIntervalSecs) * time.Second
+	if interval < 60*time.Second {
+		interval = 5 * time.Minute
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	sess.githubCancel = cancel
+
+	go func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				updated, fetchErr := client.FetchRepos(ctx)
+				if fetchErr != nil {
+					m.emitEvent("session:github:error", map[string]interface{}{
+						"sessionID": sess.Info.ID,
+						"error":     fetchErr.Error(),
+					})
+					continue
+				}
+				m.emitEvent("session:github:repos", map[string]interface{}{
+					"sessionID": sess.Info.ID,
+					"login":     login,
+					"repos":     updated,
+				})
+			}
+		}
+	}()
+
+	return nil
+}
+
+// FetchGitHubRepos triggers an on-demand refresh of GitHub repos for a session.
+func (m *Manager) FetchGitHubRepos(sessionID string) ([]models.GitHubRepo, error) {
+	m.mu.RLock()
+	sess, ok := m.sessions[sessionID]
+	m.mu.RUnlock()
+
+	if !ok {
+		return nil, fmt.Errorf("sessions: session %q not found", sessionID)
+	}
+	if sess.githubClient == nil {
+		return nil, fmt.Errorf("sessions: session %q is not a GitHub connection", sessionID)
+	}
+
+	repos, err := sess.githubClient.FetchRepos(context.Background())
+	if err != nil {
+		return nil, fmt.Errorf("fetching repos: %w", err)
+	}
+
+	m.emitEvent("session:github:repos", map[string]interface{}{
+		"sessionID": sessionID,
+		"repos":     repos,
+	})
+
+	return repos, nil
+}
+
 // ---------------------------------------------------------------------------
 // Internal: helpers
 // ---------------------------------------------------------------------------
@@ -644,6 +754,9 @@ func (m *Manager) closeSession(sess *Session) {
 	}
 	if sess.rawClient != nil {
 		sess.rawClient.Close()
+	}
+	if sess.githubCancel != nil {
+		sess.githubCancel()
 	}
 
 	m.mu.Lock()

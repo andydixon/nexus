@@ -618,6 +618,12 @@ func (s *Service) GetAppInfo() map[string]string {
 	}
 }
 
+// RefreshGitHubRepos triggers an on-demand refresh of GitHub repositories for
+// the given session. The updated list is also emitted as a Wails event.
+func (s *Service) RefreshGitHubRepos(sessionID string) ([]models.GitHubRepo, error) {
+	return s.sessions.FetchGitHubRepos(sessionID)
+}
+
 // TestConnection performs a basic TCP reachability check to the given host and port.
 // This verifies the network path without establishing a full protocol session.
 func (s *Service) TestConnection(host string, port int) (map[string]interface{}, error) {

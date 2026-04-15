@@ -419,6 +419,10 @@
     background: rgba(171, 71, 188, 0.15);
     color: var(--protocol-raw);
 }
+.badge-github {
+    background: rgba(124, 138, 255, 0.15);
+    color: var(--protocol-github);
+}
 
 /* Status badges */
 .badge-status {

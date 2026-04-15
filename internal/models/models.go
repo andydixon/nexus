@@ -11,6 +11,7 @@ const (
 	ProtocolSSH    Protocol = "ssh"
 	ProtocolTelnet Protocol = "telnet"
 	ProtocolRAW    Protocol = "raw"
+	ProtocolGitHub Protocol = "github"
 )
 
 // HostKeyPolicy determines how unknown or changed SSH host keys are handled.
@@ -76,6 +77,9 @@ type Profile struct {
 
 	// RAW-specific configuration
 	RAW *RAWConfig `json:"raw,omitempty"`
+
+	// GitHub-specific configuration
+	GitHub *GitHubConfig `json:"github,omitempty"`
 }
 
 // SSHConfig holds SSH-specific settings for a connection profile.
@@ -130,6 +134,36 @@ type PayloadPreset struct {
 	Name    string `json:"name"`
 	Payload string `json:"payload"` // base64-encoded for binary safety
 	Format  string `json:"format"`  // text, hex, escaped
+}
+
+// GitHubConfig holds GitHub API-specific settings for a connection profile.
+type GitHubConfig struct {
+	// BaseURL is the GitHub API base (e.g. "https://api.github.com" for
+	// github.com, or "https://github.example.com/api/v3" for GHE).
+	BaseURL string `json:"baseURL"`
+
+	// SecretMode controls how the personal access token is stored.
+	SecretMode SecretMode `json:"secretMode"`
+
+	// RefreshIntervalSecs controls the auto-refresh period in seconds.
+	// Defaults to 300 (5 minutes).
+	RefreshIntervalSecs int `json:"refreshIntervalSecs"`
+}
+
+// GitHubRepo is a single repository returned to the frontend for display.
+type GitHubRepo struct {
+	FullName    string `json:"fullName"`
+	Name        string `json:"name"`
+	Owner       string `json:"owner"`
+	Description string `json:"description"`
+	HTMLURL     string `json:"htmlURL"`
+	Private     bool   `json:"private"`
+	Fork        bool   `json:"fork"`
+	Archived    bool   `json:"archived"`
+	Language    string `json:"language"`
+	Stars       int    `json:"stars"`
+	PushedAt    string `json:"pushedAt"` // ISO 8601
+	UpdatedAt   string `json:"updatedAt"`
 }
 
 // SessionState represents the lifecycle state of a connection session.

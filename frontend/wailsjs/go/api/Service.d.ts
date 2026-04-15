@@ -65,6 +65,8 @@ export function PinSession(arg1:string,arg2:boolean):Promise<void>;
 
 export function ReconnectSession(arg1:string):Promise<void>;
 
+export function RefreshGitHubRepos(arg1:string):Promise<Array<models.GitHubRepo>>;
+
 export function RegisterSecretResponseListener():Promise<void>;
 
 export function RenameSession(arg1:string,arg2:string):Promise<void>;
