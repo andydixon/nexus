@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"path/filepath"
 	"runtime"
 	"sync"
 	"time"
@@ -15,6 +16,7 @@ import (
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"github.com/copilot-ssh-client/app/internal/audit"
+	"github.com/copilot-ssh-client/app/internal/exportimport"
 	"github.com/copilot-ssh-client/app/internal/models"
 	"github.com/copilot-ssh-client/app/internal/preferences"
 	"github.com/copilot-ssh-client/app/internal/secrets"
@@ -641,6 +643,213 @@ func (s *Service) StartPortForward(sessionID string, rule models.PortForward) er
 // StopPortForward terminates an active forwarding tunnel.
 func (s *Service) StopPortForward(sessionID string, forwardID string) error {
 	return s.sessions.StopPortForward(sessionID, forwardID)
+}
+
+// ---------------------------------------------------------------------------
+// Session recording
+// ---------------------------------------------------------------------------
+
+// StartRecording begins recording terminal I/O for a session.
+func (s *Service) StartRecording(sessionID string, cols int, rows int) (string, error) {
+	return s.sessions.StartRecording(sessionID, cols, rows)
+}
+
+// StopRecording stops an active recording for a session.
+func (s *Service) StopRecording(sessionID string) error {
+	return s.sessions.StopRecording(sessionID)
+}
+
+// IsRecording reports whether a session is currently being recorded.
+func (s *Service) IsRecording(sessionID string) bool {
+	return s.sessions.IsRecording(sessionID)
+}
+
+// ListRecordings returns metadata for all saved recordings.
+func (s *Service) ListRecordings() ([]map[string]interface{}, error) {
+	metas, err := s.sessions.ListRecordings()
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]map[string]interface{}, len(metas))
+	for i, m := range metas {
+		result[i] = map[string]interface{}{
+			"id":        m.ID,
+			"sessionId": m.SessionID,
+			"title":     m.Title,
+			"width":     m.Width,
+			"height":    m.Height,
+			"duration":  m.Duration,
+			"size":      m.Size,
+			"createdAt": m.CreatedAt.Format(time.RFC3339),
+			"filePath":  m.FilePath,
+		}
+	}
+	return result, nil
+}
+
+// GetRecording returns the full recording data for playback.
+func (s *Service) GetRecording(id string) (map[string]interface{}, error) {
+	hdr, events, err := s.sessions.GetRecording(id)
+	if err != nil {
+		return nil, err
+	}
+
+	evtList := make([][]interface{}, len(events))
+	for i, e := range events {
+		evtList[i] = []interface{}{e.Elapsed, string(e.Type), e.Data}
+	}
+
+	return map[string]interface{}{
+		"header": map[string]interface{}{
+			"version":   hdr.Version,
+			"width":     hdr.Width,
+			"height":    hdr.Height,
+			"timestamp": hdr.Timestamp,
+			"title":     hdr.Title,
+		},
+		"events": evtList,
+	}, nil
+}
+
+// DeleteRecording removes a saved recording.
+func (s *Service) DeleteRecording(id string) error {
+	return s.sessions.DeleteRecording(id)
+}
+
+// ---------------------------------------------------------------------------
+// Encrypted export / import
+// ---------------------------------------------------------------------------
+
+// ExportProfilesEncrypted encrypts and exports selected profiles to a file.
+// The profileIDs parameter selects which profiles to include; if empty, all
+// profiles are exported. Returns the file path on success.
+func (s *Service) ExportProfilesEncrypted(profileIDs []string, password string) (string, error) {
+	if s.ctx == nil {
+		return "", fmt.Errorf("application context not set")
+	}
+
+	var profiles []models.Profile
+	if len(profileIDs) == 0 {
+		// Export all profiles.
+		all, err := s.store.ListProfiles()
+		if err != nil {
+			return "", fmt.Errorf("failed to list profiles: %w", err)
+		}
+		for _, p := range all {
+			profiles = append(profiles, *p)
+		}
+	} else {
+		for _, id := range profileIDs {
+			p, err := s.store.GetProfile(id)
+			if err != nil {
+				continue // skip missing profiles
+			}
+			profiles = append(profiles, *p)
+		}
+	}
+
+	if len(profiles) == 0 {
+		return "", fmt.Errorf("no profiles to export")
+	}
+
+	// Prompt for save location.
+	path, err := wailsRuntime.SaveFileDialog(s.ctx, wailsRuntime.SaveDialogOptions{
+		Title:           "Export Encrypted Profiles",
+		DefaultFilename: "nexus-profiles.nexus",
+		Filters: []wailsRuntime.FileFilter{
+			{DisplayName: "Nexus Export (*.nexus)", Pattern: "*.nexus"},
+		},
+	})
+	if err != nil {
+		return "", fmt.Errorf("save dialog failed: %w", err)
+	}
+	if path == "" {
+		return "", fmt.Errorf("export cancelled")
+	}
+
+	// Ensure .nexus extension.
+	if filepath.Ext(path) != ".nexus" {
+		path += ".nexus"
+	}
+
+	if err := exportimport.EncryptAndExport(profiles, password, path); err != nil {
+		return "", err
+	}
+
+	s.auditLog.LogExport(len(profiles), false)
+	return path, nil
+}
+
+// ImportProfilesEncrypted decrypts and imports profiles from an encrypted file.
+// Returns the number of profiles successfully imported.
+func (s *Service) ImportProfilesEncrypted(password string, strategy string) (int, error) {
+	if s.ctx == nil {
+		return 0, fmt.Errorf("application context not set")
+	}
+
+	// Prompt for file selection.
+	path, err := wailsRuntime.OpenFileDialog(s.ctx, wailsRuntime.OpenDialogOptions{
+		Title: "Import Encrypted Profiles",
+		Filters: []wailsRuntime.FileFilter{
+			{DisplayName: "Nexus Export (*.nexus)", Pattern: "*.nexus"},
+		},
+	})
+	if err != nil {
+		return 0, fmt.Errorf("open dialog failed: %w", err)
+	}
+	if path == "" {
+		return 0, fmt.Errorf("import cancelled")
+	}
+
+	profiles, err := exportimport.DecryptAndImport(path, password)
+	if err != nil {
+		return 0, err
+	}
+
+	// Import using the existing strategy logic.
+	imported := 0
+	for _, p := range profiles {
+		switch strategy {
+		case "skip":
+			if existing, _ := s.store.GetProfile(p.ID); existing != nil {
+				continue
+			}
+			if err := s.store.CreateProfile(&p); err != nil {
+				continue
+			}
+			imported++
+
+		case "overwrite":
+			p.UpdatedAt = time.Now()
+			if existing, _ := s.store.GetProfile(p.ID); existing != nil {
+				if err := s.store.UpdateProfile(&p); err != nil {
+					continue
+				}
+			} else {
+				if err := s.store.CreateProfile(&p); err != nil {
+					continue
+				}
+			}
+			imported++
+
+		case "duplicate":
+			p.ID = uuid.New().String()
+			now := time.Now()
+			p.CreatedAt = now
+			p.UpdatedAt = now
+			if err := s.store.CreateProfile(&p); err != nil {
+				continue
+			}
+			imported++
+
+		default:
+			return 0, fmt.Errorf("unknown import strategy %q", strategy)
+		}
+	}
+
+	s.auditLog.LogImport(imported)
+	return imported, nil
 }
 
 // TestConnection performs a basic TCP reachability check to the given host and port.

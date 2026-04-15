@@ -6,6 +6,7 @@ package app
 import (
 	"context"
 	"log"
+	"path/filepath"
 	"sync"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
@@ -15,6 +16,7 @@ import (
 	"github.com/copilot-ssh-client/app/internal/config"
 	"github.com/copilot-ssh-client/app/internal/knownhosts"
 	"github.com/copilot-ssh-client/app/internal/preferences"
+	"github.com/copilot-ssh-client/app/internal/recording"
 	"github.com/copilot-ssh-client/app/internal/secrets"
 	"github.com/copilot-ssh-client/app/internal/sessions"
 	"github.com/copilot-ssh-client/app/internal/storage"
@@ -97,8 +99,12 @@ func (a *App) Startup(ctx context.Context) {
 		log.Printf("warning: failed to load preferences, using defaults: %v", err)
 	}
 
+	// Initialise session recording store.
+	recordDir := filepath.Join(cfg.DataDir, "recordings")
+	recordStore := recording.NewStore(recordDir)
+
 	// Initialise the session manager.
-	a.SessionManager = sessions.NewManager(store, a.SecretStore, a.KeychainStore, a.AuditLog)
+	a.SessionManager = sessions.NewManager(store, a.SecretStore, a.KeychainStore, a.AuditLog, recordStore)
 	a.SessionManager.SetContext(ctx)
 
 	// Wire the API service with all backing stores now that they exist.

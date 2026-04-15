@@ -17,6 +17,7 @@ import (
 	"github.com/copilot-ssh-client/app/internal/githubclient"
 	"github.com/copilot-ssh-client/app/internal/models"
 	"github.com/copilot-ssh-client/app/internal/rawclient"
+	"github.com/copilot-ssh-client/app/internal/recording"
 	"github.com/copilot-ssh-client/app/internal/secrets"
 	"github.com/copilot-ssh-client/app/internal/sshclient"
 	"github.com/copilot-ssh-client/app/internal/storage"
@@ -32,6 +33,7 @@ type Session struct {
 	githubClient *githubclient.Client
 	githubCancel context.CancelFunc // stops the auto-refresh goroutine
 	profile      *models.Profile
+	recorder     *recording.Recorder // active recording, nil if not recording
 }
 
 // Manager handles the lifecycle of all active sessions.
@@ -44,17 +46,19 @@ type Manager struct {
 	secretStore   *secrets.SecretStore
 	keychainStore *secrets.KeychainStore
 	auditLog      *audit.Logger
+	recordStore   *recording.Store
 	ctx           context.Context // Wails app context for event emission
 }
 
 // NewManager creates a Manager wired to the given backing services.
-func NewManager(store *storage.Store, secretStore *secrets.SecretStore, keychainStore *secrets.KeychainStore, auditLog *audit.Logger) *Manager {
+func NewManager(store *storage.Store, secretStore *secrets.SecretStore, keychainStore *secrets.KeychainStore, auditLog *audit.Logger, recordStore *recording.Store) *Manager {
 	return &Manager{
 		sessions:      make(map[string]*Session),
 		store:         store,
 		secretStore:   secretStore,
 		keychainStore: keychainStore,
 		auditLog:      auditLog,
+		recordStore:   recordStore,
 	}
 }
 
@@ -203,6 +207,14 @@ func (m *Manager) WriteToSession(sessionID string, data []byte) error {
 
 	if !ok {
 		return fmt.Errorf("sessions: session %q not found", sessionID)
+	}
+
+	// Record input if recording is active.
+	m.mu.RLock()
+	rec := sess.recorder
+	m.mu.RUnlock()
+	if rec != nil {
+		rec.WriteInput(data)
 	}
 
 	switch {
@@ -440,6 +452,13 @@ func (m *Manager) connectSSH(sess *Session, getSecret func(prompt string) (strin
 				"sessionID": sess.Info.ID,
 				"data":      base64.StdEncoding.EncodeToString(data),
 			})
+			// Write to active recording if present.
+			m.mu.RLock()
+			rec := sess.recorder
+			m.mu.RUnlock()
+			if rec != nil {
+				rec.WriteOutput(data)
+			}
 		},
 		// onError — report connection errors to the frontend.
 		func(err error) {
@@ -512,6 +531,13 @@ func (m *Manager) connectTelnet(sess *Session) error {
 				"sessionID": sess.Info.ID,
 				"data":      base64.StdEncoding.EncodeToString(data),
 			})
+			// Write to active recording if present.
+			m.mu.RLock()
+			rec := sess.recorder
+			m.mu.RUnlock()
+			if rec != nil {
+				rec.WriteOutput(data)
+			}
 		},
 		// onError
 		func(err error) {
@@ -696,6 +722,111 @@ func (m *Manager) FetchGitHubRepos(sessionID string) ([]models.GitHubRepo, error
 }
 
 // ---------------------------------------------------------------------------
+// Session recording
+// ---------------------------------------------------------------------------
+
+// StartRecording begins recording terminal I/O for a session.
+// Returns the recording ID (same as session ID) on success.
+func (m *Manager) StartRecording(sessionID string, cols, rows int) (string, error) {
+	m.mu.Lock()
+	sess, ok := m.sessions[sessionID]
+	if !ok {
+		m.mu.Unlock()
+		return "", fmt.Errorf("sessions: session %q not found", sessionID)
+	}
+	if sess.recorder != nil {
+		m.mu.Unlock()
+		return "", fmt.Errorf("sessions: session %q is already being recorded", sessionID)
+	}
+	m.mu.Unlock()
+
+	if m.recordStore == nil {
+		return "", fmt.Errorf("sessions: recording store not configured")
+	}
+
+	title := fmt.Sprintf("%s — %s", sess.Info.ProfileName, sess.Info.Host)
+	rec, err := recording.NewRecorder(m.recordStore.Dir(), sessionID, title, cols, rows)
+	if err != nil {
+		return "", fmt.Errorf("sessions: failed to start recording: %w", err)
+	}
+
+	m.mu.Lock()
+	sess.recorder = rec
+	m.mu.Unlock()
+
+	m.emitEvent("session:recording:started", map[string]interface{}{
+		"sessionID": sessionID,
+	})
+
+	return sessionID, nil
+}
+
+// StopRecording stops an active recording for a session.
+func (m *Manager) StopRecording(sessionID string) error {
+	m.mu.Lock()
+	sess, ok := m.sessions[sessionID]
+	if !ok {
+		m.mu.Unlock()
+		return fmt.Errorf("sessions: session %q not found", sessionID)
+	}
+	rec := sess.recorder
+	sess.recorder = nil
+	m.mu.Unlock()
+
+	if rec == nil {
+		return fmt.Errorf("sessions: session %q is not being recorded", sessionID)
+	}
+
+	if err := rec.Close(); err != nil {
+		return fmt.Errorf("sessions: failed to stop recording: %w", err)
+	}
+
+	m.emitEvent("session:recording:stopped", map[string]interface{}{
+		"sessionID": sessionID,
+		"duration":  rec.Duration(),
+		"events":    rec.EventCount(),
+	})
+
+	return nil
+}
+
+// IsRecording reports whether a session is currently being recorded.
+func (m *Manager) IsRecording(sessionID string) bool {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	sess, ok := m.sessions[sessionID]
+	if !ok {
+		return false
+	}
+	return sess.recorder != nil
+}
+
+// ListRecordings returns metadata for all saved recordings.
+func (m *Manager) ListRecordings() ([]recording.RecordingMeta, error) {
+	if m.recordStore == nil {
+		return nil, fmt.Errorf("sessions: recording store not configured")
+	}
+	return m.recordStore.List()
+}
+
+// GetRecording returns the full recording data (header + events) for playback.
+func (m *Manager) GetRecording(id string) (*recording.Header, []recording.Event, error) {
+	if m.recordStore == nil {
+		return nil, nil, fmt.Errorf("sessions: recording store not configured")
+	}
+	return m.recordStore.Get(id)
+}
+
+// DeleteRecording removes a saved recording.
+func (m *Manager) DeleteRecording(id string) error {
+	if m.recordStore == nil {
+		return fmt.Errorf("sessions: recording store not configured")
+	}
+	return m.recordStore.Delete(id)
+}
+
+// ---------------------------------------------------------------------------
 // Port-forwarding management
 // ---------------------------------------------------------------------------
 
@@ -855,6 +986,12 @@ func (m *Manager) buildSecretCallback(profileID string, secretType string, mode 
 
 // closeSession shuts down the protocol client for a session.
 func (m *Manager) closeSession(sess *Session) {
+	// Stop any active recording.
+	if sess.recorder != nil {
+		sess.recorder.Close()
+		sess.recorder = nil
+	}
+
 	if sess.sshClient != nil {
 		sess.sshClient.Close()
 	}

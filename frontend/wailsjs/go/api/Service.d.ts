@@ -19,11 +19,15 @@ export function DeleteProfile(arg1:string):Promise<void>;
 
 export function DeleteProfileSecrets(arg1:string):Promise<void>;
 
+export function DeleteRecording(arg1:string):Promise<void>;
+
 export function DisconnectSession(arg1:string):Promise<void>;
 
 export function DuplicateProfile(arg1:string):Promise<models.Profile>;
 
 export function ExportProfiles(arg1:boolean):Promise<string>;
+
+export function ExportProfilesEncrypted(arg1:Array<string>,arg2:string):Promise<string>;
 
 export function GetAppInfo():Promise<Record<string, string>>;
 
@@ -31,11 +35,17 @@ export function GetPreferences():Promise<models.AppPreferences>;
 
 export function GetProfile(arg1:string):Promise<models.Profile>;
 
+export function GetRecording(arg1:string):Promise<Record<string, any>>;
+
 export function GetSessionHistory(arg1:string):Promise<Array<Record<string, any>>>;
 
 export function ImportProfiles(arg1:string,arg2:string):Promise<number>;
 
+export function ImportProfilesEncrypted(arg1:string,arg2:string):Promise<number>;
+
 export function InitialiseSecretStore(arg1:string):Promise<void>;
+
+export function IsRecording(arg1:string):Promise<boolean>;
 
 export function IsSecretStoreInitialised():Promise<boolean>;
 
@@ -56,6 +66,8 @@ export function ListProfilesByFolder(arg1:string):Promise<Array<models.Profile>>
 export function ListProfilesByProtocol(arg1:string):Promise<Array<models.Profile>>;
 
 export function ListProfilesByTag(arg1:string):Promise<Array<models.Profile>>;
+
+export function ListRecordings():Promise<Array<Record<string, any>>>;
 
 export function ListSessions():Promise<Array<models.SessionInfo>>;
 
@@ -95,7 +107,11 @@ export function SetProfileSecret(arg1:string,arg2:string,arg3:string):Promise<vo
 
 export function StartPortForward(arg1:string,arg2:models.PortForward):Promise<void>;
 
+export function StartRecording(arg1:string,arg2:number,arg3:number):Promise<string>;
+
 export function StopPortForward(arg1:string,arg2:string):Promise<void>;
+
+export function StopRecording(arg1:string):Promise<void>;
 
 export function TestConnection(arg1:string,arg2:number):Promise<Record<string, any>>;
 

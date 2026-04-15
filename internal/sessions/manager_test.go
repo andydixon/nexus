@@ -13,7 +13,7 @@ import (
 func TestNewManager(t *testing.T) {
 	// NewManager requires backing services; pass nil for lightweight tests
 	// where no actual connections are made.
-	mgr := NewManager(nil, nil, nil, nil)
+	mgr := NewManager(nil, nil, nil, nil, nil)
 	if mgr == nil {
 		t.Fatal("NewManager() returned nil")
 	}
@@ -30,7 +30,7 @@ func TestNewManager(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestListSessionsEmpty(t *testing.T) {
-	mgr := NewManager(nil, nil, nil, nil)
+	mgr := NewManager(nil, nil, nil, nil, nil)
 	sessions := mgr.ListSessions()
 	if len(sessions) != 0 {
 		t.Errorf("expected 0 sessions, got %d", len(sessions))
@@ -42,7 +42,7 @@ func TestListSessionsEmpty(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestCreateTabName(t *testing.T) {
-	mgr := NewManager(nil, nil, nil, nil)
+	mgr := NewManager(nil, nil, nil, nil, nil)
 
 	tests := []struct {
 		name    string
@@ -93,7 +93,7 @@ func TestCreateTabName(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestRenameSessionNotFound(t *testing.T) {
-	mgr := NewManager(nil, nil, nil, nil)
+	mgr := NewManager(nil, nil, nil, nil, nil)
 	err := mgr.RenameSession("nonexistent-id", "New Name")
 	if err == nil {
 		t.Error("expected error when renaming non-existent session")
@@ -105,7 +105,7 @@ func TestRenameSessionNotFound(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestPinSessionNotFound(t *testing.T) {
-	mgr := NewManager(nil, nil, nil, nil)
+	mgr := NewManager(nil, nil, nil, nil, nil)
 	err := mgr.PinSession("nonexistent-id", true)
 	if err == nil {
 		t.Error("expected error when pinning non-existent session")
@@ -117,7 +117,7 @@ func TestPinSessionNotFound(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestGetSessionNotFound(t *testing.T) {
-	mgr := NewManager(nil, nil, nil, nil)
+	mgr := NewManager(nil, nil, nil, nil, nil)
 	_, err := mgr.GetSession("nonexistent-id")
 	if err == nil {
 		t.Error("expected error when getting non-existent session")
@@ -129,7 +129,7 @@ func TestGetSessionNotFound(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestDisconnectNotFound(t *testing.T) {
-	mgr := NewManager(nil, nil, nil, nil)
+	mgr := NewManager(nil, nil, nil, nil, nil)
 	err := mgr.Disconnect("nonexistent-id")
 	if err == nil {
 		t.Error("expected error when disconnecting non-existent session")
@@ -141,7 +141,7 @@ func TestDisconnectNotFound(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestCloseAllEmpty(t *testing.T) {
-	mgr := NewManager(nil, nil, nil, nil)
+	mgr := NewManager(nil, nil, nil, nil, nil)
 	// Should not panic.
 	mgr.CloseAll()
 	if len(mgr.ListSessions()) != 0 {

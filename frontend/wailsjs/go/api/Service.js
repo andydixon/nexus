@@ -34,6 +34,10 @@ export function DeleteProfileSecrets(arg1) {
   return window['go']['api']['Service']['DeleteProfileSecrets'](arg1);
 }
 
+export function DeleteRecording(arg1) {
+  return window['go']['api']['Service']['DeleteRecording'](arg1);
+}
+
 export function DisconnectSession(arg1) {
   return window['go']['api']['Service']['DisconnectSession'](arg1);
 }
@@ -44,6 +48,10 @@ export function DuplicateProfile(arg1) {
 
 export function ExportProfiles(arg1) {
   return window['go']['api']['Service']['ExportProfiles'](arg1);
+}
+
+export function ExportProfilesEncrypted(arg1, arg2) {
+  return window['go']['api']['Service']['ExportProfilesEncrypted'](arg1, arg2);
 }
 
 export function GetAppInfo() {
@@ -58,6 +66,10 @@ export function GetProfile(arg1) {
   return window['go']['api']['Service']['GetProfile'](arg1);
 }
 
+export function GetRecording(arg1) {
+  return window['go']['api']['Service']['GetRecording'](arg1);
+}
+
 export function GetSessionHistory(arg1) {
   return window['go']['api']['Service']['GetSessionHistory'](arg1);
 }
@@ -66,8 +78,16 @@ export function ImportProfiles(arg1, arg2) {
   return window['go']['api']['Service']['ImportProfiles'](arg1, arg2);
 }
 
+export function ImportProfilesEncrypted(arg1, arg2) {
+  return window['go']['api']['Service']['ImportProfilesEncrypted'](arg1, arg2);
+}
+
 export function InitialiseSecretStore(arg1) {
   return window['go']['api']['Service']['InitialiseSecretStore'](arg1);
+}
+
+export function IsRecording(arg1) {
+  return window['go']['api']['Service']['IsRecording'](arg1);
 }
 
 export function IsSecretStoreInitialised() {
@@ -108,6 +128,10 @@ export function ListProfilesByProtocol(arg1) {
 
 export function ListProfilesByTag(arg1) {
   return window['go']['api']['Service']['ListProfilesByTag'](arg1);
+}
+
+export function ListRecordings() {
+  return window['go']['api']['Service']['ListRecordings']();
 }
 
 export function ListSessions() {
@@ -186,8 +210,16 @@ export function StartPortForward(arg1, arg2) {
   return window['go']['api']['Service']['StartPortForward'](arg1, arg2);
 }
 
+export function StartRecording(arg1, arg2, arg3) {
+  return window['go']['api']['Service']['StartRecording'](arg1, arg2, arg3);
+}
+
 export function StopPortForward(arg1, arg2) {
   return window['go']['api']['Service']['StopPortForward'](arg1, arg2);
+}
+
+export function StopRecording(arg1) {
+  return window['go']['api']['Service']['StopRecording'](arg1);
 }
 
 export function TestConnection(arg1, arg2) {

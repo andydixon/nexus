@@ -1,0 +1,167 @@
+/* ── Session Recording & Playback ────────────────────────────────────── */
+
+/* Recording indicator dot on tabs */
+.recording-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--error, #ef4444);
+    margin-right: 6px;
+    flex-shrink: 0;
+    animation: recording-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes recording-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+}
+
+/* Recordings list in browser modal */
+.recordings-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.recording-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    background: var(--surface-2, #2a2a2e);
+    border-radius: 6px;
+    transition: background 0.15s ease;
+}
+
+.recording-item:hover {
+    background: var(--surface-3, #333338);
+}
+
+.recording-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.recording-title {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-primary, #e4e4e7);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.recording-meta {
+    font-size: 11px;
+    color: var(--text-tertiary, #71717a);
+}
+
+.recording-actions {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+    margin-left: 12px;
+}
+
+/* Playback modal — larger to fit a terminal */
+.modal-playback {
+    width: 90vw;
+    max-width: 900px;
+    max-height: 90vh;
+}
+
+.playback-body {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 0 !important;
+}
+
+.playback-terminal {
+    flex: 1;
+    min-height: 300px;
+    background: #1a1a1e;
+    border-radius: 4px;
+    padding: 4px;
+    margin: 0 12px;
+}
+
+.playback-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px 12px;
+    background: var(--surface-1, #1e1e22);
+    border-top: 1px solid var(--border, #3f3f46);
+}
+
+.playback-progress {
+    flex: 1;
+    height: 4px;
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+    background: var(--surface-3, #333338);
+    border-radius: 2px;
+    outline: none;
+}
+
+.playback-progress::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--accent, #3b82f6);
+    cursor: pointer;
+    border: none;
+}
+
+.playback-time {
+    font-size: 11px;
+    color: var(--text-tertiary, #71717a);
+    white-space: nowrap;
+    min-width: 80px;
+    text-align: right;
+}
+
+.playback-speed {
+    font-size: 11px;
+    background: var(--surface-2, #2a2a2e);
+    color: var(--text-primary, #e4e4e7);
+    border: 1px solid var(--border, #3f3f46);
+    border-radius: 4px;
+}
+
+/* Export/import profile list */
+.export-profile-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 8px;
+    background: var(--surface-2, #2a2a2e);
+    border-radius: 6px;
+    border: 1px solid var(--border, #3f3f46);
+}
+
+.export-profile-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 8px;
+    font-size: 13px;
+    color: var(--text-primary, #e4e4e7);
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background 0.1s ease;
+}
+
+.export-profile-item:hover {
+    background: var(--surface-3, #333338);
+}
+
+.export-profile-item input[type="checkbox"] {
+    accent-color: var(--accent, #3b82f6);
+}

@@ -4,7 +4,7 @@
  * Initialises the application shell, loads profiles, and sets up event listeners.
  */
 
-const { State, Sidebar, TabManager, TerminalManager, ProfileEditor, RawViewer, Notifications, Settings, CommandPalette, SecretPrompt, SplitPaneManager, stateLabel } = window.NexusTerminal;
+const { State, Sidebar, TabManager, TerminalManager, ProfileEditor, RawViewer, Notifications, Settings, CommandPalette, SecretPrompt, SplitPaneManager, RecordingManager, ExportImportUI, stateLabel } = window.NexusTerminal;
 
 class App {
     constructor() {
@@ -19,6 +19,8 @@ class App {
         this.commandPalette = new CommandPalette(this);
         this.secretPrompt = new SecretPrompt(this);
         this.splitPanes = new SplitPaneManager(this);
+        this.recordings = new RecordingManager(this);
+        this.exportImport = new ExportImportUI(this);
     }
 
     /**
@@ -196,6 +198,17 @@ class App {
             this.notifications.error(`Forward error: ${payload.error}`);
         });
 
+        // Recording events
+        window.runtime.EventsOn('session:recording:started', (payload) => {
+            this.recordings.activeSessions.add(payload.sessionID);
+            this.recordings._updateRecordingIndicator(payload.sessionID, true);
+        });
+
+        window.runtime.EventsOn('session:recording:stopped', (payload) => {
+            this.recordings.activeSessions.delete(payload.sessionID);
+            this.recordings._updateRecordingIndicator(payload.sessionID, false);
+        });
+
         // Telnet negotiation debug messages
         window.runtime.EventsOn('session:debug', (payload) => {
             console.debug('[session:debug]', payload);
@@ -336,6 +349,15 @@ class App {
                 this.splitPane('horizontal');
                 return;
             }
+
+            // Ctrl/Cmd+Shift+R — toggle recording on active session
+            if (mod && e.shiftKey && e.key === 'R') {
+                e.preventDefault();
+                if (this.state.activeSessionId) {
+                    this.recordings.toggle(this.state.activeSessionId);
+                }
+                return;
+            }
         });
     }
 
@@ -349,6 +371,8 @@ class App {
         this._bindClick('btn-new-connection', () => this.profileEditor.openNew());
         this._bindClick('btn-settings', () => this.settings.open());
         this._bindClick('btn-import', () => this.importProfiles());
+        this._bindClick('btn-export', () => this.exportProfiles());
+        this._bindClick('btn-recordings', () => this.recordings.openBrowser());
         this._bindClick('btn-new-tab', () => this.profileEditor.openNew());
         this._bindClick('btn-empty-connect', () => this.profileEditor.openNew());
         this._bindClick('btn-empty-quick', () => this.quickConnect());
@@ -452,34 +476,17 @@ class App {
     // ── Import / Export ──────────────────────────────────────────────
 
     /**
-     * Triggers a profile import dialog.
+     * Triggers the encrypted profile import dialog.
      */
     async importProfiles() {
-        try {
-            const path = await window.go.api.Service.SelectFile('Import Profiles', '*.json');
-            if (!path) return;
-            this.notifications.info('Import from file is not yet supported. Selected: ' + path);
-        } catch (err) {
-            if (String(err) !== 'cancelled') {
-                this.notifications.error('Import failed: ' + err);
-            }
-        }
+        this.exportImport.showImportModal();
     }
 
     /**
-     * Triggers a profile export flow.
+     * Triggers the encrypted profile export dialog.
      */
     async exportProfiles() {
-        try {
-            const json = await window.go.api.Service.ExportProfiles(false);
-            const path = await window.go.api.Service.SaveFile('Export Profiles', '*.json');
-            if (!path) return;
-            this.notifications.success('Profiles exported');
-        } catch (err) {
-            if (String(err) !== 'cancelled') {
-                this.notifications.error('Export failed: ' + err);
-            }
-        }
+        this.exportImport.showExportModal();
     }
 
     // ── Status bar ───────────────────────────────────────────────────
