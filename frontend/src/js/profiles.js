@@ -242,8 +242,61 @@ class ProfileEditor {
             this._field('text', 'host', 'Host', profile.host, { placeholder: '192.168.1.1 or example.com', required: true }),
             this._field('number', 'port', 'Port', profile.port, { min: 1, max: 65535, required: true }),
             this._field('text', 'username', 'Username', profile.username, { placeholder: 'root' }),
+            this._renderGroupField(profile),
             this._field('text', 'description', 'Description', profile.description, { placeholder: 'Optional description' }),
         ]);
+    }
+
+    /**
+     * Renders a combo-box for the Group field — a text input backed by a
+     * datalist of existing group names. Typing a new name creates a group.
+     * @param {Object} profile
+     * @returns {HTMLElement}
+     * @private
+     */
+    _renderGroupField(profile) {
+        const group = createElement('div', 'form-group');
+        const label = createElement('label', 'form-label', {
+            textContent: 'Group',
+            for: 'field-folder',
+        });
+        group.appendChild(label);
+
+        // Collect distinct group names from all profiles
+        const existingGroups = [...new Set(
+            this.app.state.profiles
+                .map((p) => (p.folder || '').trim())
+                .filter(Boolean)
+        )].sort((a, b) => a.localeCompare(b));
+
+        // Create the datalist so the browser offers autocomplete
+        const listId = 'folder-suggestions';
+        const datalist = document.createElement('datalist');
+        datalist.id = listId;
+        for (const g of existingGroups) {
+            const opt = document.createElement('option');
+            opt.value = g;
+            datalist.appendChild(opt);
+        }
+        group.appendChild(datalist);
+
+        const input = createElement('input', 'form-input', {
+            type: 'text',
+            id: 'field-folder',
+            name: 'folder',
+            value: profile.folder || '',
+            placeholder: 'e.g. Production, Staging, Home Lab',
+        });
+        input.setAttribute('list', listId);
+        input.setAttribute('autocomplete', 'off');
+        group.appendChild(input);
+
+        const hint = createElement('span', 'form-hint', {
+            textContent: 'Choose an existing group or type a new name to create one',
+        });
+        group.appendChild(hint);
+
+        return group;
     }
 
     /** @private */
@@ -694,6 +747,7 @@ class ProfileEditor {
         p.port = val('port') || p.port;
         p.username = val('username') || '';
         p.description = val('description') || '';
+        p.folder = (val('folder') || '').trim();
         p.terminalFontFamily = val('terminalFontFamily') || '';
         p.terminalFontSize = val('terminalFontSize') || 14;
         p.terminalScrollback = val('terminalScrollback') || 10000;

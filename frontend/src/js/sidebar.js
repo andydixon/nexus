@@ -30,6 +30,11 @@ class Sidebar {
 
     /**
      * Full re-render of the sidebar profile list.
+     * Profiles are organised into:
+     *   1. Favourites (if any)
+     *   2. Recent (last 5 connected)
+     *   3. One section per group (sorted alphabetically)
+     *   4. Ungrouped (profiles with no group assigned)
      */
     render() {
         if (!this.el) return;
@@ -40,7 +45,7 @@ class Sidebar {
         // Favourites
         const favourites = profiles.filter((p) => p.favourite);
         if (favourites.length > 0) {
-            this._renderSection('Favourites', 'favourites', favourites);
+            this._renderSection('★ Favourites', 'favourites', favourites);
         }
 
         // Recent
@@ -52,8 +57,32 @@ class Sidebar {
             this._renderSection('Recent', 'recent', recent);
         }
 
-        // All connections
-        this._renderSection('All Connections', 'all', profiles);
+        // ── Group-based sections ─────────────────────────────────────
+        // Collect distinct groups and sort them alphabetically.
+        const groupMap = new Map();
+        const ungrouped = [];
+
+        for (const p of profiles) {
+            const grp = (p.folder || '').trim();
+            if (grp) {
+                if (!groupMap.has(grp)) groupMap.set(grp, []);
+                groupMap.get(grp).push(p);
+            } else {
+                ungrouped.push(p);
+            }
+        }
+
+        // Render each group as its own collapsible section
+        const sortedGroups = [...groupMap.keys()].sort((a, b) => a.localeCompare(b));
+        for (const grp of sortedGroups) {
+            this._renderSection(grp, `group:${grp}`, groupMap.get(grp));
+        }
+
+        // Ungrouped connections
+        if (ungrouped.length > 0) {
+            const label = sortedGroups.length > 0 ? 'Ungrouped' : 'All Connections';
+            this._renderSection(label, 'ungrouped', ungrouped);
+        }
 
         // Empty state
         if (profiles.length === 0) {
