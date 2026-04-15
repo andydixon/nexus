@@ -101,6 +101,7 @@ class SFTPBrowser {
         // Build the panel DOM
         var panel = createElement('div', 'sftp-panel');
         var handle = createElement('div', 'sftp-resize-handle');
+        panel.appendChild(handle);
         state.el = panel;
         state.handle = handle;
 
@@ -119,9 +120,7 @@ class SFTPBrowser {
 
         this.panels.set(sessionId, state);
 
-        // Switch session panel to row layout and append
-        sessionPanel.classList.add('has-sftp');
-        sessionPanel.appendChild(handle);
+        // Append the overlay panel into the session panel
         sessionPanel.appendChild(panel);
 
         this._setupResize(sessionId, state);
@@ -142,12 +141,6 @@ class SFTPBrowser {
         if (!state) return;
 
         state.el.remove();
-        state.handle.remove();
-
-        var sessionPanel = document.getElementById('panel-' + sessionId);
-        if (sessionPanel) {
-            sessionPanel.classList.remove('has-sftp');
-        }
 
         this.panels.delete(sessionId);
         this._refitTerminal(sessionId);

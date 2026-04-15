@@ -4,9 +4,13 @@
    ========================================================================== */
 
 /* -----------------------------------------------------------------------
-   Panel wrapper — sits inside the session-panel as a flex sibling
+   Panel wrapper — overlays the terminal from the right side
    ----------------------------------------------------------------------- */
 .sftp-panel {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
     width: 300px;
     min-width: 220px;
     max-width: 50vw;
@@ -15,20 +19,26 @@
     background: var(--bg-surface);
     border-left: 1px solid var(--border-subtle);
     overflow: hidden;
-    flex-shrink: 0;
+    z-index: var(--z-dropdown, 50);
+    box-shadow: -4px 0 16px rgba(0, 0, 0, 0.25);
 }
 
-/* When the session panel has an SFTP panel, switch to row layout */
-.session-panel.has-sftp {
-    flex-direction: row;
+/* Resize handle — positioned at the left edge of the SFTP panel */
+.sftp-resize-handle {
+    position: absolute;
+    top: 0;
+    left: -3px;
+    bottom: 0;
+    width: 6px;
+    cursor: col-resize;
+    background: transparent;
+    z-index: var(--z-dropdown, 50);
+    transition: background var(--transition-fast);
 }
 
-/* Terminal container must become a flex child when SFTP panel is open */
-.session-panel.has-sftp .terminal-container {
-    position: relative;
-    inset: unset;
-    flex: 1;
-    min-width: 0;
+.sftp-resize-handle:hover,
+.sftp-resize-handle.is-dragging {
+    background: var(--accent);
 }
 
 /* -----------------------------------------------------------------------
@@ -326,20 +336,4 @@
     border-radius: var(--radius-sm);
     outline: none;
     box-shadow: 0 0 0 2px var(--accent-muted);
-}
-
-/* -----------------------------------------------------------------------
-   Resize handle between terminal and SFTP panel
-   ----------------------------------------------------------------------- */
-.sftp-resize-handle {
-    width: 4px;
-    cursor: col-resize;
-    background: transparent;
-    flex-shrink: 0;
-    transition: background var(--transition-fast);
-}
-
-.sftp-resize-handle:hover,
-.sftp-resize-handle.is-dragging {
-    background: var(--accent);
 }
