@@ -318,6 +318,141 @@
     padding: var(--space-5);
 }
 
+/* Help tab — two-column layout with navigation sidebar */
+.settings-body.help-layout {
+    display: flex;
+    gap: 0;
+    padding: 0;
+    overflow: hidden;
+}
+
+.help-nav {
+    width: 180px;
+    min-width: 160px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    padding: var(--space-2) 0;
+    border-right: 1px solid var(--border-subtle);
+    overflow-y: auto;
+    background: var(--bg-surface);
+}
+
+.help-nav-item {
+    display: block;
+    width: 100%;
+    padding: var(--space-2) var(--space-4);
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+    background: none;
+    border: none;
+    text-align: left;
+    cursor: pointer;
+    transition: background var(--transition-fast), color var(--transition-fast);
+    border-left: 2px solid transparent;
+}
+
+.help-nav-item:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+.help-nav-item.active {
+    color: var(--accent);
+    background: var(--bg-elevated);
+    border-left-color: var(--accent);
+    font-weight: var(--weight-medium);
+}
+
+.help-content {
+    flex: 1;
+    padding: var(--space-4) var(--space-5);
+    overflow-y: auto;
+    min-width: 0;
+    font-size: var(--text-sm);
+    line-height: 1.65;
+    color: var(--text-secondary);
+}
+
+.help-section-title {
+    font-size: var(--text-lg);
+    font-weight: var(--weight-semibold);
+    color: var(--text-primary);
+    margin: 0 0 var(--space-3) 0;
+    padding-bottom: var(--space-2);
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.help-content h4 {
+    font-size: var(--text-sm);
+    font-weight: var(--weight-semibold);
+    color: var(--text-primary);
+    margin: var(--space-4) 0 var(--space-2) 0;
+}
+
+.help-content p {
+    margin: 0 0 var(--space-2) 0;
+}
+
+.help-content ul, .help-content ol {
+    margin: 0 0 var(--space-3) 0;
+    padding-left: var(--space-5);
+}
+
+.help-content li {
+    margin-bottom: var(--space-1);
+}
+
+.help-content code {
+    font-family: 'Menlo', 'Consolas', 'Courier New', monospace;
+    font-size: 0.9em;
+    background: var(--bg-base);
+    padding: 1px 5px;
+    border-radius: var(--radius-sm);
+    color: var(--accent);
+}
+
+.help-content kbd {
+    display: inline-block;
+    font-family: 'Menlo', 'Consolas', 'Courier New', monospace;
+    font-size: 0.8em;
+    padding: 1px 5px;
+    background: var(--bg-base);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    box-shadow: 0 1px 0 var(--border-strong, var(--border-default));
+    line-height: 1.4;
+}
+
+.help-content em {
+    color: var(--text-tertiary);
+    font-style: italic;
+}
+
+.help-content strong {
+    color: var(--text-primary);
+    font-weight: var(--weight-medium);
+}
+
+.help-shortcuts-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: var(--space-2) 0 var(--space-3) 0;
+}
+
+.help-shortcuts-table td {
+    padding: var(--space-1) var(--space-2);
+    border-bottom: 1px solid var(--border-subtle);
+    font-size: var(--text-sm);
+}
+
+.help-shortcuts-table td:first-child {
+    width: 140px;
+    white-space: nowrap;
+    color: var(--text-primary);
+}
+
 /* Command palette */
 .palette-overlay {
     position: fixed;

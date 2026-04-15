@@ -13,6 +13,7 @@ const TABS = [
     { key: 'terminal', label: 'Terminal' },
     { key: 'security', label: 'Security' },
     { key: 'knownhosts', label: 'Known Hosts' },
+    { key: 'help', label: 'Help' },
     { key: 'about', label: 'About' },
 ];
 
@@ -167,11 +168,13 @@ class Settings {
      */
     _renderTabContent(body) {
         body.innerHTML = '';
+        body.classList.remove('help-layout');
         switch (this._activeTab) {
             case 'general': this._renderGeneralTab(body); break;
             case 'terminal': this._renderTerminalTab(body); break;
             case 'security': this._renderSecurityTab(body); break;
             case 'knownhosts': this._renderKnownHostsTab(body); break;
+            case 'help': this._renderHelpTab(body); break;
             case 'about': this._renderAboutTab(body); break;
         }
     }
@@ -350,6 +353,211 @@ class Settings {
 
         table.appendChild(tbody);
         body.appendChild(table);
+    }
+
+    /**
+     * In-app help and documentation tab.
+     * @param {HTMLElement} body
+     * @private
+     */
+    _renderHelpTab(body) {
+        const HELP_SECTIONS = [
+            { id: 'getting-started', title: 'Getting Started', content: `
+                <p>Welcome to <strong>Nexus Terminal</strong> — a desktop application for connecting to remote servers via SSH, Telnet, and RAW TCP, as well as browsing your GitHub repositories.</p>
+                <h4>Creating Your First Connection</h4>
+                <ol>
+                    <li>Click the <strong>+</strong> button at the top of the sidebar, or press <kbd>⌘N</kbd> (Mac) / <kbd>Ctrl+N</kbd> (Windows/Linux).</li>
+                    <li>Choose a protocol (SSH, Telnet, RAW, or GitHub).</li>
+                    <li>Fill in the hostname, port, and any credentials required.</li>
+                    <li>Optionally assign the connection to a <strong>group</strong> to keep your sidebar organised.</li>
+                    <li>Click <strong>Save</strong>, then double-click the entry in the sidebar to connect.</li>
+                </ol>
+                <h4>Managing Connections</h4>
+                <p>Right-click any connection in the sidebar to <strong>edit</strong>, <strong>duplicate</strong>, or <strong>delete</strong> it. You can drag connections between groups, and use the search box to filter by name, host, or tag.</p>
+            ` },
+            { id: 'ssh', title: 'SSH Connections', content: `
+                <p>SSH (Secure Shell) is the most common way to connect to remote servers. Nexus Terminal supports:</p>
+                <ul>
+                    <li><strong>Password authentication</strong> — enter your password when prompted, or save it in the encrypted vault.</li>
+                    <li><strong>Public key authentication</strong> — point to your private key file (e.g. <code>~/.ssh/id_rsa</code>). If the key has a passphrase, you will be prompted.</li>
+                    <li><strong>Keyboard-interactive</strong> — for servers that use challenge-response (e.g. two-factor prompts).</li>
+                    <li><strong>SSH agent</strong> — tick "Use SSH Agent" to authenticate via your system's SSH agent (e.g. <code>ssh-agent</code> or 1Password).</li>
+                </ul>
+                <h4>Jump Hosts (Bastions)</h4>
+                <p>If you need to reach a server through an intermediate host, add one or more jump hosts in the connection editor. Nexus Terminal will tunnel through each hop automatically.</p>
+                <h4>Port Forwarding</h4>
+                <p>You can set up <strong>local</strong>, <strong>remote</strong>, and <strong>dynamic</strong> (SOCKS proxy) port forwards in the connection editor. These start automatically when the session connects.</p>
+                <h4>SFTP File Browser</h4>
+                <p>Once connected to an SSH server, click the <strong>📁</strong> icon on the tab to open the SFTP file browser. You can browse directories, upload, download, rename, and delete files from a side panel.</p>
+                <h4>SSH Agent Forwarding</h4>
+                <p>Tick "Agent Forwarding" in the SSH settings to forward your local SSH agent to the remote server. This lets you use your local keys when connecting onward from that server.</p>
+            ` },
+            { id: 'telnet', title: 'Telnet Connections', content: `
+                <p>Telnet is an older, unencrypted protocol still used for network equipment, legacy systems, and some fun internet services.</p>
+                <ul>
+                    <li><strong>Option negotiation</strong> — Nexus Terminal handles standard Telnet options (echo, terminal type, window size) automatically.</li>
+                    <li><strong>Character encoding</strong> — choose UTF-8, ASCII, or Latin-1 for the connection.</li>
+                    <li><strong>Local echo</strong> — enable this if the remote host does not echo back what you type.</li>
+                    <li><strong>Line mode</strong> — send data line-by-line (press Enter to send) rather than character-by-character.</li>
+                </ul>
+                <p><em>Note:</em> Telnet sends everything in plain text. Avoid using it for anything sensitive over an untrusted network.</p>
+            ` },
+            { id: 'raw', title: 'RAW TCP Connections', content: `
+                <p>RAW TCP lets you connect to any TCP port and exchange data directly — useful for debugging network services, testing APIs, or working with custom protocols.</p>
+                <ul>
+                    <li><strong>Text view</strong> — shows incoming data as readable text.</li>
+                    <li><strong>Hex view</strong> — shows raw bytes in a hex dump format.</li>
+                    <li><strong>Split view</strong> — text and hex side by side.</li>
+                    <li><strong>Payload presets</strong> — save frequently-used commands or data packets for quick sending.</li>
+                    <li><strong>Line endings</strong> — choose CR, LF, or CRLF to match the remote service.</li>
+                    <li><strong>Auto-reconnect</strong> — automatically reconnect if the connection drops.</li>
+                </ul>
+            ` },
+            { id: 'github', title: 'GitHub Connections', content: `
+                <p>The GitHub connection type lets you browse your repositories without leaving Nexus Terminal.</p>
+                <h4>Setting Up</h4>
+                <ol>
+                    <li>Create a new connection and choose <strong>GitHub</strong> as the protocol.</li>
+                    <li>Enter your <strong>Personal Access Token</strong> (create one at <em>GitHub → Settings → Developer settings → Personal access tokens</em>). The token needs the <code>repo</code> scope.</li>
+                    <li>Save and connect.</li>
+                </ol>
+                <h4>What You'll See</h4>
+                <p>Your repositories are listed grouped by organisation or owner, sorted by last commit date (newest first). The list refreshes automatically every few minutes.</p>
+            ` },
+            { id: 'sessions', title: 'Sessions &amp; Tabs', content: `
+                <h4>Tab Management</h4>
+                <ul>
+                    <li><strong>Rename</strong> — right-click a tab and choose "Rename".</li>
+                    <li><strong>Reorder</strong> — drag tabs left or right to rearrange.</li>
+                    <li><strong>Pin</strong> — right-click and pin a tab so it stays at the left of the bar.</li>
+                    <li><strong>Close</strong> — click the <strong>×</strong> on a tab, or press <kbd>⌘W</kbd> / <kbd>Ctrl+W</kbd>.</li>
+                </ul>
+                <h4>Split Panes</h4>
+                <p>You can split the terminal into multiple panes:</p>
+                <ul>
+                    <li><kbd>⌘⇧D</kbd> / <kbd>Ctrl+Shift+D</kbd> — split vertically (side by side).</li>
+                    <li><kbd>⌘⇧E</kbd> / <kbd>Ctrl+Shift+E</kbd> — split horizontally (top and bottom).</li>
+                </ul>
+                <p>Drag the divider between panes to resize them.</p>
+                <h4>Session Recording</h4>
+                <p>Press <kbd>⌘⇧R</kbd> / <kbd>Ctrl+Shift+R</kbd> to start recording a session. A red dot will appear on the tab. Press the same shortcut again to stop. Browse and replay recordings from the <strong>⏺</strong> button in the sidebar.</p>
+            ` },
+            { id: 'security', title: 'Security &amp; Credentials', content: `
+                <h4>How Your Passwords Are Stored</h4>
+                <p>Nexus Terminal uses a <strong>two-tier</strong> approach to keep your credentials safe:</p>
+                <ol>
+                    <li><strong>OS keychain</strong> (preferred) — your operating system's built-in credential store (macOS Keychain, Windows Credential Manager, or Linux Secret Service). If available, this is used automatically.</li>
+                    <li><strong>Encrypted vault</strong> (fallback) — if the OS keychain is not available, Nexus Terminal creates a local vault encrypted with AES-256-GCM. You set a master password to unlock it.</li>
+                </ol>
+                <h4>Encryption Details</h4>
+                <p>The vault uses <strong>Argon2id</strong> to derive the encryption key from your master password (128 MiB memory, making brute-force attacks very expensive). Each secret is individually encrypted and never stored in plain text.</p>
+                <h4>Known Hosts</h4>
+                <p>When you connect to an SSH server for the first time, Nexus Terminal records the server's fingerprint. If the fingerprint changes on a subsequent connection, you'll be warned — this protects against man-in-the-middle attacks.</p>
+                <p>You can manage known hosts and change the verification policy in <strong>Settings → Known Hosts</strong>.</p>
+                <h4>Encrypted Export</h4>
+                <p>When exporting profiles, you can choose encrypted export (.nexus file) which protects the file with a password. This uses the same strong AES-256-GCM encryption as the vault.</p>
+            ` },
+            { id: 'shortcuts', title: 'Keyboard Shortcuts', content: `
+                <p>On macOS, use <kbd>⌘</kbd> (Cmd). On Windows and Linux, use <kbd>Ctrl</kbd>.</p>
+                <table class="help-shortcuts-table">
+                    <tbody>
+                        <tr><td><kbd>⌘K</kbd></td><td>Open the command palette</td></tr>
+                        <tr><td><kbd>⌘N</kbd></td><td>New connection</td></tr>
+                        <tr><td><kbd>⌘W</kbd></td><td>Close the active tab</td></tr>
+                        <tr><td><kbd>⌘Tab</kbd></td><td>Next tab</td></tr>
+                        <tr><td><kbd>⌘⇧Tab</kbd></td><td>Previous tab</td></tr>
+                        <tr><td><kbd>⌘1</kbd>–<kbd>⌘9</kbd></td><td>Switch to tab by number</td></tr>
+                        <tr><td><kbd>⌘,</kbd></td><td>Open Settings</td></tr>
+                        <tr><td><kbd>⌘F</kbd></td><td>Search in terminal</td></tr>
+                        <tr><td><kbd>⌘⇧D</kbd></td><td>Split pane vertically</td></tr>
+                        <tr><td><kbd>⌘⇧E</kbd></td><td>Split pane horizontally</td></tr>
+                        <tr><td><kbd>⌘⇧R</kbd></td><td>Toggle session recording</td></tr>
+                        <tr><td><kbd>F11</kbd></td><td>Toggle fullscreen (Windows/Linux)</td></tr>
+                    </tbody>
+                </table>
+            ` },
+            { id: 'import-export', title: 'Import &amp; Export', content: `
+                <h4>Exporting Profiles</h4>
+                <p>Click the <strong>↗</strong> export button in the sidebar footer. You can choose which profiles to include, and set a password to encrypt the file. Exported files use the <code>.nexus</code> extension.</p>
+                <h4>Importing Profiles</h4>
+                <p>Click the <strong>↙</strong> import button. Select a <code>.nexus</code> file and enter the password used when exporting. Imported profiles will appear in your sidebar immediately.</p>
+                <h4>Importing from OpenSSH</h4>
+                <p>If you have an existing <code>~/.ssh/config</code> file, go to <strong>Settings → About</strong> and click <strong>Import ~/.ssh/config</strong>. Nexus Terminal will create profiles from your SSH Host blocks, including hostnames, usernames, ports, identity files, and jump hosts.</p>
+            ` },
+            { id: 'troubleshooting', title: 'Troubleshooting', content: `
+                <h4>I can't connect to my server</h4>
+                <ul>
+                    <li>Double-check the <strong>hostname</strong> and <strong>port</strong> — a common mistake is using port 22 for Telnet (which is usually 23) or vice versa.</li>
+                    <li>Make sure the server is reachable from your machine. Try <code>ping hostname</code> from another terminal.</li>
+                    <li>If using SSH keys, check that the key file path is correct and that the file permissions are not too open (should be <code>600</code> or <code>400</code>).</li>
+                    <li>If you're behind a firewall or VPN, ensure the relevant port is allowed through.</li>
+                </ul>
+                <h4>The terminal looks garbled or the wrong size</h4>
+                <ul>
+                    <li>Try resizing the window — the terminal should re-fit automatically.</li>
+                    <li>If you're using split panes, drag the divider to give the terminal more space.</li>
+                    <li>Some older servers may not support modern terminal features. Try a different terminal theme in <strong>Settings → Terminal</strong>.</li>
+                </ul>
+                <h4>"Host key verification failed"</h4>
+                <p>This means the server's fingerprint has changed since your last connection. This can happen if the server was reinstalled, but it could also indicate a security threat. If you're certain it's safe, go to <strong>Settings → Known Hosts</strong>, find the entry, and remove it. You'll be prompted to accept the new key on your next connection.</p>
+                <h4>I forgot my vault master password</h4>
+                <p>Unfortunately, the vault encryption is designed so that without the master password, the stored credentials cannot be recovered. You would need to delete the vault file and set up a new one. Your connection profiles (without saved passwords) will remain intact.</p>
+                <h4>SFTP panel doesn't open</h4>
+                <p>SFTP is only available for <strong>SSH</strong> connections (not Telnet, RAW, or GitHub). Make sure you are connected to an SSH session first, then click the <strong>📁</strong> icon on the tab.</p>
+                <h4>The application looks blurry on my display</h4>
+                <p>Make sure your system display scaling is set correctly. On macOS, Nexus Terminal is fully Retina-aware. On Windows, check your DPI settings in Display preferences.</p>
+                <h4>Export/import isn't working</h4>
+                <p>Ensure you're using the same password to import that was used to export. The encrypted <code>.nexus</code> files cannot be opened with the wrong password.</p>
+            ` },
+            { id: 'fun', title: 'Fun Things to Try', content: `
+                <p>Nexus Terminal isn't just for work! Here are some entertaining things you can connect to:</p>
+                <h4>🌟 Star Wars in ASCII Art</h4>
+                <p>Create a <strong>Telnet</strong> connection to <code>towel.blinkenlights.nl</code> on port <strong>23</strong>. Sit back and enjoy the original Star Wars film retold entirely in ASCII art.</p>
+                <h4>🗺️ MapSCII — World Map in Your Terminal</h4>
+                <p>Connect via <strong>SSH</strong> to <code>mapscii.me</code> on port <strong>22</strong>. Use the arrow keys to pan and <kbd>a</kbd>/<kbd>z</kbd> to zoom in and out of a fully interactive world map rendered in text.</p>
+                <h4>🎮 Telnet BBS Systems</h4>
+                <p>Connect via <strong>Telnet</strong> to <code>particlesbbs.dyndns.org</code> on port <strong>23</strong> for a retro bulletin board system experience, complete with door games, message boards, and ASCII art.</p>
+                <h4>🐄 Fortune Cookies</h4>
+                <p>Connect via <strong>Telnet</strong> to <code>djxmmx.net</code> on port <strong>17</strong> (the Quote of the Day protocol). You'll receive a random quote each time you connect — great for testing RAW TCP connections too.</p>
+                <h4>🔒 Test Your SSH Setup</h4>
+                <p>Connect via <strong>SSH</strong> to <code>ssh.github.com</code> on port <strong>443</strong> (or <code>github.com</code> on port <strong>22</strong>) with your GitHub username. GitHub will greet you by name if your key is set up correctly — a quick way to verify your SSH configuration.</p>
+                <h4>📡 RAW TCP Experiments</h4>
+                <p>Create a <strong>RAW TCP</strong> connection to any HTTP server on port <strong>80</strong>, then type <code>GET / HTTP/1.0</code> followed by two blank lines. You'll see the raw HTTP response — a great way to understand how the web works under the hood.</p>
+            ` },
+        ];
+
+        body.innerHTML = '';
+
+        // Navigation sidebar
+        body.classList.add('help-layout');
+        var nav = createElement('div', 'help-nav');
+        var content = createElement('div', 'help-content');
+
+        for (var i = 0; i < HELP_SECTIONS.length; i++) {
+            var section = HELP_SECTIONS[i];
+            var navItem = createElement('button', 'help-nav-item', {
+                textContent: section.title,
+                dataset: { section: section.id },
+            });
+            navItem.addEventListener('mousedown', function(e) { e.preventDefault(); });
+            (function(sec) {
+                navItem.addEventListener('click', function() {
+                    nav.querySelectorAll('.help-nav-item').forEach(function(n) { n.classList.remove('active'); });
+                    this.classList.add('active');
+                    content.innerHTML = '<h3 class="help-section-title">' + sec.title + '</h3>' + sec.content;
+                });
+            })(section);
+            nav.appendChild(navItem);
+        }
+
+        body.appendChild(nav);
+        body.appendChild(content);
+
+        // Show first section by default
+        if (nav.firstChild) {
+            nav.firstChild.classList.add('active');
+            content.innerHTML = '<h3 class="help-section-title">' + HELP_SECTIONS[0].title + '</h3>' + HELP_SECTIONS[0].content;
+        }
     }
 
     /**
