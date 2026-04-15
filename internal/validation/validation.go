@@ -93,6 +93,8 @@ func ValidateProfile(p *models.Profile) error {
 				errs.Errors = append(errs.Errors, ve.Errors...)
 			}
 		}
+	case models.ProtocolGitHub:
+		// GitHub profiles require no host-level validation beyond the common checks.
 	default:
 		errs.Add("protocol", fmt.Sprintf("unsupported protocol %q", p.Protocol))
 	}
@@ -214,6 +216,23 @@ func ValidateSSHConfig(cfg *models.SSHConfig) error {
 		}
 		if strings.TrimSpace(jh.Username) == "" {
 			errs.Add(prefix+".username", "jump host username must not be empty")
+		}
+	}
+
+	// Validate each port-forwarding rule.
+	for i, pf := range cfg.PortForwards {
+		prefix := fmt.Sprintf("ssh.portForwards[%d]", i)
+		if pf.Direction != models.PortForwardLocal && pf.Direction != models.PortForwardRemote {
+			errs.Add(prefix+".direction", fmt.Sprintf("unsupported forwarding direction %q", pf.Direction))
+		}
+		if pf.BindPort < 1 || pf.BindPort > 65535 {
+			errs.Add(prefix+".bindPort", "bind port must be between 1 and 65535")
+		}
+		if pf.DestPort < 1 || pf.DestPort > 65535 {
+			errs.Add(prefix+".destPort", "destination port must be between 1 and 65535")
+		}
+		if strings.TrimSpace(pf.DestHost) == "" {
+			errs.Add(prefix+".destHost", "destination host must not be empty")
 		}
 	}
 

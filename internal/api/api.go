@@ -624,6 +624,25 @@ func (s *Service) RefreshGitHubRepos(sessionID string) ([]models.GitHubRepo, err
 	return s.sessions.FetchGitHubRepos(sessionID)
 }
 
+// ---------------------------------------------------------------------------
+// Port forwarding
+// ---------------------------------------------------------------------------
+
+// ListPortForwards returns the active port-forwarding tunnels for an SSH session.
+func (s *Service) ListPortForwards(sessionID string) ([]models.PortForward, error) {
+	return s.sessions.ListPortForwards(sessionID)
+}
+
+// StartPortForward activates a new forwarding tunnel on a live SSH session.
+func (s *Service) StartPortForward(sessionID string, rule models.PortForward) error {
+	return s.sessions.StartPortForward(sessionID, rule)
+}
+
+// StopPortForward terminates an active forwarding tunnel.
+func (s *Service) StopPortForward(sessionID string, forwardID string) error {
+	return s.sessions.StopPortForward(sessionID, forwardID)
+}
+
 // TestConnection performs a basic TCP reachability check to the given host and port.
 // This verifies the network path without establishing a full protocol session.
 func (s *Service) TestConnection(host string, port int) (map[string]interface{}, error) {

@@ -209,6 +209,32 @@ export namespace models {
 	        this.format = source["format"];
 	    }
 	}
+	export class PortForward {
+	    id: string;
+	    direction: string;
+	    bindHost: string;
+	    bindPort: number;
+	    destHost: string;
+	    destPort: number;
+	    enabled: boolean;
+	    label: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new PortForward(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.direction = source["direction"];
+	        this.bindHost = source["bindHost"];
+	        this.bindPort = source["bindPort"];
+	        this.destHost = source["destHost"];
+	        this.destPort = source["destPort"];
+	        this.enabled = source["enabled"];
+	        this.label = source["label"];
+	    }
+	}
 	export class RAWConfig {
 	    autoReconnect: boolean;
 	    lineEnding: string;
@@ -282,6 +308,7 @@ export namespace models {
 	    keepaliveCountMax: number;
 	    compression: boolean;
 	    jumpHosts: JumpHost[];
+	    portForwards: PortForward[];
 	    startupCommand: string;
 	    envVars: Record<string, string>;
 	
@@ -301,6 +328,7 @@ export namespace models {
 	        this.keepaliveCountMax = source["keepaliveCountMax"];
 	        this.compression = source["compression"];
 	        this.jumpHosts = this.convertValues(source["jumpHosts"], JumpHost);
+	        this.portForwards = this.convertValues(source["portForwards"], PortForward);
 	        this.startupCommand = source["startupCommand"];
 	        this.envVars = source["envVars"];
 	    }

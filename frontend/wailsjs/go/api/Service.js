@@ -90,6 +90,10 @@ export function ListKnownHosts() {
   return window['go']['api']['Service']['ListKnownHosts']();
 }
 
+export function ListPortForwards(arg1) {
+  return window['go']['api']['Service']['ListPortForwards'](arg1);
+}
+
 export function ListProfiles() {
   return window['go']['api']['Service']['ListProfiles']();
 }
@@ -176,6 +180,14 @@ export function SetFavourite(arg1, arg2) {
 
 export function SetProfileSecret(arg1, arg2, arg3) {
   return window['go']['api']['Service']['SetProfileSecret'](arg1, arg2, arg3);
+}
+
+export function StartPortForward(arg1, arg2) {
+  return window['go']['api']['Service']['StartPortForward'](arg1, arg2);
+}
+
+export function StopPortForward(arg1, arg2) {
+  return window['go']['api']['Service']['StopPortForward'](arg1, arg2);
 }
 
 export function TestConnection(arg1, arg2) {

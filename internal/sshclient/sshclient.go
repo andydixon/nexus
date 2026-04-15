@@ -15,7 +15,7 @@ import (
 
 // Client manages a single SSH session lifecycle.
 // It handles connection establishment, authentication, PTY allocation,
-// terminal resize propagation, and clean shutdown.
+// terminal resize propagation, port forwarding, and clean shutdown.
 type Client struct {
 	mu        sync.Mutex
 	config    *models.Profile
@@ -30,6 +30,7 @@ type Client struct {
 	onClose   func()
 	ctx       context.Context
 	cancel    context.CancelFunc
+	forwards  *ForwardManager // port forwarding tunnels
 }
 
 // NewClient creates a new SSH client bound to the given profile.
@@ -193,6 +194,7 @@ func (c *Client) connectInternal(
 	c.stdout = stdoutPipe
 	c.stderr = stderrPipe
 	c.connected = true
+	c.forwards = NewForwardManager(sshConn)
 	c.mu.Unlock()
 
 	go c.readLoop()
@@ -242,10 +244,16 @@ func (c *Client) Close() error {
 	c.connected = false
 	session := c.session
 	sshClient := c.sshClient
+	fwdMgr := c.forwards
 	onClose := c.onClose
 	c.mu.Unlock()
 
 	c.cancel()
+
+	// Shut down any active port forwards first.
+	if fwdMgr != nil {
+		fwdMgr.StopAll()
+	}
 
 	var firstErr error
 	if session != nil {
@@ -270,6 +278,13 @@ func (c *Client) IsConnected() bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return c.connected
+}
+
+// Forwards returns the ForwardManager for this client, or nil if not connected.
+func (c *Client) Forwards() *ForwardManager {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.forwards
 }
 
 // buildAuthMethods constructs the SSH authentication method list from the

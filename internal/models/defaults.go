@@ -80,6 +80,7 @@ func NewProfile(protocol Protocol) Profile {
 			KeepaliveInterval: DefaultKeepaliveInterval,
 			KeepaliveCountMax: DefaultKeepaliveCountMax,
 			JumpHosts:         []JumpHost{},
+			PortForwards:      []PortForward{},
 			EnvVars:           map[string]string{},
 		}
 	case ProtocolTelnet:

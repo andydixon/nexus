@@ -24,6 +24,7 @@ const DEFAULTS = {
             keepaliveCountMax: 3,
             compression: false,
             jumpHosts: [],
+            portForwards: [],
             startupCommand: '',
             envVars: {},
         },
@@ -373,6 +374,11 @@ class ProfileEditor {
             this._renderJumpHostsList(ssh.jumpHosts || []),
         ], true));
 
+        // Port Forwarding
+        sections.push(this._renderSection('Port Forwarding', [
+            this._renderPortForwardsList(ssh.portForwards || []),
+        ], true));
+
         // Startup
         sections.push(this._renderSection('Startup', [
             this._field('text', 'ssh.startupCommand', 'Startup Command', ssh.startupCommand, {
@@ -712,10 +718,15 @@ class ProfileEditor {
             const jh = jumpHosts[i];
             const row = createElement('div', 'jump-host-row');
             row.innerHTML = `
-                <input class="form-input form-input-sm" name="jumpHost-${i}-host" value="${escapeHtml(jh.host || '')}" placeholder="Host" />
-                <input class="form-input form-input-sm" name="jumpHost-${i}-port" type="number" value="${jh.port || 22}" min="1" max="65535" style="width:80px" />
-                <input class="form-input form-input-sm" name="jumpHost-${i}-username" value="${escapeHtml(jh.username || '')}" placeholder="User" />
-                <button class="btn btn-icon btn-danger jump-host-remove" data-index="${i}" title="Remove">&times;</button>
+                <div class="jump-host-fields">
+                    <input class="form-input form-input-sm" name="jumpHost-${i}-host" value="${escapeHtml(jh.host || '')}" placeholder="Host" />
+                    <input class="form-input form-input-sm" name="jumpHost-${i}-port" type="number" value="${jh.port || 22}" min="1" max="65535" style="width:80px" />
+                    <input class="form-input form-input-sm" name="jumpHost-${i}-username" value="${escapeHtml(jh.username || '')}" placeholder="User" />
+                </div>
+                <div class="jump-host-fields">
+                    <input class="form-input form-input-sm" name="jumpHost-${i}-privateKeyPath" value="${escapeHtml(jh.privateKeyPath || '')}" placeholder="Private key path (optional)" style="flex:1" />
+                    <button class="btn btn-icon btn-danger jump-host-remove" data-index="${i}" title="Remove">&times;</button>
+                </div>
             `;
             row.querySelector('.jump-host-remove').addEventListener('click', () => {
                 jumpHosts.splice(i, 1);
@@ -727,6 +738,65 @@ class ProfileEditor {
         const addBtn = createElement('button', 'btn btn-sm btn-outline', { textContent: '+ Add Jump Host' });
         addBtn.addEventListener('click', () => {
             jumpHosts.push({ host: '', port: 22, username: '', authMethod: 'publickey', secretMode: 'ask-every-time', privateKeyPath: '' });
+            this.render(this._profile, this._isNew);
+        });
+        wrapper.appendChild(addBtn);
+
+        return wrapper;
+    }
+
+    /**
+     * Renders the port-forwarding rules list editor.
+     * @param {Array<Object>} portForwards
+     * @returns {HTMLElement}
+     * @private
+     */
+    _renderPortForwardsList(portForwards) {
+        const wrapper = createElement('div', 'port-forwards-list');
+
+        for (let i = 0; i < portForwards.length; i++) {
+            const pf = portForwards[i];
+            const row = createElement('div', 'port-forward-row');
+            row.innerHTML = `
+                <div class="port-forward-fields">
+                    <select class="form-select form-select-sm" name="portFwd-${i}-direction" style="width:110px">
+                        <option value="local" ${pf.direction === 'local' ? 'selected' : ''}>Local →</option>
+                        <option value="remote" ${pf.direction === 'remote' ? 'selected' : ''}>← Remote</option>
+                    </select>
+                    <input class="form-input form-input-sm" name="portFwd-${i}-bindHost" value="${escapeHtml(pf.bindHost || '127.0.0.1')}" placeholder="Bind host" style="width:110px" />
+                    <input class="form-input form-input-sm" name="portFwd-${i}-bindPort" type="number" value="${pf.bindPort || 0}" min="1" max="65535" placeholder="Bind port" style="width:80px" />
+                    <span class="port-forward-arrow">⟶</span>
+                    <input class="form-input form-input-sm" name="portFwd-${i}-destHost" value="${escapeHtml(pf.destHost || '')}" placeholder="Dest host" style="width:110px" />
+                    <input class="form-input form-input-sm" name="portFwd-${i}-destPort" type="number" value="${pf.destPort || 0}" min="1" max="65535" placeholder="Dest port" style="width:80px" />
+                </div>
+                <div class="port-forward-fields">
+                    <input class="form-input form-input-sm" name="portFwd-${i}-label" value="${escapeHtml(pf.label || '')}" placeholder="Label (optional)" style="flex:1" />
+                    <label class="port-forward-enabled-label" title="Enable on connect">
+                        <input type="checkbox" name="portFwd-${i}-enabled" ${pf.enabled !== false ? 'checked' : ''} />
+                        <span>Active</span>
+                    </label>
+                    <button class="btn btn-icon btn-danger port-forward-remove" data-index="${i}" title="Remove">&times;</button>
+                </div>
+            `;
+            row.querySelector('.port-forward-remove').addEventListener('click', () => {
+                portForwards.splice(i, 1);
+                this.render(this._profile, this._isNew);
+            });
+            wrapper.appendChild(row);
+        }
+
+        const addBtn = createElement('button', 'btn btn-sm btn-outline', { textContent: '+ Add Port Forward' });
+        addBtn.addEventListener('click', () => {
+            portForwards.push({
+                id: generateId(),
+                direction: 'local',
+                bindHost: '127.0.0.1',
+                bindPort: 0,
+                destHost: '',
+                destPort: 0,
+                enabled: true,
+                label: '',
+            });
             this.render(this._profile, this._isNew);
         });
         wrapper.appendChild(addBtn);
@@ -855,11 +925,29 @@ class ProfileEditor {
                     username: val(`jumpHost-${ji}-username`) || '',
                     authMethod: 'publickey',
                     secretMode: 'ask-every-time',
-                    privateKeyPath: '',
+                    privateKeyPath: val(`jumpHost-${ji}-privateKeyPath`) || '',
                 });
                 ji++;
             }
             p.ssh.jumpHosts = jh;
+
+            // Port forwards
+            const pfs = [];
+            let fi = 0;
+            while (this.drawer.querySelector(`[name="portFwd-${fi}-direction"]`)) {
+                pfs.push({
+                    id: (p.ssh.portForwards && p.ssh.portForwards[fi]?.id) || generateId(),
+                    direction: val(`portFwd-${fi}-direction`) || 'local',
+                    bindHost: val(`portFwd-${fi}-bindHost`) || '127.0.0.1',
+                    bindPort: val(`portFwd-${fi}-bindPort`) || 0,
+                    destHost: val(`portFwd-${fi}-destHost`) || '',
+                    destPort: val(`portFwd-${fi}-destPort`) || 0,
+                    enabled: val(`portFwd-${fi}-enabled`) !== false,
+                    label: val(`portFwd-${fi}-label`) || '',
+                });
+                fi++;
+            }
+            p.ssh.portForwards = pfs;
         }
 
         // Telnet-specific

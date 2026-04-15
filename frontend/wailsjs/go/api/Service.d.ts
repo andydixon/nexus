@@ -47,6 +47,8 @@ export function ListFavourites():Promise<Array<models.Profile>>;
 
 export function ListKnownHosts():Promise<Array<models.KnownHost>>;
 
+export function ListPortForwards(arg1:string):Promise<Array<models.PortForward>>;
+
 export function ListProfiles():Promise<Array<models.Profile>>;
 
 export function ListProfilesByFolder(arg1:string):Promise<Array<models.Profile>>;
@@ -90,6 +92,10 @@ export function SetContext(arg1:context.Context):Promise<void>;
 export function SetFavourite(arg1:string,arg2:boolean):Promise<void>;
 
 export function SetProfileSecret(arg1:string,arg2:string,arg3:string):Promise<void>;
+
+export function StartPortForward(arg1:string,arg2:models.PortForward):Promise<void>;
+
+export function StopPortForward(arg1:string,arg2:string):Promise<void>;
 
 export function TestConnection(arg1:string,arg2:number):Promise<Record<string, any>>;
 

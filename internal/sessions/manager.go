@@ -470,6 +470,33 @@ func (m *Manager) connectSSH(sess *Session, getSecret func(prompt string) (strin
 	}
 
 	sess.sshClient = client
+
+	// Start any port-forwarding rules configured in the profile.
+	if sshConf != nil && len(sshConf.PortForwards) > 0 {
+		fwdMgr := client.Forwards()
+		if fwdMgr != nil {
+			for _, pf := range sshConf.PortForwards {
+				if !pf.Enabled {
+					continue
+				}
+				if err := fwdMgr.StartForward(pf); err != nil {
+					// Non-fatal — log and notify but don't abort the session.
+					m.emitEvent("session:forward:error", map[string]interface{}{
+						"sessionID": sess.Info.ID,
+						"forwardID": pf.ID,
+						"label":     pf.Label,
+						"error":     err.Error(),
+					})
+				} else {
+					m.emitEvent("session:forward:started", map[string]interface{}{
+						"sessionID": sess.Info.ID,
+						"forward":   pf,
+					})
+				}
+			}
+		}
+	}
+
 	return nil
 }
 
@@ -666,6 +693,88 @@ func (m *Manager) FetchGitHubRepos(sessionID string) ([]models.GitHubRepo, error
 	})
 
 	return repos, nil
+}
+
+// ---------------------------------------------------------------------------
+// Port-forwarding management
+// ---------------------------------------------------------------------------
+
+// ListPortForwards returns the active port-forwarding rules for a session.
+func (m *Manager) ListPortForwards(sessionID string) ([]models.PortForward, error) {
+	m.mu.RLock()
+	sess, ok := m.sessions[sessionID]
+	m.mu.RUnlock()
+
+	if !ok {
+		return nil, fmt.Errorf("sessions: session %q not found", sessionID)
+	}
+	if sess.sshClient == nil {
+		return nil, fmt.Errorf("sessions: session %q is not an SSH connection", sessionID)
+	}
+
+	fwdMgr := sess.sshClient.Forwards()
+	if fwdMgr == nil {
+		return []models.PortForward{}, nil
+	}
+	return fwdMgr.ActiveForwards(), nil
+}
+
+// StartPortForward activates a new forwarding tunnel on a live SSH session.
+func (m *Manager) StartPortForward(sessionID string, rule models.PortForward) error {
+	m.mu.RLock()
+	sess, ok := m.sessions[sessionID]
+	m.mu.RUnlock()
+
+	if !ok {
+		return fmt.Errorf("sessions: session %q not found", sessionID)
+	}
+	if sess.sshClient == nil {
+		return fmt.Errorf("sessions: session %q is not an SSH connection", sessionID)
+	}
+
+	fwdMgr := sess.sshClient.Forwards()
+	if fwdMgr == nil {
+		return fmt.Errorf("sessions: forward manager not initialised")
+	}
+
+	if err := fwdMgr.StartForward(rule); err != nil {
+		return err
+	}
+
+	m.emitEvent("session:forward:started", map[string]interface{}{
+		"sessionID": sessionID,
+		"forward":   rule,
+	})
+	return nil
+}
+
+// StopPortForward terminates an active forwarding tunnel.
+func (m *Manager) StopPortForward(sessionID string, forwardID string) error {
+	m.mu.RLock()
+	sess, ok := m.sessions[sessionID]
+	m.mu.RUnlock()
+
+	if !ok {
+		return fmt.Errorf("sessions: session %q not found", sessionID)
+	}
+	if sess.sshClient == nil {
+		return fmt.Errorf("sessions: session %q is not an SSH connection", sessionID)
+	}
+
+	fwdMgr := sess.sshClient.Forwards()
+	if fwdMgr == nil {
+		return fmt.Errorf("sessions: forward manager not initialised")
+	}
+
+	if err := fwdMgr.StopForward(forwardID); err != nil {
+		return err
+	}
+
+	m.emitEvent("session:forward:stopped", map[string]interface{}{
+		"sessionID": sessionID,
+		"forwardID": forwardID,
+	})
+	return nil
 }
 
 // ---------------------------------------------------------------------------

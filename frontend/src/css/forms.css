@@ -486,10 +486,64 @@
 }
 
 .jump-host-row {
-    display: grid;
-    grid-template-columns: 1fr 80px 1fr auto;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    padding: var(--space-2);
+    background: var(--surface-2);
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+}
+
+.jump-host-fields {
+    display: flex;
     gap: var(--space-2);
     align-items: center;
+}
+
+/* -----------------------------------------------------------------------
+   Port-forwarding rows
+   ----------------------------------------------------------------------- */
+.port-forwards-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+}
+
+.port-forward-row {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    padding: var(--space-2);
+    background: var(--surface-2);
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+}
+
+.port-forward-fields {
+    display: flex;
+    gap: var(--space-2);
+    align-items: center;
+}
+
+.port-forward-arrow {
+    color: var(--text-muted);
+    font-size: var(--text-sm);
+    flex-shrink: 0;
+}
+
+.port-forward-enabled-label {
+    display: flex;
+    gap: var(--space-1);
+    align-items: center;
+    font-size: var(--text-xs);
+    color: var(--text-secondary);
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.port-forward-enabled-label input[type="checkbox"] {
+    accent-color: var(--accent);
 }
 
 /* -----------------------------------------------------------------------

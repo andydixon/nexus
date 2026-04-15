@@ -180,6 +180,21 @@ class App {
             );
         });
 
+        // Port-forwarding events
+        window.runtime.EventsOn('session:forward:started', (payload) => {
+            const fwd = payload.forward || {};
+            const label = fwd.label || `${fwd.bindHost || ''}:${fwd.bindPort} → ${fwd.destHost}:${fwd.destPort}`;
+            this.notifications.success(`Forward started: ${label}`);
+        });
+
+        window.runtime.EventsOn('session:forward:stopped', (payload) => {
+            this.notifications.info(`Forward stopped: ${payload.forwardID}`);
+        });
+
+        window.runtime.EventsOn('session:forward:error', (payload) => {
+            this.notifications.error(`Forward error: ${payload.error}`);
+        });
+
         // Telnet negotiation debug messages
         window.runtime.EventsOn('session:debug', (payload) => {
             console.debug('[session:debug]', payload);

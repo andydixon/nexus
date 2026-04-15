@@ -94,6 +94,7 @@ type SSHConfig struct {
 	KeepaliveCountMax int               `json:"keepaliveCountMax"`
 	Compression       bool              `json:"compression"`
 	JumpHosts         []JumpHost        `json:"jumpHosts"`
+	PortForwards      []PortForward     `json:"portForwards"`
 	StartupCommand    string            `json:"startupCommand"`
 	EnvVars           map[string]string `json:"envVars"`
 }
@@ -106,6 +107,26 @@ type JumpHost struct {
 	AuthMethod     string     `json:"authMethod"`
 	SecretMode     SecretMode `json:"secretMode"`
 	PrivateKeyPath string     `json:"privateKeyPath"`
+}
+
+// PortForwardDirection indicates the tunnel direction.
+type PortForwardDirection string
+
+const (
+	PortForwardLocal  PortForwardDirection = "local"
+	PortForwardRemote PortForwardDirection = "remote"
+)
+
+// PortForward defines a single SSH port-forwarding rule.
+type PortForward struct {
+	ID        string               `json:"id"`
+	Direction PortForwardDirection `json:"direction"`
+	BindHost  string               `json:"bindHost"`  // local address to listen on (local) or remote bind (remote)
+	BindPort  int                  `json:"bindPort"`
+	DestHost  string               `json:"destHost"`  // target address to forward to
+	DestPort  int                  `json:"destPort"`
+	Enabled   bool                 `json:"enabled"`   // whether to activate on connect
+	Label     string               `json:"label"`     // optional descriptive label
 }
 
 // TelnetConfig holds Telnet-specific settings for a connection profile.
