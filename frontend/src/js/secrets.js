@@ -134,6 +134,10 @@ class SecretPrompt {
             `;
             if (isNew) {
                 formHtml += `
+                    <div class="password-strength-meter">
+                        <div class="strength-bar"><div class="strength-fill"></div></div>
+                        <span class="strength-label"></span>
+                    </div>
                     <div class="form-group">
                         <label class="form-label">Confirm password</label>
                         <input type="password" class="form-input master-confirm"
@@ -165,6 +169,19 @@ class SecretPrompt {
             const confirmInput = modal.querySelector('.master-confirm');
             const errorEl = modal.querySelector('.secret-error');
             passInput.focus();
+
+            // Wire up the password strength meter for new vault creation.
+            if (isNew) {
+                const strengthFill = modal.querySelector('.strength-fill');
+                const strengthLabel = modal.querySelector('.strength-label');
+                passInput.addEventListener('input', () => {
+                    const result = _measureStrength(passInput.value);
+                    strengthFill.style.width = result.percent + '%';
+                    strengthFill.className = 'strength-fill strength-' + result.level;
+                    strengthLabel.textContent = result.label;
+                    strengthLabel.className = 'strength-label strength-' + result.level;
+                });
+            }
 
             const handleSubmit = () => {
                 const pw = passInput.value;
@@ -308,6 +325,42 @@ class SecretPrompt {
             this._overlay = null;
         }
     }
+}
+
+/**
+ * Estimates password strength based on length and character diversity.
+ * Returns an object with { percent, level, label } for the strength meter.
+ * @param {string} pw
+ * @returns {{ percent: number, level: string, label: string }}
+ * @private
+ */
+function _measureStrength(pw) {
+    if (!pw) return { percent: 0, level: 'none', label: '' };
+
+    let score = 0;
+    const len = pw.length;
+
+    // Length contribution (0–40 points)
+    score += Math.min(len * 3, 40);
+
+    // Character-class diversity (0–40 points)
+    const hasLower = /[a-z]/.test(pw);
+    const hasUpper = /[A-Z]/.test(pw);
+    const hasDigit = /[0-9]/.test(pw);
+    const hasSymbol = /[^a-zA-Z0-9]/.test(pw);
+    const classes = [hasLower, hasUpper, hasDigit, hasSymbol].filter(Boolean).length;
+    score += classes * 10;
+
+    // Unique-character ratio bonus (0–20 points)
+    const unique = new Set(pw).size;
+    score += Math.min(Math.floor((unique / Math.max(len, 1)) * 20), 20);
+
+    score = Math.min(score, 100);
+
+    if (score < 25) return { percent: score, level: 'weak', label: 'Weak' };
+    if (score < 50) return { percent: score, level: 'fair', label: 'Fair' };
+    if (score < 75) return { percent: score, level: 'good', label: 'Good' };
+    return { percent: score, level: 'strong', label: 'Strong' };
 }
 
 window.NexusTerminal = window.NexusTerminal || {};

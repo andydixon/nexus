@@ -665,3 +665,45 @@
     padding: 1px 4px;
     border-radius: 2px;
 }
+
+/* -----------------------------------------------------------------------
+   Password strength meter
+   ----------------------------------------------------------------------- */
+.password-strength-meter {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-bottom: var(--space-2);
+}
+
+.strength-bar {
+    flex: 1;
+    height: 4px;
+    background: var(--surface-2);
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.strength-fill {
+    height: 100%;
+    width: 0;
+    border-radius: 2px;
+    transition: width 0.3s ease, background-color 0.3s ease;
+}
+
+.strength-fill.strength-weak   { background: var(--error); }
+.strength-fill.strength-fair   { background: var(--warning); }
+.strength-fill.strength-good   { background: #66bb6a; }
+.strength-fill.strength-strong { background: var(--success); }
+
+.strength-label {
+    font-size: var(--text-xs);
+    font-weight: 500;
+    min-width: 48px;
+    text-align: right;
+}
+
+.strength-label.strength-weak   { color: var(--error); }
+.strength-label.strength-fair   { color: var(--warning); }
+.strength-label.strength-good   { color: #66bb6a; }
+.strength-label.strength-strong { color: var(--success); }

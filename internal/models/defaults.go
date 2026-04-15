@@ -39,6 +39,7 @@ const (
 func DefaultAppPreferences() AppPreferences {
 	return AppPreferences{
 		Theme:               "dark",
+		TerminalTheme:       "charcoal",
 		DefaultProtocol:     string(ProtocolSSH),
 		ConfirmOnClose:      true,
 		ConfirmOnDisconnect: true,

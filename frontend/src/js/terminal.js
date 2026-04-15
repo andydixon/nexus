@@ -33,8 +33,9 @@ class TerminalManager {
      * @returns {Terminal} The xterm.js Terminal instance.
      */
     createTerminal(sessionId, containerId, profile) {
+        const themeName = (this.app.state.preferences || {}).terminalTheme || 'charcoal';
         const term = new Terminal({
-            theme: this._buildTheme(),
+            theme: window.NexusTerminal.getTerminalTheme(themeName),
             fontFamily: profile.terminalFontFamily || 'JetBrains Mono, Menlo, Monaco, Consolas, monospace',
             fontSize: profile.terminalFontSize || 14,
             scrollback: profile.terminalScrollback || 10000,
@@ -265,6 +266,17 @@ class TerminalManager {
         if (entry) entry.term.focus();
     }
 
+    /**
+     * Applies a named colour theme to all active terminal instances.
+     * @param {string} themeName
+     */
+    applyTheme(themeName) {
+        const themeObj = window.NexusTerminal.getTerminalTheme(themeName);
+        for (const [, entry] of this.terminals) {
+            entry.term.options.theme = themeObj;
+        }
+    }
+
     // ── Private helpers ──────────────────────────────────────────────
 
     /**
@@ -273,30 +285,8 @@ class TerminalManager {
      * @private
      */
     _buildTheme() {
-        return {
-            background: '#1c1c1c',
-            foreground: '#e4e4e4',
-            cursor: '#4ecdc4',
-            cursorAccent: '#1c1c1c',
-            selectionBackground: 'rgba(78, 205, 196, 0.3)',
-            selectionForeground: '#ffffff',
-            black: '#1c1c1c',
-            red: '#ef5350',
-            green: '#66bb6a',
-            yellow: '#ffa726',
-            blue: '#42a5f5',
-            magenta: '#ab47bc',
-            cyan: '#4ecdc4',
-            white: '#e4e4e4',
-            brightBlack: '#555555',
-            brightRed: '#ff7043',
-            brightGreen: '#81c784',
-            brightYellow: '#ffcc02',
-            brightBlue: '#64b5f6',
-            brightMagenta: '#ce93d8',
-            brightCyan: '#80deea',
-            brightWhite: '#ffffff',
-        };
+        const themeName = (this.app.state.preferences || {}).terminalTheme || 'charcoal';
+        return window.NexusTerminal.getTerminalTheme(themeName);
     }
 }
 

@@ -2,6 +2,7 @@ export namespace models {
 	
 	export class AppPreferences {
 	    theme: string;
+	    terminalTheme: string;
 	    defaultProtocol: string;
 	    confirmOnClose: boolean;
 	    confirmOnDisconnect: boolean;
@@ -19,6 +20,7 @@ export namespace models {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.theme = source["theme"];
+	        this.terminalTheme = source["terminalTheme"];
 	        this.defaultProtocol = source["defaultProtocol"];
 	        this.confirmOnClose = source["confirmOnClose"];
 	        this.confirmOnDisconnect = source["confirmOnDisconnect"];
@@ -307,6 +309,8 @@ export namespace models {
 	    keepaliveInterval: number;
 	    keepaliveCountMax: number;
 	    compression: boolean;
+	    agentAuth: boolean;
+	    agentForwarding: boolean;
 	    jumpHosts: JumpHost[];
 	    portForwards: PortForward[];
 	    startupCommand: string;
@@ -327,6 +331,8 @@ export namespace models {
 	        this.keepaliveInterval = source["keepaliveInterval"];
 	        this.keepaliveCountMax = source["keepaliveCountMax"];
 	        this.compression = source["compression"];
+	        this.agentAuth = source["agentAuth"];
+	        this.agentForwarding = source["agentForwarding"];
 	        this.jumpHosts = this.convertValues(source["jumpHosts"], JumpHost);
 	        this.portForwards = this.convertValues(source["portForwards"], PortForward);
 	        this.startupCommand = source["startupCommand"];

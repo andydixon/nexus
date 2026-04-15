@@ -230,6 +230,7 @@ type KnownHost struct {
 // AppPreferences stores user-level application settings.
 type AppPreferences struct {
 	Theme               string `json:"theme"`
+	TerminalTheme       string `json:"terminalTheme"` // colour scheme name (e.g. "charcoal", "solarized-dark")
 	DefaultProtocol     string `json:"defaultProtocol"`
 	ConfirmOnClose      bool   `json:"confirmOnClose"`
 	ConfirmOnDisconnect bool   `json:"confirmOnDisconnect"`

@@ -4,7 +4,7 @@
  * Initialises the application shell, loads profiles, and sets up event listeners.
  */
 
-const { State, Sidebar, TabManager, TerminalManager, ProfileEditor, RawViewer, Notifications, Settings, CommandPalette, SecretPrompt, stateLabel } = window.NexusTerminal;
+const { State, Sidebar, TabManager, TerminalManager, ProfileEditor, RawViewer, Notifications, Settings, CommandPalette, SecretPrompt, SplitPaneManager, stateLabel } = window.NexusTerminal;
 
 class App {
     constructor() {
@@ -18,6 +18,7 @@ class App {
         this.settings = new Settings(this);
         this.commandPalette = new CommandPalette(this);
         this.secretPrompt = new SecretPrompt(this);
+        this.splitPanes = new SplitPaneManager(this);
     }
 
     /**
@@ -321,6 +322,20 @@ class App {
             if (e.key === 'Escape') {
                 this.commandPalette.close();
             }
+
+            // Ctrl/Cmd+Shift+D — split pane vertically (left/right)
+            if (mod && e.shiftKey && e.key === 'D') {
+                e.preventDefault();
+                this.splitPane('vertical');
+                return;
+            }
+
+            // Ctrl/Cmd+Shift+E — split pane horizontally (top/bottom)
+            if (mod && e.shiftKey && e.key === 'E') {
+                e.preventDefault();
+                this.splitPane('horizontal');
+                return;
+            }
         });
     }
 
@@ -345,7 +360,25 @@ class App {
 
         // Window resize → re-fit active terminal (debounced)
         const { debounce } = window.NexusTerminal;
-        window.addEventListener('resize', debounce(() => this.terminals.fitActive(), 100));
+        window.addEventListener('resize', debounce(() => {
+            this.terminals.fitActive();
+            this.splitPanes.refitAll();
+        }, 100));
+    }
+
+    // ── Split pane ─────────────────────────────────────────────────
+
+    /**
+     * Splits the active session panel in the given direction.
+     * @param {'horizontal'|'vertical'} direction
+     */
+    splitPane(direction) {
+        if (!this.state.activeSessionId) return;
+        if (direction === 'horizontal') {
+            this.splitPanes.splitHorizontal();
+        } else {
+            this.splitPanes.splitVertical();
+        }
     }
 
     // ── Connection lifecycle ─────────────────────────────────────────

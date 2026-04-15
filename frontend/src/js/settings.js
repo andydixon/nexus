@@ -73,6 +73,12 @@ class Settings {
         try {
             await window.go.api.Service.SavePreferences(this._prefs);
             this.app.state.setPreferences(this._prefs);
+
+            // Apply terminal colour theme change immediately.
+            if (this.app.terminals && this._prefs.terminalTheme) {
+                this.app.terminals.applyTheme(this._prefs.terminalTheme);
+            }
+
             this.app.notifications.success('Settings saved');
             this.close();
         } catch (err) {
@@ -205,6 +211,13 @@ class Settings {
      */
     _renderTerminalTab(body) {
         const p = this._prefs;
+
+        // Terminal colour theme selector
+        const themes = window.NexusTerminal.listTerminalThemes();
+        body.appendChild(this._settingField('select', 'terminalTheme', 'Colour scheme', p.terminalTheme || 'charcoal', {
+            options: themes,
+        }));
+
         body.appendChild(this._settingField('text', 'defaultFontFamily', 'Font family', p.defaultFontFamily, {
             placeholder: 'JetBrains Mono, Menlo, Monaco, Consolas, monospace',
         }));
@@ -455,7 +468,7 @@ class Settings {
         };
 
         const fields = [
-            'theme', 'defaultProtocol', 'confirmOnClose', 'confirmOnDisconnect',
+            'theme', 'terminalTheme', 'defaultProtocol', 'confirmOnClose', 'confirmOnDisconnect',
             'showStatusBar', 'sidebarWidth', 'defaultFontFamily', 'defaultFontSize',
             'defaultScrollback', 'defaultCursorStyle',
         ];
