@@ -424,7 +424,7 @@ class Settings {
                 <h4>What You'll See</h4>
                 <p>Your repositories are listed grouped by organisation or owner, sorted by last commit date (newest first). The list refreshes automatically every few minutes.</p>
             ` },
-            { id: 'sessions', title: 'Sessions &amp; Tabs', content: `
+            { id: 'sessions', title: 'Sessions & Tabs', content: `
                 <h4>Tab Management</h4>
                 <ul>
                     <li><strong>Rename</strong> — right-click a tab and choose "Rename".</li>
@@ -442,7 +442,7 @@ class Settings {
                 <h4>Session Recording</h4>
                 <p>Press <kbd>⌘⇧R</kbd> / <kbd>Ctrl+Shift+R</kbd> to start recording a session. A red dot will appear on the tab. Press the same shortcut again to stop. Browse and replay recordings from the <strong>⏺</strong> button in the sidebar.</p>
             ` },
-            { id: 'security', title: 'Security &amp; Credentials', content: `
+            { id: 'security', title: 'Security & Credentials', content: `
                 <h4>How Your Passwords Are Stored</h4>
                 <p>Nexus Terminal uses a <strong>two-tier</strong> approach to keep your credentials safe:</p>
                 <ol>
@@ -476,7 +476,7 @@ class Settings {
                     </tbody>
                 </table>
             ` },
-            { id: 'import-export', title: 'Import &amp; Export', content: `
+            { id: 'import-export', title: 'Import & Export', content: `
                 <h4>Exporting Profiles</h4>
                 <p>Click the <strong>↗</strong> export button in the sidebar footer. You can choose which profiles to include, and set a password to encrypt the file. Exported files use the <code>.nexus</code> extension.</p>
                 <h4>Importing Profiles</h4>
