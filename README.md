@@ -1,392 +1,251 @@
 # Nexus Terminal
 
-**A premium desktop SSH, Telnet, and RAW TCP client** built with [Wails v2](https://wails.io/) (Go backend, web frontend).
+**A cross-platform desktop client for SSH, Telnet, RAW TCP, and GitHub — with encrypted credential storage and a dark Material-inspired interface.**
 
-Nexus Terminal provides a modern, tabbed interface for managing remote connections over SSH, Telnet, and raw TCP — with encrypted credential storage, host key verification, audit logging, and a dark Material-inspired design.
-
----
-
-## Features
-
-### Implemented
-
-- ✅ **SSH connections** — password, public key, and keyboard-interactive authentication
-- ✅ **Telnet** — option negotiation, character encoding, local echo, configurable line modes
-- ✅ **RAW TCP** — binary-safe text, hex, and split views with payload presets
-- ✅ **Saved connection profiles** — tags, folders, environments, favourites
-- ✅ **Encrypted secret storage** — AES-256-GCM with Argon2id key derivation
-- ✅ **OS keychain integration** — macOS Keychain, Linux Secret Service, Windows Credential Manager
-- ✅ **Known hosts verification** — configurable policies (strict / ask / accept-new / insecure)
-- ✅ **Tabbed multi-session management** — rename, reorder, pin, context menu
-- ✅ **xterm.js terminal** — search, web links, fit-to-container
-- ✅ **Profile import/export** — JSON format, secrets excluded by default
-- ✅ **Command palette** — quick access via Ctrl+K / Cmd+K
-- ✅ **Dark charcoal Material-inspired UI**
-- ✅ **Audit logging** — timestamped records of connections and actions
-- ✅ **Input validation** — comprehensive profile and protocol validation
-
-### In Progress
-
-- 🔨 **Jump host / bastion support** — architecture in place, single-hop implemented
-- 🔨 **Session transcript export** — partial implementation
-
-### Planned
-
-- 📋 Port forwarding (extension point architected)
-- 📋 SFTP file transfer (extension point architected)
-- 📋 Split panes
-- 📋 Theme customisation
-- 📋 OpenSSH config import (partial parser exists)
-- 📋 Encrypted profile export
+Built with [Wails v2](https://wails.io/) (Go backend, HTML/CSS/JS frontend, [xterm.js](https://xtermjs.org/) terminal emulator).
 
 ---
 
-## Screenshots
+### Feature Highlights
 
-> _Screenshots will be added once the UI is feature-complete._
+- ✅ SSH with password, public key, keyboard-interactive, and SSH agent authentication
+- ✅ Telnet with option negotiation, encoding, and local echo
+- ✅ RAW TCP with text, hex, and split views
+- ✅ GitHub repository browser grouped by organisation
+- ✅ Tabbed multi-session with split panes, pinning, and reordering
+- ✅ SFTP file browser overlay for SSH sessions
+- ✅ Session recording and playback (asciicast v2)
+- ✅ Encrypted vault (AES-256-GCM + Argon2id) and OS keychain integration
+- ✅ Jump hosts, port forwarding, and SSH agent forwarding
+- ✅ OpenSSH `~/.ssh/config` import
+- ✅ Encrypted profile export/import (`.nexus` format)
+- ✅ 8 built-in colour themes and command palette
+- ✅ Automatic update checking via GitHub Releases
 
 ---
 
-## Prerequisites
+## Table of Contents
 
-| Tool       | Version | Install                                                           |
-|------------|---------|-------------------------------------------------------------------|
-| Go         | 1.21+   | [golang.org/dl](https://golang.org/dl/)                           |
-| Node.js    | 18+     | [nodejs.org](https://nodejs.org/)                                 |
-| Wails CLI  | v2      | `go install github.com/wailsapp/wails/v2/cmd/wails@latest`       |
-
-> **Note:** On Linux you may also need GTK, WebKit, and related system libraries.
-> Run `wails doctor` to verify your environment.
+1. [Getting Started](#getting-started)
+2. [Keyboard Shortcuts](#keyboard-shortcuts)
+3. [Connection Types](#connection-types)
+4. [Security](#security)
+5. [Architecture](#architecture)
+6. [Building & Testing](#building--testing)
+7. [Data Locations](#data-locations)
+8. [Troubleshooting](#troubleshooting)
+9. [Licence](#licence)
 
 ---
 
-## Quick Start
+## Getting Started
+
+### What You'll Need
+
+| Tool | Version | Where to get it |
+|------|---------|-----------------|
+| Go | 1.23+ | [golang.org/dl](https://golang.org/dl/) |
+| Node.js | 18+ | [nodejs.org](https://nodejs.org/) |
+| Wails CLI | v2 | `go install github.com/wailsapp/wails/v2/cmd/wails@latest` |
+
+> **Linux users:** you'll also need GTK and WebKit system libraries. Run `wails doctor` to check your setup.
+
+### Clone and Run
 
 ```bash
-git clone https://github.com/your-org/nexus-terminal.git
+git clone https://github.com/andydixon/nexus-terminal.git
 cd nexus-terminal
-make deps    # install Go modules and frontend npm packages
-make dev     # launch in development mode with hot reload
+make deps    # install Go modules and npm packages
+make dev     # launch with hot reload
 ```
 
-Or using the shell script:
-
-```bash
-./build.sh deps
-./build.sh dev
-```
+The first build may take a minute or two while dependencies are fetched. Once it's running you'll see the Nexus Terminal window appear — ready to create your first connection profile.
 
 ---
 
-## Build
+## Keyboard Shortcuts
 
-| Command            | Description                              |
-|--------------------|------------------------------------------|
-| `make deps`        | Install all dependencies                 |
-| `make dev`         | Run in development mode with hot reload  |
-| `make build`       | Production build                         |
-| `make test`        | Run Go tests                             |
-| `make test-cover`  | Run tests with HTML coverage report      |
-| `make clean`       | Remove build artefacts and caches        |
-| `make lint`        | Run golangci-lint                        |
-| `make package`     | Build and package for distribution       |
-| `make help`        | Show all available targets               |
+All shortcuts use **Cmd** on macOS and **Ctrl** on Windows/Linux.
 
-The production binary is written to `build/bin/NexusTerminal`.
+| Shortcut | Action |
+|----------|--------|
+| Cmd + K | Open command palette |
+| Cmd + N | New connection |
+| Cmd + W | Close current tab |
+| Cmd + Tab | Next tab |
+| Cmd + Shift + Tab | Previous tab |
+| Cmd + 1–9 | Switch to tab by number |
+| Cmd + , | Open settings |
+| Cmd + F | Find in terminal |
+| Cmd + Shift + D | Split pane vertically |
+| Cmd + Shift + E | Split pane horizontally |
+| Cmd + Shift + R | Toggle session recording |
+| F11 | Toggle fullscreen (Windows/Linux) |
 
 ---
 
-## Architecture Overview
+## Connection Types
 
-```
-copilot-ssh-client/
-├── cmd/
-│   └── app/
-│       └── main.go              # Application entry point (Wails bootstrap)
-├── frontend/
-│   ├── dist/
-│   │   └── index.html           # HTML entry point (embedded by Wails)
-│   ├── scripts/
-│   │   ├── build.js             # Frontend build & watch script
-│   │   └── copy-assets.js       # Copies xterm assets from node_modules
-│   ├── src/
-│   │   ├── assets/icons/        # Application icons
-│   │   ├── components/          # UI components (planned)
-│   │   ├── css/                 # Stylesheets
-│   │   │   └── lib/             # Vendored CSS (xterm.css — auto-copied)
-│   │   └── js/                  # JavaScript source
-│   │       └── lib/             # Vendored JS (xterm — auto-copied)
-│   └── package.json
-├── internal/
-│   ├── api/                     # Wails-bound API methods (planned)
-│   ├── app/
-│   │   └── app.go               # Application lifecycle management
-│   ├── audit/                   # Audit log service (planned)
-│   ├── config/
-│   │   └── config.go            # Platform-specific path resolution
-│   ├── knownhosts/              # Known hosts management (planned)
-│   ├── models/
-│   │   ├── models.go            # Core domain types (Profile, Session, etc.)
-│   │   └── defaults.go          # Default values and factory functions
-│   ├── preferences/             # Preferences service (planned)
-│   ├── rawclient/
-│   │   └── encoding.go          # Hex, escaped, and character encoding utilities
-│   ├── secrets/
-│   │   ├── keychain.go          # OS keychain integration
-│   │   ├── redact.go            # Secret redaction for logs and UI
-│   │   └── secrets.go           # AES-256-GCM encrypted vault
-│   ├── sessions/                # Session lifecycle management (planned)
-│   ├── sshclient/
-│   │   └── hostkey.go           # SSH host key verification with policies
-│   ├── storage/
-│   │   ├── migrations/
-│   │   │   ├── 001_initial.sql  # Initial database schema
-│   │   │   └── migrations.go    # Embedded migration files
-│   │   └── storage.go           # SQLite persistence layer
-│   ├── telnetclient/            # Telnet client (planned)
-│   └── validation/
-│       └── validation.go        # Profile and protocol validation
-├── build.sh                     # Shell build script for CI
-├── Makefile                     # Make-based build targets
-├── wails.json                   # Wails v2 project configuration
-├── go.mod                       # Go module definition
-└── README.md
-```
+### SSH
 
-### Key Packages
+Full-featured SSH client with support for:
 
-| Package            | Purpose                                                                |
-|--------------------|------------------------------------------------------------------------|
-| `cmd/app`          | Wails application bootstrap — window size, title, lifecycle hooks      |
-| `internal/app`     | Wires together all subsystems; manages startup and shutdown            |
-| `internal/config`  | Resolves platform-specific data, database, and vault paths             |
-| `internal/models`  | Domain types shared across all packages — profiles, sessions, enums    |
-| `internal/storage` | SQLite repository with WAL mode, migrations, and import/export         |
-| `internal/secrets` | Encrypted vault (AES-256-GCM + Argon2id) and OS keychain abstraction  |
-| `internal/sshclient` | SSH host key verification with strict / ask / accept-new policies   |
-| `internal/rawclient` | Hex dump, escape parsing, and character encoding for raw TCP         |
-| `internal/validation` | Multi-field validation for profiles and protocol-specific configs  |
+- **Authentication** — password, public key, keyboard-interactive, SSH agent, and agent forwarding
+- **Jump hosts** — connect through one or more bastion servers (multi-hop)
+- **Port forwarding** — local, remote, and dynamic (SOCKS) tunnels
+- **SFTP** — built-in file browser that slides open as a right-side overlay panel
+- **Host key verification** — four policies: strict, ask, accept-new, and insecure
+- **Session recording** — capture terminal output to asciicast v2 files for later playback
+- **OpenSSH config import** — reads your existing `~/.ssh/config` to create connection profiles
 
-### Frontend–Backend Interaction
+### Telnet
 
-Wails v2 exposes Go methods to the frontend as JavaScript functions. The `App` struct (and future API types) are bound in `main.go`. Frontend calls arrive as synchronous RPC; asynchronous data (terminal output, session events) flows via the Wails event system.
+- Option negotiation, configurable character encoding (UTF-8 and others)
+- Local echo and line mode settings
+- Configurable line endings
 
-```
-┌─────────────┐   Wails bindings   ┌──────────────┐
-│  Frontend    │ ◄────────────────► │  Go backend   │
-│  (xterm.js)  │   Wails events     │  (App struct) │
-└─────────────┘                     └──────────────┘
-       │                                    │
-       │ xterm.js writes                    │ golang.org/x/crypto/ssh
-       │ to terminal                        │ net.Dial (telnet, raw)
-       ▼                                    ▼
-   Browser DOM                        Remote hosts
-```
+### RAW TCP
+
+- Binary-safe connection with three view modes: text, hex, and split (text + hex side by side)
+- Payload presets for quick sending of common data
+- Configurable character encoding and line endings
+- Auto-reconnect on disconnection
+
+### GitHub
+
+- Browse your repositories grouped by organisation
+- Sorted by most recent commit, with automatic refresh
+- Quick access from the sidebar alongside your other connections
 
 ---
 
 ## Security
 
-### Secret Storage
+Nexus Terminal takes credential storage seriously. Your passwords and private key passphrases are never stored in plain text.
 
-Nexus Terminal uses a two-tier approach to credential storage:
+### Two-Tier Credential Storage
 
-1. **OS keychain (preferred)** — macOS Keychain, Linux Secret Service (via D-Bus), Windows Credential Manager. Probed at startup; used automatically when available.
-2. **Encrypted file vault (fallback)** — AES-256-GCM encrypted JSON file at `<data-dir>/vault`. Requires a master password to unlock.
+1. **OS keychain (preferred)** — on macOS this is Keychain, on Linux it's Secret Service via D-Bus, and on Windows it's Credential Manager. If your system's keychain is available, Nexus Terminal uses it automatically.
 
-### Encryption Details
+2. **Encrypted file vault (fallback)** — if the OS keychain isn't available, credentials are stored in a local vault file encrypted with AES-256-GCM. You set a master password when creating the vault, and a strength metre helps you choose a good one.
 
-| Parameter       | Value                             |
-|-----------------|-----------------------------------|
-| Cipher          | AES-256-GCM                       |
-| Key derivation  | Argon2id (time=3, mem=64 KB, threads=4) |
-| Key length      | 256 bits (32 bytes)               |
-| Salt            | 32 random bytes (per vault)       |
-| Nonce           | Random, prepended to ciphertext   |
+### How the Encryption Works
 
-### Threat Model
+| Detail | Value |
+|--------|-------|
+| Cipher | AES-256-GCM |
+| Key derivation | Argon2id — 128 MiB memory, 3 iterations, 4 threads |
+| Key length | 256 bits (32 bytes) |
+| Salt | 32 random bytes (unique per vault) |
+| Nonce | Random, prepended to ciphertext |
 
-**Protects against:**
-- Secrets exposed via disk theft or backup exfiltration
-- Accidental secret leakage in logs, exports, or UI (redaction layer)
-- Credential access without the master password
+### Known Hosts
 
-**Does NOT protect against:**
-- A compromised operating system or process with memory access
-- Memory forensics whilst the vault is unlocked
-- Keyloggers capturing the master password
-- Weak master passwords (no strength enforcement currently)
+When you connect to an SSH server for the first time, Nexus Terminal can remember the server's fingerprint. You choose one of four policies per profile:
 
-### Secret Key Format
+- **Strict** — reject any server whose key doesn't match a saved fingerprint
+- **Ask** — prompt you to accept or reject unknown keys
+- **Accept new** — automatically trust first-time connections, reject changes
+- **Insecure** — accept any key (not recommended)
 
-Secrets are keyed by profile: `profile:<uuid>:password`, `profile:<uuid>:passphrase`. The `ListKeys()` method exposes keys but never values.
+### Profile Export & Import
 
-### Export Handling
-
-Profile exports exclude secrets by default. The JSON export format contains connection metadata but no passwords or private key passphrases unless explicitly requested (future encrypted export).
+Profiles can be exported as encrypted `.nexus` bundles (AES-256-GCM, same as the vault). By default, exports exclude secrets — passwords and passphrases are only included when you choose an encrypted export. Secrets are keyed internally by profile: `profile:<uuid>:password`, `profile:<uuid>:passphrase`.
 
 ---
 
-## Protocol Support
+## Architecture
 
-| Feature                          | SSH | Telnet | RAW TCP |
-|----------------------------------|:---:|:------:|:-------:|
-| Password authentication          | ✅  | —      | —       |
-| Public key authentication        | ✅  | —      | —       |
-| Keyboard-interactive auth        | ✅  | —      | —       |
-| Host key verification            | ✅  | —      | —       |
-| Keepalive                        | ✅  | —      | —       |
-| Option negotiation               | —   | ✅     | —       |
-| Local echo                       | —   | ✅     | —       |
-| Character encoding (UTF-8, etc.) | —   | ✅     | ✅      |
-| Text view                        | ✅  | ✅     | ✅      |
-| Hex view                         | —   | —      | ✅      |
-| Split (text + hex) view          | —   | —      | ✅      |
-| Payload presets                  | —   | —      | ✅      |
-| Configurable line endings        | —   | ✅     | ✅      |
-| Auto-reconnect                   | —   | —      | ✅      |
-| Jump hosts / bastions            | 🔨  | —      | —       |
-| Port forwarding                  | 📋  | —      | —       |
-| SFTP                             | 📋  | —      | —       |
+> This section is aimed at developers who want to understand or contribute to the codebase.
 
-**Legend:** ✅ implemented · 🔨 in progress · 📋 planned · — not applicable
+Nexus Terminal is a [Wails v2](https://wails.io/) desktop application: a Go backend handles all connection logic and data storage, whilst an HTML/CSS/JS frontend (rendered in a native webview) provides the interface.
 
----
+```
+internal/
+  app/           — lifecycle bootstrap: opens database, initialises secrets, wires everything together
+  api/           — single Service struct bound to Wails; every public method is callable from JS
+  sessions/      — manages concurrent sessions; owns SSH/Telnet/RAW/GitHub client lifecycles
+  storage/       — SQLite repository (WAL mode) with embedded sequential migrations
+  secrets/       — two-tier credential storage (OS keychain + encrypted file vault)
+  models/        — shared domain types, protocol configs, and defaults
+  sshclient/     — SSH client with agent support
+  telnetclient/  — Telnet with option negotiation
+  rawclient/     — RAW TCP with hex encoding
+  githubclient/  — GitHub API integration
+  sftpclient/    — SFTP file operations
+  sshconfig/     — OpenSSH config parser
+  recording/     — asciicast v2 session recording
+  exportimport/  — encrypted profile bundles (.nexus format)
+  updater/       — GitHub Releases update checker
+  knownhosts/    — SSH host key management
+  validation/    — profile and protocol validation
+  audit/         — timestamped audit logging
 
-## Storage
+frontend/
+  src/js/        — 15 IIFE-wrapped JS modules (no framework, no bundler)
+  src/css/       — modular stylesheets with design tokens (tokens.css)
+```
 
-### Database
+### How the Frontend and Backend Communicate
 
-Nexus Terminal stores profiles, known hosts, preferences, and audit entries in a SQLite database with WAL (Write-Ahead Logging) mode for concurrent read performance.
-
-| Platform | Default location                                       |
-|----------|--------------------------------------------------------|
-| macOS    | `~/Library/Application Support/NexusTerminal/nexus.db` |
-| Linux    | `~/.config/NexusTerminal/nexus.db`                     |
-| Windows  | `%APPDATA%\NexusTerminal\nexus.db`                     |
-
-### Schema Versioning
-
-Migrations are embedded at compile time via `embed.FS` and applied sequentially at startup. Each migration records its version in the `schema_version` table to prevent re-application.
-
-Current schema (v001):
-- `profiles` — connection profiles with JSON-encoded protocol configs
-- `known_hosts` — SSH host key fingerprints with trust state
-- `preferences` — key-value application preferences (JSON)
-- `audit_log` — timestamped action records
-- `schema_version` — applied migration tracking
+- **Frontend → Backend:** calling `window.go.api.Service.MethodName()` returns a Promise. Every public method on the Go `Service` struct is available this way.
+- **Backend → Frontend:** the Go side pushes events via `wailsRuntime.EventsEmit()`. The frontend listens with `window.runtime.EventsOn()`.
+- **Interactive prompts** (e.g. password requests, host key verification) use a request/response event pattern with a unique `requestID`, so the Go side can block on a channel until the user responds in the UI.
 
 ---
 
-## Import / Export
+## Building & Testing
 
-### JSON Export
+| Command | What it does |
+|---------|-------------|
+| `make deps` | Install Go modules and npm packages |
+| `make build` | Production build → `build/bin/nexus-terminal.app` (macOS) |
+| `make dev` | Development mode with hot reload |
+| `make test` | Run all Go tests (`go test ./... -v -count=1`) |
+| `make lint` | Run golangci-lint |
+
+To run tests for a single package:
 
 ```bash
-# Via the application UI: Profiles → Export
+go test ./internal/storage/ -v -count=1 -run TestProfileCRUD
 ```
 
-The export format is a JSON array of profile objects. Each profile includes connection settings, terminal preferences, and protocol-specific configuration — but **not** secrets (passwords, passphrases) by default.
-
-### Import Strategies
-
-| Strategy    | Behaviour                                                     |
-|-------------|---------------------------------------------------------------|
-| `skip`      | Skip profiles whose ID already exists                         |
-| `overwrite` | Replace existing profiles with the imported version           |
-| `duplicate` | Import as a new profile with a fresh UUID                     |
-
-### Format
-
-```json
-{
-  "version": 1,
-  "exported_at": "2024-01-15T10:30:00Z",
-  "profiles": [
-    {
-      "id": "uuid",
-      "display_name": "Production Server",
-      "protocol": "ssh",
-      "host": "prod.example.com",
-      "port": 22,
-      "username": "deploy",
-      "tags": ["production", "web"],
-      "folder": "Servers",
-      "ssh_config": { "..." : "..." }
-    }
-  ]
-}
-```
+The frontend has no separate build step — `npm run build` (called by Wails) copies xterm vendor libraries from `node_modules` into the frontend source tree. All frontend assets are embedded at compile time.
 
 ---
 
-## Developer Notes
+## Data Locations
 
-### Adding a New Protocol
+| Platform | Database | Vault | Recordings |
+|----------|----------|-------|------------|
+| macOS | `~/Library/Application Support/NexusTerminal/nexus.db` | `.../vault` | `.../recordings/` |
+| Linux | `~/.config/NexusTerminal/nexus.db` | `.../vault` | `.../recordings/` |
+| Windows | `%APPDATA%\NexusTerminal\nexus.db` | `...\vault` | `...\recordings\` |
 
-1. Create a new package under `internal/` (e.g., `internal/mystclient/`).
-2. Define a protocol-specific config struct in `internal/models/models.go`.
-3. Add the protocol constant to the `Protocol` type.
-4. Update `internal/models/defaults.go` with default values and a factory case in `NewProfile()`.
-5. Add validation rules in `internal/validation/validation.go`.
-6. Wire the new client into `internal/app/app.go` and `internal/sessions/`.
-7. Update the database migration if new columns are required.
+The database uses SQLite in WAL (Write-Ahead Logging) mode. Migrations are embedded at compile time and applied automatically on startup.
 
-### Adding Tests
+---
 
-Tests live alongside the code they exercise:
+## Troubleshooting
 
+**The app won't start on Linux**
+You likely need GTK and WebKit system libraries. Run `wails doctor` to see what's missing, then install the packages it recommends for your distribution.
+
+**"Vault locked" on every launch**
+If you're using the encrypted file vault (rather than the OS keychain), you'll need to enter your master password each time. If your system supports a keychain, Nexus Terminal will use it instead and you won't see this prompt.
+
+**SSH connection fails with "host key verification failed"**
+Your profile's host key policy may be set to **strict** and the server's key has changed (or hasn't been saved yet). Open the profile settings and choose **ask** if you'd like to be prompted, or verify the server's key and update your known hosts.
+
+**Terminal text looks wrong or garbled**
+Check the character encoding setting on the connection profile. Most modern servers use UTF-8, but some older systems may need a different encoding.
+
+**Build fails with "wails: command not found"**
+Install the Wails CLI:
 ```bash
-go test ./internal/validation/ -v          # run validation tests
-go test ./internal/secrets/ -v             # run secrets tests
-go test ./... -v -count=1                  # run all tests
-go test ./... -coverprofile=coverage.out   # with coverage
+go install github.com/wailsapp/wails/v2/cmd/wails@latest
 ```
-
-Use `_test.go` files in the same package for white-box tests, or in a `_test` package for black-box tests. Table-driven tests are preferred.
-
-### Event System
-
-The Wails runtime provides an event bus for asynchronous communication:
-
-- **Backend → Frontend:** `runtime.EventsEmit(ctx, "event:name", payload)`
-- **Frontend → Backend:** `runtime.EventsOn("event:name", callback)`
-
-Key events:
-- `backend:ready` — emitted when the Go backend has finished initialisation
-- `session:data` — terminal output data for a specific session
-- `session:state` — session state changes (connecting, connected, disconnected, error)
-
----
-
-## Limitations and Future Work
-
-### Known Limitations
-
-- **Single-hop jump hosts only** — the jump host architecture supports chaining, but only one hop is currently implemented.
-- **No SFTP** — the extension point is designed but file transfer is not yet available.
-- **No port forwarding** — local/remote/dynamic forwarding is planned but not implemented.
-- **No split panes** — single terminal per tab; split view is planned.
-- **No theme customisation** — the dark charcoal theme is currently the only option.
-- **No master password strength enforcement** — the vault accepts any master password.
-- **Argon2id memory parameter is conservative** — 64 KB is low for production use; will be increased in a future release.
-- **No SSH agent forwarding** — authentication uses direct key/password only.
-- **Linux recursive file watch** — the development watch script may not detect all changes on Linux due to `fs.watch` limitations.
-
-### Planned Improvements
-
-- Increase Argon2id memory to 64 MB+ for stronger key derivation
-- SFTP file browser and transfer
-- Local, remote, and dynamic port forwarding
-- Multi-hop jump host chains
-- Split pane terminal layout
-- Custom themes and colour schemes
-- OpenSSH `~/.ssh/config` import
-- Session recording and playback
-- SSH agent forwarding
-- Encrypted profile export/import
-- Master password strength meter
-- Automatic update checking
+Make sure `$GOPATH/bin` (or `$HOME/go/bin`) is in your `PATH`.
 
 ---
 
@@ -394,6 +253,9 @@ Key events:
 
 This project is licensed under the MIT Licence. See [LICENCE](LICENCE) for details.
 
+**Bundle identifier:** `com.andydixon.nexusterminal`
+**Author:** Andy Dixon — [www.dixon.cx/nexus](https://www.dixon.cx/nexus)
+
 ---
 
-<sub>Built with ❤ using [Wails](https://wails.io/), [xterm.js](https://xtermjs.org/), and [Go](https://go.dev/).</sub>
+<sub>Built with [Wails](https://wails.io/), [xterm.js](https://xtermjs.org/), and [Go](https://go.dev/).</sub>
