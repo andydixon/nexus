@@ -94,7 +94,7 @@
 .terminal-container {
     position: absolute;
     inset: 0;
-    padding: var(--space-1);
+    padding: 3px;
 }
 
 /* -----------------------------------------------------------------------
