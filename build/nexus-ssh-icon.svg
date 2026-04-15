@@ -1,0 +1,137 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <!-- Background gradient: deep navy -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0D1117;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1A1F2E;stop-opacity:1" />
+    </linearGradient>
+
+    <!-- Cyan glow for terminal elements -->
+    <linearGradient id="cyanGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#00D4FF;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#00FF88;stop-opacity:1" />
+    </linearGradient>
+
+    <!-- Inner glow effect for terminal text -->
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="8" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <!-- Subtle glow for grid lines -->
+    <filter id="softGlow" x="-10%" y="-10%" width="120%" height="120%">
+      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <!-- Clip to rounded rect -->
+    <clipPath id="roundedClip">
+      <rect x="0" y="0" width="1024" height="1024" rx="224" ry="224"/>
+    </clipPath>
+  </defs>
+
+  <!-- Rounded rectangle background -->
+  <rect x="0" y="0" width="1024" height="1024" rx="224" ry="224" fill="url(#bgGrad)"/>
+
+  <!-- Clipped content group -->
+  <g clip-path="url(#roundedClip)">
+
+    <!-- Subtle grid lines (circuit board / network feel) -->
+    <g opacity="0.07" stroke="#00D4FF" stroke-width="1.5" filter="url(#softGlow)">
+      <!-- Horizontal lines -->
+      <line x1="0" y1="200" x2="1024" y2="200"/>
+      <line x1="0" y1="350" x2="1024" y2="350"/>
+      <line x1="0" y1="500" x2="1024" y2="500"/>
+      <line x1="0" y1="650" x2="1024" y2="650"/>
+      <line x1="0" y1="800" x2="1024" y2="800"/>
+      <!-- Vertical lines -->
+      <line x1="200" y1="0" x2="200" y2="1024"/>
+      <line x1="350" y1="0" x2="350" y2="1024"/>
+      <line x1="500" y1="0" x2="500" y2="1024"/>
+      <line x1="650" y1="0" x2="650" y2="1024"/>
+      <line x1="800" y1="0" x2="800" y2="1024"/>
+    </g>
+
+    <!-- Network node dots at grid intersections (subtle) -->
+    <g opacity="0.12" fill="#00D4FF">
+      <circle cx="200" cy="200" r="4"/>
+      <circle cx="350" cy="200" r="4"/>
+      <circle cx="500" cy="200" r="4"/>
+      <circle cx="650" cy="200" r="4"/>
+      <circle cx="800" cy="200" r="4"/>
+      <circle cx="200" cy="350" r="4"/>
+      <circle cx="350" cy="350" r="4"/>
+      <circle cx="650" cy="350" r="4"/>
+      <circle cx="800" cy="350" r="4"/>
+      <circle cx="200" cy="500" r="4"/>
+      <circle cx="800" cy="500" r="4"/>
+      <circle cx="200" cy="650" r="4"/>
+      <circle cx="350" cy="650" r="4"/>
+      <circle cx="650" cy="650" r="4"/>
+      <circle cx="800" cy="650" r="4"/>
+      <circle cx="200" cy="800" r="4"/>
+      <circle cx="350" cy="800" r="4"/>
+      <circle cx="500" cy="800" r="4"/>
+      <circle cx="650" cy="800" r="4"/>
+      <circle cx="800" cy="800" r="4"/>
+    </g>
+
+    <!-- Central terminal window panel -->
+    <rect x="112" y="240" width="800" height="544" rx="16" ry="16"
+          fill="#0A0E17" fill-opacity="0.85"
+          stroke="#00D4FF" stroke-width="1.5" stroke-opacity="0.3"/>
+
+    <!-- Terminal title bar -->
+    <rect x="112" y="240" width="800" height="52" rx="16" ry="16"
+          fill="#161B27" fill-opacity="0.9"/>
+    <!-- Fix bottom corners of title bar -->
+    <rect x="112" y="268" width="800" height="24"
+          fill="#161B27" fill-opacity="0.9"/>
+
+    <!-- Window control dots -->
+    <circle cx="162" cy="266" r="10" fill="#FF5F57"/>
+    <circle cx="198" cy="266" r="10" fill="#FFBD2E"/>
+    <circle cx="234" cy="266" r="10" fill="#28C840"/>
+
+    <!-- Title bar text: "nexus ssh" -->
+    <text x="512" y="273" font-family="'SF Mono', 'Courier New', monospace"
+          font-size="20" fill="#8892A4" text-anchor="middle" dominant-baseline="middle"
+          letter-spacing="3">nexus — ssh</text>
+
+    <!-- Terminal separator line -->
+    <line x1="112" y1="292" x2="912" y2="292" stroke="#00D4FF" stroke-width="1" stroke-opacity="0.2"/>
+
+    <!-- MAIN TERMINAL CONTENT -->
+    <!-- Line 1: prompt line -->
+    <text x="152" y="360" font-family="'SF Mono', 'Courier New', monospace"
+          font-size="38" fill="#8892A4" filter="url(#softGlow)">user@nexus:~$</text>
+
+    <!-- THE BIG PROMPT SYMBOL: ">_" — cyan glowing, centered -->
+    <text x="512" y="560" font-family="'SF Mono', 'Courier New', monospace"
+          font-size="260" font-weight="bold"
+          fill="url(#cyanGrad)"
+          text-anchor="middle" dominant-baseline="middle"
+          filter="url(#glow)">&gt;_</text>
+
+    <!-- Blinking cursor line at bottom of terminal -->
+    <rect x="152" y="726" width="22" height="36" rx="2" ry="2"
+          fill="#00D4FF" opacity="0.9" filter="url(#softGlow)"/>
+
+    <!-- Bottom status line -->
+    <text x="740" y="748" font-family="'SF Mono', 'Courier New', monospace"
+          font-size="22" fill="#00FF88" fill-opacity="0.6" text-anchor="end">SSH v2  AES-256</text>
+
+  </g>
+
+  <!-- Outer border glow (subtle cyan rim) -->
+  <rect x="2" y="2" width="1020" height="1020" rx="223" ry="223"
+        fill="none"
+        stroke="url(#cyanGrad)" stroke-width="4" stroke-opacity="0.25"/>
+</svg>
