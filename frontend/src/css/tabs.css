@@ -129,6 +129,41 @@
 .tab-status.is-disconnected { background: var(--text-tertiary); }
 
 /* -----------------------------------------------------------------------
+   SFTP toggle button — revealed on hover (SSH tabs only)
+   ----------------------------------------------------------------------- */
+.tab-sftp {
+    width: 16px;
+    height: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-sm);
+    font-size: 10px;
+    color: var(--text-tertiary);
+    flex-shrink: 0;
+    opacity: 0;
+    transition:
+        opacity var(--transition-fast),
+        background var(--transition-fast),
+        color var(--transition-fast);
+    cursor: pointer;
+    background: none;
+    border: none;
+    padding: 0;
+    margin-left: auto;
+}
+
+.tab:hover .tab-sftp,
+.tab.active .tab-sftp {
+    opacity: 1;
+}
+
+.tab-sftp:hover {
+    background: var(--bg-active);
+    color: var(--accent);
+}
+
+/* -----------------------------------------------------------------------
    Close button — revealed on hover
    ----------------------------------------------------------------------- */
 .tab-close {
@@ -147,7 +182,7 @@
         background var(--transition-fast),
         color var(--transition-fast);
     cursor: pointer;
-    margin-left: auto;
+    margin-left: 2px;
 }
 
 .tab:hover .tab-close,

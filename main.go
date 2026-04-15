@@ -8,6 +8,9 @@ import (
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
+	"github.com/wailsapp/wails/v2/pkg/options/linux"
+	"github.com/wailsapp/wails/v2/pkg/options/mac"
+	"github.com/wailsapp/wails/v2/pkg/options/windows"
 
 	application "github.com/copilot-ssh-client/app/internal/app"
 	"github.com/copilot-ssh-client/app/frontend"
@@ -32,6 +35,17 @@ func main() {
 		OnStartup:        nexus.Startup,
 		OnShutdown:       nexus.Shutdown,
 		OnDomReady:       nexus.DomReady,
+		// macOS: enable the green fullscreen traffic-light button.
+		Mac: &mac.Options{
+			About: &mac.AboutInfo{
+				Title:   "Nexus Terminal",
+				Message: "A premium desktop terminal client",
+			},
+		},
+		// Windows: default decorations include maximise; fullscreen via F11.
+		Windows: &windows.Options{},
+		// Linux: use the default window manager decorations (fullscreen via WM).
+		Linux: &linux.Options{},
 		Bind: []interface{}{
 			nexus.APIService(),
 		},

@@ -418,6 +418,20 @@ class TabManager {
             tab.classList.add('tab-pinned');
         }
 
+        // SFTP toggle button (SSH sessions only)
+        if (sessionInfo.protocol === 'ssh') {
+            const sftpBtn = createElement('button', 'tab-sftp', {
+                textContent: '📁',
+                title: 'Toggle SFTP file browser',
+                'aria-label': 'Toggle SFTP',
+            });
+            sftpBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.app.sftp.toggle(sessionInfo.id);
+            });
+            tab.appendChild(sftpBtn);
+        }
+
         // Close button
         const closeBtn = createElement('button', 'tab-close', {
             textContent: '×',

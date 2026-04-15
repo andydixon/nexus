@@ -333,9 +333,22 @@ class App {
                 return;
             }
 
+            // F11 — toggle fullscreen (Windows/Linux convention)
+            if (e.key === 'F11') {
+                e.preventDefault();
+                if (window.runtime && typeof window.runtime.WindowFullscreen === 'function') {
+                    window.runtime.WindowFullscreen();
+                }
+                return;
+            }
+
             // Escape — close any open overlays
             if (e.key === 'Escape') {
                 this.commandPalette.close();
+                // Also exit fullscreen if active (Windows/Linux)
+                if (window.runtime && typeof window.runtime.WindowUnfullscreen === 'function') {
+                    window.runtime.WindowUnfullscreen();
+                }
             }
 
             // Ctrl/Cmd+Shift+D — split pane vertically (left/right)
@@ -361,17 +374,6 @@ class App {
                 return;
             }
 
-            // Ctrl/Cmd+Shift+F — toggle SFTP file browser on active SSH session
-            if (mod && e.shiftKey && e.key === 'F') {
-                e.preventDefault();
-                if (this.state.activeSessionId) {
-                    var session = this.state.getSession(this.state.activeSessionId);
-                    if (session && session.protocol === 'ssh') {
-                        this.sftp.toggle(this.state.activeSessionId);
-                    }
-                }
-                return;
-            }
         });
     }
 
