@@ -31,6 +31,7 @@ type Client struct {
 	ctx       context.Context
 	cancel    context.CancelFunc
 	forwards  *ForwardManager // port forwarding tunnels
+	agentCleanup func()       // closes agent socket connection
 }
 
 // NewClient creates a new SSH client bound to the given profile.
@@ -151,6 +152,16 @@ func (c *Client) connectInternal(
 		return fmt.Errorf("PTY request failed: %w", err)
 	}
 
+	// Set up SSH agent forwarding if requested (must happen before shell start).
+	if sc.AgentForwarding {
+		if fwdErr := requestAgentForwarding(sshConn, session); fwdErr != nil {
+			// Non-fatal — log but don't abort the connection.
+			if c.onError != nil {
+				c.onError(fmt.Errorf("agent forwarding: %w", fwdErr))
+			}
+		}
+	}
+
 	stdinPipe, err := session.StdinPipe()
 	if err != nil {
 		session.Close()
@@ -245,6 +256,7 @@ func (c *Client) Close() error {
 	session := c.session
 	sshClient := c.sshClient
 	fwdMgr := c.forwards
+	agCleanup := c.agentCleanup
 	onClose := c.onClose
 	c.mu.Unlock()
 
@@ -253,6 +265,11 @@ func (c *Client) Close() error {
 	// Shut down any active port forwards first.
 	if fwdMgr != nil {
 		fwdMgr.StopAll()
+	}
+
+	// Close the SSH agent socket connection.
+	if agCleanup != nil {
+		agCleanup()
 	}
 
 	var firstErr error
@@ -291,6 +308,18 @@ func (c *Client) Forwards() *ForwardManager {
 // profile's SSHConfig and the provided credential callbacks.
 func (c *Client) buildAuthMethods(sc models.SSHConfig, getPassword func() (string, error), getPassphrase func() (string, error)) ([]ssh.AuthMethod, error) {
 	var methods []ssh.AuthMethod
+
+	// If agent auth is enabled, try to use the local SSH agent first.
+	if sc.AgentAuth {
+		am, cleanup, err := agentAuthMethod()
+		if err == nil {
+			methods = append(methods, am)
+			c.mu.Lock()
+			c.agentCleanup = cleanup
+			c.mu.Unlock()
+		}
+		// Non-fatal — fall through to other auth methods if agent unavailable.
+	}
 
 	authList := sc.AuthMethods
 	if len(authList) == 0 {

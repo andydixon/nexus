@@ -23,7 +23,7 @@ const (
 
 	// Argon2id key derivation parameters.
 	argonTime    = 3
-	argonMemory  = 64 * 1024
+	argonMemory  = 128 * 1024 // 128 MiB — deliberately strong for a desktop app
 	argonThreads = 4
 	argonKeyLen  = 32
 

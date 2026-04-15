@@ -390,6 +390,16 @@ class ProfileEditor {
             }),
         ]));
 
+        // SSH Agent
+        sections.push(this._renderSection('SSH Agent', [
+            this._field('toggle', 'ssh.agentAuth', 'Use SSH Agent for Authentication', ssh.agentAuth, {
+                help: 'Authenticate using keys from the local SSH agent (ssh-agent)',
+            }),
+            this._field('toggle', 'ssh.agentForwarding', 'Forward Agent to Remote', ssh.agentForwarding, {
+                help: 'Allow the remote host to use your local SSH agent keys (equivalent to ssh -A)',
+            }),
+        ], true));
+
         // Advanced
         sections.push(this._renderSection('Advanced', [
             this._field('text', 'ssh.terminalType', 'Terminal Type', ssh.terminalType, { placeholder: 'xterm-256color' }),
@@ -896,6 +906,8 @@ class ProfileEditor {
             p.ssh.keepaliveInterval = val('ssh.keepaliveInterval') ?? 30;
             p.ssh.keepaliveCountMax = val('ssh.keepaliveCountMax') ?? 3;
             p.ssh.compression = val('ssh.compression') || false;
+            p.ssh.agentAuth = val('ssh.agentAuth') || false;
+            p.ssh.agentForwarding = val('ssh.agentForwarding') || false;
             p.ssh.startupCommand = val('ssh.startupCommand') || '';
 
             const authStr = val('ssh.authMethods');

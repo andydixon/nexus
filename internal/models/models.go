@@ -93,6 +93,8 @@ type SSHConfig struct {
 	KeepaliveInterval int               `json:"keepaliveInterval"`
 	KeepaliveCountMax int               `json:"keepaliveCountMax"`
 	Compression       bool              `json:"compression"`
+	AgentAuth         bool              `json:"agentAuth"`         // use SSH agent for authentication
+	AgentForwarding   bool              `json:"agentForwarding"`   // forward agent to remote host
 	JumpHosts         []JumpHost        `json:"jumpHosts"`
 	PortForwards      []PortForward     `json:"portForwards"`
 	StartupCommand    string            `json:"startupCommand"`
