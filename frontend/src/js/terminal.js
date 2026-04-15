@@ -67,23 +67,15 @@ class TerminalManager {
         const container = document.getElementById(containerId);
         term.open(container);
 
-        // Fit the terminal once the container has real dimensions.
-        // The panel may have just transitioned from display:none, so we
-        // poll until the container reports a non-trivial size.
+        // Force a synchronous layout reflow so the container reports its
+        // true dimensions, then fit the terminal to fill the space.
+        // eslint-disable-next-line no-unused-expressions
+        container.offsetHeight;
         const doFit = () => { try { fitAddon.fit(); } catch (_) { /* noop */ } };
-        let fitAttempts = 0;
-        const tryFit = () => {
-            fitAttempts++;
-            const rect = container.getBoundingClientRect();
-            if (rect.width > 10 && rect.height > 10) {
-                doFit();
-            } else if (fitAttempts < 20) {
-                // Container still has no size — retry
-                setTimeout(tryFit, 50);
-                return;
-            }
-        };
-        requestAnimationFrame(tryFit);
+        doFit();
+        // Belt-and-braces: retry once after a paint in case the initial
+        // reflow dimensions were still stale.
+        requestAnimationFrame(doFit);
 
         // Forward user keystrokes to the backend
         term.onData((data) => {

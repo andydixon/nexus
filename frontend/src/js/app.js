@@ -134,13 +134,24 @@ class App {
         window.runtime.EventsOn('session:state', (payload) => {
             this.tabs.updateSessionState(payload.sessionID, payload.state, payload.error);
             this.updateStatusBar();
-            // Re-fit the terminal once connected so it picks up the final container size.
-            // Use multiple delays because the panel layout may still be settling.
+            // Once connected, ensure the backend PTY has the correct dimensions.
+            // The initial fit happens before the SSH handshake completes, so the
+            // onResize callback fires when the backend isn't ready. By the time
+            // the connection is established, xterm already has the right cols/rows
+            // and fitAddon.fit() won't trigger a new resize event. We must
+            // explicitly send the current terminal size to the backend.
             if (payload.state === 'connected') {
+                const entry = this.terminals.terminals.get(payload.sessionID);
+                if (entry) {
+                    const { cols, rows } = entry.term;
+                    try {
+                        window.go.api.Service.ResizeSession(payload.sessionID, cols, rows);
+                    } catch (_) { /* noop */ }
+                }
+                // Also re-fit to catch any layout changes that occurred while connecting.
                 const fit = () => this.terminals.fitSession(payload.sessionID);
-                setTimeout(fit, 30);
-                setTimeout(fit, 150);
-                setTimeout(fit, 500);
+                setTimeout(fit, 50);
+                setTimeout(fit, 300);
             }
         });
 

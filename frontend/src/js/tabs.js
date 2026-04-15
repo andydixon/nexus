@@ -47,8 +47,10 @@ class TabManager {
         panel.style.display = 'none';
         this.panelContainer.appendChild(panel);
 
-        this.setActive(sessionInfo.id);
+        // Hide the empty-state BEFORE activating the panel so the
+        // panel-container gets the full workspace height immediately.
         this._updateEmptyState();
+        this.setActive(sessionInfo.id);
     }
 
     /**
