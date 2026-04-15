@@ -139,3 +139,14 @@
     --toolbar-height:           40px;
     --status-bar-height:        24px;
 }
+
+/* -----------------------------------------------------------------------
+   Global input overrides — disable macOS/WebKit auto-capitalisation,
+   autocorrect, and spellcheck on all text fields.
+   ----------------------------------------------------------------------- */
+input, textarea, select {
+    autocapitalize: none;
+    autocorrect: off;
+    spellcheck: false;
+    text-transform: none;
+}

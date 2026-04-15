@@ -259,4 +259,32 @@ function stateLabel(state) {
 window.NexusTerminal = window.NexusTerminal || {};
 Object.assign(window.NexusTerminal, { $, $$, createElement, escapeHtml, formatTimestamp, debounce, fuzzyMatch, base64Encode, base64Decode, generateId, formatBytes, truncate, dismissContextMenus, protocolColour, stateLabel, relativeTime });
 
+/* ── Disable macOS/WebKit auto-capitalisation on all text inputs ───────── */
+function disableAutoCapitalise(el) {
+    el.setAttribute('autocapitalize', 'none');
+    el.setAttribute('autocorrect', 'off');
+    el.setAttribute('spellcheck', 'false');
+}
+
+// Apply to existing inputs
+document.querySelectorAll('input, textarea').forEach(disableAutoCapitalise);
+
+// Observe for dynamically added inputs
+var inputObserver = new MutationObserver(function(mutations) {
+    for (var i = 0; i < mutations.length; i++) {
+        var nodes = mutations[i].addedNodes;
+        for (var j = 0; j < nodes.length; j++) {
+            var node = nodes[j];
+            if (node.nodeType !== 1) continue;
+            if (node.tagName === 'INPUT' || node.tagName === 'TEXTAREA') {
+                disableAutoCapitalise(node);
+            }
+            if (node.querySelectorAll) {
+                node.querySelectorAll('input, textarea').forEach(disableAutoCapitalise);
+            }
+        }
+    }
+});
+inputObserver.observe(document.body, { childList: true, subtree: true });
+
 })();

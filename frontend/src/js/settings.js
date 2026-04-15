@@ -362,11 +362,10 @@ class Settings {
             <div class="about-section">
                 <h3 class="about-title">Nexus Terminal</h3>
                 <p class="about-version">Version 1.0.0</p>
-                <p class="about-desc">A premium desktop SSH, Telnet, and RAW TCP client built with Wails.</p>
+                <p class="about-desc">Developed by Andy Dixon - www.dixon.cx/nexus</p>
                 <div class="about-links">
                     <p>AES-256-GCM encrypted credential vault</p>
                     <p>Platform-native keychain integration</p>
-                    <p>xterm.js terminal emulation</p>
                     <p>SFTP file browser and transfer</p>
                     <p>Session recording and playback</p>
                 </div>
