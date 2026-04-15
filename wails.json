@@ -15,5 +15,8 @@
     "productVersion": "0.1.0",
     "copyright": "Copyright © 2024 Nexus Terminal Contributors",
     "comments": "A premium desktop SSH, Telnet, and RAW TCP client"
+  },
+  "windows": {
+    "icon": "build/windows/icon.ico"
   }
 }
