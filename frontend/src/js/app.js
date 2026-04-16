@@ -577,47 +577,120 @@ class App {
         const sessionId = this.state.activeSessionId;
         if (!sessionId) return;
 
-        // Check if search bar already exists
         const panel = document.getElementById(`panel-${sessionId}`);
-        if (!panel || panel.querySelector('.terminal-search-bar')) return;
+        if (!panel) return;
+
+        // If search bar already exists, just focus the input
+        const existing = panel.querySelector('.terminal-search');
+        if (existing) {
+            const input = existing.querySelector('input');
+            if (input) input.focus();
+            return;
+        }
 
         const bar = document.createElement('div');
-        bar.className = 'terminal-search-bar';
-        bar.innerHTML = `
-            <input type="text" class="form-input terminal-search-input" placeholder="Find…" />
-            <button class="btn btn-xs btn-outline terminal-search-prev">▲</button>
-            <button class="btn btn-xs btn-outline terminal-search-next">▼</button>
-            <button class="btn btn-xs btn-outline terminal-search-close">✕</button>
-        `;
+        bar.className = 'terminal-search';
 
-        const input = bar.querySelector('.terminal-search-input');
-        const closeBtn = bar.querySelector('.terminal-search-close');
-        const prevBtn = bar.querySelector('.terminal-search-prev');
-        const nextBtn = bar.querySelector('.terminal-search-next');
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.placeholder = 'Find in terminal…';
+        input.className = 'terminal-search-input';
 
-        const doSearch = () => this.terminals.search(sessionId, input.value);
-        const doPrev = () => this.terminals.searchPrevious(sessionId, input.value);
+        const count = document.createElement('span');
+        count.className = 'terminal-search-count';
+        count.textContent = '';
+
+        const prevBtn = document.createElement('button');
+        prevBtn.className = 'btn btn-xs btn-ghost';
+        prevBtn.textContent = '▲';
+        prevBtn.title = 'Previous match (Shift+Enter)';
+
+        const nextBtn = document.createElement('button');
+        nextBtn.className = 'btn btn-xs btn-ghost';
+        nextBtn.textContent = '▼';
+        nextBtn.title = 'Next match (Enter)';
+
+        const caseSensBtn = document.createElement('button');
+        caseSensBtn.className = 'btn btn-xs btn-ghost terminal-search-toggle';
+        caseSensBtn.textContent = 'Aa';
+        caseSensBtn.title = 'Toggle case sensitivity';
+        let caseSensitive = false;
+
+        const regexBtn = document.createElement('button');
+        regexBtn.className = 'btn btn-xs btn-ghost terminal-search-toggle';
+        regexBtn.textContent = '.*';
+        regexBtn.title = 'Toggle regular expression';
+        let useRegex = false;
+
+        const closeBtn = document.createElement('button');
+        closeBtn.className = 'btn btn-xs btn-ghost';
+        closeBtn.textContent = '✕';
+        closeBtn.title = 'Close (Escape)';
+
+        bar.appendChild(input);
+        bar.appendChild(count);
+        bar.appendChild(prevBtn);
+        bar.appendChild(nextBtn);
+        bar.appendChild(caseSensBtn);
+        bar.appendChild(regexBtn);
+        bar.appendChild(closeBtn);
+
+        const searchOpts = () => ({ caseSensitive, regex: useRegex });
+
+        const doSearch = () => {
+            const found = this.terminals.search(sessionId, input.value, searchOpts());
+            count.textContent = input.value ? (found ? 'Match found' : 'No matches') : '';
+        };
+        const doPrev = () => {
+            const found = this.terminals.searchPrevious(sessionId, input.value, searchOpts());
+            count.textContent = input.value ? (found ? 'Match found' : 'No matches') : '';
+        };
+
+        const closeSearch = () => {
+            // Clear search decorations
+            const entry = this.terminals.terminals.get(sessionId);
+            if (entry && entry.searchAddon) {
+                entry.searchAddon.clearDecorations();
+            }
+            bar.classList.remove('is-visible');
+            setTimeout(() => bar.remove(), 200);
+            this.terminals.focusTerminal(sessionId);
+        };
 
         input.addEventListener('input', doSearch);
         input.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
+                e.preventDefault();
                 e.shiftKey ? doPrev() : doSearch();
             }
             if (e.key === 'Escape') {
-                bar.remove();
-                this.terminals.focusTerminal(sessionId);
+                e.preventDefault();
+                closeSearch();
             }
         });
 
         nextBtn.addEventListener('click', doSearch);
         prevBtn.addEventListener('click', doPrev);
-        closeBtn.addEventListener('click', () => {
-            bar.remove();
-            this.terminals.focusTerminal(sessionId);
+        closeBtn.addEventListener('click', closeSearch);
+
+        caseSensBtn.addEventListener('click', () => {
+            caseSensitive = !caseSensitive;
+            caseSensBtn.classList.toggle('is-active', caseSensitive);
+            doSearch();
         });
 
-        panel.prepend(bar);
-        input.focus();
+        regexBtn.addEventListener('click', () => {
+            useRegex = !useRegex;
+            regexBtn.classList.toggle('is-active', useRegex);
+            doSearch();
+        });
+
+        panel.appendChild(bar);
+        // Trigger the entrance animation
+        requestAnimationFrame(() => {
+            bar.classList.add('is-visible');
+            input.focus();
+        });
     }
 
     /**

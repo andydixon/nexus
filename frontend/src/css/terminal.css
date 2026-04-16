@@ -168,6 +168,19 @@
     color: var(--text-tertiary);
     padding: 0 var(--space-1);
     white-space: nowrap;
+    min-width: 70px;
+}
+
+.terminal-search-toggle {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    opacity: 0.5;
+    transition: opacity var(--transition-fast), color var(--transition-fast);
+}
+
+.terminal-search-toggle.is-active {
+    opacity: 1;
+    color: var(--accent);
 }
 
 /* -----------------------------------------------------------------------
