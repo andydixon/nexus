@@ -571,3 +571,102 @@
     padding: var(--space-1) var(--space-2);
     height: 30px;
 }
+
+/* -----------------------------------------------------------------------
+   Login Script Editor — expect-style send/wait steps
+   ----------------------------------------------------------------------- */
+.form-help {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    margin-bottom: var(--space-3);
+    line-height: 1.5;
+}
+
+.login-script-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    margin-bottom: var(--space-3);
+}
+
+.login-script-empty {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    font-style: italic;
+    padding: var(--space-2) 0;
+}
+
+.login-script-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    background: var(--bg-base);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    padding: var(--space-2);
+}
+
+.login-script-type {
+    width: 90px;
+    min-width: 90px;
+    font-size: var(--text-xs);
+    padding: var(--space-1) var(--space-2);
+    height: 30px;
+}
+
+.login-script-value {
+    flex: 1;
+    font-size: var(--text-xs);
+    padding: var(--space-1) var(--space-2);
+    height: 30px;
+}
+
+.login-script-timeout {
+    width: 60px;
+    min-width: 60px;
+    font-size: var(--text-xs);
+    padding: var(--space-1) var(--space-2);
+    height: 30px;
+}
+
+.login-script-timeout-label {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    min-width: 10px;
+}
+
+.login-script-actions {
+    display: flex;
+    gap: 2px;
+    flex-shrink: 0;
+}
+
+.login-script-btn {
+    background: var(--bg-elevated);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-xs);
+    width: 24px;
+    height: 24px;
+    font-size: 10px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s, color 0.15s;
+}
+
+.login-script-btn:hover {
+    background: var(--bg-surface);
+    color: var(--text-primary);
+}
+
+.login-script-btn-remove:hover {
+    background: var(--danger);
+    color: #fff;
+}
+
+.login-script-add-row {
+    display: flex;
+    gap: var(--space-2);
+}

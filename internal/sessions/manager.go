@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -38,6 +39,11 @@ type Session struct {
 	recorder       *recording.Recorder // active recording, nil if not recording
 	reconnectCount int                 // number of reconnection attempts so far
 	cancelReconn   context.CancelFunc  // cancels an in-progress reconnect backoff
+
+	// Login script support — temporary buffer for expect-style matching.
+	loginBuf   []byte
+	loginBufMu sync.Mutex
+	loginDone  chan struct{} // closed when login script completes or is abandoned
 }
 
 // Manager handles the lifecycle of all active sessions.
@@ -463,6 +469,20 @@ func (m *Manager) connectSSH(sess *Session, getSecret func(prompt string) (strin
 			if rec != nil {
 				rec.WriteOutput(data)
 			}
+			// Feed data to the login script buffer if active.
+			sess.loginBufMu.Lock()
+			if sess.loginDone != nil {
+				select {
+				case <-sess.loginDone:
+					// Login script finished — stop buffering.
+				default:
+					sess.loginBuf = append(sess.loginBuf, data...)
+					if len(sess.loginBuf) > 16384 {
+						sess.loginBuf = sess.loginBuf[len(sess.loginBuf)-16384:]
+					}
+				}
+			}
+			sess.loginBufMu.Unlock()
 		},
 		// onError — report connection errors to the frontend.
 		func(err error) {
@@ -520,6 +540,11 @@ func (m *Manager) connectSSH(sess *Session, getSecret func(prompt string) (strin
 		}
 	}
 
+	// Execute login scripts if configured.
+	if sshConf != nil && len(sshConf.LoginScripts) > 0 {
+		go m.executeLoginScripts(sess, sshConf.LoginScripts)
+	}
+
 	return nil
 }
 
@@ -542,6 +567,19 @@ func (m *Manager) connectTelnet(sess *Session) error {
 			if rec != nil {
 				rec.WriteOutput(data)
 			}
+			// Feed data to the login script buffer if active.
+			sess.loginBufMu.Lock()
+			if sess.loginDone != nil {
+				select {
+				case <-sess.loginDone:
+				default:
+					sess.loginBuf = append(sess.loginBuf, data...)
+					if len(sess.loginBuf) > 16384 {
+						sess.loginBuf = sess.loginBuf[len(sess.loginBuf)-16384:]
+					}
+				}
+			}
+			sess.loginBufMu.Unlock()
 		},
 		// onError
 		func(err error) {
@@ -574,6 +612,13 @@ func (m *Manager) connectTelnet(sess *Session) error {
 	}
 
 	sess.telnetClient = client
+
+	// Execute login scripts if configured.
+	telConf := profile.Telnet
+	if telConf != nil && len(telConf.LoginScripts) > 0 {
+		go m.executeLoginScripts(sess, telConf.LoginScripts)
+	}
+
 	return nil
 }
 
@@ -1155,6 +1200,103 @@ func (m *Manager) closeSession(sess *Session) {
 	m.mu.Lock()
 	sess.Info.State = models.SessionDisconnected
 	m.mu.Unlock()
+}
+
+// ---------------------------------------------------------------------------
+// Login script execution (expect-style send/wait)
+// ---------------------------------------------------------------------------
+
+// executeLoginScripts processes an expect-style login script sequence against
+// a connected session. "wait" steps block until the specified text appears in
+// the session output (with a timeout). "send" steps write text to the session
+// input. The session's loginBuf/loginDone fields are used for pattern matching.
+func (m *Manager) executeLoginScripts(sess *Session, steps []models.LoginScriptStep) {
+	// Initialise the login buffer so the onData hook starts accumulating.
+	sess.loginBufMu.Lock()
+	sess.loginBuf = nil
+	sess.loginDone = make(chan struct{})
+	sess.loginBufMu.Unlock()
+
+	defer func() {
+		sess.loginBufMu.Lock()
+		close(sess.loginDone)
+		sess.loginBuf = nil
+		sess.loginBufMu.Unlock()
+	}()
+
+	// Short delay to allow the shell to start and produce its initial prompt.
+	time.Sleep(500 * time.Millisecond)
+
+	for i, step := range steps {
+		// Check session is still alive.
+		m.mu.RLock()
+		state := sess.Info.State
+		m.mu.RUnlock()
+		if state != models.SessionConnected {
+			return
+		}
+
+		switch step.Type {
+		case "wait":
+			timeout := time.Duration(step.Timeout) * time.Second
+			if timeout <= 0 {
+				timeout = 10 * time.Second
+			}
+			if err := m.waitForOutput(sess, step.Value, timeout); err != nil {
+				m.emitEvent("session:debug", map[string]interface{}{
+					"sessionID": sess.Info.ID,
+					"message":   fmt.Sprintf("login script step %d timed out waiting for %q", i+1, step.Value),
+				})
+				return
+			}
+
+		case "send":
+			data := []byte(step.Value + "\n")
+			if err := m.WriteToSession(sess.Info.ID, data); err != nil {
+				m.emitEvent("session:debug", map[string]interface{}{
+					"sessionID": sess.Info.ID,
+					"message":   fmt.Sprintf("login script step %d failed to send: %v", i+1, err),
+				})
+				return
+			}
+			// Small inter-step delay for the remote to process.
+			time.Sleep(200 * time.Millisecond)
+
+		default:
+			// Unknown step type — skip.
+		}
+	}
+}
+
+// waitForOutput polls the session's login buffer until the specified text
+// appears or the timeout expires.
+func (m *Manager) waitForOutput(sess *Session, pattern string, timeout time.Duration) error {
+	if pattern == "" {
+		return nil
+	}
+
+	deadline := time.After(timeout)
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-deadline:
+			return fmt.Errorf("timeout waiting for %q", pattern)
+		case <-ticker.C:
+			sess.loginBufMu.Lock()
+			found := strings.Contains(string(sess.loginBuf), pattern)
+			if found {
+				// Clear the buffer up to the match so subsequent waits start fresh.
+				idx := strings.Index(string(sess.loginBuf), pattern)
+				sess.loginBuf = sess.loginBuf[idx+len(pattern):]
+			}
+			sess.loginBufMu.Unlock()
+			if found {
+				return nil
+			}
+		}
+	}
 }
 
 // handleSessionClosed is called when a protocol client reports closure.

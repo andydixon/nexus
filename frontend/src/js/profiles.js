@@ -27,6 +27,7 @@ const DEFAULTS = {
             portForwards: [],
             startupCommand: '',
             envVars: {},
+            loginScripts: [],
         },
     },
     telnet: {
@@ -39,6 +40,7 @@ const DEFAULTS = {
             encoding: 'utf-8',
             negotiationDebug: false,
             lineMode: false,
+            loginScripts: [],
         },
     },
     raw: {
@@ -390,6 +392,9 @@ class ProfileEditor {
             }),
         ]));
 
+        // Login Scripts (expect-style)
+        sections.push(this._renderLoginScriptSection('ssh', ssh.loginScripts || []));
+
         // SSH Agent
         sections.push(this._renderSection('SSH Agent', [
             this._field('toggle', 'ssh.agentAuth', 'Use SSH Agent for Authentication', ssh.agentAuth, {
@@ -450,6 +455,9 @@ class ProfileEditor {
         sections.push(this._renderSection('Negotiation', [
             this._field('toggle', 'telnet.negotiationDebug', 'Debug Negotiation', tel.negotiationDebug),
         ], true));
+
+        // Login Scripts (expect-style)
+        sections.push(this._renderLoginScriptSection('telnet', tel.loginScripts || []));
 
         sections.push(this._renderSection('Reconnection', [
             this._field('toggle', 'telnet.autoReconnect', 'Auto-Reconnect', tel.autoReconnect, {
@@ -571,6 +579,175 @@ class ProfileEditor {
      * @returns {HTMLElement}
      * @private
      */
+    /**
+     * Renders the login script section (expect-style send/wait steps).
+     * @param {string} prefix - 'ssh' or 'telnet'
+     * @param {Array} steps - Array of {type, value, timeout}
+     * @returns {HTMLElement}
+     * @private
+     */
+    _renderLoginScriptSection(prefix, steps) {
+        const section = createElement('div', 'form-section');
+        const header = createElement('div', 'form-section-header');
+        let collapsed = true;
+
+        header.innerHTML = `
+            <span class="form-section-chevron">▸</span>
+            <span class="form-section-title">Login Script</span>
+        `;
+
+        const content = createElement('div', 'form-section-content');
+        content.style.display = 'none';
+
+        const helpText = createElement('div', 'form-help', {
+            textContent: 'Automate login sequences: wait for text from the server, then send a response. Steps execute in order after connection.',
+        });
+        content.appendChild(helpText);
+
+        // Hidden input to hold JSON
+        const hiddenInput = createElement('input', '', {
+            type: 'hidden',
+            id: `field-${prefix}.loginScripts`,
+            dataset: { field: `${prefix}.loginScripts` },
+        });
+        content.appendChild(hiddenInput);
+
+        // List container
+        const listContainer = createElement('div', 'login-script-list');
+        content.appendChild(listContainer);
+
+        // Working copy
+        let currentSteps = JSON.parse(JSON.stringify(steps || []));
+
+        const renderSteps = () => {
+            listContainer.innerHTML = '';
+            hiddenInput.value = JSON.stringify(currentSteps);
+
+            if (currentSteps.length === 0) {
+                const empty = createElement('div', 'login-script-empty', {
+                    textContent: 'No login script steps configured.',
+                });
+                listContainer.appendChild(empty);
+            }
+
+            currentSteps.forEach((step, idx) => {
+                const row = createElement('div', 'login-script-row');
+
+                const typeSelect = createElement('select', 'form-input login-script-type');
+                ['wait', 'send'].forEach(t => {
+                    const opt = createElement('option', '', { value: t, textContent: t === 'wait' ? 'Wait for' : 'Send' });
+                    if (t === step.type) opt.selected = true;
+                    typeSelect.appendChild(opt);
+                });
+                typeSelect.addEventListener('change', () => {
+                    currentSteps[idx].type = typeSelect.value;
+                    hiddenInput.value = JSON.stringify(currentSteps);
+                    renderSteps();
+                });
+
+                const valueInput = createElement('input', 'form-input login-script-value', {
+                    type: 'text',
+                    value: step.value || '',
+                    placeholder: step.type === 'wait' ? 'Text to match...' : 'Text to send...',
+                    autocapitalize: 'off',
+                    autocorrect: 'off',
+                    spellcheck: false,
+                });
+                valueInput.addEventListener('input', () => {
+                    currentSteps[idx].value = valueInput.value;
+                    hiddenInput.value = JSON.stringify(currentSteps);
+                });
+
+                row.appendChild(typeSelect);
+                row.appendChild(valueInput);
+
+                // Timeout field for wait steps
+                if (step.type === 'wait') {
+                    const timeoutInput = createElement('input', 'form-input login-script-timeout', {
+                        type: 'number',
+                        value: step.timeout || 10,
+                        min: 1,
+                        max: 120,
+                        title: 'Timeout (seconds)',
+                    });
+                    timeoutInput.style.width = '60px';
+                    timeoutInput.addEventListener('input', () => {
+                        currentSteps[idx].timeout = parseInt(timeoutInput.value, 10) || 10;
+                        hiddenInput.value = JSON.stringify(currentSteps);
+                    });
+                    const timeoutLabel = createElement('span', 'login-script-timeout-label', { textContent: 's' });
+                    row.appendChild(timeoutInput);
+                    row.appendChild(timeoutLabel);
+                }
+
+                // Move up/down/remove buttons
+                const actions = createElement('div', 'login-script-actions');
+
+                if (idx > 0) {
+                    const upBtn = createElement('button', 'login-script-btn', { textContent: '▲', title: 'Move up', type: 'button' });
+                    upBtn.addEventListener('mousedown', e => e.preventDefault());
+                    upBtn.addEventListener('click', () => {
+                        [currentSteps[idx - 1], currentSteps[idx]] = [currentSteps[idx], currentSteps[idx - 1]];
+                        renderSteps();
+                    });
+                    actions.appendChild(upBtn);
+                }
+
+                if (idx < currentSteps.length - 1) {
+                    const downBtn = createElement('button', 'login-script-btn', { textContent: '▼', title: 'Move down', type: 'button' });
+                    downBtn.addEventListener('mousedown', e => e.preventDefault());
+                    downBtn.addEventListener('click', () => {
+                        [currentSteps[idx], currentSteps[idx + 1]] = [currentSteps[idx + 1], currentSteps[idx]];
+                        renderSteps();
+                    });
+                    actions.appendChild(downBtn);
+                }
+
+                const removeBtn = createElement('button', 'login-script-btn login-script-btn-remove', { textContent: '✕', title: 'Remove', type: 'button' });
+                removeBtn.addEventListener('mousedown', e => e.preventDefault());
+                removeBtn.addEventListener('click', () => {
+                    currentSteps.splice(idx, 1);
+                    renderSteps();
+                });
+                actions.appendChild(removeBtn);
+
+                row.appendChild(actions);
+                listContainer.appendChild(row);
+            });
+        };
+
+        renderSteps();
+
+        // Add step buttons
+        const addRow = createElement('div', 'login-script-add-row');
+        const addWaitBtn = createElement('button', 'btn btn-small btn-secondary', { textContent: '+ Wait', type: 'button' });
+        addWaitBtn.addEventListener('mousedown', e => e.preventDefault());
+        addWaitBtn.addEventListener('click', () => {
+            currentSteps.push({ type: 'wait', value: '', timeout: 10 });
+            renderSteps();
+        });
+        const addSendBtn = createElement('button', 'btn btn-small btn-secondary', { textContent: '+ Send', type: 'button' });
+        addSendBtn.addEventListener('mousedown', e => e.preventDefault());
+        addSendBtn.addEventListener('click', () => {
+            currentSteps.push({ type: 'send', value: '', timeout: 0 });
+            renderSteps();
+        });
+        addRow.appendChild(addWaitBtn);
+        addRow.appendChild(addSendBtn);
+        content.appendChild(addRow);
+
+        header.addEventListener('mousedown', (e) => e.preventDefault());
+        header.addEventListener('click', () => {
+            collapsed = !collapsed;
+            content.style.display = collapsed ? 'none' : 'block';
+            header.querySelector('.form-section-chevron').textContent = collapsed ? '▸' : '▾';
+        });
+
+        section.appendChild(header);
+        section.appendChild(content);
+        return section;
+    }
+
     _renderSection(title, fields, startCollapsed = false) {
         const section = createElement('div', 'form-section');
         const header = createElement('div', 'form-section-header');
@@ -973,6 +1150,18 @@ class ProfileEditor {
                 fi++;
             }
             p.ssh.portForwards = pfs;
+
+            // Login scripts
+            const loginScriptsRaw = val('ssh.loginScripts');
+            if (loginScriptsRaw) {
+                try {
+                    p.ssh.loginScripts = JSON.parse(loginScriptsRaw);
+                } catch (_) {
+                    p.ssh.loginScripts = [];
+                }
+            } else {
+                p.ssh.loginScripts = [];
+            }
         }
 
         // Telnet-specific
@@ -985,6 +1174,18 @@ class ProfileEditor {
             p.telnet.negotiationDebug = val('telnet.negotiationDebug') || false;
             p.telnet.autoReconnect = val('telnet.autoReconnect') || false;
             p.telnet.maxReconnectTries = val('telnet.maxReconnectTries') ?? 5;
+
+            // Login scripts
+            const telLoginScriptsRaw = val('telnet.loginScripts');
+            if (telLoginScriptsRaw) {
+                try {
+                    p.telnet.loginScripts = JSON.parse(telLoginScriptsRaw);
+                } catch (_) {
+                    p.telnet.loginScripts = [];
+                }
+            } else {
+                p.telnet.loginScripts = [];
+            }
         }
 
         // RAW-specific

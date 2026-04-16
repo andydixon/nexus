@@ -97,10 +97,18 @@ type SSHConfig struct {
 	AgentForwarding   bool              `json:"agentForwarding"`   // forward agent to remote host
 	AutoReconnect     bool              `json:"autoReconnect"`     // reconnect on unexpected disconnect
 	MaxReconnectTries int               `json:"maxReconnectTries"` // 0 = use default (5)
+	LoginScripts      []LoginScriptStep `json:"loginScripts"`     // expect-style auto-login sequence
 	JumpHosts         []JumpHost        `json:"jumpHosts"`
 	PortForwards      []PortForward     `json:"portForwards"`
 	StartupCommand    string            `json:"startupCommand"`
 	EnvVars           map[string]string `json:"envVars"`
+}
+
+// LoginScriptStep represents a single step in an expect-style auto-login sequence.
+type LoginScriptStep struct {
+	Type    string `json:"type"`    // "wait" or "send"
+	Value   string `json:"value"`   // text to wait for / text to send
+	Timeout int    `json:"timeout"` // max seconds to wait (for "wait" steps; 0 = use default 10s)
 }
 
 // JumpHost describes a proxy/bastion host used for SSH multi-hop connections.
@@ -135,14 +143,15 @@ type PortForward struct {
 
 // TelnetConfig holds Telnet-specific settings for a connection profile.
 type TelnetConfig struct {
-	LocalEcho         bool       `json:"localEcho"`
-	LineEnding        LineEnding `json:"lineEnding"`
-	TerminalType      string     `json:"terminalType"`
-	Encoding          string     `json:"encoding"`
-	NegotiationDebug  bool       `json:"negotiationDebug"`
-	LineMode          bool       `json:"lineMode"`
-	AutoReconnect     bool       `json:"autoReconnect"`     // reconnect on unexpected disconnect
-	MaxReconnectTries int        `json:"maxReconnectTries"` // 0 = use default (5)
+	LocalEcho         bool              `json:"localEcho"`
+	LineEnding        LineEnding        `json:"lineEnding"`
+	TerminalType      string            `json:"terminalType"`
+	Encoding          string            `json:"encoding"`
+	NegotiationDebug  bool              `json:"negotiationDebug"`
+	LineMode          bool              `json:"lineMode"`
+	AutoReconnect     bool              `json:"autoReconnect"`     // reconnect on unexpected disconnect
+	MaxReconnectTries int               `json:"maxReconnectTries"` // 0 = use default (5)
+	LoginScripts      []LoginScriptStep `json:"loginScripts"`     // expect-style auto-login sequence
 }
 
 // RAWConfig holds RAW TCP-specific settings for a connection profile.
