@@ -670,3 +670,34 @@
     display: flex;
     gap: var(--space-2);
 }
+
+/* -----------------------------------------------------------------------
+   TOTP / 2FA — secret input row with action buttons
+   ----------------------------------------------------------------------- */
+.totp-input-row {
+    display: flex;
+    gap: var(--space-2);
+    align-items: center;
+}
+
+.totp-input-row .form-input {
+    flex: 1;
+}
+
+.totp-toggle,
+.totp-test,
+.totp-save,
+.totp-delete {
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+.btn-danger {
+    background: var(--error);
+    color: #fff;
+    border: 1px solid transparent;
+}
+
+.btn-danger:hover {
+    background: #d32f2f;
+}

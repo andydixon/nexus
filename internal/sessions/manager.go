@@ -508,6 +508,21 @@ func (m *Manager) connectSSH(sess *Session, getSecret func(prompt string) (strin
 	getPassword := m.buildSecretCallback(profile.ID, "password", sshConf.SecretMode, getSecret)
 	getPassphrase := m.buildSecretCallback(profile.ID, "passphrase", sshConf.KeySecretMode, getSecret)
 
+	// Resolve TOTP secret from vault if not already inline.
+	if sshConf.TOTPSecret == "" {
+		totpKey := fmt.Sprintf("profile:%s:totp", profile.ID)
+		if m.keychainStore != nil && m.keychainStore.Available() {
+			if val, err := m.keychainStore.GetSecret(totpKey); err == nil && val != "" {
+				sshConf.TOTPSecret = val
+			}
+		}
+		if sshConf.TOTPSecret == "" && m.secretStore != nil && m.secretStore.IsUnlocked() {
+			if val, err := m.secretStore.GetSecret(totpKey); err == nil && val != "" {
+				sshConf.TOTPSecret = val
+			}
+		}
+	}
+
 	if err := client.Connect(getPassword, getPassphrase); err != nil {
 		return err
 	}

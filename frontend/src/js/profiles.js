@@ -405,6 +405,9 @@ class ProfileEditor {
             }),
         ], true));
 
+        // TOTP / 2FA
+        sections.push(this._renderTOTPSection(profile));
+
         // Advanced
         sections.push(this._renderSection('Advanced', [
             this._field('text', 'ssh.terminalType', 'Terminal Type', ssh.terminalType, { placeholder: 'xterm-256color' }),
@@ -579,6 +582,167 @@ class ProfileEditor {
      * @returns {HTMLElement}
      * @private
      */
+    /**
+     * Renders the TOTP/2FA section with secret management and test button.
+     * @param {Object} profile
+     * @returns {HTMLElement}
+     * @private
+     */
+    _renderTOTPSection(profile) {
+        const section = createElement('div', 'form-section');
+        const header = createElement('div', 'form-section-header');
+        let collapsed = true;
+
+        header.innerHTML = `
+            <span class="form-section-chevron">▸</span>
+            <span class="form-section-title">TOTP / 2FA</span>
+        `;
+
+        const content = createElement('div', 'form-section-content');
+        content.style.display = 'none';
+
+        const helpText = createElement('div', 'form-help', {
+            textContent: 'Configure a TOTP secret to auto-fill 2FA codes during SSH keyboard-interactive authentication. The secret is stored encrypted.',
+        });
+        content.appendChild(helpText);
+
+        // TOTP secret input
+        const group = createElement('div', 'form-group');
+        const label = createElement('label', 'form-label', { textContent: 'TOTP Secret' });
+        group.appendChild(label);
+
+        const row = createElement('div', 'totp-input-row');
+
+        const secretInput = createElement('input', 'form-input', {
+            type: 'password',
+            placeholder: 'Base32-encoded secret (e.g. from authenticator app setup)',
+            id: 'field-ssh.totpSecret',
+            dataset: { field: 'ssh.totpSecret' },
+            autocapitalize: 'off',
+            autocorrect: 'off',
+            spellcheck: false,
+        });
+
+        // Show/hide toggle
+        const toggleBtn = createElement('button', 'btn btn-small btn-secondary totp-toggle', {
+            textContent: '👁',
+            title: 'Show/hide secret',
+            type: 'button',
+        });
+        toggleBtn.addEventListener('mousedown', e => e.preventDefault());
+        toggleBtn.addEventListener('click', () => {
+            secretInput.type = secretInput.type === 'password' ? 'text' : 'password';
+        });
+
+        // Test button — generates a live code
+        const testBtn = createElement('button', 'btn btn-small btn-accent totp-test', {
+            textContent: 'Test',
+            title: 'Generate a code with this secret',
+            type: 'button',
+        });
+        testBtn.addEventListener('mousedown', e => e.preventDefault());
+        testBtn.addEventListener('click', async () => {
+            const profileId = profile.id;
+            if (profileId) {
+                try {
+                    const code = await window.go.api.Service.GetTOTPCode(profileId);
+                    testBtn.textContent = code;
+                    setTimeout(() => { testBtn.textContent = 'Test'; }, 5000);
+                } catch (err) {
+                    // If no saved secret yet, try computing locally using the input value
+                    testBtn.textContent = 'Save first';
+                    setTimeout(() => { testBtn.textContent = 'Test'; }, 2000);
+                }
+            }
+        });
+
+        // Save button
+        const saveBtn = createElement('button', 'btn btn-small btn-primary totp-save', {
+            textContent: 'Save',
+            title: 'Encrypt and save the TOTP secret',
+            type: 'button',
+        });
+        saveBtn.addEventListener('mousedown', e => e.preventDefault());
+        saveBtn.addEventListener('click', async () => {
+            const profileId = profile.id;
+            const secret = secretInput.value.trim();
+            if (!profileId) {
+                NexusTerminal.Notifications.show('Save the profile first, then set the TOTP secret.', 'warning');
+                return;
+            }
+            if (!secret) {
+                // Delete existing secret
+                try {
+                    await window.go.api.Service.DeleteTOTPSecret(profileId);
+                    NexusTerminal.Notifications.show('TOTP secret removed.', 'info');
+                } catch (err) {
+                    NexusTerminal.Notifications.show('Failed to remove TOTP secret.', 'error');
+                }
+                return;
+            }
+            try {
+                await window.go.api.Service.SetTOTPSecret(profileId, secret);
+                NexusTerminal.Notifications.show('TOTP secret saved securely.', 'success');
+                secretInput.value = '';
+                secretInput.placeholder = '••••••••• (secret saved)';
+            } catch (err) {
+                NexusTerminal.Notifications.show('Failed to save TOTP secret: ' + err, 'error');
+            }
+        });
+
+        // Delete button
+        const deleteBtn = createElement('button', 'btn btn-small btn-danger totp-delete', {
+            textContent: 'Delete',
+            title: 'Remove the TOTP secret',
+            type: 'button',
+        });
+        deleteBtn.addEventListener('mousedown', e => e.preventDefault());
+        deleteBtn.addEventListener('click', async () => {
+            const profileId = profile.id;
+            if (!profileId) return;
+            try {
+                await window.go.api.Service.DeleteTOTPSecret(profileId);
+                NexusTerminal.Notifications.show('TOTP secret removed.', 'info');
+                secretInput.placeholder = 'Base32-encoded secret (e.g. from authenticator app setup)';
+            } catch (err) {
+                NexusTerminal.Notifications.show('Failed to remove TOTP secret.', 'error');
+            }
+        });
+
+        row.appendChild(secretInput);
+        row.appendChild(toggleBtn);
+        row.appendChild(testBtn);
+        row.appendChild(saveBtn);
+        row.appendChild(deleteBtn);
+        group.appendChild(row);
+        content.appendChild(group);
+
+        // Check if secret is already saved and show placeholder
+        if (profile.id) {
+            (async () => {
+                try {
+                    const has = await window.go.api.Service.HasTOTPSecret(profile.id);
+                    if (has) {
+                        secretInput.placeholder = '••••••••• (secret saved)';
+                    }
+                } catch (_) {
+                    // Ignore — might not be unlocked.
+                }
+            })();
+        }
+
+        header.addEventListener('mousedown', (e) => e.preventDefault());
+        header.addEventListener('click', () => {
+            collapsed = !collapsed;
+            content.style.display = collapsed ? 'none' : 'block';
+            header.querySelector('.form-section-chevron').textContent = collapsed ? '▸' : '▾';
+        });
+
+        section.appendChild(header);
+        section.appendChild(content);
+        return section;
+    }
+
     /**
      * Renders the login script section (expect-style send/wait steps).
      * @param {string} prefix - 'ssh' or 'telnet'

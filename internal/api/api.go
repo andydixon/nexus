@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/pquerna/otp/totp"
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"github.com/copilot-ssh-client/app/internal/audit"
@@ -438,6 +439,72 @@ func (s *Service) DeleteProfileSecrets(profileID string) error {
 	}
 	// OS keychain entries need individual deletion — handled at a higher level
 	// because we cannot enumerate keychain keys by prefix portably.
+	return nil
+}
+
+// ---------------------------------------------------------------------------
+// TOTP / 2FA
+// ---------------------------------------------------------------------------
+
+// SetTOTPSecret stores a TOTP secret for the given profile, encrypted in
+// the secret vault (or OS keychain).
+func (s *Service) SetTOTPSecret(profileID string, secret string) error {
+	return s.SetProfileSecret(profileID, "totp", secret)
+}
+
+// GetTOTPCode generates the current 6-digit TOTP code for the given profile.
+// Used for the "Test" button in the profile editor.
+func (s *Service) GetTOTPCode(profileID string) (string, error) {
+	// Look up the TOTP secret from the vault.
+	totpKey := fmt.Sprintf("profile:%s:totp", profileID)
+	var secret string
+
+	if s.keychainStore != nil && s.keychainStore.Available() {
+		if val, err := s.keychainStore.GetSecret(totpKey); err == nil && val != "" {
+			secret = val
+		}
+	}
+	if secret == "" && s.secretStore != nil && s.secretStore.IsUnlocked() {
+		if val, err := s.secretStore.GetSecret(totpKey); err == nil && val != "" {
+			secret = val
+		}
+	}
+	if secret == "" {
+		return "", fmt.Errorf("no TOTP secret configured for this profile")
+	}
+
+	code, err := totp.GenerateCode(secret, time.Now())
+	if err != nil {
+		return "", fmt.Errorf("failed to generate TOTP code: %w", err)
+	}
+	return code, nil
+}
+
+// HasTOTPSecret checks whether a profile has a TOTP secret stored.
+func (s *Service) HasTOTPSecret(profileID string) bool {
+	totpKey := fmt.Sprintf("profile:%s:totp", profileID)
+	if s.keychainStore != nil && s.keychainStore.Available() {
+		if val, err := s.keychainStore.GetSecret(totpKey); err == nil && val != "" {
+			return true
+		}
+	}
+	if s.secretStore != nil && s.secretStore.IsUnlocked() {
+		if val, err := s.secretStore.GetSecret(totpKey); err == nil && val != "" {
+			return true
+		}
+	}
+	return false
+}
+
+// DeleteTOTPSecret removes the TOTP secret for the given profile.
+func (s *Service) DeleteTOTPSecret(profileID string) error {
+	totpKey := fmt.Sprintf("profile:%s:totp", profileID)
+	if s.keychainStore != nil && s.keychainStore.Available() {
+		_ = s.keychainStore.DeleteSecret(totpKey)
+	}
+	if s.secretStore != nil && s.secretStore.IsUnlocked() {
+		_ = s.secretStore.DeleteSecret(totpKey)
+	}
 	return nil
 }
 

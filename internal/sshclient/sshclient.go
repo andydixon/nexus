@@ -6,10 +6,12 @@ import (
 	"io"
 	"net"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/copilot-ssh-client/app/internal/models"
+	"github.com/pquerna/otp/totp"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -355,15 +357,29 @@ func (c *Client) buildAuthMethods(sc models.SSHConfig, getPassword func() (strin
 		case "keyboard-interactive":
 			if getPassword != nil {
 				pwdCallback := getPassword
+				totpSecret := ""
+				if sc.TOTPSecret != "" {
+					totpSecret = sc.TOTPSecret
+				}
 				methods = append(methods, ssh.KeyboardInteractive(
 					func(name, instruction string, questions []string, echos []bool) ([]string, error) {
 						answers := make([]string, len(questions))
-						for i := range questions {
-							ans, err := pwdCallback()
-							if err != nil {
-								return nil, err
+						for i, question := range questions {
+							q := strings.ToLower(question)
+							// Detect TOTP/2FA prompts and auto-fill when secret is configured.
+							if totpSecret != "" && isTOTPPrompt(q) {
+								code, err := totp.GenerateCode(totpSecret, time.Now())
+								if err != nil {
+									return nil, fmt.Errorf("failed to generate TOTP code: %w", err)
+								}
+								answers[i] = code
+							} else {
+								ans, err := pwdCallback()
+								if err != nil {
+									return nil, err
+								}
+								answers[i] = ans
 							}
-							answers[i] = ans
 						}
 						return answers, nil
 					},
@@ -376,6 +392,32 @@ func (c *Client) buildAuthMethods(sc models.SSHConfig, getPassword func() (strin
 		return nil, fmt.Errorf("no authentication methods available")
 	}
 	return methods, nil
+}
+
+// isTOTPPrompt checks whether a keyboard-interactive question looks like a
+// TOTP/2FA prompt. Common patterns include "verification code", "otp",
+// "two-factor", "2fa", "authenticator", etc.
+func isTOTPPrompt(question string) bool {
+	totpKeywords := []string{
+		"verification code",
+		"otp",
+		"one-time",
+		"one time",
+		"two-factor",
+		"two factor",
+		"2fa",
+		"totp",
+		"authenticator",
+		"security code",
+		"6-digit",
+		"6 digit",
+	}
+	for _, kw := range totpKeywords {
+		if strings.Contains(question, kw) {
+			return true
+		}
+	}
+	return false
 }
 
 // connectViaJumpHosts establishes the SSH connection through a chain of

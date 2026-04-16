@@ -98,6 +98,7 @@ type SSHConfig struct {
 	AutoReconnect     bool              `json:"autoReconnect"`     // reconnect on unexpected disconnect
 	MaxReconnectTries int               `json:"maxReconnectTries"` // 0 = use default (5)
 	LoginScripts      []LoginScriptStep `json:"loginScripts"`     // expect-style auto-login sequence
+	TOTPSecret        string            `json:"totpSecret"`       // TOTP secret key for 2FA auto-fill (stored encrypted)
 	JumpHosts         []JumpHost        `json:"jumpHosts"`
 	PortForwards      []PortForward     `json:"portForwards"`
 	StartupCommand    string            `json:"startupCommand"`
