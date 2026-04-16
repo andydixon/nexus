@@ -17,6 +17,8 @@ export function ConnectSession(arg1:string):Promise<models.SessionInfo>;
 
 export function CreateProfile(arg1:models.Profile):Promise<models.Profile>;
 
+export function CreateSnippet(arg1:models.Snippet):Promise<models.Snippet>;
+
 export function DeleteKnownHost(arg1:string):Promise<void>;
 
 export function DeleteProfile(arg1:string):Promise<void>;
@@ -24,6 +26,8 @@ export function DeleteProfile(arg1:string):Promise<void>;
 export function DeleteProfileSecrets(arg1:string):Promise<void>;
 
 export function DeleteRecording(arg1:string):Promise<void>;
+
+export function DeleteSnippet(arg1:string):Promise<void>;
 
 export function DisconnectSession(arg1:string):Promise<void>;
 
@@ -76,6 +80,8 @@ export function ListProfilesByTag(arg1:string):Promise<Array<models.Profile>>;
 export function ListRecordings():Promise<Array<Record<string, any>>>;
 
 export function ListSessions():Promise<Array<models.SessionInfo>>;
+
+export function ListSnippets():Promise<Array<models.Snippet>>;
 
 export function LockSecretStore():Promise<void>;
 
@@ -138,6 +144,8 @@ export function TestConnection(arg1:string,arg2:number):Promise<Record<string, a
 export function UnlockSecretStore(arg1:string):Promise<void>;
 
 export function UpdateProfile(arg1:models.Profile):Promise<models.Profile>;
+
+export function UpdateSnippet(arg1:models.Snippet):Promise<models.Snippet>;
 
 export function WriteSession(arg1:string,arg2:string):Promise<void>;
 

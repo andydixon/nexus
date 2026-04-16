@@ -4,7 +4,7 @@
  * Initialises the application shell, loads profiles, and sets up event listeners.
  */
 
-const { State, Sidebar, TabManager, TerminalManager, ProfileEditor, RawViewer, Notifications, Settings, CommandPalette, SecretPrompt, SplitPaneManager, RecordingManager, ExportImportUI, SFTPBrowser, stateLabel } = window.NexusTerminal;
+const { State, Sidebar, TabManager, TerminalManager, ProfileEditor, RawViewer, Notifications, Settings, CommandPalette, SecretPrompt, SplitPaneManager, RecordingManager, ExportImportUI, SFTPBrowser, SnippetLibrary, stateLabel } = window.NexusTerminal;
 
 class App {
     constructor() {
@@ -22,6 +22,7 @@ class App {
         this.recordings = new RecordingManager(this);
         this.exportImport = new ExportImportUI(this);
         this.sftp = new SFTPBrowser(this);
+        this.snippets = new SnippetLibrary(this);
     }
 
     /**
@@ -389,6 +390,13 @@ class App {
             if (mod && e.shiftKey && e.key === 'B') {
                 e.preventDefault();
                 this.toggleBroadcast();
+                return;
+            }
+
+            // Ctrl/Cmd+Shift+S — open snippet library
+            if (mod && e.shiftKey && e.key === 'S') {
+                e.preventDefault();
+                this.snippets.open();
                 return;
             }
 

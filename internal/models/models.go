@@ -256,3 +256,15 @@ type AuditEntry struct {
 	SessionID string    `json:"sessionId,omitempty"`
 	Details   string    `json:"details"`
 }
+
+// Snippet stores a reusable command for the snippet library.
+type Snippet struct {
+	ID          string    `json:"id"`
+	Name        string    `json:"name"`
+	Command     string    `json:"command"`
+	Description string    `json:"description"`
+	Folder      string    `json:"folder"`
+	Tags        []string  `json:"tags"`
+	CreatedAt   time.Time `json:"createdAt"`
+	UpdatedAt   time.Time `json:"updatedAt"`
+}

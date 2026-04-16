@@ -709,3 +709,82 @@ func nullableJSON(ptr interface{}, data []byte) interface{} {
 	}
 	return string(data)
 }
+
+// ---------------------------------------------------------------------------
+// Snippet CRUD
+// ---------------------------------------------------------------------------
+
+// CreateSnippet inserts a new snippet into the database.
+func (s *Store) CreateSnippet(snippet *models.Snippet) error {
+	tagsJSON, _ := json.Marshal(snippet.Tags)
+	_, err := s.db.Exec(`INSERT INTO snippets (id, name, command, description, folder, tags, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		snippet.ID, snippet.Name, snippet.Command, snippet.Description,
+		snippet.Folder, string(tagsJSON),
+		snippet.CreatedAt.Format(time.RFC3339),
+		snippet.UpdatedAt.Format(time.RFC3339),
+	)
+	return err
+}
+
+// UpdateSnippet updates an existing snippet.
+func (s *Store) UpdateSnippet(snippet *models.Snippet) error {
+	tagsJSON, _ := json.Marshal(snippet.Tags)
+	_, err := s.db.Exec(`UPDATE snippets SET name=?, command=?, description=?, folder=?, tags=?, updated_at=? WHERE id=?`,
+		snippet.Name, snippet.Command, snippet.Description,
+		snippet.Folder, string(tagsJSON),
+		snippet.UpdatedAt.Format(time.RFC3339),
+		snippet.ID,
+	)
+	return err
+}
+
+// DeleteSnippet removes a snippet by ID.
+func (s *Store) DeleteSnippet(id string) error {
+	_, err := s.db.Exec(`DELETE FROM snippets WHERE id = ?`, id)
+	return err
+}
+
+// ListSnippets returns all snippets ordered by name.
+func (s *Store) ListSnippets() ([]*models.Snippet, error) {
+	rows, err := s.db.Query(`SELECT id, name, command, description, folder, tags, created_at, updated_at FROM snippets ORDER BY name ASC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var snippets []*models.Snippet
+	for rows.Next() {
+		sn := &models.Snippet{}
+		var tagsStr, createdAt, updatedAt string
+		if err := rows.Scan(&sn.ID, &sn.Name, &sn.Command, &sn.Description, &sn.Folder, &tagsStr, &createdAt, &updatedAt); err != nil {
+			return nil, err
+		}
+		_ = json.Unmarshal([]byte(tagsStr), &sn.Tags)
+		if sn.Tags == nil {
+			sn.Tags = []string{}
+		}
+		sn.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
+		sn.UpdatedAt, _ = time.Parse(time.RFC3339, updatedAt)
+		snippets = append(snippets, sn)
+	}
+	return snippets, rows.Err()
+}
+
+// GetSnippet returns a single snippet by ID.
+func (s *Store) GetSnippet(id string) (*models.Snippet, error) {
+	sn := &models.Snippet{}
+	var tagsStr, createdAt, updatedAt string
+	err := s.db.QueryRow(`SELECT id, name, command, description, folder, tags, created_at, updated_at FROM snippets WHERE id = ?`, id).
+		Scan(&sn.ID, &sn.Name, &sn.Command, &sn.Description, &sn.Folder, &tagsStr, &createdAt, &updatedAt)
+	if err != nil {
+		return nil, err
+	}
+	_ = json.Unmarshal([]byte(tagsStr), &sn.Tags)
+	if sn.Tags == nil {
+		sn.Tags = []string{}
+	}
+	sn.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
+	sn.UpdatedAt, _ = time.Parse(time.RFC3339, updatedAt)
+	return sn, nil
+}

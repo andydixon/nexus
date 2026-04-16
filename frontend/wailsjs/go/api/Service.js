@@ -30,6 +30,10 @@ export function CreateProfile(arg1) {
   return window['go']['api']['Service']['CreateProfile'](arg1);
 }
 
+export function CreateSnippet(arg1) {
+  return window['go']['api']['Service']['CreateSnippet'](arg1);
+}
+
 export function DeleteKnownHost(arg1) {
   return window['go']['api']['Service']['DeleteKnownHost'](arg1);
 }
@@ -44,6 +48,10 @@ export function DeleteProfileSecrets(arg1) {
 
 export function DeleteRecording(arg1) {
   return window['go']['api']['Service']['DeleteRecording'](arg1);
+}
+
+export function DeleteSnippet(arg1) {
+  return window['go']['api']['Service']['DeleteSnippet'](arg1);
 }
 
 export function DisconnectSession(arg1) {
@@ -148,6 +156,10 @@ export function ListRecordings() {
 
 export function ListSessions() {
   return window['go']['api']['Service']['ListSessions']();
+}
+
+export function ListSnippets() {
+  return window['go']['api']['Service']['ListSnippets']();
 }
 
 export function LockSecretStore() {
@@ -272,6 +284,10 @@ export function UnlockSecretStore(arg1) {
 
 export function UpdateProfile(arg1) {
   return window['go']['api']['Service']['UpdateProfile'](arg1);
+}
+
+export function UpdateSnippet(arg1) {
+  return window['go']['api']['Service']['UpdateSnippet'](arg1);
 }
 
 export function WriteSession(arg1, arg2) {

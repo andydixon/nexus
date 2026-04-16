@@ -393,6 +393,10 @@ class TerminalManager {
                 label: 'Find…',
                 action: () => this.app._openTerminalSearch(),
             },
+            {
+                label: 'Send Snippet…',
+                action: () => this.app.snippets.open(),
+            },
             { divider: true },
             {
                 label: 'Clear Terminal',

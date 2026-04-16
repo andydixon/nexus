@@ -575,6 +575,54 @@ func (s *Service) ListAuditEntries(limit int) ([]models.AuditEntry, error) {
 }
 
 // ---------------------------------------------------------------------------
+// Snippets (command library)
+// ---------------------------------------------------------------------------
+
+// ListSnippets returns all saved command snippets.
+func (s *Service) ListSnippets() ([]models.Snippet, error) {
+	snippets, err := s.store.ListSnippets()
+	if err != nil {
+		return nil, err
+	}
+	result := make([]models.Snippet, len(snippets))
+	for i, sn := range snippets {
+		result[i] = *sn
+	}
+	return result, nil
+}
+
+// CreateSnippet saves a new command snippet.
+func (s *Service) CreateSnippet(snippet models.Snippet) (models.Snippet, error) {
+	if snippet.ID == "" {
+		snippet.ID = uuid.New().String()
+	}
+	now := time.Now()
+	snippet.CreatedAt = now
+	snippet.UpdatedAt = now
+	if snippet.Tags == nil {
+		snippet.Tags = []string{}
+	}
+	if err := s.store.CreateSnippet(&snippet); err != nil {
+		return models.Snippet{}, fmt.Errorf("failed to create snippet: %w", err)
+	}
+	return snippet, nil
+}
+
+// UpdateSnippet updates an existing command snippet.
+func (s *Service) UpdateSnippet(snippet models.Snippet) (models.Snippet, error) {
+	snippet.UpdatedAt = time.Now()
+	if err := s.store.UpdateSnippet(&snippet); err != nil {
+		return models.Snippet{}, fmt.Errorf("failed to update snippet: %w", err)
+	}
+	return snippet, nil
+}
+
+// DeleteSnippet removes a command snippet by ID.
+func (s *Service) DeleteSnippet(id string) error {
+	return s.store.DeleteSnippet(id)
+}
+
+// ---------------------------------------------------------------------------
 // Utility
 // ---------------------------------------------------------------------------
 
