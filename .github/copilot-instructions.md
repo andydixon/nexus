@@ -22,16 +22,25 @@ Wails v2 desktop app: Go backend + HTML/CSS/JS frontend rendered in a native web
 **Go backend** (`internal/`):
 - `app/` — lifecycle bootstrap: opens SQLite, inits secret stores, wires everything together
 - `api/` — single `Service` struct bound to Wails; every public method is callable from JS as `window.go.api.Service.MethodName()`
-- `sessions/` — manages concurrent protocol sessions; owns SSH/Telnet/RAW/GitHub client lifecycles
+- `sessions/` — manages concurrent protocol sessions; owns SSH/Telnet/RAW/GitHub client lifecycles; handles auto-reconnect, login scripts, broadcast
 - `storage/` — SQLite repository (WAL mode) with embedded sequential migrations in `storage/migrations/`
 - `secrets/` — two-tier credential storage: OS keychain (preferred) → AES-256-GCM encrypted file vault (fallback)
 - `models/` — shared domain types and defaults; protocol configs are JSON-encoded in the DB
-- `sshclient/`, `telnetclient/`, `rawclient/`, `githubclient/` — protocol implementations
+- `sshclient/` — SSH client with agent, TOTP/2FA, and SOCKS5/HTTP proxy support
+- `telnetclient/`, `rawclient/`, `githubclient/` — protocol implementations
+- `sftpclient/` — SFTP file operations (browse, upload, download, rename, delete)
+- `sshconfig/` — OpenSSH `~/.ssh/config` parser and importer
+- `recording/` — asciicast v2 session recording and playback
+- `exportimport/` — encrypted profile bundles (.nexus format)
+- `updater/` — GitHub Releases update checker
+- `knownhosts/` — SSH host key management
+- `validation/` — profile and protocol validation
+- `audit/` — timestamped audit logging
 
 **Frontend** (`frontend/`):
 - Plain HTML/CSS/JS — no framework, no bundler, no ES modules
 - `index.html` is the app shell; loads CSS then JS in strict order
-- `src/js/` — 13 modules, each IIFE-wrapped, exporting to `window.NexusTerminal`
+- `src/js/` — 18 modules, each IIFE-wrapped, exporting to `window.NexusTerminal`
 - `src/css/` — modular stylesheets; `tokens.css` defines all design tokens
 - Vendor libs (xterm.js, addons) live in `src/js/lib/` and `src/css/lib/` — auto-copied, gitignored
 
@@ -69,9 +78,11 @@ The macOS webview silently blocks or breaks several standard web APIs. These con
 
 **Frontend patterns:**
 - Every JS file is IIFE-wrapped and exports to `window.NexusTerminal` namespace
-- Script load order matters (defined in `index.html`) — utils → state → notifications → sidebar → tabs → terminal → profiles → raw → github → settings → commands → secrets → app
+- Script load order matters (defined in `index.html`) — utils → state → notifications → sidebar → tabs → themes → terminal → profiles → raw → github → settings → commands → secrets → recordings → sftp → splitpane → snippets → app
 - DOM helpers: `createElement(tag, className, attrs)` from utils.js (supports `textContent`, `innerHTML`, `dataset`, `on*` event handlers)
 - Profile editor uses `_renderSection(title, fields)` pattern with `_field(type, name, label, value, opts)` helper for form generation
+- Login script editor uses `_renderLoginScriptSection(prefix, steps)` for expect-style step lists
+- TOTP section uses `_renderTOTPSection(profile)` with encrypted vault storage
 - `protocolColour()` returns CSS class names like `proto-ssh`; tab badges use `badge-ssh` class naming (different pattern)
 
 **CSS patterns:**

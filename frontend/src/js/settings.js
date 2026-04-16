@@ -372,6 +372,8 @@ class Settings {
                     <li>Optionally assign the connection to a <strong>group</strong> to keep your sidebar organised.</li>
                     <li>Click <strong>Save</strong>, then double-click the entry in the sidebar to connect.</li>
                 </ol>
+                <h4>Quick Connect</h4>
+                <p>Need to connect quickly without saving a profile? Press <kbd>⌘⇧Q</kbd> / <kbd>Ctrl+Shift+Q</kbd> to open the quick connect dialog. Choose SSH, Telnet, or RAW, enter the host and port, and you're connected immediately.</p>
                 <h4>Managing Connections</h4>
                 <p>Right-click any connection in the sidebar to <strong>edit</strong>, <strong>duplicate</strong>, or <strong>delete</strong> it. You can drag connections between groups, and use the search box to filter by name, host, or tag.</p>
             ` },
@@ -383,14 +385,29 @@ class Settings {
                     <li><strong>Keyboard-interactive</strong> — for servers that use challenge-response (e.g. two-factor prompts).</li>
                     <li><strong>SSH agent</strong> — tick "Use SSH Agent" to authenticate via your system's SSH agent (e.g. <code>ssh-agent</code> or 1Password).</li>
                 </ul>
+                <h4>TOTP / 2FA Auto-Fill</h4>
+                <p>If your server requires a time-based one-time password (TOTP) during login, you can store the TOTP secret in the profile editor under the <strong>TOTP / 2FA</strong> section. When connecting, Nexus Terminal will detect 2FA prompts (such as "Verification code" or "OTP") and automatically generate and submit a 6-digit code. Use the <strong>Test</strong> button to verify your secret generates valid codes before connecting.</p>
                 <h4>Jump Hosts (Bastions)</h4>
                 <p>If you need to reach a server through an intermediate host, add one or more jump hosts in the connection editor. Nexus Terminal will tunnel through each hop automatically.</p>
                 <h4>Port Forwarding</h4>
                 <p>You can set up <strong>local</strong>, <strong>remote</strong>, and <strong>dynamic</strong> (SOCKS proxy) port forwards in the connection editor. These start automatically when the session connects.</p>
+                <h4>Proxy Support</h4>
+                <p>If you need to connect through a proxy, open the <strong>Proxy</strong> section in the profile editor. Nexus Terminal supports <strong>SOCKS5</strong> and <strong>HTTP CONNECT</strong> proxies, with optional username/password authentication. The proxy is used to reach the SSH server (or the first jump host if jump hosts are configured).</p>
                 <h4>SFTP File Browser</h4>
                 <p>Once connected to an SSH server, click the <strong>📁</strong> icon on the tab to open the SFTP file browser. You can browse directories, upload, download, rename, and delete files from a side panel.</p>
                 <h4>SSH Agent Forwarding</h4>
                 <p>Tick "Agent Forwarding" in the SSH settings to forward your local SSH agent to the remote server. This lets you use your local keys when connecting onward from that server.</p>
+                <h4>Auto-Login Scripts</h4>
+                <p>Define expect-style login scripts to automate interactions after connecting. In the <strong>Login Script</strong> section of the profile editor, add a sequence of <strong>Wait for</strong> (match text from the server) and <strong>Send</strong> (send text + newline) steps. For example:</p>
+                <ol>
+                    <li>Wait for: <code>login:</code></li>
+                    <li>Send: <code>admin</code></li>
+                    <li>Wait for: <code>Password:</code></li>
+                    <li>Send: <code>mysecretpassword</code></li>
+                </ol>
+                <p>Each wait step has a configurable timeout (default 10 seconds). Steps execute in order after the connection is established.</p>
+                <h4>Auto-Reconnect</h4>
+                <p>Enable <strong>Auto-Reconnect</strong> in the Advanced section to automatically reconnect when the connection drops unexpectedly. Reconnection uses exponential backoff (1s, 2s, 4s, 8s... up to 30s). You can configure the maximum number of attempts (default 5).</p>
             ` },
             { id: 'telnet', title: 'Telnet Connections', content: `
                 <p>Telnet is an older, unencrypted protocol still used for network equipment, legacy systems, and some fun internet services.</p>
@@ -399,6 +416,8 @@ class Settings {
                     <li><strong>Character encoding</strong> — choose UTF-8, ASCII, or Latin-1 for the connection.</li>
                     <li><strong>Local echo</strong> — enable this if the remote host does not echo back what you type.</li>
                     <li><strong>Line mode</strong> — send data line-by-line (press Enter to send) rather than character-by-character.</li>
+                    <li><strong>Auto-login scripts</strong> — same expect-style send/wait sequences as SSH (see the Login Script section).</li>
+                    <li><strong>Auto-reconnect</strong> — automatically reconnect with exponential backoff when the connection drops.</li>
                 </ul>
                 <p><em>Note:</em> Telnet sends everything in plain text. Avoid using it for anything sensitive over an untrusted network.</p>
             ` },
@@ -439,8 +458,38 @@ class Settings {
                     <li><kbd>⌘⇧E</kbd> / <kbd>Ctrl+Shift+E</kbd> — split horizontally (top and bottom).</li>
                 </ul>
                 <p>Drag the divider between panes to resize them.</p>
+                <h4>Broadcast Input</h4>
+                <p>Press <kbd>⌘⇧B</kbd> / <kbd>Ctrl+Shift+B</kbd> to toggle <strong>broadcast mode</strong>. When active, everything you type is sent to <strong>all connected sessions</strong> simultaneously — perfect for running the same command across multiple servers. The broadcast button in the tab bar pulses red to remind you it's active.</p>
                 <h4>Session Recording</h4>
                 <p>Press <kbd>⌘⇧R</kbd> / <kbd>Ctrl+Shift+R</kbd> to start recording a session. A red dot will appear on the tab. Press the same shortcut again to stop. Browse and replay recordings from the <strong>⏺</strong> button in the sidebar.</p>
+                <h4>Right-Click Context Menu</h4>
+                <p>Right-click in the terminal to access a context menu with:</p>
+                <ul>
+                    <li><strong>Copy</strong> — copy selected text to the clipboard</li>
+                    <li><strong>Paste</strong> — paste from the clipboard into the terminal</li>
+                    <li><strong>Select All</strong> — select all terminal content</li>
+                    <li><strong>Find</strong> — open the terminal search overlay</li>
+                    <li><strong>Send Snippet</strong> — quickly send a saved command from the snippet library</li>
+                    <li><strong>Clear</strong> / <strong>Reset</strong> — clear the terminal buffer</li>
+                </ul>
+            ` },
+            { id: 'power', title: 'Power Features', content: `
+                <h4>Snippet Library</h4>
+                <p>Press <kbd>⌘⇧S</kbd> / <kbd>Ctrl+Shift+S</kbd> to open the <strong>snippet library</strong>. Save frequently-used commands with a name, description, and optional folder and tags. Click <strong>Send to Session</strong> to inject a command into the active terminal. You can also access snippets from the right-click context menu.</p>
+                <h4>Terminal Search</h4>
+                <p>Press <kbd>⌘F</kbd> / <kbd>Ctrl+F</kbd> to open the search overlay on the active terminal. Features include:</p>
+                <ul>
+                    <li><strong>Aa</strong> button — toggle case-sensitive matching</li>
+                    <li><strong>.*</strong> button — toggle regular expression mode</li>
+                    <li>Match count indicator showing current/total matches</li>
+                    <li>Navigate matches with the up/down arrows or <kbd>Enter</kbd> / <kbd>Shift+Enter</kbd></li>
+                </ul>
+                <h4>Quick Connect</h4>
+                <p>Press <kbd>⌘⇧Q</kbd> / <kbd>Ctrl+Shift+Q</kbd> to open a lightweight connect dialog. Choose SSH, Telnet, or RAW; enter the host and port; and connect immediately without creating a saved profile.</p>
+                <h4>Auto-Login Scripts</h4>
+                <p>For SSH and Telnet connections, you can define expect-style login scripts — a sequence of "wait for text" and "send text" steps that execute automatically after connecting. Configure them in the <strong>Login Script</strong> section of the profile editor.</p>
+                <h4>Auto-Reconnect</h4>
+                <p>Enable auto-reconnect in a profile's settings to automatically reconnect when a connection drops. Uses exponential backoff with a configurable maximum number of attempts.</p>
             ` },
             { id: 'security', title: 'Security & Credentials', content: `
                 <h4>How Your Passwords Are Stored</h4>
@@ -451,6 +500,8 @@ class Settings {
                 </ol>
                 <h4>Encryption Details</h4>
                 <p>The vault uses <strong>Argon2id</strong> to derive the encryption key from your master password (128 MiB memory, making brute-force attacks very expensive). Each secret is individually encrypted and never stored in plain text.</p>
+                <h4>TOTP / 2FA Secrets</h4>
+                <p>TOTP secrets for SSH two-factor authentication are stored alongside your other credentials — encrypted in the OS keychain or the file vault. They are never saved in the profile database in plain text.</p>
                 <h4>Known Hosts</h4>
                 <p>When you connect to an SSH server for the first time, Nexus Terminal records the server's fingerprint. If the fingerprint changes on a subsequent connection, you'll be warned — this protects against man-in-the-middle attacks.</p>
                 <p>You can manage known hosts and change the verification policy in <strong>Settings → Known Hosts</strong>.</p>
@@ -469,9 +520,12 @@ class Settings {
                         <tr><td><kbd>⌘1</kbd>–<kbd>⌘9</kbd></td><td>Switch to tab by number</td></tr>
                         <tr><td><kbd>⌘,</kbd></td><td>Open Settings</td></tr>
                         <tr><td><kbd>⌘F</kbd></td><td>Search in terminal</td></tr>
+                        <tr><td><kbd>⌘⇧B</kbd></td><td>Toggle broadcast input mode</td></tr>
                         <tr><td><kbd>⌘⇧D</kbd></td><td>Split pane vertically</td></tr>
                         <tr><td><kbd>⌘⇧E</kbd></td><td>Split pane horizontally</td></tr>
+                        <tr><td><kbd>⌘⇧Q</kbd></td><td>Quick connect (no saved profile)</td></tr>
                         <tr><td><kbd>⌘⇧R</kbd></td><td>Toggle session recording</td></tr>
+                        <tr><td><kbd>⌘⇧S</kbd></td><td>Open snippet library</td></tr>
                         <tr><td><kbd>F11</kbd></td><td>Toggle fullscreen (Windows/Linux)</td></tr>
                     </tbody>
                 </table>
@@ -491,6 +545,31 @@ class Settings {
                     <li>Make sure the server is reachable from your machine. Try <code>ping hostname</code> from another terminal.</li>
                     <li>If using SSH keys, check that the key file path is correct and that the file permissions are not too open (should be <code>600</code> or <code>400</code>).</li>
                     <li>If you're behind a firewall or VPN, ensure the relevant port is allowed through.</li>
+                </ul>
+                <h4>SSH connection fails through a proxy</h4>
+                <ul>
+                    <li>Check the proxy host, port, and type (SOCKS5 or HTTP CONNECT) are correct in the profile's <strong>Proxy</strong> section.</li>
+                    <li>If the proxy requires authentication, make sure the username and password are filled in.</li>
+                    <li>SOCKS5 defaults to port 1080; HTTP CONNECT defaults to port 8080.</li>
+                    <li>Some proxies may block SSH traffic — check with your network administrator.</li>
+                </ul>
+                <h4>TOTP/2FA code is rejected</h4>
+                <ul>
+                    <li>Ensure the TOTP secret is correct (base32-encoded, as shown during authenticator app setup).</li>
+                    <li>Check that your system clock is accurate — TOTP codes are only valid for 30-second windows.</li>
+                    <li>Use the <strong>Test</strong> button in the profile's TOTP section to verify the secret generates valid codes.</li>
+                </ul>
+                <h4>Login script times out</h4>
+                <ul>
+                    <li>Each "wait" step has a configurable timeout (default 10 seconds). Increase it in the profile editor if the server takes longer.</li>
+                    <li>Check that the wait pattern matches exactly — it's a plain text substring match, not a regular expression.</li>
+                    <li>Make sure the server actually sends the expected text. Some servers may use different prompts depending on locale or configuration.</li>
+                </ul>
+                <h4>Auto-reconnect keeps failing</h4>
+                <ul>
+                    <li>Auto-reconnect only works after a successful initial connection.</li>
+                    <li>If the server is genuinely unreachable, attempts will exhaust after the configured maximum (default 5).</li>
+                    <li>Check the reconnection settings in the profile's Advanced section.</li>
                 </ul>
                 <h4>The terminal looks garbled or the wrong size</h4>
                 <ul>
@@ -523,6 +602,8 @@ class Settings {
                 <p>Connect via <strong>SSH</strong> to <code>ssh.github.com</code> on port <strong>443</strong> (or <code>github.com</code> on port <strong>22</strong>) with your GitHub username. GitHub will greet you by name if your key is set up correctly — a quick way to verify your SSH configuration.</p>
                 <h4>📡 RAW TCP Experiments</h4>
                 <p>Create a <strong>RAW TCP</strong> connection to any HTTP server on port <strong>80</strong>, then type <code>GET / HTTP/1.0</code> followed by two blank lines. You'll see the raw HTTP response — a great way to understand how the web works under the hood.</p>
+                <h4>📢 Broadcast Mode Fun</h4>
+                <p>Open two or more sessions (e.g. to different servers) and press <kbd>⌘⇧B</kbd> / <kbd>Ctrl+Shift+B</kbd> to turn on broadcast mode. Everything you type goes to all sessions at once — try running <code>hostname</code> and watch them all respond with different names!</p>
             ` },
         ];
 
