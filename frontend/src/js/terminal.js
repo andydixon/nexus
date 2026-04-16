@@ -88,6 +88,42 @@ class TerminalManager {
             }
         });
 
+        // Clipboard: copy selection on Cmd/Ctrl+C, paste on Cmd/Ctrl+V
+        term.attachCustomKeyEventHandler((e) => {
+            const mod = e.ctrlKey || e.metaKey;
+
+            // Cmd/Ctrl+C — copy selected text (let xterm handle it normally if no selection)
+            if (mod && e.key === 'c' && e.type === 'keydown') {
+                const selection = term.getSelection();
+                if (selection) {
+                    if (window.runtime && window.runtime.ClipboardSetText) {
+                        window.runtime.ClipboardSetText(selection);
+                    } else {
+                        navigator.clipboard.writeText(selection).catch(function() {});
+                    }
+                    return false; // Prevent xterm from sending Ctrl+C
+                }
+                // No selection — let Ctrl+C pass through as SIGINT
+                return true;
+            }
+
+            // Cmd/Ctrl+V — paste from clipboard
+            if (mod && e.key === 'v' && e.type === 'keydown') {
+                if (window.runtime && window.runtime.ClipboardGetText) {
+                    window.runtime.ClipboardGetText().then(function(text) {
+                        if (text) term.paste(text);
+                    }).catch(function() {});
+                } else {
+                    navigator.clipboard.readText().then(function(text) {
+                        if (text) term.paste(text);
+                    }).catch(function() {});
+                }
+                return false;
+            }
+
+            return true;
+        });
+
         // Notify backend when terminal dimensions change
         term.onResize(({ cols, rows }) => {
             try {
