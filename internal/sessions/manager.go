@@ -27,15 +27,17 @@ import (
 
 // Session wraps a protocol client with metadata and state.
 type Session struct {
-	Info         models.SessionInfo
-	sshClient    *sshclient.Client
-	telnetClient *telnetclient.Client
-	rawClient    *rawclient.Client
-	githubClient *githubclient.Client
-	githubCancel context.CancelFunc // stops the auto-refresh goroutine
-	sftpClient   *sftpclient.Client // SFTP subsystem, nil until requested
-	profile      *models.Profile
-	recorder     *recording.Recorder // active recording, nil if not recording
+	Info           models.SessionInfo
+	sshClient      *sshclient.Client
+	telnetClient   *telnetclient.Client
+	rawClient      *rawclient.Client
+	githubClient   *githubclient.Client
+	githubCancel   context.CancelFunc // stops the auto-refresh goroutine
+	sftpClient     *sftpclient.Client // SFTP subsystem, nil until requested
+	profile        *models.Profile
+	recorder       *recording.Recorder // active recording, nil if not recording
+	reconnectCount int                 // number of reconnection attempts so far
+	cancelReconn   context.CancelFunc  // cancels an in-progress reconnect backoff
 }
 
 // Manager handles the lifecycle of all active sessions.
@@ -1119,6 +1121,12 @@ func (m *Manager) buildSecretCallback(profileID string, secretType string, mode 
 
 // closeSession shuts down the protocol client for a session.
 func (m *Manager) closeSession(sess *Session) {
+	// Cancel any in-progress reconnect backoff.
+	if sess.cancelReconn != nil {
+		sess.cancelReconn()
+		sess.cancelReconn = nil
+	}
+
 	// Stop any active recording.
 	if sess.recorder != nil {
 		sess.recorder.Close()
@@ -1160,6 +1168,12 @@ func (m *Manager) handleSessionClosed(sessionID string) {
 
 	m.auditLog.LogDisconnect(sessionID)
 
+	// Check whether auto-reconnect is enabled for this session.
+	if ok && m.shouldAutoReconnect(sess) {
+		m.scheduleReconnect(sess, sessionID)
+		return
+	}
+
 	m.emitEvent("session:closed", map[string]interface{}{
 		"sessionID": sessionID,
 	})
@@ -1167,6 +1181,231 @@ func (m *Manager) handleSessionClosed(sessionID string) {
 		"sessionID": sessionID,
 		"state":     string(models.SessionDisconnected),
 	})
+}
+
+// shouldAutoReconnect checks whether a session is configured for automatic reconnection.
+func (m *Manager) shouldAutoReconnect(sess *Session) bool {
+	if sess.profile == nil {
+		return false
+	}
+	switch sess.profile.Protocol {
+	case models.ProtocolSSH:
+		if sess.profile.SSH != nil {
+			return sess.profile.SSH.AutoReconnect
+		}
+	case models.ProtocolTelnet:
+		if sess.profile.Telnet != nil {
+			return sess.profile.Telnet.AutoReconnect
+		}
+	case models.ProtocolRAW:
+		if sess.profile.RAW != nil {
+			return sess.profile.RAW.AutoReconnect
+		}
+	}
+	return false
+}
+
+// maxReconnectAttempts returns the configured (or default) max retry count.
+func (m *Manager) maxReconnectAttempts(sess *Session) int {
+	maxTries := 5
+	switch sess.profile.Protocol {
+	case models.ProtocolSSH:
+		if sess.profile.SSH != nil && sess.profile.SSH.MaxReconnectTries > 0 {
+			maxTries = sess.profile.SSH.MaxReconnectTries
+		}
+	case models.ProtocolTelnet:
+		if sess.profile.Telnet != nil && sess.profile.Telnet.MaxReconnectTries > 0 {
+			maxTries = sess.profile.Telnet.MaxReconnectTries
+		}
+	}
+	return maxTries
+}
+
+// scheduleReconnect initiates an exponential-backoff reconnection loop for a session.
+func (m *Manager) scheduleReconnect(sess *Session, sessionID string) {
+	maxTries := m.maxReconnectAttempts(sess)
+
+	m.mu.Lock()
+	sess.reconnectCount++
+	attempt := sess.reconnectCount
+	if attempt > maxTries {
+		// Give up — too many attempts.
+		sess.Info.State = models.SessionDisconnected
+		m.mu.Unlock()
+
+		m.emitEvent("session:closed", map[string]interface{}{
+			"sessionID": sessionID,
+		})
+		m.emitEvent("session:state", map[string]interface{}{
+			"sessionID": sessionID,
+			"state":     string(models.SessionDisconnected),
+			"error":     "auto-reconnect failed after maximum attempts",
+		})
+		return
+	}
+
+	sess.Info.State = models.SessionReconnecting
+	sess.Info.Error = ""
+
+	// Cancel any previous reconnect timer.
+	if sess.cancelReconn != nil {
+		sess.cancelReconn()
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	sess.cancelReconn = cancel
+	m.mu.Unlock()
+
+	// Exponential backoff: 1s, 2s, 4s, 8s, 16s, capped at 30s.
+	delaySec := 1 << (attempt - 1) // 2^(attempt-1)
+	if delaySec > 30 {
+		delaySec = 30
+	}
+
+	m.emitEvent("session:state", map[string]interface{}{
+		"sessionID": sessionID,
+		"state":     string(models.SessionReconnecting),
+		"attempt":   attempt,
+		"maxRetries": maxTries,
+		"delaySec":  delaySec,
+	})
+
+	go func() {
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(time.Duration(delaySec) * time.Second):
+		}
+
+		// Clear old clients before reconnecting.
+		m.mu.Lock()
+		sess.sshClient = nil
+		sess.telnetClient = nil
+		sess.rawClient = nil
+		sess.sftpClient = nil
+		sess.Info.State = models.SessionConnecting
+		m.mu.Unlock()
+
+		m.emitEvent("session:state", map[string]interface{}{
+			"sessionID": sessionID,
+			"state":     string(models.SessionConnecting),
+		})
+
+		var err error
+		switch sess.profile.Protocol {
+		case models.ProtocolSSH:
+			err = m.connectSSH(sess, m.buildInteractiveSecretCallback(sessionID))
+		case models.ProtocolTelnet:
+			err = m.connectTelnet(sess)
+		case models.ProtocolRAW:
+			err = m.connectRAW(sess)
+		default:
+			err = fmt.Errorf("unsupported protocol for reconnect: %s", sess.profile.Protocol)
+		}
+
+		if err != nil {
+			m.mu.Lock()
+			sess.Info.State = models.SessionError
+			sess.Info.Error = err.Error()
+			m.mu.Unlock()
+
+			m.emitEvent("session:state", map[string]interface{}{
+				"sessionID": sessionID,
+				"state":     string(models.SessionError),
+				"error":     err.Error(),
+			})
+
+			// Schedule the next attempt.
+			m.scheduleReconnect(sess, sessionID)
+			return
+		}
+
+		// Success — reset the counter.
+		m.mu.Lock()
+		sess.reconnectCount = 0
+		sess.Info.State = models.SessionConnected
+		sess.Info.ConnectedAt = time.Now()
+		m.mu.Unlock()
+
+		m.emitEvent("session:state", map[string]interface{}{
+			"sessionID": sessionID,
+			"state":     string(models.SessionConnected),
+		})
+	}()
+}
+
+// buildInteractiveSecretCallback creates a getSecret callback that prompts
+// the user via Wails events. Used during auto-reconnect flows where the
+// original callback is no longer available.
+func (m *Manager) buildInteractiveSecretCallback(sessionID string) func(prompt string) (string, error) {
+	return func(prompt string) (string, error) {
+		// Use the same event-based flow as the initial connection.
+		requestID := uuid.New().String()
+
+		ch := make(chan string, 1)
+		m.mu.Lock()
+		// Store a temporary secret channel keyed by requestID.
+		if m.ctx != nil {
+			wailsRuntime.EventsEmit(m.ctx, "session:secret:prompt", map[string]interface{}{
+				"requestID": requestID,
+				"sessionID": sessionID,
+				"title":     "Reconnection Credentials",
+				"message":   prompt,
+			})
+		}
+		m.mu.Unlock()
+
+		// Wait for the response with a timeout.
+		var response string
+		cancel := make(chan struct{})
+
+		if m.ctx != nil {
+			wailsRuntime.EventsOn(m.ctx, "session:secret:response", func(optionalData ...interface{}) {
+				if len(optionalData) == 0 {
+					return
+				}
+				data, ok := optionalData[0].(map[string]interface{})
+				if !ok {
+					return
+				}
+				if rid, _ := data["requestID"].(string); rid == requestID {
+					val, _ := data["value"].(string)
+					select {
+					case ch <- val:
+					default:
+					}
+				}
+			})
+		}
+
+		select {
+		case response = <-ch:
+		case <-time.After(60 * time.Second):
+			close(cancel)
+			return "", fmt.Errorf("credential prompt timed out during reconnect")
+		}
+
+		return response, nil
+	}
+}
+
+// CancelReconnect cancels any in-progress auto-reconnect for a session.
+func (m *Manager) CancelReconnect(sessionID string) {
+	m.mu.Lock()
+	sess, ok := m.sessions[sessionID]
+	if ok && sess.cancelReconn != nil {
+		sess.cancelReconn()
+		sess.cancelReconn = nil
+		sess.reconnectCount = 0
+		sess.Info.State = models.SessionDisconnected
+	}
+	m.mu.Unlock()
+
+	if ok {
+		m.emitEvent("session:state", map[string]interface{}{
+			"sessionID": sessionID,
+			"state":     string(models.SessionDisconnected),
+		})
+	}
 }
 
 // createTabName generates a default tab name from the profile's display name

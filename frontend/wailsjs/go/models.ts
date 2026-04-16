@@ -284,6 +284,8 @@ export namespace models {
 	    encoding: string;
 	    negotiationDebug: boolean;
 	    lineMode: boolean;
+	    autoReconnect: boolean;
+	    maxReconnectTries: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new TelnetConfig(source);
@@ -297,6 +299,8 @@ export namespace models {
 	        this.encoding = source["encoding"];
 	        this.negotiationDebug = source["negotiationDebug"];
 	        this.lineMode = source["lineMode"];
+	        this.autoReconnect = source["autoReconnect"];
+	        this.maxReconnectTries = source["maxReconnectTries"];
 	    }
 	}
 	export class SSHConfig {
@@ -311,6 +315,8 @@ export namespace models {
 	    compression: boolean;
 	    agentAuth: boolean;
 	    agentForwarding: boolean;
+	    autoReconnect: boolean;
+	    maxReconnectTries: number;
 	    jumpHosts: JumpHost[];
 	    portForwards: PortForward[];
 	    startupCommand: string;
@@ -333,6 +339,8 @@ export namespace models {
 	        this.compression = source["compression"];
 	        this.agentAuth = source["agentAuth"];
 	        this.agentForwarding = source["agentForwarding"];
+	        this.autoReconnect = source["autoReconnect"];
+	        this.maxReconnectTries = source["maxReconnectTries"];
 	        this.jumpHosts = this.convertValues(source["jumpHosts"], JumpHost);
 	        this.portForwards = this.convertValues(source["portForwards"], PortForward);
 	        this.startupCommand = source["startupCommand"];

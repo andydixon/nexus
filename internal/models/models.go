@@ -95,6 +95,8 @@ type SSHConfig struct {
 	Compression       bool              `json:"compression"`
 	AgentAuth         bool              `json:"agentAuth"`         // use SSH agent for authentication
 	AgentForwarding   bool              `json:"agentForwarding"`   // forward agent to remote host
+	AutoReconnect     bool              `json:"autoReconnect"`     // reconnect on unexpected disconnect
+	MaxReconnectTries int               `json:"maxReconnectTries"` // 0 = use default (5)
 	JumpHosts         []JumpHost        `json:"jumpHosts"`
 	PortForwards      []PortForward     `json:"portForwards"`
 	StartupCommand    string            `json:"startupCommand"`
@@ -133,12 +135,14 @@ type PortForward struct {
 
 // TelnetConfig holds Telnet-specific settings for a connection profile.
 type TelnetConfig struct {
-	LocalEcho        bool       `json:"localEcho"`
-	LineEnding       LineEnding `json:"lineEnding"`
-	TerminalType     string     `json:"terminalType"`
-	Encoding         string     `json:"encoding"`
-	NegotiationDebug bool       `json:"negotiationDebug"`
-	LineMode         bool       `json:"lineMode"`
+	LocalEcho         bool       `json:"localEcho"`
+	LineEnding        LineEnding `json:"lineEnding"`
+	TerminalType      string     `json:"terminalType"`
+	Encoding          string     `json:"encoding"`
+	NegotiationDebug  bool       `json:"negotiationDebug"`
+	LineMode          bool       `json:"lineMode"`
+	AutoReconnect     bool       `json:"autoReconnect"`     // reconnect on unexpected disconnect
+	MaxReconnectTries int        `json:"maxReconnectTries"` // 0 = use default (5)
 }
 
 // RAWConfig holds RAW TCP-specific settings for a connection profile.
@@ -196,6 +200,7 @@ const (
 	SessionConnecting   SessionState = "connecting"
 	SessionConnected    SessionState = "connected"
 	SessionDisconnected SessionState = "disconnected"
+	SessionReconnecting SessionState = "reconnecting"
 	SessionError        SessionState = "error"
 )
 

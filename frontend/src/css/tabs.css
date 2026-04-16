@@ -125,8 +125,16 @@
 
 .tab-status.is-connected    { background: var(--success); }
 .tab-status.is-connecting   { background: var(--warning); animation: pulse-dot 1.2s ease infinite; }
+.tab-status.is-reconnecting { background: var(--warning); animation: pulse-dot 0.8s ease infinite; }
 .tab-status.is-error        { background: var(--error); }
 .tab-status.is-disconnected { background: var(--text-tertiary); }
+
+/* Also match the status-* pattern used by updateSessionState */
+.tab-status.status-connected    { background: var(--success); }
+.tab-status.status-connecting   { background: var(--warning); animation: pulse-dot 1.2s ease infinite; }
+.tab-status.status-reconnecting { background: var(--warning); animation: pulse-dot 0.8s ease infinite; }
+.tab-status.status-error        { background: var(--error); }
+.tab-status.status-disconnected { background: var(--text-tertiary); }
 
 /* -----------------------------------------------------------------------
    SFTP toggle button — revealed on hover (SSH tabs only)

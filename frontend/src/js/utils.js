@@ -251,6 +251,7 @@ function stateLabel(state) {
         case 'connecting': return 'Connecting';
         case 'connected': return 'Connected';
         case 'disconnected': return 'Disconnected';
+        case 'reconnecting': return 'Reconnecting';
         case 'error': return 'Error';
         default: return state || 'Unknown';
     }

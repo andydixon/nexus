@@ -3,6 +3,8 @@
 import {models} from '../models';
 import {context} from '../models';
 
+export function CancelReconnect(arg1:string):Promise<void>;
+
 export function CheckForUpdates():Promise<Record<string, any>>;
 
 export function ClearSessionHistory(arg1:string):Promise<void>;

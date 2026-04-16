@@ -276,6 +276,11 @@ func (s *Service) ReconnectSession(sessionID string) error {
 	return s.sessions.Reconnect(sessionID, s.promptSecret)
 }
 
+// CancelReconnect cancels an in-progress auto-reconnect for a session.
+func (s *Service) CancelReconnect(sessionID string) {
+	s.sessions.CancelReconnect(sessionID)
+}
+
 // WriteSession writes base64-encoded data to a session.
 func (s *Service) WriteSession(sessionID string, data string) error {
 	decoded, err := base64.StdEncoding.DecodeString(data)

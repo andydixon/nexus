@@ -406,6 +406,10 @@ class ProfileEditor {
             this._field('number', 'ssh.keepaliveInterval', 'Keepalive Interval (s)', ssh.keepaliveInterval, { min: 0 }),
             this._field('number', 'ssh.keepaliveCountMax', 'Max Missed Keepalives', ssh.keepaliveCountMax, { min: 0 }),
             this._field('toggle', 'ssh.compression', 'Compression', ssh.compression),
+            this._field('toggle', 'ssh.autoReconnect', 'Auto-Reconnect', ssh.autoReconnect, {
+                help: 'Automatically reconnect with exponential backoff when the connection drops',
+            }),
+            this._field('number', 'ssh.maxReconnectTries', 'Max Reconnect Attempts', ssh.maxReconnectTries || 5, { min: 1, max: 20 }),
         ], true));
 
         return sections;
@@ -445,6 +449,13 @@ class ProfileEditor {
 
         sections.push(this._renderSection('Negotiation', [
             this._field('toggle', 'telnet.negotiationDebug', 'Debug Negotiation', tel.negotiationDebug),
+        ], true));
+
+        sections.push(this._renderSection('Reconnection', [
+            this._field('toggle', 'telnet.autoReconnect', 'Auto-Reconnect', tel.autoReconnect, {
+                help: 'Automatically reconnect with exponential backoff when the connection drops',
+            }),
+            this._field('number', 'telnet.maxReconnectTries', 'Max Reconnect Attempts', tel.maxReconnectTries || 5, { min: 1, max: 20 }),
         ], true));
 
         return sections;
@@ -908,6 +919,8 @@ class ProfileEditor {
             p.ssh.compression = val('ssh.compression') || false;
             p.ssh.agentAuth = val('ssh.agentAuth') || false;
             p.ssh.agentForwarding = val('ssh.agentForwarding') || false;
+            p.ssh.autoReconnect = val('ssh.autoReconnect') || false;
+            p.ssh.maxReconnectTries = val('ssh.maxReconnectTries') ?? 5;
             p.ssh.startupCommand = val('ssh.startupCommand') || '';
 
             const authStr = val('ssh.authMethods');
@@ -970,6 +983,8 @@ class ProfileEditor {
             p.telnet.encoding = val('telnet.encoding') || 'utf-8';
             p.telnet.lineEnding = val('telnet.lineEnding') || 'crlf';
             p.telnet.negotiationDebug = val('telnet.negotiationDebug') || false;
+            p.telnet.autoReconnect = val('telnet.autoReconnect') || false;
+            p.telnet.maxReconnectTries = val('telnet.maxReconnectTries') ?? 5;
         }
 
         // RAW-specific

@@ -134,10 +134,21 @@ class App {
             this.terminals.handleData(payload.sessionID, payload.data);
         });
 
-        // Session state transitions (connecting → connected → disconnected)
+        // Session state transitions (connecting → connected → reconnecting → disconnected)
         window.runtime.EventsOn('session:state', (payload) => {
             this.tabs.updateSessionState(payload.sessionID, payload.state, payload.error);
             this.updateStatusBar();
+
+            // Show reconnecting notification
+            if (payload.state === 'reconnecting') {
+                const attempt = payload.attempt || 1;
+                const maxRetries = payload.maxRetries || 5;
+                const delaySec = payload.delaySec || 1;
+                this.notifications.info(
+                    `Reconnecting (attempt ${attempt}/${maxRetries}) in ${delaySec}s…`
+                );
+            }
+
             // Once connected, ensure the backend PTY has the correct dimensions.
             // The initial fit happens before the SSH handshake completes, so the
             // onResize callback fires when the backend isn't ready. By the time
