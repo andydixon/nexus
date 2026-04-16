@@ -510,29 +510,119 @@ class App {
     }
 
     /**
-     * Prompts the user for a host/port and opens a quick connection.
+     * Opens a quick connect dialog for ad-hoc connections without saving a profile.
      */
     async quickConnect() {
-        const input = await this._inputPrompt('Quick Connect', 'Enter host[:port]', 'e.g. 192.168.1.1:22');
-        if (!input || !input.trim()) return;
+        const createElement = window.NexusTerminal.createElement;
+        const result = await new Promise((resolve) => {
+            const backdrop = createElement('div', 'modal-backdrop');
+            const modal = createElement('div', 'modal modal-sm');
+            modal.innerHTML = `
+                <div class="modal-header">
+                    <h3 class="modal-title">Quick Connect</h3>
+                    <button class="btn btn-icon btn-xs modal-close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label class="form-label">Protocol</label>
+                        <select class="form-input qc-protocol">
+                            <option value="ssh">SSH</option>
+                            <option value="telnet">Telnet</option>
+                            <option value="raw">RAW TCP</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Host</label>
+                        <input class="form-input qc-host" type="text" placeholder="e.g. 192.168.1.1" autofocus />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Port</label>
+                        <input class="form-input qc-port" type="number" value="22" min="1" max="65535" />
+                    </div>
+                    <div class="form-group qc-username-group">
+                        <label class="form-label">Username</label>
+                        <input class="form-input qc-username" type="text" placeholder="root" />
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-sm qc-cancel">Cancel</button>
+                    <button class="btn btn-sm btn-primary qc-connect">Connect</button>
+                </div>
+            `;
+            backdrop.appendChild(modal);
+            document.body.appendChild(backdrop);
+            requestAnimationFrame(() => {
+                backdrop.classList.add('is-visible');
+                modal.classList.add('is-visible');
+            });
 
-        const parts = input.trim().split(':');
-        const host = parts[0];
-        const port = parts[1] ? parseInt(parts[1], 10) : 22;
-        const protocol = this.state.preferences.defaultProtocol || 'ssh';
+            const protocolSelect = modal.querySelector('.qc-protocol');
+            const portInput = modal.querySelector('.qc-port');
+            const usernameGroup = modal.querySelector('.qc-username-group');
+            const hostInput = modal.querySelector('.qc-host');
+
+            // Update port default and username visibility when protocol changes
+            protocolSelect.addEventListener('change', () => {
+                const proto = protocolSelect.value;
+                const defaultPorts = { ssh: 22, telnet: 23, raw: 23 };
+                portInput.value = defaultPorts[proto] || 22;
+                usernameGroup.style.display = proto === 'ssh' ? '' : 'none';
+            });
+
+            const close = (value) => {
+                backdrop.classList.remove('is-visible');
+                modal.classList.remove('is-visible');
+                setTimeout(() => backdrop.remove(), 200);
+                resolve(value);
+            };
+
+            modal.querySelector('.modal-close').addEventListener('click', () => close(null));
+            modal.querySelector('.qc-cancel').addEventListener('click', () => close(null));
+            modal.querySelector('.qc-connect').addEventListener('click', () => {
+                const host = hostInput.value.trim();
+                if (!host) {
+                    hostInput.focus();
+                    return;
+                }
+                close({
+                    protocol: protocolSelect.value,
+                    host,
+                    port: parseInt(portInput.value, 10) || 22,
+                    username: modal.querySelector('.qc-username').value.trim(),
+                });
+            });
+            backdrop.addEventListener('click', (e) => { if (e.target === backdrop) close(null); });
+            hostInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') modal.querySelector('.qc-connect').click();
+                if (e.key === 'Escape') close(null);
+            });
+
+            setTimeout(() => hostInput.focus(), 50);
+        });
+
+        if (!result) return;
 
         try {
-            const profile = { protocol, host, port, displayName: host, tags: [] };
+            const profile = {
+                protocol: result.protocol,
+                host: result.host,
+                port: result.port,
+                username: result.username || '',
+                displayName: result.host,
+                tags: [],
+            };
             const sessionInfo = await window.go.api.Service.ConnectQuick(profile);
             this.state.addSession(sessionInfo);
             this.tabs.addTab(sessionInfo);
 
             const panelId = `panel-${sessionInfo.id}`;
-            if (protocol === 'raw') {
-                this.rawViewer.createViewer(sessionInfo.id, panelId, { protocol, raw: {} });
+            if (result.protocol === 'raw') {
+                this.rawViewer.createViewer(sessionInfo.id, panelId, { protocol: 'raw', raw: {} });
             } else {
-                this.terminals.createTerminal(sessionInfo.id, panelId, { protocol });
+                this.terminals.createTerminal(sessionInfo.id, panelId, { protocol: result.protocol });
             }
+
+            this.notifications.info(`Connecting to ${result.host}…`);
         } catch (err) {
             this.notifications.error('Quick connect failed: ' + err);
         }
