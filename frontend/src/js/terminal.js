@@ -68,6 +68,15 @@ class TerminalManager {
         const container = document.getElementById(containerId);
         term.open(container);
 
+        // Right-click context menu on the terminal viewport
+        const termEl = container.querySelector('.xterm');
+        if (termEl) {
+            termEl.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                this._showTerminalContextMenu(sessionId, term, e.clientX, e.clientY);
+            });
+        }
+
         // Force a synchronous layout reflow so the container reports its
         // true dimensions, then fit the terminal to fill the space.
         // eslint-disable-next-line no-unused-expressions
@@ -314,6 +323,102 @@ class TerminalManager {
     }
 
     // ── Private helpers ──────────────────────────────────────────────
+
+    /**
+     * Shows a right-click context menu for a terminal.
+     * @param {string} sessionId
+     * @param {Terminal} term
+     * @param {number} x
+     * @param {number} y
+     * @private
+     */
+    _showTerminalContextMenu(sessionId, term, x, y) {
+        const { createElement, dismissContextMenus } = window.NexusTerminal;
+        dismissContextMenus();
+
+        const hasSelection = term.hasSelection();
+        const menu = createElement('div', 'context-menu');
+        menu.style.left = `${x}px`;
+        menu.style.top = `${y}px`;
+
+        const items = [
+            {
+                label: 'Copy',
+                disabled: !hasSelection,
+                action: () => {
+                    const text = term.getSelection();
+                    if (text) {
+                        if (window.runtime && window.runtime.ClipboardSetText) {
+                            window.runtime.ClipboardSetText(text);
+                        } else {
+                            navigator.clipboard.writeText(text).catch(function() {});
+                        }
+                        this.app.notifications.info('Copied to clipboard');
+                    }
+                },
+            },
+            {
+                label: 'Paste',
+                action: () => {
+                    if (window.runtime && window.runtime.ClipboardGetText) {
+                        window.runtime.ClipboardGetText().then((text) => {
+                            if (text) term.paste(text);
+                        }).catch(function() {});
+                    } else {
+                        navigator.clipboard.readText().then((text) => {
+                            if (text) term.paste(text);
+                        }).catch(function() {});
+                    }
+                },
+            },
+            { divider: true },
+            {
+                label: 'Select All',
+                action: () => term.selectAll(),
+            },
+            {
+                label: 'Find…',
+                action: () => this.app._openTerminalSearch(),
+            },
+            { divider: true },
+            {
+                label: 'Clear Terminal',
+                action: () => term.clear(),
+            },
+            {
+                label: 'Reset Terminal',
+                action: () => term.reset(),
+            },
+        ];
+
+        for (const entry of items) {
+            if (entry.divider) {
+                menu.appendChild(createElement('div', 'context-menu-divider'));
+                continue;
+            }
+            const btn = createElement('button', 'context-menu-item', {
+                textContent: entry.label,
+            });
+            if (entry.disabled) {
+                btn.disabled = true;
+                btn.classList.add('context-menu-disabled');
+            }
+            btn.addEventListener('click', () => {
+                dismissContextMenus();
+                entry.action();
+            });
+            // Prevent mousedown from causing text deselection in WKWebView
+            btn.addEventListener('mousedown', (e) => e.preventDefault());
+            menu.appendChild(btn);
+        }
+
+        document.body.appendChild(menu);
+
+        // Keep within viewport
+        const rect = menu.getBoundingClientRect();
+        if (rect.right > window.innerWidth) menu.style.left = `${window.innerWidth - rect.width - 8}px`;
+        if (rect.bottom > window.innerHeight) menu.style.top = `${window.innerHeight - rect.height - 8}px`;
+    }
 
     /**
      * Builds the xterm.js colour theme.
