@@ -1,10 +1,13 @@
 package sshclient
 
 import (
+	"bufio"
 	"context"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"net"
+	"net/http"
 	"os"
 	"strings"
 	"sync"
@@ -13,6 +16,7 @@ import (
 	"github.com/copilot-ssh-client/app/internal/models"
 	"github.com/pquerna/otp/totp"
 	"golang.org/x/crypto/ssh"
+	"golang.org/x/net/proxy"
 )
 
 // Client manages a single SSH session lifecycle.
@@ -127,7 +131,18 @@ func (c *Client) connectInternal(
 			port = 22
 		}
 		addr := net.JoinHostPort(c.config.Host, fmt.Sprintf("%d", port))
-		sshConn, err = ssh.Dial("tcp", addr, sshConfig)
+
+		// Dial through proxy if configured, otherwise use direct TCP.
+		conn, dialErr := c.dialTarget(sc, addr, timeout)
+		if dialErr != nil {
+			return fmt.Errorf("SSH connection failed: %w", dialErr)
+		}
+		ncc, chans, reqs, sshErr := ssh.NewClientConn(conn, addr, sshConfig)
+		if sshErr != nil {
+			conn.Close()
+			return fmt.Errorf("SSH handshake failed: %w", sshErr)
+		}
+		sshConn = ssh.NewClient(ncc, chans, reqs)
 	}
 	if err != nil {
 		return fmt.Errorf("SSH connection failed: %w", err)
@@ -418,6 +433,91 @@ func isTOTPPrompt(question string) bool {
 		}
 	}
 	return false
+}
+
+// dialTarget dials the target address, optionally through a SOCKS5 or HTTP
+// CONNECT proxy as configured in the profile's SSH settings.
+func (c *Client) dialTarget(sc models.SSHConfig, addr string, timeout time.Duration) (net.Conn, error) {
+	switch strings.ToLower(sc.ProxyType) {
+	case "socks5":
+		return c.dialSOCKS5(sc, addr, timeout)
+	case "http":
+		return c.dialHTTPProxy(sc, addr, timeout)
+	default:
+		// No proxy — direct TCP dial.
+		return net.DialTimeout("tcp", addr, timeout)
+	}
+}
+
+// dialSOCKS5 connects to the target via a SOCKS5 proxy.
+func (c *Client) dialSOCKS5(sc models.SSHConfig, addr string, timeout time.Duration) (net.Conn, error) {
+	proxyPort := sc.ProxyPort
+	if proxyPort == 0 {
+		proxyPort = 1080
+	}
+	proxyAddr := net.JoinHostPort(sc.ProxyHost, fmt.Sprintf("%d", proxyPort))
+
+	var auth *proxy.Auth
+	if sc.ProxyUsername != "" {
+		auth = &proxy.Auth{
+			User:     sc.ProxyUsername,
+			Password: sc.ProxyPassword,
+		}
+	}
+
+	dialer, err := proxy.SOCKS5("tcp", proxyAddr, auth, &net.Dialer{Timeout: timeout})
+	if err != nil {
+		return nil, fmt.Errorf("SOCKS5 proxy setup failed: %w", err)
+	}
+
+	conn, err := dialer.Dial("tcp", addr)
+	if err != nil {
+		return nil, fmt.Errorf("SOCKS5 proxy connection to %s failed: %w", addr, err)
+	}
+	return conn, nil
+}
+
+// dialHTTPProxy connects to the target via an HTTP CONNECT proxy.
+func (c *Client) dialHTTPProxy(sc models.SSHConfig, addr string, timeout time.Duration) (net.Conn, error) {
+	proxyPort := sc.ProxyPort
+	if proxyPort == 0 {
+		proxyPort = 8080
+	}
+	proxyAddr := net.JoinHostPort(sc.ProxyHost, fmt.Sprintf("%d", proxyPort))
+
+	conn, err := net.DialTimeout("tcp", proxyAddr, timeout)
+	if err != nil {
+		return nil, fmt.Errorf("HTTP proxy connection failed: %w", err)
+	}
+
+	// Send CONNECT request.
+	connectReq := fmt.Sprintf("CONNECT %s HTTP/1.1\r\nHost: %s\r\n", addr, addr)
+	if sc.ProxyUsername != "" {
+		cred := base64.StdEncoding.EncodeToString([]byte(sc.ProxyUsername + ":" + sc.ProxyPassword))
+		connectReq += fmt.Sprintf("Proxy-Authorization: Basic %s\r\n", cred)
+	}
+	connectReq += "\r\n"
+
+	if _, err := conn.Write([]byte(connectReq)); err != nil {
+		conn.Close()
+		return nil, fmt.Errorf("HTTP CONNECT write failed: %w", err)
+	}
+
+	// Read response.
+	br := bufio.NewReader(conn)
+	resp, err := http.ReadResponse(br, &http.Request{Method: "CONNECT"})
+	if err != nil {
+		conn.Close()
+		return nil, fmt.Errorf("HTTP CONNECT response read failed: %w", err)
+	}
+	resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		conn.Close()
+		return nil, fmt.Errorf("HTTP CONNECT proxy returned %d %s", resp.StatusCode, resp.Status)
+	}
+
+	return conn, nil
 }
 
 // connectViaJumpHosts establishes the SSH connection through a chain of

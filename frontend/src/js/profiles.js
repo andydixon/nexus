@@ -408,6 +408,27 @@ class ProfileEditor {
         // TOTP / 2FA
         sections.push(this._renderTOTPSection(profile));
 
+        // Proxy
+        sections.push(this._renderSection('Proxy', [
+            this._field('select', 'ssh.proxyType', 'Proxy Type', ssh.proxyType || 'none', {
+                options: [
+                    { value: 'none', label: 'None (direct connection)' },
+                    { value: 'socks5', label: 'SOCKS5' },
+                    { value: 'http', label: 'HTTP CONNECT' },
+                ],
+            }),
+            this._field('text', 'ssh.proxyHost', 'Proxy Host', ssh.proxyHost || '', {
+                placeholder: 'proxy.example.com',
+            }),
+            this._field('number', 'ssh.proxyPort', 'Proxy Port', ssh.proxyPort || 1080, { min: 1, max: 65535 }),
+            this._field('text', 'ssh.proxyUsername', 'Proxy Username', ssh.proxyUsername || '', {
+                placeholder: 'Optional',
+            }),
+            this._field('text', 'ssh.proxyPassword', 'Proxy Password', ssh.proxyPassword || '', {
+                placeholder: 'Optional',
+            }),
+        ], true));
+
         // Advanced
         sections.push(this._renderSection('Advanced', [
             this._field('text', 'ssh.terminalType', 'Terminal Type', ssh.terminalType, { placeholder: 'xterm-256color' }),
@@ -1263,6 +1284,13 @@ class ProfileEditor {
             p.ssh.autoReconnect = val('ssh.autoReconnect') || false;
             p.ssh.maxReconnectTries = val('ssh.maxReconnectTries') ?? 5;
             p.ssh.startupCommand = val('ssh.startupCommand') || '';
+
+            // Proxy settings
+            p.ssh.proxyType = val('ssh.proxyType') || 'none';
+            p.ssh.proxyHost = val('ssh.proxyHost') || '';
+            p.ssh.proxyPort = val('ssh.proxyPort') || 1080;
+            p.ssh.proxyUsername = val('ssh.proxyUsername') || '';
+            p.ssh.proxyPassword = val('ssh.proxyPassword') || '';
 
             const authStr = val('ssh.authMethods');
             if (authStr !== undefined) {
