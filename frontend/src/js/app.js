@@ -385,6 +385,13 @@ class App {
                 return;
             }
 
+            // Ctrl/Cmd+Shift+B — toggle broadcast mode
+            if (mod && e.shiftKey && e.key === 'B') {
+                e.preventDefault();
+                this.toggleBroadcast();
+                return;
+            }
+
         });
     }
 
@@ -401,6 +408,7 @@ class App {
         this._bindClick('btn-export', () => this.exportProfiles());
         this._bindClick('btn-recordings', () => this.recordings.openBrowser());
         this._bindClick('btn-new-tab', () => this.profileEditor.openNew());
+        this._bindClick('btn-broadcast', () => this.toggleBroadcast());
         this._bindClick('btn-empty-connect', () => this.profileEditor.openNew());
         this._bindClick('btn-empty-quick', () => this.quickConnect());
 
@@ -430,6 +438,28 @@ class App {
         } else {
             this.splitPanes.splitVertical();
         }
+    }
+
+    // ── Broadcast mode ─────────────────────────────────────────────
+
+    /**
+     * Toggles broadcast mode — when active, keystrokes are sent to all
+     * connected sessions simultaneously.
+     */
+    toggleBroadcast() {
+        this.state.broadcastMode = !this.state.broadcastMode;
+        const btn = document.getElementById('btn-broadcast');
+        if (btn) {
+            btn.classList.toggle('is-active', this.state.broadcastMode);
+            btn.title = this.state.broadcastMode
+                ? 'Broadcast Mode ON — keystrokes sent to all sessions (Ctrl+Shift+B)'
+                : 'Toggle Broadcast Mode (Ctrl+Shift+B)';
+        }
+        this.notifications.info(
+            this.state.broadcastMode
+                ? 'Broadcast mode enabled — input sent to all sessions'
+                : 'Broadcast mode disabled'
+        );
     }
 
     // ── Connection lifecycle ─────────────────────────────────────────

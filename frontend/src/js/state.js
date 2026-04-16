@@ -25,6 +25,9 @@ class State {
         /** @type {boolean} */
         this.secretStoreInitialised = false;
 
+        /** @type {boolean} Whether broadcast mode is active (keystrokes to all sessions). */
+        this.broadcastMode = false;
+
         /** @type {Map<string, Set<Function>>} event name → callbacks */
         this._listeners = new Map();
     }

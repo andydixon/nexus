@@ -92,6 +92,19 @@ class TerminalManager {
             try {
                 const b64 = btoa(data);
                 window.go.api.Service.WriteSession(sessionId, b64);
+
+                // Broadcast to all other connected sessions if enabled
+                if (this.app.state.broadcastMode) {
+                    for (const [otherId] of this.terminals) {
+                        if (otherId === sessionId) continue;
+                        const otherSession = this.app.state.getSession(otherId);
+                        if (otherSession && otherSession.state === 'connected') {
+                            try {
+                                window.go.api.Service.WriteSession(otherId, b64);
+                            } catch (_) { /* non-critical */ }
+                        }
+                    }
+                }
             } catch (err) {
                 console.error('WriteSession error:', err);
             }

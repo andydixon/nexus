@@ -310,6 +310,36 @@
 }
 
 /* -----------------------------------------------------------------------
+   Broadcast toggle button
+   ----------------------------------------------------------------------- */
+.tab-broadcast {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--tab-bar-height);
+    height: var(--tab-bar-height);
+    color: var(--text-tertiary);
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background var(--transition-fast), color var(--transition-fast);
+    border: none;
+    background: none;
+    opacity: 0.5;
+}
+
+.tab-broadcast:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+    opacity: 0.8;
+}
+
+.tab-broadcast.is-active {
+    color: var(--error);
+    opacity: 1;
+    animation: pulse-dot 1.5s ease infinite;
+}
+
+/* -----------------------------------------------------------------------
    Tab overflow indicators (chevrons at edges)
    ----------------------------------------------------------------------- */
 .tab-bar-overflow-left,
