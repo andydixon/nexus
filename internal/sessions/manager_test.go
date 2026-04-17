@@ -3,7 +3,7 @@ package sessions
 import (
 	"testing"
 
-	"github.com/copilot-ssh-client/app/internal/models"
+	"github.com/andydixon/nexus/internal/models"
 )
 
 // ---------------------------------------------------------------------------

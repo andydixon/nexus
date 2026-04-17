@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/copilot-ssh-client/app/internal/models"
+	"github.com/andydixon/nexus/internal/models"
 )
 
 // Client manages a raw TCP connection.

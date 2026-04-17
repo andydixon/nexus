@@ -18,7 +18,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/copilot-ssh-client/app/internal/models"
+	"github.com/andydixon/nexus/internal/models"
 	"github.com/google/uuid"
 )
 

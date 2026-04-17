@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/copilot-ssh-client/app/internal/models"
+	"github.com/andydixon/nexus/internal/models"
 )
 
 // Client wraps the GitHub REST API for repository listing.

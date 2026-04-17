@@ -7,7 +7,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/copilot-ssh-client/app/internal/models"
+	"github.com/andydixon/nexus/internal/models"
 	"golang.org/x/crypto/ssh"
 )
 

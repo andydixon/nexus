@@ -11,15 +11,15 @@ import (
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
-	"github.com/copilot-ssh-client/app/internal/api"
-	"github.com/copilot-ssh-client/app/internal/audit"
-	"github.com/copilot-ssh-client/app/internal/config"
-	"github.com/copilot-ssh-client/app/internal/knownhosts"
-	"github.com/copilot-ssh-client/app/internal/preferences"
-	"github.com/copilot-ssh-client/app/internal/recording"
-	"github.com/copilot-ssh-client/app/internal/secrets"
-	"github.com/copilot-ssh-client/app/internal/sessions"
-	"github.com/copilot-ssh-client/app/internal/storage"
+	"github.com/andydixon/nexus/internal/api"
+	"github.com/andydixon/nexus/internal/audit"
+	"github.com/andydixon/nexus/internal/config"
+	"github.com/andydixon/nexus/internal/knownhosts"
+	"github.com/andydixon/nexus/internal/preferences"
+	"github.com/andydixon/nexus/internal/recording"
+	"github.com/andydixon/nexus/internal/secrets"
+	"github.com/andydixon/nexus/internal/sessions"
+	"github.com/andydixon/nexus/internal/storage"
 )
 
 // App is the central application struct. Wails binds its lifecycle methods

@@ -62,8 +62,8 @@ Built with [Wails v2](https://wails.io/) (Go backend, HTML/CSS/JS frontend, [xte
 ### Clone and Run
 
 ```bash
-git clone https://github.com/andydixon/nexus-terminal.git
-cd nexus-terminal
+git clone https://github.com/andydixon/nexus.git
+cd nexus
 make deps    # install Go modules and npm packages
 make dev     # launch with hot reload
 ```

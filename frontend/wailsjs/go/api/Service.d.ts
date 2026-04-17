@@ -29,6 +29,8 @@ export function DeleteRecording(arg1:string):Promise<void>;
 
 export function DeleteSnippet(arg1:string):Promise<void>;
 
+export function DeleteTOTPSecret(arg1:string):Promise<void>;
+
 export function DisconnectSession(arg1:string):Promise<void>;
 
 export function DuplicateProfile(arg1:string):Promise<models.Profile>;
@@ -46,6 +48,10 @@ export function GetProfile(arg1:string):Promise<models.Profile>;
 export function GetRecording(arg1:string):Promise<Record<string, any>>;
 
 export function GetSessionHistory(arg1:string):Promise<Array<Record<string, any>>>;
+
+export function GetTOTPCode(arg1:string):Promise<string>;
+
+export function HasTOTPSecret(arg1:string):Promise<boolean>;
 
 export function ImportProfiles(arg1:string,arg2:string):Promise<number>;
 
@@ -130,6 +136,8 @@ export function SetContext(arg1:context.Context):Promise<void>;
 export function SetFavourite(arg1:string,arg2:boolean):Promise<void>;
 
 export function SetProfileSecret(arg1:string,arg2:string,arg3:string):Promise<void>;
+
+export function SetTOTPSecret(arg1:string,arg2:string):Promise<void>;
 
 export function StartPortForward(arg1:string,arg2:models.PortForward):Promise<void>;
 

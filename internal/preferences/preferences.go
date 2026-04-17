@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/copilot-ssh-client/app/internal/models"
+	"github.com/andydixon/nexus/internal/models"
 )
 
 // PreferenceStore is the persistence interface used by the Manager.

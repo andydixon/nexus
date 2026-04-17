@@ -193,6 +193,22 @@ export namespace models {
 		    return a;
 		}
 	}
+	export class LoginScriptStep {
+	    type: string;
+	    value: string;
+	    timeout: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new LoginScriptStep(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.type = source["type"];
+	        this.value = source["value"];
+	        this.timeout = source["timeout"];
+	    }
+	}
 	export class PayloadPreset {
 	    id: string;
 	    name: string;
@@ -286,6 +302,7 @@ export namespace models {
 	    lineMode: boolean;
 	    autoReconnect: boolean;
 	    maxReconnectTries: number;
+	    loginScripts: LoginScriptStep[];
 	
 	    static createFrom(source: any = {}) {
 	        return new TelnetConfig(source);
@@ -301,7 +318,26 @@ export namespace models {
 	        this.lineMode = source["lineMode"];
 	        this.autoReconnect = source["autoReconnect"];
 	        this.maxReconnectTries = source["maxReconnectTries"];
+	        this.loginScripts = this.convertValues(source["loginScripts"], LoginScriptStep);
 	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class SSHConfig {
 	    authMethods: string[];
@@ -317,6 +353,13 @@ export namespace models {
 	    agentForwarding: boolean;
 	    autoReconnect: boolean;
 	    maxReconnectTries: number;
+	    loginScripts: LoginScriptStep[];
+	    totpSecret: string;
+	    proxyType: string;
+	    proxyHost: string;
+	    proxyPort: number;
+	    proxyUsername: string;
+	    proxyPassword: string;
 	    jumpHosts: JumpHost[];
 	    portForwards: PortForward[];
 	    startupCommand: string;
@@ -341,6 +384,13 @@ export namespace models {
 	        this.agentForwarding = source["agentForwarding"];
 	        this.autoReconnect = source["autoReconnect"];
 	        this.maxReconnectTries = source["maxReconnectTries"];
+	        this.loginScripts = this.convertValues(source["loginScripts"], LoginScriptStep);
+	        this.totpSecret = source["totpSecret"];
+	        this.proxyType = source["proxyType"];
+	        this.proxyHost = source["proxyHost"];
+	        this.proxyPort = source["proxyPort"];
+	        this.proxyUsername = source["proxyUsername"];
+	        this.proxyPassword = source["proxyPassword"];
 	        this.jumpHosts = this.convertValues(source["jumpHosts"], JumpHost);
 	        this.portForwards = this.convertValues(source["portForwards"], PortForward);
 	        this.startupCommand = source["startupCommand"];

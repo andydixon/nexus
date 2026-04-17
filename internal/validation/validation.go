@@ -7,7 +7,7 @@ import (
 	"net"
 	"strings"
 
-	"github.com/copilot-ssh-client/app/internal/models"
+	"github.com/andydixon/nexus/internal/models"
 )
 
 // ValidationError describes a single field-level validation failure.

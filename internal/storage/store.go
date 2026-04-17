@@ -11,8 +11,8 @@ import (
 
 	_ "github.com/mattn/go-sqlite3"
 
-	"github.com/copilot-ssh-client/app/internal/models"
-	"github.com/copilot-ssh-client/app/internal/storage/migrations"
+	"github.com/andydixon/nexus/internal/models"
+	"github.com/andydixon/nexus/internal/storage/migrations"
 	"github.com/google/uuid"
 )
 

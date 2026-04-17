@@ -54,6 +54,10 @@ export function DeleteSnippet(arg1) {
   return window['go']['api']['Service']['DeleteSnippet'](arg1);
 }
 
+export function DeleteTOTPSecret(arg1) {
+  return window['go']['api']['Service']['DeleteTOTPSecret'](arg1);
+}
+
 export function DisconnectSession(arg1) {
   return window['go']['api']['Service']['DisconnectSession'](arg1);
 }
@@ -88,6 +92,14 @@ export function GetRecording(arg1) {
 
 export function GetSessionHistory(arg1) {
   return window['go']['api']['Service']['GetSessionHistory'](arg1);
+}
+
+export function GetTOTPCode(arg1) {
+  return window['go']['api']['Service']['GetTOTPCode'](arg1);
+}
+
+export function HasTOTPSecret(arg1) {
+  return window['go']['api']['Service']['HasTOTPSecret'](arg1);
 }
 
 export function ImportProfiles(arg1, arg2) {
@@ -256,6 +268,10 @@ export function SetFavourite(arg1, arg2) {
 
 export function SetProfileSecret(arg1, arg2, arg3) {
   return window['go']['api']['Service']['SetProfileSecret'](arg1, arg2, arg3);
+}
+
+export function SetTOTPSecret(arg1, arg2) {
+  return window['go']['api']['Service']['SetTOTPSecret'](arg1, arg2);
 }
 
 export function StartPortForward(arg1, arg2) {

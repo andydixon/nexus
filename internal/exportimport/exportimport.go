@@ -18,7 +18,7 @@ import (
 
 	"golang.org/x/crypto/argon2"
 
-	"github.com/copilot-ssh-client/app/internal/models"
+	"github.com/andydixon/nexus/internal/models"
 )
 
 const (

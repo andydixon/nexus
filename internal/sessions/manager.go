@@ -14,16 +14,16 @@ import (
 	"github.com/google/uuid"
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 
-	"github.com/copilot-ssh-client/app/internal/audit"
-	"github.com/copilot-ssh-client/app/internal/githubclient"
-	"github.com/copilot-ssh-client/app/internal/models"
-	"github.com/copilot-ssh-client/app/internal/rawclient"
-	"github.com/copilot-ssh-client/app/internal/recording"
-	"github.com/copilot-ssh-client/app/internal/secrets"
-	"github.com/copilot-ssh-client/app/internal/sftpclient"
-	"github.com/copilot-ssh-client/app/internal/sshclient"
-	"github.com/copilot-ssh-client/app/internal/storage"
-	"github.com/copilot-ssh-client/app/internal/telnetclient"
+	"github.com/andydixon/nexus/internal/audit"
+	"github.com/andydixon/nexus/internal/githubclient"
+	"github.com/andydixon/nexus/internal/models"
+	"github.com/andydixon/nexus/internal/rawclient"
+	"github.com/andydixon/nexus/internal/recording"
+	"github.com/andydixon/nexus/internal/secrets"
+	"github.com/andydixon/nexus/internal/sftpclient"
+	"github.com/andydixon/nexus/internal/sshclient"
+	"github.com/andydixon/nexus/internal/storage"
+	"github.com/andydixon/nexus/internal/telnetclient"
 )
 
 // Session wraps a protocol client with metadata and state.

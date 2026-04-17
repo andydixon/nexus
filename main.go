@@ -12,8 +12,8 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/options/mac"
 	"github.com/wailsapp/wails/v2/pkg/options/windows"
 
-	application "github.com/copilot-ssh-client/app/internal/app"
-	"github.com/copilot-ssh-client/app/frontend"
+	application "github.com/andydixon/nexus/internal/app"
+	"github.com/andydixon/nexus/frontend"
 )
 
 func main() {
