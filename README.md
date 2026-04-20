@@ -288,6 +288,36 @@ go test ./internal/storage/ -v -count=1 -run TestProfileCRUD
 
 The frontend has no separate build step — `npm run build` (called by Wails) copies xterm vendor libraries from `node_modules` into the frontend source tree. All frontend assets are embedded at compile time.
 
+### Cross-Build Helper (macOS/Linux)
+
+If you want to build multiple targets from a macOS or Linux host, use the helper script:
+
+```bash
+./build-all.sh
+```
+
+It builds the host platform plus Linux and Windows (both `amd64` and `arm64`) **where a suitable C compiler is available**. SQLite requires cgo, so missing toolchains will cause a target to be skipped. Common compiler names:
+
+- Linux: `x86_64-linux-gnu-gcc`, `aarch64-linux-gnu-gcc`
+- Windows: `x86_64-w64-mingw32-gcc`, `aarch64-w64-mingw32-gcc`
+
+### Windows Builds
+
+SQLite requires cgo on Windows, which means you need a C compiler in `PATH` (for example MSYS2 with mingw-w64). Use the Windows build script to set `CGO_ENABLED=1` and run the right steps:
+
+```powershell
+.\build.ps1 deps
+.\build.ps1 build
+```
+
+If the build fails with a cgo/SQLite error, install MSYS2, then install the toolchain:
+
+```powershell
+pacman -S --needed mingw-w64-x86_64-toolchain
+```
+
+Then reopen your terminal so `gcc` is on `PATH` and retry `build.ps1`.
+
 ---
 
 ## Data Locations

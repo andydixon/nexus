@@ -30,6 +30,10 @@ const assets = [
     dest: 'src/js/lib/xterm-addon-search.min.js',
   },
   {
+    src:  'xterm-addon-unicode11/lib/xterm-addon-unicode11.js',
+    dest: 'src/js/lib/xterm-addon-unicode11.min.js',
+  },
+  {
     src:  'xterm-addon-web-links/lib/xterm-addon-web-links.js',
     dest: 'src/js/lib/xterm-addon-web-links.min.js',
   },

@@ -483,6 +483,23 @@ class App {
             return;
         }
 
+        const existingSessions = this.state.getAllSessions().filter((session) => {
+            if (session.profileId !== profileId) return false;
+            return session.state === 'connected' || session.state === 'connecting' || session.state === 'reconnecting';
+        });
+        if (existingSessions.length > 0) {
+            const preferred = existingSessions.find((s) => s.id === this.state.activeSessionId) || existingSessions[0];
+            const decision = await this._confirmReuseSession(profile, preferred);
+            if (decision === 'existing') {
+                this.tabs.setActive(preferred.id);
+                if (preferred.protocol !== 'raw' && preferred.protocol !== 'github') {
+                    this.terminals.focusTerminal(preferred.id);
+                }
+                return;
+            }
+            if (decision !== 'new') return;
+        }
+
         try {
             const sessionInfo = await window.go.api.Service.ConnectSession(profileId);
             this.state.addSession(sessionInfo);
@@ -626,6 +643,60 @@ class App {
         } catch (err) {
             this.notifications.error('Quick connect failed: ' + err);
         }
+    }
+
+    /**
+     * Prompts to reuse an existing session for a profile.
+     * @param {Object} profile
+     * @param {Object} session
+     * @returns {Promise<'existing'|'new'|null>}
+     * @private
+     */
+    _confirmReuseSession(profile, session) {
+        const createElement = window.NexusTerminal.createElement;
+        const label = (profile.displayName || profile.host || 'Untitled').trim();
+        const stateLabel = session.state === 'connected' ? 'connected' : 'connecting';
+
+        return new Promise((resolve) => {
+            const backdrop = createElement('div', 'modal-backdrop');
+            const modal = createElement('div', 'modal modal-sm');
+            modal.innerHTML = `
+                <div class="modal-header">
+                    <h3 class="modal-title">Connection Already Open</h3>
+                    <button class="btn btn-icon btn-xs modal-close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p style="font-size:var(--text-sm);color:var(--text-secondary)">
+                        <strong>${label}</strong> is already ${stateLabel}.
+                        Do you want to use the existing session or open a new one?
+                    </p>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-sm confirm-cancel">Cancel</button>
+                    <button class="btn btn-sm confirm-new">New Connection</button>
+                    <button class="btn btn-sm btn-primary confirm-ok">Use Existing</button>
+                </div>
+            `;
+            backdrop.appendChild(modal);
+            document.body.appendChild(backdrop);
+            requestAnimationFrame(() => {
+                backdrop.classList.add('is-visible');
+                modal.classList.add('is-visible');
+            });
+
+            const close = (val) => {
+                backdrop.classList.remove('is-visible');
+                modal.classList.remove('is-visible');
+                setTimeout(() => backdrop.remove(), 200);
+                resolve(val);
+            };
+
+            modal.querySelector('.modal-close').addEventListener('click', () => close(null));
+            modal.querySelector('.confirm-cancel').addEventListener('click', () => close(null));
+            modal.querySelector('.confirm-ok').addEventListener('click', () => close('existing'));
+            modal.querySelector('.confirm-new').addEventListener('click', () => close('new'));
+            backdrop.addEventListener('click', (e) => { if (e.target === backdrop) close(null); });
+        });
     }
 
     // ── Import / Export ──────────────────────────────────────────────

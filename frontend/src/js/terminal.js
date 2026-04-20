@@ -5,7 +5,7 @@
  * Handles data routing, resizing, and search.
  */
 
-/* global Terminal, FitAddon, SearchAddon, WebLinksAddon */
+/* global Terminal, FitAddon, SearchAddon, WebLinksAddon, Unicode11Addon */
 
 class TerminalManager {
     /**
@@ -36,7 +36,7 @@ class TerminalManager {
         const themeName = (this.app.state.preferences || {}).terminalTheme || 'charcoal';
         const term = new Terminal({
             theme: window.NexusTerminal.getTerminalTheme(themeName),
-            fontFamily: profile.terminalFontFamily || 'JetBrains Mono, Menlo, Monaco, Consolas, monospace',
+            fontFamily: profile.terminalFontFamily || 'JetBrains Mono, Menlo, Monaco, Consolas, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", monospace',
             fontSize: profile.terminalFontSize || 14,
             scrollback: profile.terminalScrollback || 10000,
             cursorStyle: profile.terminalCursorStyle || 'block',
@@ -50,9 +50,18 @@ class TerminalManager {
         const fitAddon = new FitAddon.FitAddon();
         const searchAddon = new SearchAddon.SearchAddon();
         let webLinksAddon = null;
+        let unicode11Addon = null;
 
         term.loadAddon(fitAddon);
         term.loadAddon(searchAddon);
+
+        try {
+            unicode11Addon = new Unicode11Addon.Unicode11Addon();
+            term.loadAddon(unicode11Addon);
+            term.unicode.activeVersion = '11';
+        } catch (_) {
+            // Unicode 11 addon is optional; fall back to default unicode handling.
+        }
 
         // WebLinksAddon may not always be available
         try {
@@ -67,6 +76,19 @@ class TerminalManager {
         // Open the terminal in the DOM container
         const container = document.getElementById(containerId);
         term.open(container);
+
+        let suppressPasteEvent = false;
+        const attachPasteGuard = () => {
+            const inputEl = term.textarea || container.querySelector('textarea');
+            if (!inputEl) return;
+            inputEl.addEventListener('paste', (e) => {
+                if (!suppressPasteEvent) return;
+                e.preventDefault();
+                e.stopPropagation();
+                suppressPasteEvent = false;
+            });
+        };
+        attachPasteGuard();
 
         // Right-click context menu on the terminal viewport
         const termEl = container.querySelector('.xterm');
@@ -131,6 +153,8 @@ class TerminalManager {
 
             // Cmd/Ctrl+V — paste from clipboard
             if (mod && e.key === 'v' && e.type === 'keydown') {
+                suppressPasteEvent = true;
+                setTimeout(() => { suppressPasteEvent = false; }, 250);
                 if (window.runtime && window.runtime.ClipboardGetText) {
                     window.runtime.ClipboardGetText().then(function(text) {
                         if (text) term.paste(text);
