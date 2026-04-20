@@ -79,6 +79,9 @@ class Settings {
             if (this.app.terminals && this._prefs.terminalTheme) {
                 this.app.terminals.applyTheme(this._prefs.terminalTheme);
             }
+            if (this.app && typeof this.app._applyPreferences === 'function') {
+                this.app._applyPreferences();
+            }
 
             this.app.notifications.success('Settings saved');
             this.close();

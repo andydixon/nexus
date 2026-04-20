@@ -684,10 +684,19 @@ class App {
     _applyPreferences() {
         const prefs = this.state.preferences;
 
-        // Sidebar width
+        // Sidebar width (drives the grid column width).
+        // Use the CSS variable so the workspace never sits underneath the sidebar.
+        const root = document.documentElement;
         const sidebar = document.getElementById('sidebar');
-        if (sidebar && prefs.sidebarWidth) {
-            sidebar.style.width = `${prefs.sidebarWidth}px`;
+        const parsedSidebarWidth = Number(prefs.sidebarWidth);
+        if (Number.isFinite(parsedSidebarWidth) && parsedSidebarWidth > 0) {
+            const clampedWidth = Math.max(180, Math.min(500, Math.round(parsedSidebarWidth)));
+            root.style.setProperty('--sidebar-width', `${clampedWidth}px`);
+        } else {
+            root.style.removeProperty('--sidebar-width');
+        }
+        if (sidebar) {
+            sidebar.style.width = '';
         }
 
         // Status bar visibility
@@ -695,6 +704,12 @@ class App {
         if (statusBar) {
             statusBar.style.display = prefs.showStatusBar === false ? 'none' : 'flex';
         }
+
+        // Refit any visible terminal after geometry changes.
+        requestAnimationFrame(() => {
+            this.terminals.fitActive();
+            this.splitPanes.refitAll();
+        });
     }
 
     /**

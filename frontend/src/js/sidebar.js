@@ -138,12 +138,16 @@ class Sidebar {
     _renderSection(title, key, profiles) {
         const section = createElement('div', 'sidebar-section');
         const isCollapsed = this.collapsedSections.has(key);
+        const isGroupSection = key.startsWith('group:');
 
         // Section header
-        const header = createElement('div', 'sidebar-section-header');
+        const header = createElement(
+            'div',
+            `sidebar-section-header ${isGroupSection ? 'sidebar-section-header-group' : ''}`.trim()
+        );
         header.innerHTML = `
             <span class="section-chevron ${isCollapsed ? 'collapsed' : ''}">${isCollapsed ? '▸' : '▾'}</span>
-            <span>${escapeHtml(title)}</span>
+            <span class="section-title">${escapeHtml(title)}</span>
             <span class="section-count">${profiles.length}</span>
         `;
         // Prevent mousedown from starting a text selection gesture in WKWebView,
@@ -182,20 +186,24 @@ class Sidebar {
             item.classList.add('sidebar-item-active');
         }
 
-        // Protocol colour dot
-        const dot = createElement('span', `protocol-indicator ${protocolColour(profile.protocol)}`);
-        item.appendChild(dot);
+        // Protocol icon
+        const protocolLabel = "";  // Seemed pretty naff to have this as well as the little icon badboy this._protocolLabel(profile.protocol);
+        const indicator = createElement('span', `protocol-indicator ${protocolColour(profile.protocol)}`, {
+            title: protocolLabel,
+            'aria-label': protocolLabel,
+        });
+        item.appendChild(indicator);
 
         // Text content
         const textWrapper = createElement('div', 'sidebar-item-text');
+        const displayName = (profile.displayName || '').trim();
+        const primaryLabel = displayName || profile.host || 'Untitled';
         const nameEl = createElement('span', 'sidebar-item-name', {
-            textContent: profile.displayName || profile.host || 'Untitled',
+            textContent: primaryLabel,
         });
         textWrapper.appendChild(nameEl);
 
-        const subtitle = profile.host
-            ? `${profile.host}:${profile.port}`
-            : profile.protocol.toUpperCase();
+        const subtitle = protocolLabel;
         const subEl = createElement('span', 'sidebar-item-host', {
             textContent: truncate(subtitle, 30),
         });
@@ -423,6 +431,27 @@ class Sidebar {
             .filter((r) => r.match)
             .sort((a, b) => b.score - a.score)
             .map((r) => r.profile);
+    }
+
+    /**
+     * Returns a display label for a protocol.
+     * @param {string} protocol
+     * @returns {string}
+     * @private
+     */
+    _protocolLabel(protocol) {
+        switch (protocol) {
+            case 'github':
+                return 'GitHub';
+            case 'ssh':
+                return 'SSH';
+            case 'telnet':
+                return 'TELNET';
+            case 'raw':
+                return 'RAW';
+            default:
+                return (protocol || '').toUpperCase() || 'UNKNOWN';
+        }
     }
 }
 

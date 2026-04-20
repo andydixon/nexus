@@ -84,9 +84,17 @@
     border: none;
 }
 
+.sidebar-section-header.sidebar-section-header-group .section-title {
+    color: var(--sidebar-group-title);
+}
+
 .sidebar-section-header:hover {
     color: var(--text-secondary);
     background: var(--bg-hover);
+}
+
+.sidebar-section-header.sidebar-section-header-group:hover .section-title {
+    color: var(--sidebar-group-title);
 }
 
 .sidebar-section-header .section-icon {
@@ -174,18 +182,47 @@
     background: var(--accent);
 }
 
-/* Protocol colour indicator dot */
+/* Protocol indicator icon */
 .sidebar-item .protocol-indicator {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
+    width: 14px;
+    height: 14px;
+    border-radius: var(--radius-sm);
     flex-shrink: 0;
-    background: var(--text-tertiary);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 8px;
+    font-weight: var(--weight-semibold);
+    line-height: 1;
+    background: var(--bg-overlay);
+    color: var(--text-tertiary);
 }
-.sidebar-item .protocol-indicator.proto-ssh    { background: var(--protocol-ssh); }
-.sidebar-item .protocol-indicator.proto-telnet { background: var(--protocol-telnet); }
-.sidebar-item .protocol-indicator.proto-raw    { background: var(--protocol-raw); }
-.sidebar-item .protocol-indicator.proto-github { background: var(--protocol-github); }
+
+.sidebar-item .protocol-indicator::before {
+    content: '?';
+}
+
+.sidebar-item .protocol-indicator.proto-ssh::before    { content: '⌨'; }
+.sidebar-item .protocol-indicator.proto-telnet::before { content: '⇄'; }
+.sidebar-item .protocol-indicator.proto-raw::before    { content: '≋'; }
+.sidebar-item .protocol-indicator.proto-github::before { content: 'GH'; }
+
+.sidebar-item .protocol-indicator.proto-ssh    {
+    background: rgba(78, 205, 196, 0.18);
+    color: var(--protocol-ssh);
+}
+.sidebar-item .protocol-indicator.proto-telnet {
+    background: rgba(255, 167, 38, 0.18);
+    color: var(--protocol-telnet);
+}
+.sidebar-item .protocol-indicator.proto-raw {
+    background: rgba(171, 71, 188, 0.18);
+    color: var(--protocol-raw);
+}
+.sidebar-item .protocol-indicator.proto-github {
+    background: rgba(124, 138, 255, 0.18);
+    color: var(--protocol-github);
+}
 
 /* Text block (name + host) */
 .sidebar-item-text {
