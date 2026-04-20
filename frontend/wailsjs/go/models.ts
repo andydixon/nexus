@@ -95,6 +95,9 @@ export namespace models {
 	    owner: string;
 	    description: string;
 	    htmlURL: string;
+	    defaultBranch: string;
+	    latestCommitter: string;
+	    latestCommitAt: string;
 	    private: boolean;
 	    fork: boolean;
 	    archived: boolean;
@@ -114,6 +117,9 @@ export namespace models {
 	        this.owner = source["owner"];
 	        this.description = source["description"];
 	        this.htmlURL = source["htmlURL"];
+	        this.defaultBranch = source["defaultBranch"];
+	        this.latestCommitter = source["latestCommitter"];
+	        this.latestCommitAt = source["latestCommitAt"];
 	        this.private = source["private"];
 	        this.fork = source["fork"];
 	        this.archived = source["archived"];

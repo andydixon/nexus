@@ -42,9 +42,9 @@ class Settings {
     /**
      * Opens the settings modal.
      */
-    async open() {
+    async open(tabKey) {
         this._prefs = JSON.parse(JSON.stringify(this.app.state.preferences));
-        this._activeTab = 'general';
+        this._activeTab = tabKey || this._activeTab || 'general';
 
         try {
             this._knownHosts = await window.go.api.Service.ListKnownHosts() || [];
@@ -53,6 +53,15 @@ class Settings {
         }
 
         this._render();
+    }
+
+    /**
+     * Opens the settings modal on a specific tab.
+     * @param {string} tabKey
+     */
+    async openTab(tabKey) {
+        this._activeTab = tabKey || 'general';
+        return this.open(this._activeTab);
     }
 
     /**

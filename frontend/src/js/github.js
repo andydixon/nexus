@@ -54,6 +54,18 @@ class GitHubViewer {
     }
 
     /**
+     * Updates the status line for a session.
+     * @param {string} sessionID
+     * @param {string} message
+     */
+    setStatus(sessionID, message) {
+        const viewer = this._viewers.get(sessionID);
+        if (viewer) {
+            viewer.setStatus(message);
+        }
+    }
+
+    /**
      * Handles an error event for a session.
      * @param {string} sessionID
      * @param {string} message
@@ -166,6 +178,16 @@ class GitHubViewerInstance {
     }
 
     /**
+     * Updates the status line with a custom message.
+     * @param {string} message
+     */
+    setStatus(message) {
+        if (!this._statusEl) return;
+        this._statusEl.classList.remove('github-viewer-status-error');
+        this._statusEl.textContent = message || '';
+    }
+
+    /**
      * Displays an error message in the status bar.
      * @param {string} message
      */
@@ -272,6 +294,7 @@ class GitHubViewerInstance {
         nameEl.textContent = repo.name;
         topRow.appendChild(nameEl);
 
+
         if (repo.private) {
             const badge = createElement('span', 'github-repo-badge github-repo-private');
             badge.textContent = 'Private';
@@ -288,7 +311,45 @@ class GitHubViewerInstance {
             topRow.appendChild(badge);
         }
 
+        const actions = createElement('div', 'github-repo-actions');
+
+        const downloadBtn = createElement('button', 'github-repo-download', {
+            textContent: 'ZIP',
+            title: 'Download repository as zip',
+        });
+        downloadBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this._downloadRepo(repo);
+        });
+        actions.appendChild(downloadBtn);
+
+        const visitLink = createElement('button', 'github-repo-visit', {
+            textContent: 'Visit',
+            title: 'Open repository in browser',
+        });
+        visitLink.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (repo.htmlURL) {
+                if (window.runtime && window.runtime.BrowserOpenURL) {
+                    window.runtime.BrowserOpenURL(repo.htmlURL);
+                } else {
+                    window.open(repo.htmlURL, '_blank');
+                }
+            }
+        });
+        actions.appendChild(visitLink);
+
+        topRow.appendChild(actions);
+
         card.appendChild(topRow);
+
+        if (repo.latestCommitter && repo.latestCommitAt) {
+            const commitLine = createElement('div', 'github-repo-commit');
+            const when = new Date(repo.latestCommitAt);
+            const whenText = isNaN(when.getTime()) ? repo.latestCommitAt : when.toLocaleString();
+            commitLine.textContent = `Last commit: ${whenText} by ${repo.latestCommitter}`;
+            card.appendChild(commitLine);
+        }
 
         // Description
         if (repo.description) {
@@ -322,6 +383,25 @@ class GitHubViewerInstance {
         card.appendChild(meta);
 
         return card;
+    }
+
+    async _downloadRepo(repo) {
+        if (!this._statusEl) return;
+        const ref = repo.defaultBranch || '';
+        this._statusEl.classList.remove('github-viewer-status-error');
+        this._statusEl.textContent = `Downloading ${repo.fullName}...`;
+
+        try {
+            await window.go.api.Service.DownloadGitHubRepoArchive(
+                this.sessionID,
+                repo.fullName,
+                ref,
+            );
+            this._updateStatus();
+        } catch (err) {
+            this._statusEl.textContent = `⚠ Download failed: ${err}`;
+            this._statusEl.classList.add('github-viewer-status-error');
+        }
     }
 
     async _manualRefresh() {

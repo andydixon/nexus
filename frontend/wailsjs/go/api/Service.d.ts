@@ -33,6 +33,8 @@ export function DeleteTOTPSecret(arg1:string):Promise<void>;
 
 export function DisconnectSession(arg1:string):Promise<void>;
 
+export function DownloadGitHubRepoArchive(arg1:string,arg2:string,arg3:string):Promise<string>;
+
 export function DuplicateProfile(arg1:string):Promise<models.Profile>;
 
 export function ExportProfiles(arg1:boolean):Promise<string>;

@@ -19,11 +19,22 @@ class Sidebar {
         this.el = document.getElementById('sidebar-profiles');
         this.searchQuery = '';
 
+        /** @type {Set<string>} */
+        this.selectedProfiles = new Set();
+
         // Section collapse state
         this.collapsedSections = new Set();
 
         // Dismiss context menus on any outside click
         document.addEventListener('click', () => dismissContextMenus());
+
+        if (this.el) {
+            this.el.addEventListener('click', (e) => {
+                if (!e.target.closest('.sidebar-item') && this.selectedProfiles.size > 0) {
+                    this._clearSelection();
+                }
+            });
+        }
     }
 
     // ── Public API ───────────────────────────────────────────────────
@@ -41,6 +52,11 @@ class Sidebar {
         this.el.innerHTML = '';
 
         const profiles = this._filteredProfiles();
+        this._syncSelection(profiles);
+
+        if (this.selectedProfiles.size > 0) {
+            this.el.appendChild(this._renderBulkActions());
+        }
 
         // Favourites
         const favourites = profiles.filter((p) => p.favourite);
@@ -178,6 +194,10 @@ class Sidebar {
             dataset: { profileId: profile.id },
         });
 
+        if (this.selectedProfiles.has(profile.id)) {
+            item.classList.add('sidebar-item-selected');
+        }
+
         // Highlight if this profile's session is active
         const activeSession = this.app.state.activeSessionId
             ? this.app.state.getSession(this.app.state.activeSessionId)
@@ -227,8 +247,21 @@ class Sidebar {
             item.appendChild(star);
         }
 
-        // Click → connect
-        item.addEventListener('click', () => {
+        // Prevent mousedown text selection in WKWebView
+        item.addEventListener('mousedown', (e) => e.preventDefault());
+
+        // Click → connect / multi-select
+        item.addEventListener('click', (e) => {
+            const multi = e.metaKey || e.ctrlKey;
+            if (multi) {
+                e.preventDefault();
+                this._toggleSelection(profile.id);
+                return;
+            }
+
+            if (this.selectedProfiles.size > 0) {
+                this._clearSelection();
+            }
             this.app.connectProfile(profile.id);
         });
 
@@ -403,6 +436,285 @@ class Sidebar {
             modal.querySelector('.confirm-cancel').addEventListener('click', () => close(false));
             modal.querySelector('.confirm-ok').addEventListener('click', () => close(true));
             backdrop.addEventListener('click', (e) => { if (e.target === backdrop) close(false); });
+        });
+    }
+
+    // ── Multi-select + bulk actions ─────────────────────────────────
+
+    /**
+     * Removes selections that are no longer visible in the filtered list.
+     * @param {Array<Object>} profiles
+     * @private
+     */
+    _syncSelection(profiles) {
+        const valid = new Set(profiles.map((p) => p.id));
+        for (const id of [...this.selectedProfiles]) {
+            if (!valid.has(id)) this.selectedProfiles.delete(id);
+        }
+    }
+
+    /** @private */
+    _toggleSelection(profileId) {
+        if (this.selectedProfiles.has(profileId)) {
+            this.selectedProfiles.delete(profileId);
+        } else {
+            this.selectedProfiles.add(profileId);
+        }
+        this.render();
+    }
+
+    /** @private */
+    _clearSelection() {
+        if (this.selectedProfiles.size === 0) return;
+        this.selectedProfiles.clear();
+        this.render();
+    }
+
+    /** @private */
+    _getSelectedProfiles() {
+        return this.app.state.profiles.filter((p) => this.selectedProfiles.has(p.id));
+    }
+
+    /** @private */
+    _renderBulkActions() {
+        const bar = createElement('div', 'sidebar-bulk-actions');
+        const count = createElement('span', 'sidebar-bulk-count', {
+            textContent: `${this.selectedProfiles.size} selected`,
+        });
+        bar.appendChild(count);
+
+        const actions = createElement('div', 'sidebar-bulk-buttons');
+        const makeBtn = (label, handler, className) => {
+            const btn = createElement('button', `btn btn-xs ${className || ''}`.trim(), {
+                textContent: label,
+            });
+            btn.addEventListener('click', handler);
+            actions.appendChild(btn);
+        };
+
+        makeBtn('Connect', () => this._bulkConnect());
+        makeBtn('Disconnect', () => this._bulkDisconnect(), 'btn-outline');
+        makeBtn('Tags', () => this._bulkEditTags(), 'btn-outline');
+        makeBtn('Move Group', () => this._bulkMoveGroup(), 'btn-outline');
+        makeBtn('Clear', () => this._clearSelection(), 'btn-ghost');
+
+        bar.appendChild(actions);
+        return bar;
+    }
+
+    /** @private */
+    _bulkConnect() {
+        const profiles = this._getSelectedProfiles();
+        for (const p of profiles) {
+            this.app.connectProfile(p.id);
+        }
+        this._clearSelection();
+    }
+
+    /** @private */
+    async _bulkDisconnect() {
+        const sessions = this.app.state.getAllSessions()
+            .filter((s) => this.selectedProfiles.has(s.profileId));
+        if (sessions.length === 0) {
+            this.app.notifications.info('No active sessions to disconnect');
+            return;
+        }
+
+        const ok = await this._confirmBulkDisconnect(sessions.length);
+        if (!ok) return;
+
+        for (const s of sessions) {
+            await this.app.closeSessionImmediate(s.id);
+        }
+        this._clearSelection();
+    }
+
+    /** @private */
+    async _bulkEditTags() {
+        const result = await this._promptTagEdit();
+        if (!result) return;
+
+        const profiles = this._getSelectedProfiles();
+        for (const p of profiles) {
+            const updated = JSON.parse(JSON.stringify(p));
+            const existing = updated.tags || [];
+            if (result.mode === 'replace') {
+                updated.tags = result.tags;
+            } else {
+                const merged = new Set([...existing, ...result.tags]);
+                updated.tags = [...merged];
+            }
+
+            try {
+                const saved = await window.go.api.Service.UpdateProfile(updated);
+                this.app.state.updateProfile(saved);
+            } catch (err) {
+                this.app.notifications.error('Failed to update tags: ' + err);
+            }
+        }
+
+        this.render();
+        this._clearSelection();
+    }
+
+    /** @private */
+    async _bulkMoveGroup() {
+        const folder = await this._promptGroupMove();
+        if (folder === null) return;
+
+        const profiles = this._getSelectedProfiles();
+        for (const p of profiles) {
+            const updated = JSON.parse(JSON.stringify(p));
+            updated.folder = folder;
+            try {
+                const saved = await window.go.api.Service.UpdateProfile(updated);
+                this.app.state.updateProfile(saved);
+            } catch (err) {
+                this.app.notifications.error('Failed to move group: ' + err);
+            }
+        }
+
+        this.render();
+        this._clearSelection();
+    }
+
+    /** @private */
+    _confirmBulkDisconnect(count) {
+        return new Promise((resolve) => {
+            const backdrop = createElement('div', 'modal-backdrop');
+            const modal = createElement('div', 'modal modal-sm');
+            modal.innerHTML = `
+                <div class="modal-header">
+                    <h3 class="modal-title">Disconnect Sessions</h3>
+                    <button class="btn btn-icon btn-xs modal-close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p style="font-size:var(--text-sm);color:var(--text-secondary)">
+                        Disconnect ${count} active ${count === 1 ? 'session' : 'sessions'}?
+                    </p>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-sm confirm-cancel">Cancel</button>
+                    <button class="btn btn-sm btn-danger confirm-ok">Disconnect</button>
+                </div>
+            `;
+            backdrop.appendChild(modal);
+            document.body.appendChild(backdrop);
+            requestAnimationFrame(() => {
+                backdrop.classList.add('is-visible');
+                modal.classList.add('is-visible');
+            });
+
+            const close = (val) => {
+                backdrop.classList.remove('is-visible');
+                modal.classList.remove('is-visible');
+                setTimeout(() => backdrop.remove(), 200);
+                resolve(val);
+            };
+            modal.querySelector('.modal-close').addEventListener('click', () => close(false));
+            modal.querySelector('.confirm-cancel').addEventListener('click', () => close(false));
+            modal.querySelector('.confirm-ok').addEventListener('click', () => close(true));
+            backdrop.addEventListener('click', (e) => { if (e.target === backdrop) close(false); });
+        });
+    }
+
+    /** @private */
+    _promptTagEdit() {
+        return new Promise((resolve) => {
+            const backdrop = createElement('div', 'modal-backdrop');
+            const modal = createElement('div', 'modal modal-sm');
+            modal.innerHTML = `
+                <div class="modal-header">
+                    <h3 class="modal-title">Edit Tags</h3>
+                    <button class="btn btn-icon btn-xs modal-close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label class="form-label">Tags (comma separated)</label>
+                        <input class="form-input tag-input" type="text" placeholder="prod, linux, db" />
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-sm confirm-cancel">Cancel</button>
+                    <button class="btn btn-sm btn-outline confirm-add">Add Tags</button>
+                    <button class="btn btn-sm btn-primary confirm-replace">Replace Tags</button>
+                </div>
+            `;
+            backdrop.appendChild(modal);
+            document.body.appendChild(backdrop);
+            requestAnimationFrame(() => {
+                backdrop.classList.add('is-visible');
+                modal.classList.add('is-visible');
+            });
+
+            const input = modal.querySelector('.tag-input');
+            const parseTags = () => {
+                const raw = (input.value || '').split(',');
+                return raw.map((t) => t.trim()).filter((t) => t.length > 0);
+            };
+
+            const close = (val) => {
+                backdrop.classList.remove('is-visible');
+                modal.classList.remove('is-visible');
+                setTimeout(() => backdrop.remove(), 200);
+                resolve(val);
+            };
+            modal.querySelector('.modal-close').addEventListener('click', () => close(null));
+            modal.querySelector('.confirm-cancel').addEventListener('click', () => close(null));
+            modal.querySelector('.confirm-add').addEventListener('click', () => {
+                close({ mode: 'add', tags: parseTags() });
+            });
+            modal.querySelector('.confirm-replace').addEventListener('click', () => {
+                close({ mode: 'replace', tags: parseTags() });
+            });
+            backdrop.addEventListener('click', (e) => { if (e.target === backdrop) close(null); });
+            setTimeout(() => input.focus(), 50);
+        });
+    }
+
+    /** @private */
+    _promptGroupMove() {
+        return new Promise((resolve) => {
+            const backdrop = createElement('div', 'modal-backdrop');
+            const modal = createElement('div', 'modal modal-sm');
+            modal.innerHTML = `
+                <div class="modal-header">
+                    <h3 class="modal-title">Move to Group</h3>
+                    <button class="btn btn-icon btn-xs modal-close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label class="form-label">Group name</label>
+                        <input class="form-input group-input" type="text" placeholder="e.g. Production" />
+                        <p style="font-size:var(--text-xs);color:var(--text-secondary);margin-top:6px;">
+                            Leave blank to remove the group.
+                        </p>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-sm confirm-cancel">Cancel</button>
+                    <button class="btn btn-sm btn-primary confirm-ok">Move</button>
+                </div>
+            `;
+            backdrop.appendChild(modal);
+            document.body.appendChild(backdrop);
+            requestAnimationFrame(() => {
+                backdrop.classList.add('is-visible');
+                modal.classList.add('is-visible');
+            });
+
+            const input = modal.querySelector('.group-input');
+            const close = (val) => {
+                backdrop.classList.remove('is-visible');
+                modal.classList.remove('is-visible');
+                setTimeout(() => backdrop.remove(), 200);
+                resolve(val);
+            };
+            modal.querySelector('.modal-close').addEventListener('click', () => close(null));
+            modal.querySelector('.confirm-cancel').addEventListener('click', () => close(null));
+            modal.querySelector('.confirm-ok').addEventListener('click', () => close(input.value.trim()));
+            backdrop.addEventListener('click', (e) => { if (e.target === backdrop) close(null); });
+            setTimeout(() => input.focus(), 50);
         });
     }
 

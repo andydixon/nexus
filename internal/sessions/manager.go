@@ -703,13 +703,40 @@ func (m *Manager) connectGitHub(sess *Session, getSecret func(prompt string) (st
 	// Validate the token.
 	login, err := client.ValidateToken(context.Background())
 	if err != nil {
-		return fmt.Errorf("GitHub authentication failed: %w", err)
+		if m.isGitHubAuthError(err) && getSecret != nil {
+			retryToken, retryErr := m.promptAndStoreSecret(
+				profile.ID,
+				"github-token",
+				ghConf.SecretMode,
+				getSecret,
+				"GitHub token did not work. Please enter a valid token:",
+			)
+			if retryErr == nil && retryToken != "" {
+				client = githubclient.New(ghConf.BaseURL, retryToken)
+				login, err = client.ValidateToken(context.Background())
+			}
+		}
+		if err != nil {
+			return fmt.Errorf("GitHub authentication failed: %w", err)
+		}
 	}
 
 	sess.githubClient = client
 
 	// Perform the initial fetch.
-	repos, err := client.FetchRepos(context.Background())
+	m.emitEvent("session:github:status", map[string]interface{}{
+		"sessionID": sess.Info.ID,
+		"status":    "Loading repositories...",
+	})
+	repos, err := client.FetchReposWithProgress(context.Background(), func(done int, total int) {
+		if total <= 0 {
+			return
+		}
+		m.emitEvent("session:github:status", map[string]interface{}{
+			"sessionID": sess.Info.ID,
+			"status":    fmt.Sprintf("Loading commit info (%d/%d)", done, total),
+		})
+	})
 	if err != nil {
 		return fmt.Errorf("fetching repositories: %w", err)
 	}
@@ -739,7 +766,19 @@ func (m *Manager) connectGitHub(sess *Session, getSecret func(prompt string) (st
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				updated, fetchErr := client.FetchRepos(ctx)
+				m.emitEvent("session:github:status", map[string]interface{}{
+					"sessionID": sess.Info.ID,
+					"status":    "Refreshing repositories...",
+				})
+				updated, fetchErr := client.FetchReposWithProgress(ctx, func(done int, total int) {
+					if total <= 0 {
+						return
+					}
+					m.emitEvent("session:github:status", map[string]interface{}{
+						"sessionID": sess.Info.ID,
+						"status":    fmt.Sprintf("Loading commit info (%d/%d)", done, total),
+					})
+				})
 				if fetchErr != nil {
 					m.emitEvent("session:github:error", map[string]interface{}{
 						"sessionID": sess.Info.ID,
@@ -783,6 +822,29 @@ func (m *Manager) FetchGitHubRepos(sessionID string) ([]models.GitHubRepo, error
 	})
 
 	return repos, nil
+}
+
+// DownloadGitHubArchive downloads a repository zip archive for a GitHub session.
+func (m *Manager) DownloadGitHubArchive(sessionID string, fullName string, ref string, destPath string) error {
+	m.mu.RLock()
+	sess, ok := m.sessions[sessionID]
+	m.mu.RUnlock()
+
+	if !ok {
+		return fmt.Errorf("sessions: session %q not found", sessionID)
+	}
+	if sess.githubClient == nil {
+		return fmt.Errorf("sessions: session %q is not a GitHub connection", sessionID)
+	}
+
+	if ref == "" {
+		ref = "HEAD"
+	}
+
+	if err := sess.githubClient.DownloadRepoArchive(context.Background(), fullName, ref, destPath); err != nil {
+		return fmt.Errorf("downloading archive: %w", err)
+	}
+	return nil
 }
 
 // ---------------------------------------------------------------------------
@@ -1177,6 +1239,47 @@ func (m *Manager) buildSecretCallback(profileID string, secretType string, mode 
 
 		return val, nil
 	}
+}
+
+// promptAndStoreSecret asks the user for a secret and stores it based on the mode.
+func (m *Manager) promptAndStoreSecret(profileID string, secretType string, mode models.SecretMode, getSecret func(prompt string) (string, error), prompt string) (string, error) {
+	if getSecret == nil {
+		return "", fmt.Errorf("no %s available and no prompt callback provided", secretType)
+	}
+	val, err := getSecret(prompt)
+	if err != nil {
+		return "", err
+	}
+	if val == "" {
+		return "", fmt.Errorf("%s cannot be empty", secretType)
+	}
+
+	if mode == models.SecretModeSaved {
+		stored := false
+		secretKey := fmt.Sprintf("profile:%s:%s", profileID, secretType)
+		if m.keychainStore != nil {
+			if sErr := m.keychainStore.SetSecret(secretKey, val); sErr == nil {
+				stored = true
+			}
+		}
+		if !stored && m.secretStore != nil && m.secretStore.IsUnlocked() {
+			_ = m.secretStore.SetSecret(secretKey, val)
+		}
+	}
+
+	return val, nil
+}
+
+// isGitHubAuthError checks whether an error indicates authentication failure.
+func (m *Manager) isGitHubAuthError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "token validation failed") ||
+		strings.Contains(msg, "authentication failed") ||
+		strings.Contains(msg, "http 401") ||
+		strings.Contains(msg, "http 403")
 }
 
 // closeSession shuts down the protocol client for a session.

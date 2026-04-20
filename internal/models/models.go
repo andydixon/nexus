@@ -199,6 +199,9 @@ type GitHubRepo struct {
 	Owner       string `json:"owner"`
 	Description string `json:"description"`
 	HTMLURL     string `json:"htmlURL"`
+	DefaultBranch string `json:"defaultBranch"`
+	LatestCommitter string `json:"latestCommitter"`
+	LatestCommitAt  string `json:"latestCommitAt"`
 	Private     bool   `json:"private"`
 	Fork        bool   `json:"fork"`
 	Archived    bool   `json:"archived"`

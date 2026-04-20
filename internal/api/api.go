@@ -10,6 +10,7 @@ import (
 	"net"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 
@@ -746,6 +747,46 @@ func (s *Service) GetAppInfo() map[string]string {
 // the given session. The updated list is also emitted as a Wails event.
 func (s *Service) RefreshGitHubRepos(sessionID string) ([]models.GitHubRepo, error) {
 	return s.sessions.FetchGitHubRepos(sessionID)
+}
+
+// DownloadGitHubRepoArchive downloads a repository zip archive to a local file.
+func (s *Service) DownloadGitHubRepoArchive(sessionID string, fullName string, ref string) (string, error) {
+	if s.ctx == nil {
+		return "", fmt.Errorf("application context not set")
+	}
+	if fullName == "" {
+		return "", fmt.Errorf("repository name cannot be empty")
+	}
+
+	parts := strings.Split(fullName, "/")
+	repoName := parts[len(parts)-1]
+	defaultName := repoName + ".zip"
+	if ref != "" {
+		safeRef := strings.ReplaceAll(ref, "/", "-")
+		defaultName = fmt.Sprintf("%s-%s.zip", repoName, safeRef)
+	}
+
+	path, err := wailsRuntime.SaveFileDialog(s.ctx, wailsRuntime.SaveDialogOptions{
+		Title:           "Download Repository",
+		DefaultFilename: defaultName,
+		Filters: []wailsRuntime.FileFilter{
+			{DisplayName: "Zip Archive (*.zip)", Pattern: "*.zip"},
+		},
+	})
+	if err != nil {
+		return "", fmt.Errorf("save dialog failed: %w", err)
+	}
+	if path == "" {
+		return "", fmt.Errorf("download cancelled")
+	}
+	if filepath.Ext(path) != ".zip" {
+		path += ".zip"
+	}
+
+	if err := s.sessions.DownloadGitHubArchive(sessionID, fullName, ref, path); err != nil {
+		return "", err
+	}
+	return path, nil
 }
 
 // ---------------------------------------------------------------------------

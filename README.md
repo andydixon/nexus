@@ -51,11 +51,11 @@ Built with [Wails v2](https://wails.io/) (Go backend, HTML/CSS/JS frontend, [xte
 
 ### What You'll Need
 
-| Tool | Version | Where to get it |
-|------|---------|-----------------|
-| Go | 1.23+ | [golang.org/dl](https://golang.org/dl/) |
-| Node.js | 18+ | [nodejs.org](https://nodejs.org/) |
-| Wails CLI | v2 | `go install github.com/wailsapp/wails/v2/cmd/wails@latest` |
+| Tool      | Version | Where to get it                                            |
+| --------- | ------- | ---------------------------------------------------------- |
+| Go        | 1.23+   | [golang.org/dl](https://golang.org/dl/)                    |
+| Node.js   | 18+     | [nodejs.org](https://nodejs.org/)                          |
+| Wails CLI | v2      | `go install github.com/wailsapp/wails/v2/cmd/wails@latest` |
 
 > **Linux users:** you'll also need GTK and WebKit system libraries. Run `wails doctor` to check your setup.
 
@@ -80,23 +80,23 @@ If you just want to connect to a server without setting up a full profile, press
 
 All shortcuts use **Cmd** on macOS and **Ctrl** on Windows/Linux.
 
-| Shortcut | Action |
-|----------|--------|
-| Cmd + K | Open command palette |
-| Cmd + N | New connection |
-| Cmd + W | Close current tab |
-| Cmd + Tab | Next tab |
-| Cmd + Shift + Tab | Previous tab |
-| Cmd + 1–9 | Switch to tab by number |
-| Cmd + , | Open settings |
-| Cmd + F | Find in terminal |
-| Cmd + Shift + D | Split pane vertically |
-| Cmd + Shift + E | Split pane horizontally |
-| Cmd + Shift + R | Toggle session recording |
-| Cmd + Shift + B | Toggle broadcast input mode |
-| Cmd + Shift + S | Open snippet library |
-| Cmd + Shift + Q | Quick connect |
-| F11 | Toggle fullscreen (Windows/Linux) |
+| Shortcut          | Action                            |
+| ----------------- | --------------------------------- |
+| Cmd + K           | Open command palette              |
+| Cmd + N           | New connection                    |
+| Cmd + W           | Close current tab                 |
+| Cmd + Tab         | Next tab                          |
+| Cmd + Shift + Tab | Previous tab                      |
+| Cmd + 1–9         | Switch to tab by number           |
+| Cmd + ,           | Open settings                     |
+| Cmd + F           | Find in terminal                  |
+| Cmd + Shift + D   | Split pane vertically             |
+| Cmd + Shift + E   | Split pane horizontally           |
+| Cmd + Shift + R   | Toggle session recording          |
+| Cmd + Shift + B   | Toggle broadcast input mode       |
+| Cmd + Shift + S   | Open snippet library              |
+| Cmd + Shift + Q   | Quick connect                     |
+| F11               | Toggle fullscreen (Windows/Linux) |
 
 ---
 
@@ -156,7 +156,7 @@ Press **Cmd+Shift+S** to open the snippet library. Save frequently-used commands
 Press **Cmd+F** to open the search overlay on the active terminal. Features include:
 
 - Case-sensitive toggle (**Aa** button)
-- Regular expression toggle (**.*** button)
+- Regular expression toggle (**.\*** button)
 - Match count indicator
 - Navigate through matches with up/down arrows or Enter/Shift+Enter
 
@@ -203,13 +203,13 @@ Nexus Terminal takes credential storage seriously. Your passwords and private ke
 
 ### How the Encryption Works
 
-| Detail | Value |
-|--------|-------|
-| Cipher | AES-256-GCM |
+| Detail         | Value                                              |
+| -------------- | -------------------------------------------------- |
+| Cipher         | AES-256-GCM                                        |
 | Key derivation | Argon2id — 128 MiB memory, 3 iterations, 4 threads |
-| Key length | 256 bits (32 bytes) |
-| Salt | 32 random bytes (unique per vault) |
-| Nonce | Random, prepended to ciphertext |
+| Key length     | 256 bits (32 bytes)                                |
+| Salt           | 32 random bytes (unique per vault)                 |
+| Nonce          | Random, prepended to ciphertext                    |
 
 ### TOTP/2FA
 
@@ -272,13 +272,13 @@ frontend/
 
 ## Building & Testing
 
-| Command | What it does |
-|---------|-------------|
-| `make deps` | Install Go modules and npm packages |
+| Command      | What it does                                              |
+| ------------ | --------------------------------------------------------- |
+| `make deps`  | Install Go modules and npm packages                       |
 | `make build` | Production build → `build/bin/nexus-terminal.app` (macOS) |
-| `make dev` | Development mode with hot reload |
-| `make test` | Run all Go tests (`go test ./... -v -count=1`) |
-| `make lint` | Run golangci-lint |
+| `make dev`   | Development mode with hot reload                          |
+| `make test`  | Run all Go tests (`go test ./... -v -count=1`)            |
+| `make lint`  | Run golangci-lint                                         |
 
 To run tests for a single package:
 
@@ -322,11 +322,11 @@ Then reopen your terminal so `gcc` is on `PATH` and retry `build.ps1`.
 
 ## Data Locations
 
-| Platform | Database | Vault | Recordings |
-|----------|----------|-------|------------|
-| macOS | `~/Library/Application Support/NexusTerminal/nexus.db` | `.../vault` | `.../recordings/` |
-| Linux | `~/.config/NexusTerminal/nexus.db` | `.../vault` | `.../recordings/` |
-| Windows | `%APPDATA%\NexusTerminal\nexus.db` | `...\vault` | `...\recordings\` |
+| Platform | Database                                               | Vault       | Recordings        |
+| -------- | ------------------------------------------------------ | ----------- | ----------------- |
+| macOS    | `~/Library/Application Support/NexusTerminal/nexus.db` | `.../vault` | `.../recordings/` |
+| Linux    | `~/.config/NexusTerminal/nexus.db`                     | `.../vault` | `.../recordings/` |
+| Windows  | `%APPDATA%\NexusTerminal\nexus.db`                     | `...\vault` | `...\recordings\` |
 
 The database uses SQLite in WAL (Write-Ahead Logging) mode. Migrations are embedded at compile time and applied automatically on startup.
 
@@ -360,9 +360,11 @@ Check the character encoding setting on the connection profile. Most modern serv
 
 **Build fails with "wails: command not found"**
 Install the Wails CLI:
+
 ```bash
 go install github.com/wailsapp/wails/v2/cmd/wails@latest
 ```
+
 Make sure `$GOPATH/bin` (or `$HOME/go/bin`) is in your `PATH`.
 
 ---

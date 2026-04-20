@@ -62,6 +62,10 @@ export function DisconnectSession(arg1) {
   return window['go']['api']['Service']['DisconnectSession'](arg1);
 }
 
+export function DownloadGitHubRepoArchive(arg1, arg2, arg3) {
+  return window['go']['api']['Service']['DownloadGitHubRepoArchive'](arg1, arg2, arg3);
+}
+
 export function DuplicateProfile(arg1) {
   return window['go']['api']['Service']['DuplicateProfile'](arg1);
 }

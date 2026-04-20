@@ -174,6 +174,12 @@
     margin-bottom: 2px;
 }
 
+.github-repo-commit {
+    font-size: var(--font-size-xs);
+    color: var(--text-muted);
+    margin-bottom: 4px;
+}
+
 .github-repo-name {
     font-size: var(--font-size-sm);
     font-weight: 600;
@@ -188,6 +194,35 @@
     font-weight: 500;
     text-transform: uppercase;
     letter-spacing: 0.03em;
+}
+
+.github-repo-actions {
+    margin-left: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+}
+
+.github-repo-download,
+.github-repo-visit {
+    padding: 0 6px;
+    height: 18px;
+    border-radius: var(--radius-full);
+    border: 1px solid var(--border-subtle);
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    font-size: 10px;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.github-repo-download:hover,
+.github-repo-visit:hover {
+    background: var(--bg-hover);
+    color: var(--protocol-github);
+    border-color: var(--protocol-github);
 }
 
 .github-repo-private {

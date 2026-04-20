@@ -183,12 +183,19 @@ class ProfileEditor {
         const testBtn = createElement('button', 'btn btn-outline', { textContent: 'Test' });
         const saveBtn = createElement('button', 'btn btn-primary', { textContent: isNew ? 'Create' : 'Save' });
         const connectBtn = createElement('button', 'btn btn-accent', { textContent: isNew ? 'Create & Connect' : 'Save & Connect' });
+        const deleteBtn = !isNew
+            ? createElement('button', 'btn btn-danger', { textContent: 'Delete' })
+            : null;
 
         cancelBtn.addEventListener('click', () => this.close());
         testBtn.addEventListener('click', () => this._testConnection());
         saveBtn.addEventListener('click', () => this._handleSave(false));
         connectBtn.addEventListener('click', () => this._handleSave(true));
+        if (deleteBtn) {
+            deleteBtn.addEventListener('click', () => this._handleDelete());
+        }
 
+        if (deleteBtn) footer.appendChild(deleteBtn);
         footer.appendChild(cancelBtn);
         footer.appendChild(testBtn);
         footer.appendChild(saveBtn);
@@ -1465,6 +1472,22 @@ class ProfileEditor {
     }
 
     /** @private */
+    async _handleDelete() {
+        const ok = await this._confirmDelete();
+        if (!ok) return;
+
+        try {
+            await window.go.api.Service.DeleteProfile(this._profile.id);
+            this.app.state.removeProfile(this._profile.id);
+            this.app.sidebar.render();
+            this.app.notifications.success('Profile deleted');
+            this.close();
+        } catch (err) {
+            this.app.notifications.error('Failed to delete profile: ' + err);
+        }
+    }
+
+    /** @private */
     async _testConnection() {
         this._collectFormValues();
         const errors = this._validate(this._profile);
@@ -1483,6 +1506,51 @@ class ProfileEditor {
         } catch (err) {
             this.app.notifications.error('Test failed: ' + err);
         }
+    }
+
+    /**
+     * Shows a confirmation modal for profile deletion.
+     * @returns {Promise<boolean>}
+     * @private
+     */
+    _confirmDelete() {
+        return new Promise((resolve) => {
+            const backdrop = createElement('div', 'modal-backdrop');
+            const modal = createElement('div', 'modal modal-sm');
+            const label = escapeHtml(this._profile.displayName || this._profile.host || 'Untitled');
+            modal.innerHTML = `
+                <div class="modal-header">
+                    <h3 class="modal-title">Delete Profile</h3>
+                    <button class="btn btn-icon btn-xs modal-close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p style="font-size:var(--text-sm);color:var(--text-secondary)">
+                        Delete <strong>${label}</strong>? This cannot be undone.
+                    </p>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-sm confirm-cancel">Cancel</button>
+                    <button class="btn btn-sm btn-danger confirm-ok">Delete</button>
+                </div>
+            `;
+            backdrop.appendChild(modal);
+            document.body.appendChild(backdrop);
+            requestAnimationFrame(() => {
+                backdrop.classList.add('is-visible');
+                modal.classList.add('is-visible');
+            });
+
+            const close = (val) => {
+                backdrop.classList.remove('is-visible');
+                modal.classList.remove('is-visible');
+                setTimeout(() => backdrop.remove(), 200);
+                resolve(val);
+            };
+            modal.querySelector('.modal-close').addEventListener('click', () => close(false));
+            modal.querySelector('.confirm-cancel').addEventListener('click', () => close(false));
+            modal.querySelector('.confirm-ok').addEventListener('click', () => close(true));
+            backdrop.addEventListener('click', (e) => { if (e.target === backdrop) close(false); });
+        });
     }
 
     // ── Utilities ────────────────────────────────────────────────────
