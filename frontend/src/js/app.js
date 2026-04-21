@@ -918,10 +918,7 @@
         "permission denied",
         "no supported methods",
       ];
-      const hostKeyPatterns = [
-        "host key",
-        "fingerprint",
-      ];
+      const hostKeyPatterns = ["host key", "fingerprint"];
 
       if (authPatterns.some((p) => msg.includes(p))) {
         return {
@@ -959,17 +956,23 @@
       const session = this.state.getSession(sessionId);
       const label = session?.tabName || session?.host || "Session";
       const body = `${info.message}\n\n${message}`;
-      this._showGuidedErrorModal(info.title, label, body, (action) => {
-        if (action === "edit" && session?.profileId) {
-          this.profileEditor.openEdit(session.profileId);
-        }
-        if (action === "retry") {
-          this.tabs._reconnect(sessionId);
-        }
-        if (action === "knownhosts") {
-          this.settings.openTab("knownhosts");
-        }
-      }, info.actions);
+      this._showGuidedErrorModal(
+        info.title,
+        label,
+        body,
+        (action) => {
+          if (action === "edit" && session?.profileId) {
+            this.profileEditor.openEdit(session.profileId);
+          }
+          if (action === "retry") {
+            this.tabs._reconnect(sessionId);
+          }
+          if (action === "knownhosts") {
+            this.settings.openTab("knownhosts");
+          }
+        },
+        info.actions,
+      );
     }
 
     /**
@@ -1005,15 +1008,20 @@
 
       const footer = modal.querySelector(".modal-footer");
       const addActionBtn = (label, action, primary) => {
-        const btn = createElement("button", `btn btn-sm${primary ? " btn-primary" : ""}`, {
-          textContent: label,
-        });
+        const btn = createElement(
+          "button",
+          `btn btn-sm${primary ? " btn-primary" : ""}`,
+          {
+            textContent: label,
+          },
+        );
         btn.addEventListener("click", () => close(action));
         footer.appendChild(btn);
       };
 
       addActionBtn("Close", null, false);
-      if (actions.includes("knownhosts")) addActionBtn("Known Hosts", "knownhosts", false);
+      if (actions.includes("knownhosts"))
+        addActionBtn("Known Hosts", "knownhosts", false);
       if (actions.includes("edit")) addActionBtn("Edit Profile", "edit", false);
       if (actions.includes("retry")) addActionBtn("Retry", "retry", true);
 
@@ -1024,7 +1032,9 @@
         if (action) onAction(action);
       };
 
-      modal.querySelector(".modal-close").addEventListener("click", () => close(null));
+      modal
+        .querySelector(".modal-close")
+        .addEventListener("click", () => close(null));
       backdrop.addEventListener("click", (e) => {
         if (e.target === backdrop) close(null);
       });

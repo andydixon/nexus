@@ -1,40 +1,41 @@
-(function() {
-/**
- * Nexus Terminal — settings modal.
- * Renders a tabbed settings dialog for application-wide preferences,
- * terminal defaults, security, known-hosts management, and about info.
- */
+(function () {
+  /**
+   * Nexus Terminal — settings modal.
+   * Renders a tabbed settings dialog for application-wide preferences,
+   * terminal defaults, security, known-hosts management, and about info.
+   */
 
-const { createElement, escapeHtml, formatTimestamp, $ } = window.NexusTerminal;
+  const { createElement, escapeHtml, formatTimestamp, $ } =
+    window.NexusTerminal;
 
-/** Settings tab definitions. */
-const TABS = [
-    { key: 'general', label: 'General' },
-    { key: 'terminal', label: 'Terminal' },
-    { key: 'security', label: 'Security' },
-    { key: 'knownhosts', label: 'Known Hosts' },
-    { key: 'help', label: 'Help' },
-    { key: 'about', label: 'About' },
-];
+  /** Settings tab definitions. */
+  const TABS = [
+    { key: "general", label: "General" },
+    { key: "terminal", label: "Terminal" },
+    { key: "security", label: "Security" },
+    { key: "knownhosts", label: "Known Hosts" },
+    { key: "help", label: "Help" },
+    { key: "about", label: "About" },
+  ];
 
-class Settings {
+  class Settings {
     /**
      * @param {App} app
      */
     constructor(app) {
-        this.app = app;
+      this.app = app;
 
-        /** @type {HTMLElement|null} */
-        this._overlay = null;
+      /** @type {HTMLElement|null} */
+      this._overlay = null;
 
-        /** @type {string} Currently active tab key. */
-        this._activeTab = 'general';
+      /** @type {string} Currently active tab key. */
+      this._activeTab = "general";
 
-        /** @type {Object} Working copy of preferences. */
-        this._prefs = {};
+      /** @type {Object} Working copy of preferences. */
+      this._prefs = {};
 
-        /** @type {Array<Object>} Cached known hosts list. */
-        this._knownHosts = [];
+      /** @type {Array<Object>} Cached known hosts list. */
+      this._knownHosts = [];
     }
 
     // ── Public API ───────────────────────────────────────────────────
@@ -43,16 +44,16 @@ class Settings {
      * Opens the settings modal.
      */
     async open(tabKey) {
-        this._prefs = JSON.parse(JSON.stringify(this.app.state.preferences));
-        this._activeTab = tabKey || this._activeTab || 'general';
+      this._prefs = JSON.parse(JSON.stringify(this.app.state.preferences));
+      this._activeTab = tabKey || this._activeTab || "general";
 
-        try {
-            this._knownHosts = await window.go.api.Service.ListKnownHosts() || [];
-        } catch (_) {
-            this._knownHosts = [];
-        }
+      try {
+        this._knownHosts = (await window.go.api.Service.ListKnownHosts()) || [];
+      } catch (_) {
+        this._knownHosts = [];
+      }
 
-        this._render();
+      this._render();
     }
 
     /**
@@ -60,107 +61,119 @@ class Settings {
      * @param {string} tabKey
      */
     async openTab(tabKey) {
-        this._activeTab = tabKey || 'general';
-        return this.open(this._activeTab);
+      this._activeTab = tabKey || "general";
+      return this.open(this._activeTab);
     }
 
     /**
      * Closes the settings modal.
      */
     close() {
-        if (this._overlay) {
-            this._overlay.remove();
-            this._overlay = null;
-        }
+      if (this._overlay) {
+        this._overlay.remove();
+        this._overlay = null;
+      }
     }
 
     /**
      * Saves the modified preferences to the backend.
      */
     async save() {
-        this._collectValues();
+      this._collectValues();
 
-        try {
-            await window.go.api.Service.SavePreferences(this._prefs);
-            this.app.state.setPreferences(this._prefs);
+      try {
+        await window.go.api.Service.SavePreferences(this._prefs);
+        this.app.state.setPreferences(this._prefs);
 
-            // Apply terminal colour theme change immediately.
-            if (this.app.terminals && this._prefs.terminalTheme) {
-                this.app.terminals.applyTheme(this._prefs.terminalTheme);
-            }
-            if (this.app && typeof this.app._applyPreferences === 'function') {
-                this.app._applyPreferences();
-            }
-
-            this.app.notifications.success('Settings saved');
-            this.close();
-        } catch (err) {
-            this.app.notifications.error('Failed to save settings: ' + err);
+        // Apply terminal colour theme change immediately.
+        if (this.app.terminals && this._prefs.terminalTheme) {
+          this.app.terminals.applyTheme(this._prefs.terminalTheme);
         }
+        if (this.app && typeof this.app._applyPreferences === "function") {
+          this.app._applyPreferences();
+        }
+
+        this.app.notifications.success("Settings saved");
+        this.close();
+      } catch (err) {
+        this.app.notifications.error("Failed to save settings: " + err);
+      }
     }
 
     // ── Rendering ────────────────────────────────────────────────────
 
     /** @private */
     _render() {
-        this.close();
+      this.close();
 
-        const overlay = createElement('div', 'modal-backdrop');
-        const modal = createElement('div', 'modal modal-settings');
+      const overlay = createElement("div", "modal-backdrop");
+      const modal = createElement("div", "modal modal-settings");
 
-        // Header
-        const header = createElement('div', 'modal-header');
-        header.innerHTML = `
+      // Header
+      const header = createElement("div", "modal-header");
+      header.innerHTML = `
             <h2 class="modal-title">Settings</h2>
             <button class="modal-close" aria-label="Close">&times;</button>
         `;
-        header.querySelector('.modal-close').addEventListener('click', () => this.close());
-        modal.appendChild(header);
+      header
+        .querySelector(".modal-close")
+        .addEventListener("click", () => this.close());
+      modal.appendChild(header);
 
-        // Tab bar
-        const tabBar = createElement('div', 'settings-tab-bar');
-        for (const tab of TABS) {
-            const btn = createElement('button', `settings-tab ${tab.key === this._activeTab ? 'active' : ''}`, {
-                textContent: tab.label,
-                dataset: { tab: tab.key },
-            });
-            btn.addEventListener('click', () => {
-                this._activeTab = tab.key;
-                this._renderBody(modal);
-                tabBar.querySelectorAll('.settings-tab').forEach((t) => {
-                    t.classList.toggle('active', t.dataset.tab === tab.key);
-                });
-            });
-            tabBar.appendChild(btn);
-        }
-        modal.appendChild(tabBar);
-
-        // Body (tab content)
-        const body = createElement('div', 'modal-body settings-body');
-        modal.appendChild(body);
-        this._renderTabContent(body);
-
-        // Footer
-        const footer = createElement('div', 'modal-footer');
-        const cancelBtn = createElement('button', 'btn btn-secondary', { textContent: 'Cancel' });
-        const saveBtn = createElement('button', 'btn btn-primary', { textContent: 'Save' });
-        cancelBtn.addEventListener('click', () => this.close());
-        saveBtn.addEventListener('click', () => this.save());
-        footer.appendChild(cancelBtn);
-        footer.appendChild(saveBtn);
-        modal.appendChild(footer);
-
-        overlay.appendChild(modal);
-        overlay.addEventListener('click', (e) => { if (e.target === overlay) this.close(); });
-        modal.addEventListener('click', (e) => e.stopPropagation());
-        document.body.appendChild(overlay);
-        this._overlay = overlay;
-
-        // Trigger visibility after append so CSS transitions animate
-        requestAnimationFrame(() => {
-            overlay.classList.add('is-visible');
-            modal.classList.add('is-visible');
+      // Tab bar
+      const tabBar = createElement("div", "settings-tab-bar");
+      for (const tab of TABS) {
+        const btn = createElement(
+          "button",
+          `settings-tab ${tab.key === this._activeTab ? "active" : ""}`,
+          {
+            textContent: tab.label,
+            dataset: { tab: tab.key },
+          },
+        );
+        btn.addEventListener("click", () => {
+          this._activeTab = tab.key;
+          this._renderBody(modal);
+          tabBar.querySelectorAll(".settings-tab").forEach((t) => {
+            t.classList.toggle("active", t.dataset.tab === tab.key);
+          });
         });
+        tabBar.appendChild(btn);
+      }
+      modal.appendChild(tabBar);
+
+      // Body (tab content)
+      const body = createElement("div", "modal-body settings-body");
+      modal.appendChild(body);
+      this._renderTabContent(body);
+
+      // Footer
+      const footer = createElement("div", "modal-footer");
+      const cancelBtn = createElement("button", "btn btn-secondary", {
+        textContent: "Cancel",
+      });
+      const saveBtn = createElement("button", "btn btn-primary", {
+        textContent: "Save",
+      });
+      cancelBtn.addEventListener("click", () => this.close());
+      saveBtn.addEventListener("click", () => this.save());
+      footer.appendChild(cancelBtn);
+      footer.appendChild(saveBtn);
+      modal.appendChild(footer);
+
+      overlay.appendChild(modal);
+      overlay.addEventListener("click", (e) => {
+        if (e.target === overlay) this.close();
+      });
+      modal.addEventListener("click", (e) => e.stopPropagation());
+      document.body.appendChild(overlay);
+      this._overlay = overlay;
+
+      // Trigger visibility after append so CSS transitions animate
+      requestAnimationFrame(() => {
+        overlay.classList.add("is-visible");
+        modal.classList.add("is-visible");
+      });
     }
 
     /**
@@ -169,8 +182,8 @@ class Settings {
      * @private
      */
     _renderBody(modal) {
-        const body = modal.querySelector('.settings-body');
-        if (body) this._renderTabContent(body);
+      const body = modal.querySelector(".settings-body");
+      if (body) this._renderTabContent(body);
     }
 
     /**
@@ -179,16 +192,28 @@ class Settings {
      * @private
      */
     _renderTabContent(body) {
-        body.innerHTML = '';
-        body.classList.remove('help-layout');
-        switch (this._activeTab) {
-            case 'general': this._renderGeneralTab(body); break;
-            case 'terminal': this._renderTerminalTab(body); break;
-            case 'security': this._renderSecurityTab(body); break;
-            case 'knownhosts': this._renderKnownHostsTab(body); break;
-            case 'help': this._renderHelpTab(body); break;
-            case 'about': this._renderAboutTab(body); break;
-        }
+      body.innerHTML = "";
+      body.classList.remove("help-layout");
+      switch (this._activeTab) {
+        case "general":
+          this._renderGeneralTab(body);
+          break;
+        case "terminal":
+          this._renderTerminalTab(body);
+          break;
+        case "security":
+          this._renderSecurityTab(body);
+          break;
+        case "knownhosts":
+          this._renderKnownHostsTab(body);
+          break;
+        case "help":
+          this._renderHelpTab(body);
+          break;
+        case "about":
+          this._renderAboutTab(body);
+          break;
+      }
     }
 
     // ── Tab content renderers ────────────────────────────────────────
@@ -199,24 +224,63 @@ class Settings {
      * @private
      */
     _renderGeneralTab(body) {
-        const p = this._prefs;
-        body.appendChild(this._settingField('select', 'theme', 'Theme', p.theme, {
+      const p = this._prefs;
+      body.appendChild(
+        this._settingField("select", "theme", "Theme", p.theme, {
+          options: [
+            { value: "dark", label: "Dark" },
+            { value: "light", label: "Light" },
+          ],
+        }),
+      );
+      body.appendChild(
+        this._settingField(
+          "select",
+          "defaultProtocol",
+          "Default Protocol",
+          p.defaultProtocol,
+          {
             options: [
-                { value: 'dark', label: 'Dark' },
-                { value: 'light', label: 'Light' },
+              { value: "ssh", label: "SSH" },
+              { value: "telnet", label: "Telnet" },
+              { value: "raw", label: "RAW" },
             ],
-        }));
-        body.appendChild(this._settingField('select', 'defaultProtocol', 'Default Protocol', p.defaultProtocol, {
-            options: [
-                { value: 'ssh', label: 'SSH' },
-                { value: 'telnet', label: 'Telnet' },
-                { value: 'raw', label: 'RAW' },
-            ],
-        }));
-        body.appendChild(this._settingField('toggle', 'confirmOnClose', 'Confirm on close', p.confirmOnClose));
-        body.appendChild(this._settingField('toggle', 'confirmOnDisconnect', 'Confirm on disconnect', p.confirmOnDisconnect));
-        body.appendChild(this._settingField('toggle', 'showStatusBar', 'Show status bar', p.showStatusBar));
-        body.appendChild(this._settingField('number', 'sidebarWidth', 'Sidebar width (px)', p.sidebarWidth, { min: 180, max: 500 }));
+          },
+        ),
+      );
+      body.appendChild(
+        this._settingField(
+          "toggle",
+          "confirmOnClose",
+          "Confirm on close",
+          p.confirmOnClose,
+        ),
+      );
+      body.appendChild(
+        this._settingField(
+          "toggle",
+          "confirmOnDisconnect",
+          "Confirm on disconnect",
+          p.confirmOnDisconnect,
+        ),
+      );
+      body.appendChild(
+        this._settingField(
+          "toggle",
+          "showStatusBar",
+          "Show status bar",
+          p.showStatusBar,
+        ),
+      );
+      body.appendChild(
+        this._settingField(
+          "number",
+          "sidebarWidth",
+          "Sidebar width (px)",
+          p.sidebarWidth,
+          { min: 180, max: 500 },
+        ),
+      );
     }
 
     /**
@@ -225,26 +289,66 @@ class Settings {
      * @private
      */
     _renderTerminalTab(body) {
-        const p = this._prefs;
+      const p = this._prefs;
 
-        // Terminal colour theme selector
-        const themes = window.NexusTerminal.listTerminalThemes();
-        body.appendChild(this._settingField('select', 'terminalTheme', 'Colour scheme', p.terminalTheme || 'charcoal', {
+      // Terminal colour theme selector
+      const themes = window.NexusTerminal.listTerminalThemes();
+      body.appendChild(
+        this._settingField(
+          "select",
+          "terminalTheme",
+          "Colour scheme",
+          p.terminalTheme || "charcoal",
+          {
             options: themes,
-        }));
+          },
+        ),
+      );
 
-        body.appendChild(this._settingField('text', 'defaultFontFamily', 'Font family', p.defaultFontFamily, {
-            placeholder: 'JetBrains Mono, Menlo, Monaco, Consolas, monospace',
-        }));
-        body.appendChild(this._settingField('number', 'defaultFontSize', 'Font size', p.defaultFontSize, { min: 8, max: 36 }));
-        body.appendChild(this._settingField('number', 'defaultScrollback', 'Scrollback lines', p.defaultScrollback, { min: 0, max: 100000 }));
-        body.appendChild(this._settingField('select', 'defaultCursorStyle', 'Cursor style', p.defaultCursorStyle, {
+      body.appendChild(
+        this._settingField(
+          "text",
+          "defaultFontFamily",
+          "Font family",
+          p.defaultFontFamily,
+          {
+            placeholder: "JetBrains Mono, Menlo, Monaco, Consolas, monospace",
+          },
+        ),
+      );
+      body.appendChild(
+        this._settingField(
+          "number",
+          "defaultFontSize",
+          "Font size",
+          p.defaultFontSize,
+          { min: 8, max: 36 },
+        ),
+      );
+      body.appendChild(
+        this._settingField(
+          "number",
+          "defaultScrollback",
+          "Scrollback lines",
+          p.defaultScrollback,
+          { min: 0, max: 100000 },
+        ),
+      );
+      body.appendChild(
+        this._settingField(
+          "select",
+          "defaultCursorStyle",
+          "Cursor style",
+          p.defaultCursorStyle,
+          {
             options: [
-                { value: 'block', label: 'Block' },
-                { value: 'underline', label: 'Underline' },
-                { value: 'bar', label: 'Bar' },
+              { value: "block", label: "Block" },
+              { value: "underline", label: "Underline" },
+              { value: "bar", label: "Bar" },
             ],
-        }));
+          },
+        ),
+      );
     }
 
     /**
@@ -253,63 +357,71 @@ class Settings {
      * @private
      */
     _renderSecurityTab(body) {
-        const storeState = this.app.state.secretStoreUnlocked ? 'Unlocked' : 'Locked';
-        const storeInit = this.app.state.secretStoreInitialised;
+      const storeState = this.app.state.secretStoreUnlocked
+        ? "Unlocked"
+        : "Locked";
+      const storeInit = this.app.state.secretStoreInitialised;
 
-        const statusRow = createElement('div', 'settings-row');
-        statusRow.innerHTML = `
+      const statusRow = createElement("div", "settings-row");
+      statusRow.innerHTML = `
             <span class="settings-label">Secret store</span>
-            <span class="settings-value ${this.app.state.secretStoreUnlocked ? 'text-success' : 'text-muted'}">${storeState}</span>
+            <span class="settings-value ${this.app.state.secretStoreUnlocked ? "text-success" : "text-muted"}">${storeState}</span>
         `;
-        body.appendChild(statusRow);
+      body.appendChild(statusRow);
 
-        if (!storeInit) {
-            const initBtn = createElement('button', 'btn btn-primary btn-sm', { textContent: 'Initialise Secret Store' });
-            initBtn.addEventListener('click', async () => {
-                try {
-                    const pw = await this.app.secretPrompt.promptMasterPassword(true);
-                    await window.go.api.Service.InitialiseSecretStore(pw);
-                    this.app.state.setSecretStoreInitialised(true);
-                    this.app.state.setSecretStoreState(true);
-                    this.app.notifications.success('Secret store created');
-                    this._renderTabContent(body);
-                } catch (err) {
-                    if (err.message !== 'User cancelled') {
-                        this.app.notifications.error('Failed to initialise: ' + err);
-                    }
-                }
-            });
-            body.appendChild(initBtn);
-        } else if (!this.app.state.secretStoreUnlocked) {
-            const unlockBtn = createElement('button', 'btn btn-primary btn-sm', { textContent: 'Unlock' });
-            unlockBtn.addEventListener('click', async () => {
-                try {
-                    const pw = await this.app.secretPrompt.promptMasterPassword(false);
-                    await window.go.api.Service.UnlockSecretStore(pw);
-                    this.app.state.setSecretStoreState(true);
-                    this.app.notifications.success('Secret store unlocked');
-                    this._renderTabContent(body);
-                } catch (err) {
-                    if (err.message !== 'User cancelled') {
-                        this.app.notifications.error('Unlock failed: ' + err);
-                    }
-                }
-            });
-            body.appendChild(unlockBtn);
-        } else {
-            const lockBtn = createElement('button', 'btn btn-outline btn-sm', { textContent: 'Lock' });
-            lockBtn.addEventListener('click', async () => {
-                try {
-                    await window.go.api.Service.LockSecretStore();
-                    this.app.state.setSecretStoreState(false);
-                    this.app.notifications.info('Secret store locked');
-                    this._renderTabContent(body);
-                } catch (err) {
-                    this.app.notifications.error('Lock failed: ' + err);
-                }
-            });
-            body.appendChild(lockBtn);
-        }
+      if (!storeInit) {
+        const initBtn = createElement("button", "btn btn-primary btn-sm", {
+          textContent: "Initialise Secret Store",
+        });
+        initBtn.addEventListener("click", async () => {
+          try {
+            const pw = await this.app.secretPrompt.promptMasterPassword(true);
+            await window.go.api.Service.InitialiseSecretStore(pw);
+            this.app.state.setSecretStoreInitialised(true);
+            this.app.state.setSecretStoreState(true);
+            this.app.notifications.success("Secret store created");
+            this._renderTabContent(body);
+          } catch (err) {
+            if (err.message !== "User cancelled") {
+              this.app.notifications.error("Failed to initialise: " + err);
+            }
+          }
+        });
+        body.appendChild(initBtn);
+      } else if (!this.app.state.secretStoreUnlocked) {
+        const unlockBtn = createElement("button", "btn btn-primary btn-sm", {
+          textContent: "Unlock",
+        });
+        unlockBtn.addEventListener("click", async () => {
+          try {
+            const pw = await this.app.secretPrompt.promptMasterPassword(false);
+            await window.go.api.Service.UnlockSecretStore(pw);
+            this.app.state.setSecretStoreState(true);
+            this.app.notifications.success("Secret store unlocked");
+            this._renderTabContent(body);
+          } catch (err) {
+            if (err.message !== "User cancelled") {
+              this.app.notifications.error("Unlock failed: " + err);
+            }
+          }
+        });
+        body.appendChild(unlockBtn);
+      } else {
+        const lockBtn = createElement("button", "btn btn-outline btn-sm", {
+          textContent: "Lock",
+        });
+        lockBtn.addEventListener("click", async () => {
+          try {
+            await window.go.api.Service.LockSecretStore();
+            this.app.state.setSecretStoreState(false);
+            this.app.notifications.info("Secret store locked");
+            this._renderTabContent(body);
+          } catch (err) {
+            this.app.notifications.error("Lock failed: " + err);
+          }
+        });
+        body.appendChild(lockBtn);
+      }
     }
 
     /**
@@ -318,13 +430,17 @@ class Settings {
      * @private
      */
     _renderKnownHostsTab(body) {
-        if (this._knownHosts.length === 0) {
-            body.appendChild(createElement('p', 'text-muted', { textContent: 'No known hosts recorded.' }));
-            return;
-        }
+      if (this._knownHosts.length === 0) {
+        body.appendChild(
+          createElement("p", "text-muted", {
+            textContent: "No known hosts recorded.",
+          }),
+        );
+        return;
+      }
 
-        const table = createElement('table', 'settings-table');
-        table.innerHTML = `
+      const table = createElement("table", "settings-table");
+      table.innerHTML = `
             <thead>
                 <tr>
                     <th>Host</th>
@@ -336,11 +452,11 @@ class Settings {
                 </tr>
             </thead>
         `;
-        const tbody = createElement('tbody');
+      const tbody = createElement("tbody");
 
-        for (const kh of this._knownHosts) {
-            const tr = createElement('tr');
-            tr.innerHTML = `
+      for (const kh of this._knownHosts) {
+        const tr = createElement("tr");
+        tr.innerHTML = `
                 <td>${escapeHtml(kh.host)}</td>
                 <td>${kh.port}</td>
                 <td><code>${escapeHtml(kh.keyType)}</code></td>
@@ -348,23 +464,25 @@ class Settings {
                 <td>${formatTimestamp(kh.firstSeen)}</td>
                 <td></td>
             `;
-            const deleteBtn = createElement('button', 'btn btn-xs btn-danger', { textContent: 'Remove' });
-            deleteBtn.addEventListener('click', async () => {
-                try {
-                    await window.go.api.Service.DeleteKnownHost(kh.id);
-                    this._knownHosts = this._knownHosts.filter((h) => h.id !== kh.id);
-                    this._renderTabContent(body);
-                    this.app.notifications.success('Known host removed');
-                } catch (err) {
-                    this.app.notifications.error('Failed to remove: ' + err);
-                }
-            });
-            tr.querySelector('td:last-child').appendChild(deleteBtn);
-            tbody.appendChild(tr);
-        }
+        const deleteBtn = createElement("button", "btn btn-xs btn-danger", {
+          textContent: "Remove",
+        });
+        deleteBtn.addEventListener("click", async () => {
+          try {
+            await window.go.api.Service.DeleteKnownHost(kh.id);
+            this._knownHosts = this._knownHosts.filter((h) => h.id !== kh.id);
+            this._renderTabContent(body);
+            this.app.notifications.success("Known host removed");
+          } catch (err) {
+            this.app.notifications.error("Failed to remove: " + err);
+          }
+        });
+        tr.querySelector("td:last-child").appendChild(deleteBtn);
+        tbody.appendChild(tr);
+      }
 
-        table.appendChild(tbody);
-        body.appendChild(table);
+      table.appendChild(tbody);
+      body.appendChild(table);
     }
 
     /**
@@ -373,8 +491,11 @@ class Settings {
      * @private
      */
     _renderHelpTab(body) {
-        const HELP_SECTIONS = [
-            { id: 'getting-started', title: 'Getting Started', content: `
+      const HELP_SECTIONS = [
+        {
+          id: "getting-started",
+          title: "Getting Started",
+          content: `
                 <p>Welcome to <strong>Nexus Terminal</strong> — a desktop application for connecting to remote servers via SSH, Telnet, and RAW TCP, as well as browsing your GitHub repositories.</p>
                 <h4>Creating Your First Connection</h4>
                 <ol>
@@ -388,8 +509,12 @@ class Settings {
                 <p>Need to connect quickly without saving a profile? Press <kbd>⌘⇧Q</kbd> / <kbd>Ctrl+Shift+Q</kbd> to open the quick connect dialog. Choose SSH, Telnet, or RAW, enter the host and port, and you're connected immediately.</p>
                 <h4>Managing Connections</h4>
                 <p>Right-click any connection in the sidebar to <strong>edit</strong>, <strong>duplicate</strong>, or <strong>delete</strong> it. You can drag connections between groups, and use the search box to filter by name, host, or tag.</p>
-            ` },
-            { id: 'ssh', title: 'SSH Connections', content: `
+            `,
+        },
+        {
+          id: "ssh",
+          title: "SSH Connections",
+          content: `
                 <p>SSH (Secure Shell) is the most common way to connect to remote servers. Nexus Terminal supports:</p>
                 <ul>
                     <li><strong>Password authentication</strong> — enter your password when prompted, or save it in the encrypted vault.</li>
@@ -420,8 +545,12 @@ class Settings {
                 <p>Each wait step has a configurable timeout (default 10 seconds). Steps execute in order after the connection is established.</p>
                 <h4>Auto-Reconnect</h4>
                 <p>Enable <strong>Auto-Reconnect</strong> in the Advanced section to automatically reconnect when the connection drops unexpectedly. Reconnection uses exponential backoff (1s, 2s, 4s, 8s... up to 30s). You can configure the maximum number of attempts (default 5).</p>
-            ` },
-            { id: 'telnet', title: 'Telnet Connections', content: `
+            `,
+        },
+        {
+          id: "telnet",
+          title: "Telnet Connections",
+          content: `
                 <p>Telnet is an older, unencrypted protocol still used for network equipment, legacy systems, and some fun internet services.</p>
                 <ul>
                     <li><strong>Option negotiation</strong> — Nexus Terminal handles standard Telnet options (echo, terminal type, window size) automatically.</li>
@@ -432,8 +561,12 @@ class Settings {
                     <li><strong>Auto-reconnect</strong> — automatically reconnect with exponential backoff when the connection drops.</li>
                 </ul>
                 <p><em>Note:</em> Telnet sends everything in plain text. Avoid using it for anything sensitive over an untrusted network.</p>
-            ` },
-            { id: 'raw', title: 'RAW TCP Connections', content: `
+            `,
+        },
+        {
+          id: "raw",
+          title: "RAW TCP Connections",
+          content: `
                 <p>RAW TCP lets you connect to any TCP port and exchange data directly — useful for debugging network services, testing APIs, or working with custom protocols.</p>
                 <ul>
                     <li><strong>Text view</strong> — shows incoming data as readable text.</li>
@@ -443,8 +576,12 @@ class Settings {
                     <li><strong>Line endings</strong> — choose CR, LF, or CRLF to match the remote service.</li>
                     <li><strong>Auto-reconnect</strong> — automatically reconnect if the connection drops.</li>
                 </ul>
-            ` },
-            { id: 'github', title: 'GitHub Connections', content: `
+            `,
+        },
+        {
+          id: "github",
+          title: "GitHub Connections",
+          content: `
                 <p>The GitHub connection type lets you browse your repositories without leaving Nexus Terminal.</p>
                 <h4>Setting Up</h4>
                 <ol>
@@ -454,8 +591,12 @@ class Settings {
                 </ol>
                 <h4>What You'll See</h4>
                 <p>Your repositories are listed grouped by organisation or owner, sorted by last commit date (newest first). The list refreshes automatically every few minutes.</p>
-            ` },
-            { id: 'sessions', title: 'Sessions & Tabs', content: `
+            `,
+        },
+        {
+          id: "sessions",
+          title: "Sessions & Tabs",
+          content: `
                 <h4>Tab Management</h4>
                 <ul>
                     <li><strong>Rename</strong> — right-click a tab and choose "Rename".</li>
@@ -484,8 +625,12 @@ class Settings {
                     <li><strong>Send Snippet</strong> — quickly send a saved command from the snippet library</li>
                     <li><strong>Clear</strong> / <strong>Reset</strong> — clear the terminal buffer</li>
                 </ul>
-            ` },
-            { id: 'power', title: 'Power Features', content: `
+            `,
+        },
+        {
+          id: "power",
+          title: "Power Features",
+          content: `
                 <h4>Snippet Library</h4>
                 <p>Press <kbd>⌘⇧S</kbd> / <kbd>Ctrl+Shift+S</kbd> to open the <strong>snippet library</strong>. Save frequently-used commands with a name, description, and optional folder and tags. Click <strong>Send to Session</strong> to inject a command into the active terminal. You can also access snippets from the right-click context menu.</p>
                 <h4>Terminal Search</h4>
@@ -502,8 +647,12 @@ class Settings {
                 <p>For SSH and Telnet connections, you can define expect-style login scripts — a sequence of "wait for text" and "send text" steps that execute automatically after connecting. Configure them in the <strong>Login Script</strong> section of the profile editor.</p>
                 <h4>Auto-Reconnect</h4>
                 <p>Enable auto-reconnect in a profile's settings to automatically reconnect when a connection drops. Uses exponential backoff with a configurable maximum number of attempts.</p>
-            ` },
-            { id: 'security', title: 'Security & Credentials', content: `
+            `,
+        },
+        {
+          id: "security",
+          title: "Security & Credentials",
+          content: `
                 <h4>How Your Passwords Are Stored</h4>
                 <p>Nexus Terminal uses a <strong>two-tier</strong> approach to keep your credentials safe:</p>
                 <ol>
@@ -519,8 +668,12 @@ class Settings {
                 <p>You can manage known hosts and change the verification policy in <strong>Settings → Known Hosts</strong>.</p>
                 <h4>Encrypted Export</h4>
                 <p>When exporting profiles, you can choose encrypted export (.nexus file) which protects the file with a password. This uses the same strong AES-256-GCM encryption as the vault.</p>
-            ` },
-            { id: 'shortcuts', title: 'Keyboard Shortcuts', content: `
+            `,
+        },
+        {
+          id: "shortcuts",
+          title: "Keyboard Shortcuts",
+          content: `
                 <p>On macOS, use <kbd>⌘</kbd> (Cmd). On Windows and Linux, use <kbd>Ctrl</kbd>.</p>
                 <table class="help-shortcuts-table">
                     <tbody>
@@ -541,16 +694,24 @@ class Settings {
                         <tr><td><kbd>F11</kbd></td><td>Toggle fullscreen (Windows/Linux)</td></tr>
                     </tbody>
                 </table>
-            ` },
-            { id: 'import-export', title: 'Import & Export', content: `
+            `,
+        },
+        {
+          id: "import-export",
+          title: "Import & Export",
+          content: `
                 <h4>Exporting Profiles</h4>
                 <p>Click the <strong>↗</strong> export button in the sidebar footer. You can choose which profiles to include, and set a password to encrypt the file. Exported files use the <code>.nexus</code> extension.</p>
                 <h4>Importing Profiles</h4>
                 <p>Click the <strong>↙</strong> import button. Select a <code>.nexus</code> file and enter the password used when exporting. Imported profiles will appear in your sidebar immediately.</p>
                 <h4>Importing from OpenSSH</h4>
                 <p>If you have an existing <code>~/.ssh/config</code> file, go to <strong>Settings → About</strong> and click <strong>Import ~/.ssh/config</strong>. Nexus Terminal will create profiles from your SSH Host blocks, including hostnames, usernames, ports, identity files, and jump hosts.</p>
-            ` },
-            { id: 'troubleshooting', title: 'Troubleshooting', content: `
+            `,
+        },
+        {
+          id: "troubleshooting",
+          title: "Troubleshooting",
+          content: `
                 <h4>I can't connect to my server</h4>
                 <ul>
                     <li>Double-check the <strong>hostname</strong> and <strong>port</strong> — a common mistake is using port 22 for Telnet (which is usually 23) or vice versa.</li>
@@ -599,8 +760,12 @@ class Settings {
                 <p>Make sure your system display scaling is set correctly. On macOS, Nexus Terminal is fully Retina-aware. On Windows, check your DPI settings in Display preferences.</p>
                 <h4>Export/import isn't working</h4>
                 <p>Ensure you're using the same password to import that was used to export. The encrypted <code>.nexus</code> files cannot be opened with the wrong password.</p>
-            ` },
-            { id: 'fun', title: 'Fun Things to Try', content: `
+            `,
+        },
+        {
+          id: "fun",
+          title: "Fun Things to Try",
+          content: `
                 <p>Nexus Terminal isn't just for work! Here are some entertaining things you can connect to:</p>
                 <h4>🌟 Star Wars in ASCII Art</h4>
                 <p>Create a <strong>Telnet</strong> connection to <code>towel.blinkenlights.nl</code> on port <strong>23</strong>. Sit back and enjoy the original Star Wars film retold entirely in ASCII art.</p>
@@ -616,41 +781,54 @@ class Settings {
                 <p>Create a <strong>RAW TCP</strong> connection to any HTTP server on port <strong>80</strong>, then type <code>GET / HTTP/1.0</code> followed by two blank lines. You'll see the raw HTTP response — a great way to understand how the web works under the hood.</p>
                 <h4>📢 Broadcast Mode Fun</h4>
                 <p>Open two or more sessions (e.g. to different servers) and press <kbd>⌘⇧B</kbd> / <kbd>Ctrl+Shift+B</kbd> to turn on broadcast mode. Everything you type goes to all sessions at once — try running <code>hostname</code> and watch them all respond with different names!</p>
-            ` },
-        ];
+            `,
+        },
+      ];
 
-        body.innerHTML = '';
+      body.innerHTML = "";
 
-        // Navigation sidebar
-        body.classList.add('help-layout');
-        var nav = createElement('div', 'help-nav');
-        var content = createElement('div', 'help-content');
+      // Navigation sidebar
+      body.classList.add("help-layout");
+      var nav = createElement("div", "help-nav");
+      var content = createElement("div", "help-content");
 
-        for (var i = 0; i < HELP_SECTIONS.length; i++) {
-            var section = HELP_SECTIONS[i];
-            var navItem = createElement('button', 'help-nav-item', {
-                textContent: section.title,
-                dataset: { section: section.id },
+      for (var i = 0; i < HELP_SECTIONS.length; i++) {
+        var section = HELP_SECTIONS[i];
+        var navItem = createElement("button", "help-nav-item", {
+          textContent: section.title,
+          dataset: { section: section.id },
+        });
+        navItem.addEventListener("mousedown", function (e) {
+          e.preventDefault();
+        });
+        (function (sec) {
+          navItem.addEventListener("click", function () {
+            nav.querySelectorAll(".help-nav-item").forEach(function (n) {
+              n.classList.remove("active");
             });
-            navItem.addEventListener('mousedown', function(e) { e.preventDefault(); });
-            (function(sec) {
-                navItem.addEventListener('click', function() {
-                    nav.querySelectorAll('.help-nav-item').forEach(function(n) { n.classList.remove('active'); });
-                    this.classList.add('active');
-                    content.innerHTML = '<h3 class="help-section-title">' + sec.title + '</h3>' + sec.content;
-                });
-            })(section);
-            nav.appendChild(navItem);
-        }
+            this.classList.add("active");
+            content.innerHTML =
+              '<h3 class="help-section-title">' +
+              sec.title +
+              "</h3>" +
+              sec.content;
+          });
+        })(section);
+        nav.appendChild(navItem);
+      }
 
-        body.appendChild(nav);
-        body.appendChild(content);
+      body.appendChild(nav);
+      body.appendChild(content);
 
-        // Show first section by default
-        if (nav.firstChild) {
-            nav.firstChild.classList.add('active');
-            content.innerHTML = '<h3 class="help-section-title">' + HELP_SECTIONS[0].title + '</h3>' + HELP_SECTIONS[0].content;
-        }
+      // Show first section by default
+      if (nav.firstChild) {
+        nav.firstChild.classList.add("active");
+        content.innerHTML =
+          '<h3 class="help-section-title">' +
+          HELP_SECTIONS[0].title +
+          "</h3>" +
+          HELP_SECTIONS[0].content;
+      }
     }
 
     /**
@@ -659,7 +837,7 @@ class Settings {
      * @private
      */
     _renderAboutTab(body) {
-        body.innerHTML = `
+      body.innerHTML = `
             <div class="about-section">
                 <h3 class="about-title">Nexus Terminal</h3>
                 <p class="about-version">Version 1.0.0</p>
@@ -678,47 +856,55 @@ class Settings {
             </div>
         `;
 
-        const updateBtn = body.querySelector('#settings-check-update');
-        if (updateBtn) {
-            updateBtn.addEventListener('click', async () => {
-                updateBtn.disabled = true;
-                updateBtn.textContent = 'Checking…';
-                try {
-                    const info = await window.go.api.Service.CheckForUpdates();
-                    const resultEl = body.querySelector('#settings-update-result');
-                    if (info.available) {
-                        resultEl.innerHTML = `<span style="color:var(--accent)">Update available: <strong>${info.latestVersion}</strong></span>` +
-                            (info.releaseURL ? ` — <a href="#" onclick="window.runtime.BrowserOpenURL('${info.releaseURL}');return false;" style="color:var(--accent)">View release</a>` : '');
-                    } else {
-                        resultEl.textContent = 'You are running the latest version.';
-                    }
-                } catch (err) {
-                    const resultEl = body.querySelector('#settings-update-result');
-                    resultEl.textContent = 'Update check failed: ' + err;
-                } finally {
-                    updateBtn.disabled = false;
-                    updateBtn.textContent = 'Check for Updates';
-                }
-            });
-        }
+      const updateBtn = body.querySelector("#settings-check-update");
+      if (updateBtn) {
+        updateBtn.addEventListener("click", async () => {
+          updateBtn.disabled = true;
+          updateBtn.textContent = "Checking…";
+          try {
+            const info = await window.go.api.Service.CheckForUpdates();
+            const resultEl = body.querySelector("#settings-update-result");
+            if (info.available) {
+              resultEl.innerHTML =
+                `<span style="color:var(--accent)">Update available: <strong>${info.latestVersion}</strong></span>` +
+                (info.releaseURL
+                  ? ` — <a href="#" onclick="window.runtime.BrowserOpenURL('${info.releaseURL}');return false;" style="color:var(--accent)">View release</a>`
+                  : "");
+            } else {
+              resultEl.textContent = "You are running the latest version.";
+            }
+          } catch (err) {
+            const resultEl = body.querySelector("#settings-update-result");
+            resultEl.textContent = "Update check failed: " + err;
+          } finally {
+            updateBtn.disabled = false;
+            updateBtn.textContent = "Check for Updates";
+          }
+        });
+      }
 
-        const importBtn = body.querySelector('#settings-import-sshconfig');
-        if (importBtn) {
-            importBtn.addEventListener('click', async () => {
-                importBtn.disabled = true;
-                importBtn.textContent = 'Importing…';
-                try {
-                    const count = await window.go.api.Service.ImportSSHConfig('', 'SSH Config');
-                    this.app.notifications.success(`Imported ${count} host(s) from ~/.ssh/config`);
-                    await this.app.loadProfiles();
-                } catch (err) {
-                    this.app.notifications.error('SSH config import failed: ' + err);
-                } finally {
-                    importBtn.disabled = false;
-                    importBtn.textContent = 'Import ~/.ssh/config';
-                }
-            });
-        }
+      const importBtn = body.querySelector("#settings-import-sshconfig");
+      if (importBtn) {
+        importBtn.addEventListener("click", async () => {
+          importBtn.disabled = true;
+          importBtn.textContent = "Importing…";
+          try {
+            const count = await window.go.api.Service.ImportSSHConfig(
+              "",
+              "SSH Config",
+            );
+            this.app.notifications.success(
+              `Imported ${count} host(s) from ~/.ssh/config`,
+            );
+            await this.app.loadProfiles();
+          } catch (err) {
+            this.app.notifications.error("SSH config import failed: " + err);
+          } finally {
+            importBtn.disabled = false;
+            importBtn.textContent = "Import ~/.ssh/config";
+          }
+        });
+      }
     }
 
     // ── Form helpers ─────────────────────────────────────────────────
@@ -734,71 +920,79 @@ class Settings {
      * @private
      */
     _settingField(type, name, label, value, opts = {}) {
-        const group = createElement('div', 'form-group settings-field');
-        const labelEl = createElement('label', 'form-label', { textContent: label, for: `setting-${name}` });
-        group.appendChild(labelEl);
+      const group = createElement("div", "form-group settings-field");
+      const labelEl = createElement("label", "form-label", {
+        textContent: label,
+        for: `setting-${name}`,
+      });
+      group.appendChild(labelEl);
 
-        let input;
-        switch (type) {
-            case 'text':
-                input = createElement('input', 'form-input', {
-                    type: 'text',
-                    id: `setting-${name}`,
-                    name: `setting-${name}`,
-                    value: value || '',
-                    placeholder: opts.placeholder || '',
-                });
-                break;
+      let input;
+      switch (type) {
+        case "text":
+          input = createElement("input", "form-input", {
+            type: "text",
+            id: `setting-${name}`,
+            name: `setting-${name}`,
+            value: value || "",
+            placeholder: opts.placeholder || "",
+          });
+          break;
 
-            case 'number':
-                input = createElement('input', 'form-input', {
-                    type: 'number',
-                    id: `setting-${name}`,
-                    name: `setting-${name}`,
-                    value: value != null ? String(value) : '',
-                });
-                if (opts.min != null) input.min = opts.min;
-                if (opts.max != null) input.max = opts.max;
-                break;
+        case "number":
+          input = createElement("input", "form-input", {
+            type: "number",
+            id: `setting-${name}`,
+            name: `setting-${name}`,
+            value: value != null ? String(value) : "",
+          });
+          if (opts.min != null) input.min = opts.min;
+          if (opts.max != null) input.max = opts.max;
+          break;
 
-            case 'select':
-                input = createElement('select', 'form-select', {
-                    id: `setting-${name}`,
-                    name: `setting-${name}`,
-                });
-                for (const opt of (opts.options || [])) {
-                    const option = createElement('option', '', { value: opt.value, textContent: opt.label });
-                    if (opt.value === value) option.selected = true;
-                    input.appendChild(option);
-                }
-                break;
+        case "select":
+          input = createElement("select", "form-select", {
+            id: `setting-${name}`,
+            name: `setting-${name}`,
+          });
+          for (const opt of opts.options || []) {
+            const option = createElement("option", "", {
+              value: opt.value,
+              textContent: opt.label,
+            });
+            if (opt.value === value) option.selected = true;
+            input.appendChild(option);
+          }
+          break;
 
-            case 'toggle': {
-                const wrapper = createElement('div', 'form-toggle-wrapper');
-                input = createElement('input', 'form-toggle', {
-                    type: 'checkbox',
-                    id: `setting-${name}`,
-                    name: `setting-${name}`,
-                });
-                input.checked = !!value;
-                const slider = createElement('label', 'form-toggle-label', { for: `setting-${name}` });
-                wrapper.appendChild(input);
-                wrapper.appendChild(slider);
-                group.appendChild(wrapper);
-                return group;
-            }
-
-            default:
-                input = createElement('input', 'form-input', {
-                    type: 'text',
-                    id: `setting-${name}`,
-                    name: `setting-${name}`,
-                    value: value || '',
-                });
+        case "toggle": {
+          const wrapper = createElement("div", "form-toggle-wrapper");
+          input = createElement("input", "form-toggle", {
+            type: "checkbox",
+            id: `setting-${name}`,
+            name: `setting-${name}`,
+          });
+          input.checked = !!value;
+          const slider = createElement("label", "form-toggle-label", {
+            for: `setting-${name}`,
+          });
+          wrapper.appendChild(input);
+          wrapper.appendChild(slider);
+          group.appendChild(wrapper);
+          return group;
         }
 
-        group.appendChild(input);
-        return group;
+        default:
+          input = createElement("input", "form-input", {
+            type: "text",
+            id: `setting-${name}`,
+            name: `setting-${name}`,
+            value: value || "",
+          });
+      }
+
+      group.appendChild(input);
+      return group;
     }
 
     /**
@@ -806,32 +1000,39 @@ class Settings {
      * @private
      */
     _collectValues() {
-        if (!this._overlay) return;
+      if (!this._overlay) return;
 
-        const val = (name) => {
-            const el = this._overlay.querySelector(`[name="setting-${name}"]`);
-            if (!el) return undefined;
-            if (el.type === 'checkbox') return el.checked;
-            if (el.type === 'number') return el.value !== '' ? Number(el.value) : 0;
-            return el.value;
-        };
+      const val = (name) => {
+        const el = this._overlay.querySelector(`[name="setting-${name}"]`);
+        if (!el) return undefined;
+        if (el.type === "checkbox") return el.checked;
+        if (el.type === "number") return el.value !== "" ? Number(el.value) : 0;
+        return el.value;
+      };
 
-        const fields = [
-            'theme', 'terminalTheme', 'defaultProtocol', 'confirmOnClose', 'confirmOnDisconnect',
-            'showStatusBar', 'sidebarWidth', 'defaultFontFamily', 'defaultFontSize',
-            'defaultScrollback', 'defaultCursorStyle',
-        ];
+      const fields = [
+        "theme",
+        "terminalTheme",
+        "defaultProtocol",
+        "confirmOnClose",
+        "confirmOnDisconnect",
+        "showStatusBar",
+        "sidebarWidth",
+        "defaultFontFamily",
+        "defaultFontSize",
+        "defaultScrollback",
+        "defaultCursorStyle",
+      ];
 
-        for (const field of fields) {
-            const v = val(field);
-            if (v !== undefined) {
-                this._prefs[field] = v;
-            }
+      for (const field of fields) {
+        const v = val(field);
+        if (v !== undefined) {
+          this._prefs[field] = v;
         }
+      }
     }
-}
+  }
 
-window.NexusTerminal = window.NexusTerminal || {};
-window.NexusTerminal.Settings = Settings;
-
+  window.NexusTerminal = window.NexusTerminal || {};
+  window.NexusTerminal.Settings = Settings;
 })();

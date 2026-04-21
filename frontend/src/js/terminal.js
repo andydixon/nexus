@@ -214,6 +214,10 @@
         searchAddon,
         webLinksAddon,
         observer,
+        decoder:
+          typeof TextDecoder !== "undefined"
+            ? new TextDecoder("utf-8")
+            : null,
       });
 
       return term;
@@ -230,7 +234,16 @@
 
       try {
         const raw = atob(base64Data);
-        entry.term.write(raw);
+        if (entry.decoder) {
+          const bytes = new Uint8Array(raw.length);
+          for (let i = 0; i < raw.length; i++) {
+            bytes[i] = raw.charCodeAt(i);
+          }
+          const text = entry.decoder.decode(bytes, { stream: true });
+          entry.term.write(text);
+        } else {
+          entry.term.write(raw);
+        }
       } catch (err) {
         console.error("Failed to decode session data:", err);
       }
