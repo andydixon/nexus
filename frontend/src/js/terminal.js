@@ -102,6 +102,21 @@
         });
       }
 
+      // Drag-and-drop file handling
+      container.addEventListener("dragover", (e) => {
+        if (e.dataTransfer && Array.from(e.dataTransfer.types || []).includes("Files")) {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = "copy";
+        }
+      });
+      container.addEventListener("drop", (e) => {
+        const files = e.dataTransfer ? e.dataTransfer.files : null;
+        if (!files || files.length === 0) return;
+        e.preventDefault();
+        e.stopPropagation();
+        this._handleFileDrop(sessionId, term, files);
+      });
+
       // Force a synchronous layout reflow so the container reports its
       // true dimensions, then fit the terminal to fill the space.
       // eslint-disable-next-line no-unused-expressions
@@ -507,6 +522,526 @@
         menu.style.left = `${window.innerWidth - rect.width - 8}px`;
       if (rect.bottom > window.innerHeight)
         menu.style.top = `${window.innerHeight - rect.height - 8}px`;
+    }
+
+    _handleFileDrop(sessionId, term, fileList) {
+      const session = this.app.state.getSession(sessionId);
+      if (!session) return;
+
+      const files = Array.from(fileList || []);
+      if (files.length === 0) return;
+
+      const canUpload = session.protocol === "ssh";
+      this._promptFileDropAction(files, canUpload).then((choice) => {
+        if (!choice) return;
+        if (choice === "paste") {
+          this._pasteFileContents(files, term);
+          return;
+        }
+        if (choice === "upload") {
+          if (!canUpload) {
+            this.app.notifications.error("Upload is only available for SSH sessions.");
+            return;
+          }
+          this._uploadDroppedFiles(sessionId, files);
+        }
+      });
+    }
+
+    _promptFileDropAction(files, canUpload) {
+      const { createElement, formatBytes } = window.NexusTerminal;
+      return new Promise((resolve) => {
+        const backdrop = createElement("div", "modal-backdrop");
+        const modal = createElement("div", "modal modal-sm");
+        const count = files.length;
+        const first = files[0];
+        const sizeLabel = first && typeof first.size === "number" ? formatBytes(first.size) : "";
+        const title = count === 1 ? (first ? first.name : "File") : count + " files";
+
+        modal.innerHTML = `
+                <div class="modal-header">
+                    <h3 class="modal-title">File Drop</h3>
+                    <button class="btn btn-icon btn-xs modal-close">x</button>
+                </div>
+                <div class="modal-body">
+                    <p style="font-size:var(--text-sm);color:var(--text-secondary)">
+                        <strong>${title}</strong>${count === 1 && sizeLabel ? " (" + sizeLabel + ")" : ""}
+                    </p>
+                    <p style="font-size:var(--text-sm);color:var(--text-tertiary)">
+                      Choose what to do with the dropped ${count === 1 ? "file" : "files"}.
+                    </p>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-sm prompt-cancel">Cancel</button>
+                    <button class="btn btn-sm btn-secondary action-paste">Paste contents</button>
+                    <button class="btn btn-sm btn-primary action-upload">Upload to current directory</button>
+                </div>
+            `;
+
+        backdrop.appendChild(modal);
+        document.body.appendChild(backdrop);
+        requestAnimationFrame(() => {
+          backdrop.classList.add("is-visible");
+          modal.classList.add("is-visible");
+        });
+
+        const uploadBtn = modal.querySelector(".action-upload");
+        if (!canUpload) {
+          uploadBtn.disabled = true;
+          uploadBtn.title = "Upload is only available for SSH sessions.";
+        }
+
+        const close = (value) => {
+          backdrop.classList.remove("is-visible");
+          modal.classList.remove("is-visible");
+          setTimeout(() => backdrop.remove(), 200);
+          resolve(value);
+        };
+
+        modal
+          .querySelector(".modal-close")
+          .addEventListener("click", () => close(null));
+        modal
+          .querySelector(".prompt-cancel")
+          .addEventListener("click", () => close(null));
+        modal
+          .querySelector(".action-paste")
+          .addEventListener("click", () => close("paste"));
+        uploadBtn.addEventListener("click", () => close("upload"));
+        backdrop.addEventListener("click", (e) => {
+          if (e.target === backdrop) close(null);
+        });
+      });
+    }
+
+    _pasteFileContents(files, term) {
+      const readFile = (file) =>
+        new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result || "");
+          reader.onerror = () => reject(new Error("read failed"));
+          reader.readAsText(file);
+        });
+
+      const run = async () => {
+        try {
+          let combined = "";
+          for (let i = 0; i < files.length; i += 1) {
+            const text = await readFile(files[i]);
+            if (text) {
+              if (combined) combined += "\n";
+              combined += text;
+            }
+          }
+          if (combined) term.paste(combined);
+        } catch (_) {
+          this.app.notifications.error("Failed to read file contents.");
+        }
+      };
+
+      run();
+    }
+
+    _uploadDroppedFiles(sessionId, files) {
+      const run = async () => {
+        const remoteDir = await this._promptUploadDirectory(sessionId);
+        if (!remoteDir) return;
+
+        if (files.length > 1) {
+          this.app.notifications.info("Uploading " + files.length + " files...");
+        }
+
+        for (let i = 0; i < files.length; i += 1) {
+          const file = files[i];
+          try {
+            const buffer = await this._readFileBuffer(file);
+            const base64Data = this._arrayBufferToBase64(buffer);
+            await window.go.api.Service.SFTPUploadData(
+              sessionId,
+              remoteDir,
+              file.name,
+              base64Data,
+            );
+          } catch (err) {
+            const msg = err && err.message ? err.message : String(err);
+            this.app.notifications.error("Upload failed for " + file.name + ": " + msg);
+            return;
+          }
+        }
+
+        if (files.length === 1) {
+          this.app.notifications.success("Uploaded " + files[0].name);
+        } else {
+          this.app.notifications.success("Uploaded " + files.length + " files");
+        }
+      };
+
+      run().catch((err) => {
+        const msg = err && err.message ? err.message : String(err);
+        this.app.notifications.error("Upload failed: " + msg);
+      });
+    }
+
+    _readFileBuffer(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(new Error("read failed"));
+        reader.readAsArrayBuffer(file);
+      });
+    }
+
+    async _promptUploadDirectory(sessionId) {
+      return this._openUploadDirectoryPicker(sessionId);
+    }
+
+    _openUploadDirectoryPicker(sessionId) {
+      const { createElement, escapeHtml } = window.NexusTerminal;
+      return new Promise((resolve) => {
+        const backdrop = createElement("div", "modal-backdrop");
+        const modal = createElement("div", "modal modal-lg");
+        modal.innerHTML = `
+                <div class="modal-header">
+                    <h3 class="modal-title">Select Upload Directory</h3>
+                    <button class="btn btn-icon btn-xs modal-close">x</button>
+                </div>
+                <div class="modal-body sftp-picker-body">
+                  <div class="sftp-toolbar">
+                    <div class="sftp-breadcrumb" data-role="breadcrumb"></div>
+                    <input class="sftp-picker-filter" type="text" placeholder="Filter folders" />
+                    <div class="sftp-toolbar-actions">
+                      <button class="sftp-toolbar-btn sftp-picker-up" title="Up">Up</button>
+                      <button class="sftp-toolbar-btn sftp-picker-refresh" title="Refresh">Ref</button>
+                    </div>
+                  </div>
+                    <div class="sftp-file-list sftp-picker-list"></div>
+                </div>
+                <div class="modal-footer">
+                  <div class="modal-footer-left">
+                    <span class="form-help sftp-picker-path"></span>
+                    <span class="sftp-picker-status"></span>
+                    <span class="sftp-picker-legend">
+                      <span class="sftp-picker-badge is-readonly">READ ONLY</span>
+                      <span class="sftp-picker-badge is-noread">NO READ</span>
+                    </span>
+                  </div>
+                  <button class="btn btn-sm prompt-cancel">Cancel</button>
+                  <button class="btn btn-sm btn-primary prompt-ok">Use this folder</button>
+                </div>
+            `;
+
+        backdrop.appendChild(modal);
+        document.body.appendChild(backdrop);
+        requestAnimationFrame(() => {
+          backdrop.classList.add("is-visible");
+          modal.classList.add("is-visible");
+        });
+
+        const listEl = modal.querySelector(".sftp-picker-list");
+        const breadcrumbEl = modal.querySelector("[data-role=\"breadcrumb\"]");
+        const pathLabel = modal.querySelector(".sftp-picker-path");
+        const upBtn = modal.querySelector(".sftp-picker-up");
+        const refreshBtn = modal.querySelector(".sftp-picker-refresh");
+        const useBtn = modal.querySelector(".prompt-ok");
+        const filterInput = modal.querySelector(".sftp-picker-filter");
+        const statusLabel = modal.querySelector(".sftp-picker-status");
+
+        const state = {
+          cwd: "",
+          selected: "",
+          selectedWritable: true,
+          cwdWritable: true,
+          entries: [],
+          visibleEntries: [],
+          loading: false,
+          filter: "",
+          cursorIndex: -1,
+        };
+
+        const close = (value) => {
+          backdrop.classList.remove("is-visible");
+          modal.classList.remove("is-visible");
+          setTimeout(() => backdrop.remove(), 200);
+          resolve(value);
+        };
+
+        modal
+          .querySelector(".modal-close")
+          .addEventListener("click", () => close(null));
+        modal
+          .querySelector(".prompt-cancel")
+          .addEventListener("click", () => close(null));
+        useBtn.addEventListener("click", () => close(state.selected || state.cwd));
+        backdrop.addEventListener("click", (e) => {
+          if (e.target === backdrop) close(null);
+        });
+
+        const renderBreadcrumb = () => {
+          breadcrumbEl.innerHTML = "";
+          const segments = this._pathSegments(state.cwd);
+          for (let i = 0; i < segments.length; i += 1) {
+            if (i > 0) {
+              breadcrumbEl.appendChild(
+                createElement("span", "sftp-breadcrumb-sep", { textContent: ">" }),
+              );
+            }
+            const seg = segments[i];
+            const btn = createElement("button", "sftp-breadcrumb-segment", {
+              textContent: seg.label,
+              title: seg.path,
+            });
+            btn.addEventListener("click", () => loadDir(seg.path));
+            breadcrumbEl.appendChild(btn);
+          }
+        };
+
+        const updateStatus = () => {
+          if (state.selected) {
+            statusLabel.textContent = state.selectedWritable ? "" : "No write permission";
+          } else {
+            statusLabel.textContent = state.cwdWritable ? "" : "Current folder is read only";
+          }
+        };
+
+        const setSelection = (entry, index) => {
+          listEl.querySelectorAll(".sftp-file-row").forEach((el) => {
+            el.classList.remove("is-selected");
+          });
+          const row = listEl.querySelector(`.sftp-file-row[data-index="${index}"]`);
+          if (row) row.classList.add("is-selected");
+          state.selected = entry.path;
+          state.selectedWritable = entry.canWrite !== false;
+          state.cursorIndex = index;
+          pathLabel.textContent = entry.path;
+          useBtn.disabled = !state.selectedWritable;
+          useBtn.title = state.selectedWritable ? "" : "No write permission";
+          updateStatus();
+        };
+
+        const renderList = () => {
+          listEl.innerHTML = "";
+          const basePath = state.selected || state.cwd || "";
+          const suffix = state.selected ? "" : (state.cwdWritable ? "" : " (read only)");
+          pathLabel.textContent = basePath + suffix;
+
+          if (state.cwd && state.cwd !== "/") {
+            const parentRow = this._buildPickerRow({
+              name: "..",
+              isDir: true,
+              path: this._parentPath(state.cwd),
+            });
+            parentRow.classList.add("is-parent");
+            parentRow.addEventListener("dblclick", () => loadDir(parentRow.dataset.path));
+            listEl.appendChild(parentRow);
+          }
+
+          const filtered = state.filter
+            ? state.entries.filter((entry) => entry.name.toLowerCase().includes(state.filter))
+            : state.entries;
+          state.visibleEntries = filtered;
+
+          if (!filtered.length) {
+            const empty = createElement("div", "sftp-state");
+            empty.innerHTML = "<div class=\"sftp-state-icon\">D</div><div class=\"sftp-state-msg\">No folders found</div>";
+            listEl.appendChild(empty);
+            state.cursorIndex = -1;
+            updateStatus();
+            return;
+          }
+
+          filtered.forEach((entry, index) => {
+            const row = this._buildPickerRow(entry, index);
+            if (entry.canRead === false) {
+              row.classList.add("is-unreadable");
+            }
+            if (entry.canWrite === false) {
+              row.classList.add("is-readonly");
+            }
+            row.addEventListener("click", () => {
+              if (entry.canRead === false) return;
+              setSelection(entry, index);
+            });
+            row.addEventListener("dblclick", () => {
+              if (entry.canRead === false) return;
+              loadDir(entry.path);
+            });
+            listEl.appendChild(row);
+          });
+          updateStatus();
+        };
+
+        const renderLoading = () => {
+          listEl.innerHTML = "";
+          const s = createElement("div", "sftp-state");
+          s.innerHTML = "<div class=\"sftp-spinner\"></div><div class=\"sftp-state-msg\">Loading...</div>";
+          listEl.appendChild(s);
+        };
+
+        const renderError = (msg) => {
+          listEl.innerHTML = "";
+          const s = createElement("div", "sftp-state");
+          s.innerHTML =
+            "<div class=\"sftp-state-icon\">!</div>" +
+            "<div class=\"sftp-state-msg\">" + escapeHtml(msg) + "</div>" +
+            "<button class=\"btn btn-sm btn-secondary sftp-state-retry\">Retry</button>";
+          const retryBtn = s.querySelector(".sftp-state-retry");
+          if (retryBtn) retryBtn.addEventListener("click", () => loadDir(state.cwd));
+          listEl.appendChild(s);
+        };
+
+        const loadDir = async (path) => {
+          if (state.loading) return;
+          state.loading = true;
+          renderLoading();
+          try {
+            const targetPath = path || (await window.go.api.Service.SFTPPwd(sessionId));
+            const files = await window.go.api.Service.SFTPList(sessionId, targetPath);
+            const stat = await window.go.api.Service.SFTPStat(sessionId, targetPath);
+            state.cwd = targetPath;
+            state.selected = "";
+            state.selectedWritable = true;
+            state.cwdWritable = stat && this._modeCanWrite(stat.mode);
+            state.entries = (files || []).filter((e) => e.isDir).sort((a, b) =>
+              a.name.localeCompare(b.name, undefined, { sensitivity: "base" }),
+            );
+            state.entries = state.entries.map((entry) => {
+              const canRead = this._modeCanRead(entry.mode);
+              const canWrite = this._modeCanWrite(entry.mode);
+              return Object.assign({}, entry, { canRead, canWrite });
+            });
+            useBtn.disabled = !state.cwdWritable;
+            useBtn.title = state.cwdWritable ? "" : "No write permission";
+            renderBreadcrumb();
+            renderList();
+          } catch (err) {
+            renderError(err.message || String(err));
+          } finally {
+            state.loading = false;
+          }
+        };
+
+        upBtn.addEventListener("click", () => {
+          if (state.cwd) loadDir(this._parentPath(state.cwd));
+        });
+        refreshBtn.addEventListener("click", () => loadDir(state.cwd));
+
+        filterInput.addEventListener("input", () => {
+          state.filter = filterInput.value.trim().toLowerCase();
+          renderList();
+        });
+
+        const moveSelection = (delta) => {
+          if (!state.visibleEntries.length) return;
+          let idx = state.cursorIndex;
+          const max = state.visibleEntries.length - 1;
+          let attempts = 0;
+          do {
+            idx = idx + delta;
+            if (idx < 0) idx = max;
+            if (idx > max) idx = 0;
+            const entry = state.visibleEntries[idx];
+            if (entry && entry.canRead !== false) {
+              setSelection(entry, idx);
+              return;
+            }
+            attempts += 1;
+          } while (attempts <= max);
+        };
+
+        modal.addEventListener("keydown", (e) => {
+          const isInput = e.target === filterInput;
+          if (isInput && e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+
+          if (e.key === "ArrowDown") {
+            e.preventDefault();
+            moveSelection(1);
+          } else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            moveSelection(-1);
+          } else if (e.key === "Enter") {
+            if (state.selected && state.selectedWritable) {
+              e.preventDefault();
+              close(state.selected);
+            } else if (!state.selected && state.cwd && state.cwdWritable) {
+              e.preventDefault();
+              close(state.cwd);
+            }
+          } else if (e.key === "Escape") {
+            e.preventDefault();
+            close(null);
+          }
+        });
+
+        const initial = this.app.sftp && typeof this.app.sftp.getCwd === "function"
+          ? this.app.sftp.getCwd(sessionId)
+          : "";
+        loadDir(initial || "");
+      });
+    }
+
+    _buildPickerRow(entry, index) {
+      const { createElement } = window.NexusTerminal;
+      const dataset = { path: entry.path || "" };
+      if (typeof index === "number") {
+        dataset.index = String(index);
+      }
+      const row = createElement("div", "sftp-file-row", { dataset });
+      const icon = createElement("span", "sftp-file-icon is-dir", { textContent: "DIR" });
+      const name = createElement("span", "sftp-file-name", {
+        textContent: entry.name || entry.path || "",
+        title: entry.name || entry.path || "",
+      });
+      let metaLabel = "";
+      if (entry.canRead === false) {
+        metaLabel = "NO READ";
+      } else if (entry.canWrite === false) {
+        metaLabel = "READ ONLY";
+      }
+      const meta = createElement("span", "sftp-file-meta", { textContent: metaLabel });
+      row.appendChild(icon);
+      row.appendChild(name);
+      row.appendChild(meta);
+      return row;
+    }
+
+    _modeCanRead(mode) {
+      if (!mode || typeof mode !== "string") return true;
+      return mode.indexOf("r") !== -1;
+    }
+
+    _modeCanWrite(mode) {
+      if (!mode || typeof mode !== "string") return true;
+      return mode.indexOf("w") !== -1;
+    }
+
+    _pathSegments(p) {
+      const parts = (p || "").split("/").filter(Boolean);
+      const segs = [{ label: "/", path: "/" }];
+      let acc = "";
+      for (let i = 0; i < parts.length; i += 1) {
+        acc += "/" + parts[i];
+        segs.push({ label: parts[i], path: acc });
+      }
+      return segs;
+    }
+
+    _parentPath(p) {
+      if (!p || p === "/") return "/";
+      const trimmed = p.replace(/\/+$/, "");
+      const idx = trimmed.lastIndexOf("/");
+      return idx <= 0 ? "/" : trimmed.substring(0, idx);
+    }
+
+    _arrayBufferToBase64(buffer) {
+      if (!buffer) return "";
+      const bytes = new Uint8Array(buffer);
+      let binary = "";
+      const chunkSize = 0x8000;
+      for (let i = 0; i < bytes.length; i += chunkSize) {
+        const chunk = bytes.subarray(i, i + chunkSize);
+        binary += String.fromCharCode.apply(null, chunk);
+      }
+      return btoa(binary);
     }
 
     /**

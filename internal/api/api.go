@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"path"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -1044,6 +1045,22 @@ func (s *Service) SFTPMkdir(sessionID string, remotePath string) error {
 	return s.sessions.SFTPMkdir(sessionID, remotePath)
 }
 
+// SFTPStat returns information about a remote path.
+func (s *Service) SFTPStat(sessionID string, remotePath string) (map[string]interface{}, error) {
+	entry, err := s.sessions.SFTPStat(sessionID, remotePath)
+	if err != nil {
+		return nil, err
+	}
+	return map[string]interface{}{
+		"name":       entry.Name,
+		"path":       entry.Path,
+		"size":       entry.Size,
+		"isDir":      entry.IsDir,
+		"mode":       entry.Mode,
+		"modifiedAt": entry.ModifiedAt,
+	}, nil
+}
+
 // SFTPRemove deletes a remote file or empty directory.
 func (s *Service) SFTPRemove(sessionID string, remotePath string) error {
 	return s.sessions.SFTPRemove(sessionID, remotePath)
@@ -1096,9 +1113,35 @@ func (s *Service) SFTPUpload(sessionID string, remotePath string) error {
 	return s.sessions.SFTPUpload(sessionID, localPath, destPath)
 }
 
+// SFTPUploadData uploads raw file data to a remote directory.
+// Data is expected as base64-encoded bytes from the frontend.
+func (s *Service) SFTPUploadData(sessionID string, remoteDir string, fileName string, base64Data string) error {
+	if base64Data == "" {
+		return fmt.Errorf("empty upload payload")
+	}
+
+	data, err := base64.StdEncoding.DecodeString(base64Data)
+	if err != nil {
+		return fmt.Errorf("failed to decode upload data: %w", err)
+	}
+
+	safeName := filepath.Base(fileName)
+	if safeName == "" || safeName == "." || safeName == "/" {
+		return fmt.Errorf("invalid file name")
+	}
+
+	destPath := path.Join(remoteDir, safeName)
+	return s.sessions.SFTPUploadBytes(sessionID, destPath, data)
+}
+
 // SFTPPwd returns the current working directory on the remote host.
 func (s *Service) SFTPPwd(sessionID string) (string, error) {
 	return s.sessions.SFTPPwd(sessionID)
+}
+
+// GetSessionCwd returns a best-effort working directory for SSH sessions.
+func (s *Service) GetSessionCwd(sessionID string) (string, error) {
+	return s.sessions.GetSessionCwd(sessionID)
 }
 
 // ---------------------------------------------------------------------------

@@ -258,6 +258,26 @@ func (m *Manager) ResizeSession(sessionID string, cols, rows int) error {
 	return nil
 }
 
+// GetSessionCwd returns a best-effort working directory for SSH sessions.
+func (m *Manager) GetSessionCwd(sessionID string) (string, error) {
+	m.mu.RLock()
+	sess, ok := m.sessions[sessionID]
+	m.mu.RUnlock()
+
+	if !ok {
+		return "", fmt.Errorf("sessions: session %q not found", sessionID)
+	}
+	if sess.sshClient == nil {
+		return "", fmt.Errorf("sessions: session %q is not an SSH connection", sessionID)
+	}
+
+	cwd, err := sess.sshClient.RunCommand("pwd")
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(cwd), nil
+}
+
 // GetSession returns session info by ID.
 func (m *Manager) GetSession(sessionID string) (*models.SessionInfo, error) {
 	m.mu.RLock()
@@ -1064,6 +1084,23 @@ func (m *Manager) SFTPUpload(sessionID, localPath, remotePath string) error {
 		return err
 	}
 	return sc.Upload(localPath, remotePath, func(p sftpclient.TransferProgress) {
+		m.emitEvent("session:sftp:progress", map[string]interface{}{
+			"sessionID":   sessionID,
+			"transferred": p.Transferred,
+			"total":       p.Total,
+			"path":        p.Path,
+			"done":        p.Done,
+		})
+	})
+}
+
+// SFTPUploadBytes uploads in-memory data to a remote path.
+func (m *Manager) SFTPUploadBytes(sessionID, remotePath string, data []byte) error {
+	sc, err := m.getSFTP(sessionID)
+	if err != nil {
+		return err
+	}
+	return sc.UploadBytes(remotePath, data, func(p sftpclient.TransferProgress) {
 		m.emitEvent("session:sftp:progress", map[string]interface{}{
 			"sessionID":   sessionID,
 			"transferred": p.Transferred,

@@ -8,6 +8,7 @@
 package sftpclient
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"os"
@@ -245,6 +246,25 @@ func (c *Client) Upload(localPath, remotePath string, onProgress func(TransferPr
 	defer remote.Close()
 
 	return c.copyWithProgress(local, remote, totalSize, remotePath, onProgress)
+}
+
+// UploadBytes writes in-memory data to a remote file path.
+func (c *Client) UploadBytes(remotePath string, data []byte, onProgress func(TransferProgress)) error {
+	c.mu.Lock()
+	if c.closed || c.sftp == nil {
+		c.mu.Unlock()
+		return fmt.Errorf("sftpclient: client is closed")
+	}
+	remote, err := c.sftp.Create(remotePath)
+	if err != nil {
+		c.mu.Unlock()
+		return fmt.Errorf("sftpclient: failed to create remote file: %w", err)
+	}
+	c.mu.Unlock()
+	defer remote.Close()
+
+	reader := bytes.NewReader(data)
+	return c.copyWithProgress(reader, remote, int64(len(data)), remotePath, onProgress)
 }
 
 // Pwd returns the current working directory on the remote host.

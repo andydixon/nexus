@@ -113,6 +113,13 @@
     padding: var(--space-5);
 }
 
+.modal-body.sftp-picker-body {
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+    min-height: 320px;
+}
+
 .modal-body p {
     font-size: var(--text-sm);
     color: var(--text-secondary);

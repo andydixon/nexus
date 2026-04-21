@@ -261,6 +261,29 @@ func (c *Client) Resize(cols, rows int) error {
 	return session.WindowChange(rows, cols)
 }
 
+// RunCommand executes a single command using a new SSH session.
+func (c *Client) RunCommand(command string) (string, error) {
+	c.mu.Lock()
+	if !c.connected || c.sshClient == nil {
+		c.mu.Unlock()
+		return "", fmt.Errorf("not connected")
+	}
+	client := c.sshClient
+	c.mu.Unlock()
+
+	session, err := client.NewSession()
+	if err != nil {
+		return "", fmt.Errorf("failed to open SSH session: %w", err)
+	}
+	defer session.Close()
+
+	out, err := session.Output(command)
+	if err != nil {
+		return "", fmt.Errorf("command failed: %w", err)
+	}
+	return strings.TrimSpace(string(out)), nil
+}
+
 // Close cleanly shuts down the SSH session and connection, cancels the
 // background context, and invokes the onClose callback.
 func (c *Client) Close() error {

@@ -158,6 +158,16 @@ class SFTPBrowser {
         }
     }
 
+    /**
+     * Returns the current directory for an open SFTP panel, or an empty string.
+     * @param {string} sessionId
+     * @returns {string}
+     */
+    getCwd(sessionId) {
+        var state = this.panels.get(sessionId);
+        return state ? state.cwd : '';
+    }
+
     /* ── Toolbar ──────────────────────────────────────────────────── */
 
     _buildToolbar(sessionId, state) {

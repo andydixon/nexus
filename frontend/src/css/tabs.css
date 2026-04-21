@@ -8,335 +8,366 @@
    Individual tab
    ----------------------------------------------------------------------- */
 .tab {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-2);
-    height: var(--tab-bar-height);
-    padding: 0 var(--space-3);
-    font-size: var(--text-sm);
-    color: var(--text-secondary);
-    cursor: pointer;
-    white-space: nowrap;
-    position: relative;
-    flex-shrink: 0;
-    border-right: 1px solid var(--border-subtle);
-    transition:
-        background var(--transition-fast),
-        color var(--transition-fast);
-    user-select: none;
-    max-width: 200px;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: var(--tab-bar-height);
+  padding: 0 var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+  position: relative;
+  flex-shrink: 0;
+  border-right: 1px solid var(--border-subtle);
+  transition:
+    background var(--transition-fast),
+    color var(--transition-fast);
+  user-select: none;
+  max-width: 200px;
+  min-width: 0;
 }
 
 .tab:hover {
-    background: var(--bg-hover);
-    color: var(--text-primary);
+  background: var(--bg-hover);
+  color: var(--text-primary);
 }
 
 /* Active tab */
 .tab.active {
-    background: var(--bg-base);
-    color: var(--text-primary);
+  background: var(--bg-base);
+  color: var(--text-primary);
 }
 
 /* Active indicator — accent bar at the bottom */
 .tab.active::after {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: 2px;
-    background: var(--accent);
-    border-radius: var(--radius-full) var(--radius-full) 0 0;
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--accent);
+  border-radius: var(--radius-full) var(--radius-full) 0 0;
 }
 
 /* -----------------------------------------------------------------------
    Tab icon (small terminal/protocol icon)
    ----------------------------------------------------------------------- */
 .tab-icon {
-    width: 14px;
-    height: 14px;
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 12px;
-    color: var(--text-tertiary);
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: var(--text-tertiary);
 }
 
 .tab.active .tab-icon {
-    color: var(--text-secondary);
+  color: var(--text-secondary);
 }
 
 /* -----------------------------------------------------------------------
    Tab label
    ----------------------------------------------------------------------- */
-.tab-label {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    min-width: 0;
+.tab-label,
+.tab-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  flex: 1;
 }
 
 /* -----------------------------------------------------------------------
    Protocol mini-badge inside tab
    ----------------------------------------------------------------------- */
 .tab-badge {
-    display: inline-flex;
-    align-items: center;
-    height: 14px;
-    padding: 0 3px;
-    font-size: 9px;
-    font-weight: var(--weight-semibold);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    border-radius: 2px;
-    flex-shrink: 0;
-    line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  height: 14px;
+  padding: 0 3px;
+  font-size: 9px;
+  font-weight: var(--weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-radius: 2px;
+  flex-shrink: 0;
+  line-height: 1;
 }
 
 .tab-badge.badge-ssh {
-    background: rgba(78, 205, 196, 0.15);
-    color: var(--protocol-ssh);
+  background: rgba(78, 205, 196, 0.15);
+  color: var(--protocol-ssh);
 }
 .tab-badge.badge-telnet {
-    background: rgba(255, 167, 38, 0.15);
-    color: var(--protocol-telnet);
+  background: rgba(255, 167, 38, 0.15);
+  color: var(--protocol-telnet);
 }
 .tab-badge.badge-raw {
-    background: rgba(171, 71, 188, 0.15);
-    color: var(--protocol-raw);
+  background: rgba(171, 71, 188, 0.15);
+  color: var(--protocol-raw);
 }
 .tab-badge.badge-github {
-    background: rgba(124, 138, 255, 0.15);
-    color: var(--protocol-github);
+  background: rgba(124, 138, 255, 0.15);
+  color: var(--protocol-github);
 }
 
 /* -----------------------------------------------------------------------
    Status dot (connection state)
    ----------------------------------------------------------------------- */
 .tab-status {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    flex-shrink: 0;
-    background: var(--text-tertiary);
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--text-tertiary);
 }
 
-.tab-status.is-connected    { background: var(--success); }
-.tab-status.is-connecting   { background: var(--warning); animation: pulse-dot 1.2s ease infinite; }
-.tab-status.is-reconnecting { background: var(--warning); animation: pulse-dot 0.8s ease infinite; }
-.tab-status.is-error        { background: var(--error); }
-.tab-status.is-disconnected { background: var(--text-tertiary); }
+.tab-status.is-connected {
+  background: var(--success);
+}
+.tab-status.is-connecting {
+  background: var(--warning);
+  animation: pulse-dot 1.2s ease infinite;
+}
+.tab-status.is-reconnecting {
+  background: var(--warning);
+  animation: pulse-dot 0.8s ease infinite;
+}
+.tab-status.is-error {
+  background: var(--error);
+}
+.tab-status.is-disconnected {
+  background: var(--text-tertiary);
+}
 
 /* Also match the status-* pattern used by updateSessionState */
-.tab-status.status-connected    { background: var(--success); }
-.tab-status.status-connecting   { background: var(--warning); animation: pulse-dot 1.2s ease infinite; }
-.tab-status.status-reconnecting { background: var(--warning); animation: pulse-dot 0.8s ease infinite; }
-.tab-status.status-error        { background: var(--error); }
-.tab-status.status-disconnected { background: var(--text-tertiary); }
+.tab-status.status-connected {
+  background: var(--success);
+}
+.tab-status.status-connecting {
+  background: var(--warning);
+  animation: pulse-dot 1.2s ease infinite;
+}
+.tab-status.status-reconnecting {
+  background: var(--warning);
+  animation: pulse-dot 0.8s ease infinite;
+}
+.tab-status.status-error {
+  background: var(--error);
+}
+.tab-status.status-disconnected {
+  background: var(--text-tertiary);
+}
 
 /* -----------------------------------------------------------------------
    SFTP toggle button — revealed on hover (SSH tabs only)
    ----------------------------------------------------------------------- */
 .tab-sftp {
-    width: 16px;
-    height: 16px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: var(--radius-sm);
-    font-size: 10px;
-    color: var(--text-tertiary);
-    flex-shrink: 0;
-    opacity: 0;
-    transition:
-        opacity var(--transition-fast),
-        background var(--transition-fast),
-        color var(--transition-fast);
-    cursor: pointer;
-    background: none;
-    border: none;
-    padding: 0;
-    margin-left: auto;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  font-size: 10px;
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+  opacity: 0;
+  transition:
+    opacity var(--transition-fast),
+    background var(--transition-fast),
+    color var(--transition-fast);
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+  margin-left: auto;
 }
 
 .tab:hover .tab-sftp,
 .tab.active .tab-sftp {
-    opacity: 1;
+  opacity: 1;
 }
 
 .tab-sftp:hover {
-    background: var(--bg-active);
-    color: var(--accent);
+  background: var(--bg-active);
+  color: var(--accent);
 }
 
 /* -----------------------------------------------------------------------
    Close button — revealed on hover
    ----------------------------------------------------------------------- */
 .tab-close {
-    width: 16px;
-    height: 16px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: var(--radius-sm);
-    font-size: 11px;
-    color: var(--text-tertiary);
-    flex-shrink: 0;
-    opacity: 0;
-    transition:
-        opacity var(--transition-fast),
-        background var(--transition-fast),
-        color var(--transition-fast);
-    cursor: pointer;
-    margin-left: 2px;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+  opacity: 0;
+  transition:
+    opacity var(--transition-fast),
+    background var(--transition-fast),
+    color var(--transition-fast);
+  cursor: pointer;
+  margin-left: 2px;
 }
 
 .tab:hover .tab-close,
 .tab.active .tab-close {
-    opacity: 1;
+  opacity: 1;
 }
 
 .tab-close:hover {
-    background: var(--bg-active);
-    color: var(--text-primary);
+  background: var(--bg-active);
+  color: var(--text-primary);
 }
 
 /* -----------------------------------------------------------------------
    Pin indicator
    ----------------------------------------------------------------------- */
 .tab-pin {
-    width: 12px;
-    height: 12px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 9px;
-    color: var(--text-disabled);
-    flex-shrink: 0;
+  width: 12px;
+  height: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  color: var(--text-disabled);
+  flex-shrink: 0;
 }
 
 .tab.is-pinned .tab-pin {
-    color: var(--accent);
+  color: var(--accent);
 }
 
 /* Pinned tabs are always narrow */
 .tab.is-pinned {
-    max-width: 100px;
-    padding: 0 var(--space-2);
+  max-width: 100px;
+  padding: 0 var(--space-2);
 }
 
 .tab.is-pinned .tab-label {
-    /* Hide label on pinned tabs to save space */
-    display: none;
+  /* Hide label on pinned tabs to save space */
+  display: none;
 }
 
 .tab.is-pinned .tab-close {
-    /* Pinned tabs don't show close by default */
-    display: none;
+  /* Pinned tabs don't show close by default */
+  display: none;
 }
 
 /* -----------------------------------------------------------------------
    Drag handle area (for tab reordering)
    ----------------------------------------------------------------------- */
 .tab-drag-handle {
-    cursor: grab;
-    flex: 1;
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    min-width: 0;
-    height: 100%;
+  cursor: grab;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  height: 100%;
 }
 
 .tab-drag-handle:active {
-    cursor: grabbing;
+  cursor: grabbing;
 }
 
 /* Drag ghost styling */
 .tab.is-dragging {
-    opacity: 0.5;
+  opacity: 0.5;
 }
 
 .tab.is-drag-over-left::before {
-    content: '';
-    position: absolute;
-    left: -1px;
-    top: 4px;
-    bottom: 4px;
-    width: 2px;
-    background: var(--accent);
-    border-radius: var(--radius-full);
+  content: "";
+  position: absolute;
+  left: -1px;
+  top: 4px;
+  bottom: 4px;
+  width: 2px;
+  background: var(--accent);
+  border-radius: var(--radius-full);
 }
 
 .tab.is-drag-over-right::after {
-    content: '';
-    position: absolute;
-    right: -1px;
-    top: 4px;
-    bottom: 4px;
-    width: 2px;
-    background: var(--accent);
-    border-radius: var(--radius-full);
-    /* Note: this re-uses ::after — active tab indicator is overridden while dragging */
+  content: "";
+  position: absolute;
+  right: -1px;
+  top: 4px;
+  bottom: 4px;
+  width: 2px;
+  background: var(--accent);
+  border-radius: var(--radius-full);
+  /* Note: this re-uses ::after — active tab indicator is overridden while dragging */
 }
 
 /* -----------------------------------------------------------------------
    New-tab button (+)
    ----------------------------------------------------------------------- */
 .tab-new {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: var(--tab-bar-height);
-    height: var(--tab-bar-height);
-    font-size: var(--text-lg);
-    color: var(--text-tertiary);
-    cursor: pointer;
-    flex-shrink: 0;
-    transition: background var(--transition-fast), color var(--transition-fast);
-    border: none;
-    background: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tab-bar-height);
+  height: var(--tab-bar-height);
+  font-size: var(--text-lg);
+  color: var(--text-tertiary);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition:
+    background var(--transition-fast),
+    color var(--transition-fast);
+  border: none;
+  background: none;
 }
 
 .tab-new:hover {
-    background: var(--bg-hover);
-    color: var(--text-primary);
+  background: var(--bg-hover);
+  color: var(--text-primary);
 }
 
 .tab-new:active {
-    background: var(--bg-active);
+  background: var(--bg-active);
 }
 
 /* -----------------------------------------------------------------------
    Broadcast toggle button
    ----------------------------------------------------------------------- */
 .tab-broadcast {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: var(--tab-bar-height);
-    height: var(--tab-bar-height);
-    color: var(--text-tertiary);
-    cursor: pointer;
-    flex-shrink: 0;
-    transition: background var(--transition-fast), color var(--transition-fast);
-    border: none;
-    background: none;
-    opacity: 0.5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tab-bar-height);
+  height: var(--tab-bar-height);
+  color: var(--text-tertiary);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition:
+    background var(--transition-fast),
+    color var(--transition-fast);
+  border: none;
+  background: none;
+  opacity: 0.5;
 }
 
 .tab-broadcast:hover {
-    background: var(--bg-hover);
-    color: var(--text-primary);
-    opacity: 0.8;
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  opacity: 0.8;
 }
 
 .tab-broadcast.is-active {
-    color: var(--error);
-    opacity: 1;
-    animation: pulse-dot 1.5s ease infinite;
+  color: var(--error);
+  opacity: 1;
+  animation: pulse-dot 1.5s ease infinite;
 }
 
 /* -----------------------------------------------------------------------
@@ -344,41 +375,41 @@
    ----------------------------------------------------------------------- */
 .tab-bar-overflow-left,
 .tab-bar-overflow-right {
-    display: none;
-    align-items: center;
-    justify-content: center;
-    width: 20px;
-    flex-shrink: 0;
-    font-size: var(--text-sm);
-    color: var(--text-tertiary);
-    cursor: pointer;
-    background: linear-gradient(90deg, var(--bg-surface), transparent);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  flex-shrink: 0;
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+  cursor: pointer;
+  background: linear-gradient(90deg, var(--bg-surface), transparent);
 }
 
 .tab-bar-overflow-right {
-    background: linear-gradient(-90deg, var(--bg-surface), transparent);
+  background: linear-gradient(-90deg, var(--bg-surface), transparent);
 }
 
 .tab-bar.has-overflow-left .tab-bar-overflow-left,
 .tab-bar.has-overflow-right .tab-bar-overflow-right {
-    display: flex;
+  display: flex;
 }
 
 /* -----------------------------------------------------------------------
    Tab context menu trigger (on right-click)
    ----------------------------------------------------------------------- */
 .tab-context-area {
-    position: absolute;
-    inset: 0;
-    z-index: 1;
-    /* Transparent hit area for right-click context menu */
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  /* Transparent hit area for right-click context menu */
 }
 
 /* -----------------------------------------------------------------------
    Modified indicator (unsaved changes)
    ----------------------------------------------------------------------- */
 .tab.is-modified .tab-close::before {
-    content: '●';
-    font-size: 8px;
-    color: var(--accent);
+  content: "●";
+  font-size: 8px;
+  color: var(--accent);
 }
