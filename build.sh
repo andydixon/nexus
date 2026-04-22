@@ -62,7 +62,7 @@ build() {
     check_deps
     install_deps
     log "Building production binary…"
-    wails build
+    wails build -ldflags "-s -w"
     log "Build complete: build/bin/"
 }
 

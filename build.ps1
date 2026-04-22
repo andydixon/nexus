@@ -61,7 +61,7 @@ function Build {
 
     $env:CGO_ENABLED = '1'
     Write-Info 'Building production binary (CGO_ENABLED=1)...'
-    & $wailsPath build
+    & $wailsPath build -ldflags "-s -w"
     Write-Info 'Build complete: build\bin\'
 }
 

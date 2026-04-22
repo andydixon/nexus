@@ -14,9 +14,9 @@ One-off session? Use **Cmd+Shift+Q** / **Ctrl+Shift+Q** for quick connect.
 ## Daily workflow
 
 - **Tabs and splits**: Drag tabs to reorder, and split the workspace to view multiple sessions at once.
-- **Broadcast input**: Toggle with **Cmd+Shift+B** to send the same command to all connected sessions.
+- **Broadcast input**: Toggle with **Cmd+Shift+B** (macOS) or **Ctrl+Shift+B** (Windows/Linux) to send the same command to all connected sessions.
 - **Snippets**: Save common commands and run them with one click.
-- **Search**: Press **Cmd+F** to search within the active terminal.
+- **Search**: Press **Cmd+F** (macOS) or **Ctrl+F** (Windows/Linux) to search within the active terminal.
 
 ## File transfers on SSH
 
@@ -42,18 +42,18 @@ The upload picker lists folders only and marks permissions:
 
 ## Common shortcuts
 
-| Shortcut          | Action                      |
-| ----------------- | --------------------------- |
-| Cmd + K           | Command palette             |
-| Cmd + N           | New connection              |
-| Cmd + W           | Close tab                   |
-| Cmd + F           | Find in terminal            |
-| Cmd + Shift + S   | Snippet library             |
-| Cmd + Shift + B   | Broadcast input             |
-| Cmd + Shift + Q   | Quick connect               |
-| Cmd + Shift + R   | Toggle session recording    |
-| Cmd + Shift + D   | Split pane vertically       |
-| Cmd + Shift + E   | Split pane horizontally     |
+| macOS Shortcut | Windows/Linux Shortcut | Action                   |
+| ------------- | ----------------------- | ------------------------ |
+| Cmd + K       | Ctrl + K                 | Command palette          |
+| Cmd + N       | Ctrl + N                 | New connection           |
+| Cmd + W       | Ctrl + W                 | Close tab                |
+| Cmd + F       | Ctrl + F                 | Find in terminal         |
+| Cmd + Shift + S | Ctrl + Shift + S        | Snippet library          |
+| Cmd + Shift + B | Ctrl + Shift + B        | Broadcast input          |
+| Cmd + Shift + Q | Ctrl + Shift + Q        | Quick connect            |
+| Cmd + Shift + R | Ctrl + Shift + R        | Toggle session recording |
+| Cmd + Shift + D | Ctrl + Shift + D        | Split pane vertically    |
+| Cmd + Shift + E | Ctrl + Shift + E        | Split pane horizontally  |
 
 ## Need more detail?
 

@@ -121,6 +121,14 @@ class TabManager {
     }
 
     /**
+     * Reconnects a session by ID.
+     * @param {string} sessionId
+     */
+    reconnectSession(sessionId) {
+        return this._reconnect(sessionId);
+    }
+
+    /**
      * Disconnects and closes a tab by session ID.
      * @param {string} sessionId
      */

@@ -253,11 +253,22 @@
       const editBtn = createElement("button", "sidebar-item-edit", {
         textContent: "✎",
         title: "Edit profile",
+        type: "button",
+        "aria-label": "Edit profile",
       });
-      editBtn.addEventListener("click", (e) => {
+      let editTriggered = false;
+      const triggerEdit = (e) => {
+        e.preventDefault();
         e.stopPropagation();
+        if (editTriggered) return;
+        editTriggered = true;
+        requestAnimationFrame(() => {
+          editTriggered = false;
+        });
         this.app.profileEditor.openEdit(profile.id);
-      });
+      };
+      editBtn.addEventListener("mousedown", triggerEdit);
+      editBtn.addEventListener("click", triggerEdit);
       item.appendChild(editBtn);
 
       // Favourite star
@@ -268,8 +279,11 @@
         item.appendChild(star);
       }
 
-      // Prevent mousedown text selection in WKWebView
-      item.addEventListener("mousedown", (e) => e.preventDefault());
+      // Prevent mousedown text selection in WKWebView, but allow real controls.
+      item.addEventListener("mousedown", (e) => {
+        if (e.target.closest("button, input, select, textarea")) return;
+        e.preventDefault();
+      });
 
       // Click → connect / multi-select
       item.addEventListener("click", (e) => {

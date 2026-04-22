@@ -78,6 +78,14 @@ export function ExportProfilesEncrypted(arg1, arg2) {
   return window['go']['api']['Service']['ExportProfilesEncrypted'](arg1, arg2);
 }
 
+export function FileExists(arg1) {
+  return window['go']['api']['Service']['FileExists'](arg1);
+}
+
+export function FileIsPrivateKey(arg1) {
+  return window['go']['api']['Service']['FileIsPrivateKey'](arg1);
+}
+
 export function GetAppInfo() {
   return window['go']['api']['Service']['GetAppInfo']();
 }
@@ -92,6 +100,10 @@ export function GetProfile(arg1) {
 
 export function GetRecording(arg1) {
   return window['go']['api']['Service']['GetRecording'](arg1);
+}
+
+export function GetSessionCwd(arg1) {
+  return window['go']['api']['Service']['GetSessionCwd'](arg1);
 }
 
 export function GetSessionHistory(arg1) {
@@ -170,6 +182,10 @@ export function ListRecordings() {
   return window['go']['api']['Service']['ListRecordings']();
 }
 
+export function ListSSHKeys() {
+  return window['go']['api']['Service']['ListSSHKeys']();
+}
+
 export function ListSessions() {
   return window['go']['api']['Service']['ListSessions']();
 }
@@ -234,8 +250,16 @@ export function SFTPRename(arg1, arg2, arg3) {
   return window['go']['api']['Service']['SFTPRename'](arg1, arg2, arg3);
 }
 
+export function SFTPStat(arg1, arg2) {
+  return window['go']['api']['Service']['SFTPStat'](arg1, arg2);
+}
+
 export function SFTPUpload(arg1, arg2) {
   return window['go']['api']['Service']['SFTPUpload'](arg1, arg2);
+}
+
+export function SFTPUploadData(arg1, arg2, arg3, arg4) {
+  return window['go']['api']['Service']['SFTPUploadData'](arg1, arg2, arg3, arg4);
 }
 
 export function SaveFile(arg1, arg2) {

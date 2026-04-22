@@ -3,14 +3,17 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net"
+	"os"
 	"path"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -143,6 +146,99 @@ func (s *Service) ListProfiles() ([]models.Profile, error) {
 		return nil, err
 	}
 	return derefProfiles(profiles), nil
+}
+
+// ListSSHKeys returns absolute paths to candidate SSH private keys in ~/.ssh.
+func (s *Service) ListSSHKeys() ([]string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return []string{}, nil
+	}
+
+	dir := filepath.Join(home, ".ssh")
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return []string{}, nil
+		}
+		return nil, err
+	}
+
+	ignored := map[string]bool{
+		"authorized_keys":  true,
+		"authorized_keys2": true,
+		"config":           true,
+		"known_hosts":      true,
+		"known_hosts.old":  true,
+		"ssh_config":       true,
+		"ssh_known_hosts":  true,
+		"ssh_known_hosts2": true,
+	}
+
+	keys := make([]string, 0)
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		name := entry.Name()
+		if ignored[name] {
+			continue
+		}
+		if strings.HasSuffix(name, ".pub") {
+			continue
+		}
+		if strings.HasSuffix(name, ".old") {
+			continue
+		}
+		fullPath := filepath.Join(dir, name)
+		if !isLikelyPrivateKey(fullPath) {
+			continue
+		}
+		keys = append(keys, fullPath)
+	}
+
+	sort.Strings(keys)
+	return keys, nil
+}
+
+func isLikelyPrivateKey(path string) bool {
+	file, err := os.Open(path)
+	if err != nil {
+		return false
+	}
+	defer file.Close()
+
+	buf := make([]byte, 512)
+	n, err := file.Read(buf)
+	if err != nil && n == 0 {
+		return false
+	}
+	head := buf[:n]
+
+	if bytes.HasPrefix(head, []byte("openssh-key-v1")) {
+		return true
+	}
+
+	if bytes.Contains(head, []byte("BEGIN OPENSSH PRIVATE KEY")) {
+		return true
+	}
+	if bytes.Contains(head, []byte("BEGIN RSA PRIVATE KEY")) {
+		return true
+	}
+	if bytes.Contains(head, []byte("BEGIN DSA PRIVATE KEY")) {
+		return true
+	}
+	if bytes.Contains(head, []byte("BEGIN EC PRIVATE KEY")) {
+		return true
+	}
+	if bytes.Contains(head, []byte("BEGIN ED25519 PRIVATE KEY")) {
+		return true
+	}
+	if bytes.Contains(head, []byte("BEGIN PRIVATE KEY")) {
+		return true
+	}
+
+	return false
 }
 
 // SearchProfiles searches profiles by display name, host, or tags.
@@ -731,6 +827,29 @@ func (s *Service) SaveFile(title string, defaultName string) (string, error) {
 		return "", fmt.Errorf("save dialog failed: %w", err)
 	}
 	return path, nil
+}
+
+// FileExists returns true if the path exists and is not a directory.
+func (s *Service) FileExists(path string) (bool, error) {
+	if path == "" {
+		return false, nil
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	return !info.IsDir(), nil
+}
+
+// FileIsPrivateKey returns true if the path appears to be an SSH private key.
+func (s *Service) FileIsPrivateKey(path string) (bool, error) {
+	if path == "" {
+		return false, nil
+	}
+	return isLikelyPrivateKey(path), nil
 }
 
 // GetAppInfo returns build and environment information.

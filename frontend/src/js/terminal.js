@@ -104,7 +104,10 @@
 
       // Drag-and-drop file handling
       container.addEventListener("dragover", (e) => {
-        if (e.dataTransfer && Array.from(e.dataTransfer.types || []).includes("Files")) {
+        if (
+          e.dataTransfer &&
+          Array.from(e.dataTransfer.types || []).includes("Files")
+        ) {
           e.preventDefault();
           e.dataTransfer.dropEffect = "copy";
         }
@@ -230,9 +233,7 @@
         webLinksAddon,
         observer,
         decoder:
-          typeof TextDecoder !== "undefined"
-            ? new TextDecoder("utf-8")
-            : null,
+          typeof TextDecoder !== "undefined" ? new TextDecoder("utf-8") : null,
       });
 
       return term;
@@ -328,6 +329,28 @@
     }
 
     /**
+     * Shows or hides the disconnected overlay for a session panel.
+     * @param {string} sessionId
+     * @param {boolean} isDisconnected
+     * @param {string} [error]
+     */
+    setDisconnectedOverlay(sessionId, isDisconnected, error) {
+      const panel = document.getElementById(`panel-${sessionId}`);
+      if (!panel) return;
+
+      const overlay = this._ensureDisconnectOverlay(panel, sessionId);
+      if (!overlay) return;
+
+      const message = overlay.querySelector(".terminal-disconnect-message");
+      if (message) {
+        message.textContent = error ? error : "Connection lost.";
+      }
+
+      panel.classList.toggle("is-disconnected", isDisconnected);
+      overlay.classList.toggle("is-visible", isDisconnected);
+    }
+
+    /**
      * Searches within a terminal using the search addon.
      * @param {string} sessionId
      * @param {string} query
@@ -415,6 +438,44 @@
     }
 
     // ── Private helpers ──────────────────────────────────────────────
+
+    /**
+     * Ensures the disconnect overlay exists for a session panel.
+     * @param {HTMLElement} panel
+     * @param {string} sessionId
+     * @returns {HTMLElement|null}
+     * @private
+     */
+    _ensureDisconnectOverlay(panel, sessionId) {
+      let overlay = panel.querySelector(".terminal-disconnect-overlay");
+      if (overlay) return overlay;
+
+      const { createElement } = window.NexusTerminal;
+      if (!createElement) return null;
+
+      overlay = createElement("div", "terminal-disconnect-overlay");
+      const content = createElement("div", "terminal-disconnect-content");
+      const title = createElement("div", "terminal-disconnect-title", {
+        textContent: "DISCONNECTED",
+      });
+      const message = createElement("div", "terminal-disconnect-message", {
+        textContent: "Connection lost.",
+      });
+      const button = createElement("button", "btn btn-sm btn-primary", {
+        textContent: "Reconnect",
+      });
+      button.addEventListener("click", () => {
+        this.app.tabs.reconnectSession(sessionId);
+      });
+
+      content.appendChild(title);
+      content.appendChild(message);
+      content.appendChild(button);
+      overlay.appendChild(content);
+      panel.appendChild(overlay);
+
+      return overlay;
+    }
 
     /**
      * Shows a right-click context menu for a terminal.
@@ -540,7 +601,9 @@
         }
         if (choice === "upload") {
           if (!canUpload) {
-            this.app.notifications.error("Upload is only available for SSH sessions.");
+            this.app.notifications.error(
+              "Upload is only available for SSH sessions.",
+            );
             return;
           }
           this._uploadDroppedFiles(sessionId, files);
@@ -555,8 +618,12 @@
         const modal = createElement("div", "modal modal-sm");
         const count = files.length;
         const first = files[0];
-        const sizeLabel = first && typeof first.size === "number" ? formatBytes(first.size) : "";
-        const title = count === 1 ? (first ? first.name : "File") : count + " files";
+        const sizeLabel =
+          first && typeof first.size === "number"
+            ? formatBytes(first.size)
+            : "";
+        const title =
+          count === 1 ? (first ? first.name : "File") : count + " files";
 
         modal.innerHTML = `
                 <div class="modal-header">
@@ -648,7 +715,9 @@
         if (!remoteDir) return;
 
         if (files.length > 1) {
-          this.app.notifications.info("Uploading " + files.length + " files...");
+          this.app.notifications.info(
+            "Uploading " + files.length + " files...",
+          );
         }
 
         for (let i = 0; i < files.length; i += 1) {
@@ -664,7 +733,9 @@
             );
           } catch (err) {
             const msg = err && err.message ? err.message : String(err);
-            this.app.notifications.error("Upload failed for " + file.name + ": " + msg);
+            this.app.notifications.error(
+              "Upload failed for " + file.name + ": " + msg,
+            );
             return;
           }
         }
@@ -738,7 +809,7 @@
         });
 
         const listEl = modal.querySelector(".sftp-picker-list");
-        const breadcrumbEl = modal.querySelector("[data-role=\"breadcrumb\"]");
+        const breadcrumbEl = modal.querySelector('[data-role="breadcrumb"]');
         const pathLabel = modal.querySelector(".sftp-picker-path");
         const upBtn = modal.querySelector(".sftp-picker-up");
         const refreshBtn = modal.querySelector(".sftp-picker-refresh");
@@ -771,7 +842,9 @@
         modal
           .querySelector(".prompt-cancel")
           .addEventListener("click", () => close(null));
-        useBtn.addEventListener("click", () => close(state.selected || state.cwd));
+        useBtn.addEventListener("click", () =>
+          close(state.selected || state.cwd),
+        );
         backdrop.addEventListener("click", (e) => {
           if (e.target === backdrop) close(null);
         });
@@ -782,7 +855,9 @@
           for (let i = 0; i < segments.length; i += 1) {
             if (i > 0) {
               breadcrumbEl.appendChild(
-                createElement("span", "sftp-breadcrumb-sep", { textContent: ">" }),
+                createElement("span", "sftp-breadcrumb-sep", {
+                  textContent: ">",
+                }),
               );
             }
             const seg = segments[i];
@@ -797,9 +872,13 @@
 
         const updateStatus = () => {
           if (state.selected) {
-            statusLabel.textContent = state.selectedWritable ? "" : "No write permission";
+            statusLabel.textContent = state.selectedWritable
+              ? ""
+              : "No write permission";
           } else {
-            statusLabel.textContent = state.cwdWritable ? "" : "Current folder is read only";
+            statusLabel.textContent = state.cwdWritable
+              ? ""
+              : "Current folder is read only";
           }
         };
 
@@ -807,7 +886,9 @@
           listEl.querySelectorAll(".sftp-file-row").forEach((el) => {
             el.classList.remove("is-selected");
           });
-          const row = listEl.querySelector(`.sftp-file-row[data-index="${index}"]`);
+          const row = listEl.querySelector(
+            `.sftp-file-row[data-index="${index}"]`,
+          );
           if (row) row.classList.add("is-selected");
           state.selected = entry.path;
           state.selectedWritable = entry.canWrite !== false;
@@ -821,7 +902,11 @@
         const renderList = () => {
           listEl.innerHTML = "";
           const basePath = state.selected || state.cwd || "";
-          const suffix = state.selected ? "" : (state.cwdWritable ? "" : " (read only)");
+          const suffix = state.selected
+            ? ""
+            : state.cwdWritable
+              ? ""
+              : " (read only)";
           pathLabel.textContent = basePath + suffix;
 
           if (state.cwd && state.cwd !== "/") {
@@ -831,18 +916,23 @@
               path: this._parentPath(state.cwd),
             });
             parentRow.classList.add("is-parent");
-            parentRow.addEventListener("dblclick", () => loadDir(parentRow.dataset.path));
+            parentRow.addEventListener("dblclick", () =>
+              loadDir(parentRow.dataset.path),
+            );
             listEl.appendChild(parentRow);
           }
 
           const filtered = state.filter
-            ? state.entries.filter((entry) => entry.name.toLowerCase().includes(state.filter))
+            ? state.entries.filter((entry) =>
+                entry.name.toLowerCase().includes(state.filter),
+              )
             : state.entries;
           state.visibleEntries = filtered;
 
           if (!filtered.length) {
             const empty = createElement("div", "sftp-state");
-            empty.innerHTML = "<div class=\"sftp-state-icon\">D</div><div class=\"sftp-state-msg\">No folders found</div>";
+            empty.innerHTML =
+              '<div class="sftp-state-icon">D</div><div class="sftp-state-msg">No folders found</div>';
             listEl.appendChild(empty);
             state.cursorIndex = -1;
             updateStatus();
@@ -873,7 +963,8 @@
         const renderLoading = () => {
           listEl.innerHTML = "";
           const s = createElement("div", "sftp-state");
-          s.innerHTML = "<div class=\"sftp-spinner\"></div><div class=\"sftp-state-msg\">Loading...</div>";
+          s.innerHTML =
+            '<div class="sftp-spinner"></div><div class="sftp-state-msg">Loading...</div>';
           listEl.appendChild(s);
         };
 
@@ -881,11 +972,14 @@
           listEl.innerHTML = "";
           const s = createElement("div", "sftp-state");
           s.innerHTML =
-            "<div class=\"sftp-state-icon\">!</div>" +
-            "<div class=\"sftp-state-msg\">" + escapeHtml(msg) + "</div>" +
-            "<button class=\"btn btn-sm btn-secondary sftp-state-retry\">Retry</button>";
+            '<div class="sftp-state-icon">!</div>' +
+            '<div class="sftp-state-msg">' +
+            escapeHtml(msg) +
+            "</div>" +
+            '<button class="btn btn-sm btn-secondary sftp-state-retry">Retry</button>';
           const retryBtn = s.querySelector(".sftp-state-retry");
-          if (retryBtn) retryBtn.addEventListener("click", () => loadDir(state.cwd));
+          if (retryBtn)
+            retryBtn.addEventListener("click", () => loadDir(state.cwd));
           listEl.appendChild(s);
         };
 
@@ -894,16 +988,27 @@
           state.loading = true;
           renderLoading();
           try {
-            const targetPath = path || (await window.go.api.Service.SFTPPwd(sessionId));
-            const files = await window.go.api.Service.SFTPList(sessionId, targetPath);
-            const stat = await window.go.api.Service.SFTPStat(sessionId, targetPath);
+            const targetPath =
+              path || (await window.go.api.Service.SFTPPwd(sessionId));
+            const files = await window.go.api.Service.SFTPList(
+              sessionId,
+              targetPath,
+            );
+            const stat = await window.go.api.Service.SFTPStat(
+              sessionId,
+              targetPath,
+            );
             state.cwd = targetPath;
             state.selected = "";
             state.selectedWritable = true;
             state.cwdWritable = stat && this._modeCanWrite(stat.mode);
-            state.entries = (files || []).filter((e) => e.isDir).sort((a, b) =>
-              a.name.localeCompare(b.name, undefined, { sensitivity: "base" }),
-            );
+            state.entries = (files || [])
+              .filter((e) => e.isDir)
+              .sort((a, b) =>
+                a.name.localeCompare(b.name, undefined, {
+                  sensitivity: "base",
+                }),
+              );
             state.entries = state.entries.map((entry) => {
               const canRead = this._modeCanRead(entry.mode);
               const canWrite = this._modeCanWrite(entry.mode);
@@ -972,9 +1077,10 @@
           }
         });
 
-        const initial = this.app.sftp && typeof this.app.sftp.getCwd === "function"
-          ? this.app.sftp.getCwd(sessionId)
-          : "";
+        const initial =
+          this.app.sftp && typeof this.app.sftp.getCwd === "function"
+            ? this.app.sftp.getCwd(sessionId)
+            : "";
         loadDir(initial || "");
       });
     }
@@ -986,7 +1092,9 @@
         dataset.index = String(index);
       }
       const row = createElement("div", "sftp-file-row", { dataset });
-      const icon = createElement("span", "sftp-file-icon is-dir", { textContent: "DIR" });
+      const icon = createElement("span", "sftp-file-icon is-dir", {
+        textContent: "DIR",
+      });
       const name = createElement("span", "sftp-file-name", {
         textContent: entry.name || entry.path || "",
         title: entry.name || entry.path || "",
@@ -997,7 +1105,9 @@
       } else if (entry.canWrite === false) {
         metaLabel = "READ ONLY";
       }
-      const meta = createElement("span", "sftp-file-meta", { textContent: metaLabel });
+      const meta = createElement("span", "sftp-file-meta", {
+        textContent: metaLabel,
+      });
       row.appendChild(icon);
       row.appendChild(name);
       row.appendChild(meta);

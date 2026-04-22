@@ -82,6 +82,15 @@
 
       /** @type {boolean} */
       this._isNew = false;
+
+      /** @type {string[]} */
+      this._sshKeyOptions = [];
+
+      /** @type {boolean} */
+      this._sshKeyOptionsLoaded = false;
+
+      /** @type {boolean} */
+      this._sshKeyOptionsLoading = false;
     }
 
     // ── Public API ───────────────────────────────────────────────────
@@ -151,6 +160,7 @@
 
       // ── Scrollable body ─────────────────────────────────────
       const body = createElement("div", "drawer-body");
+      const sshKeyDatalist = this._buildSSHKeyDatalist();
 
       // General section (common to all protocols)
       body.appendChild(this._renderGeneralSection(profile));
@@ -159,6 +169,7 @@
       switch (profile.protocol) {
         case "ssh":
           this._renderSSHSections(profile).forEach((s) => body.appendChild(s));
+          body.appendChild(sshKeyDatalist);
           break;
         case "telnet":
           this._renderTelnetSections(profile).forEach((s) =>
@@ -240,6 +251,8 @@
       // Focus the first input
       const firstInput = drawer.querySelector("input, select, textarea");
       if (firstInput) firstInput.focus();
+
+      this._loadSSHKeyOptions();
     }
 
     /**
@@ -377,6 +390,42 @@
       return group;
     }
 
+    _buildSSHKeyDatalist() {
+      const list = createElement("datalist", "", {
+        id: "ssh-key-path-options",
+      });
+      this._applySSHKeyOptionsToList(list);
+      return list;
+    }
+
+    _applySSHKeyOptionsToList(listEl) {
+      if (!listEl) return;
+      listEl.innerHTML = "";
+      for (const keyPath of this._sshKeyOptions) {
+        const opt = createElement("option", "", { value: keyPath });
+        listEl.appendChild(opt);
+      }
+    }
+
+    _loadSSHKeyOptions() {
+      if (this._sshKeyOptionsLoading || this._sshKeyOptionsLoaded) return;
+      if (!window.go || !window.go.api || !window.go.api.Service) return;
+
+      this._sshKeyOptionsLoading = true;
+      window.go.api.Service.ListSSHKeys()
+        .then((keys) => {
+          this._sshKeyOptions = Array.isArray(keys) ? keys : [];
+          this._sshKeyOptionsLoaded = true;
+          this._sshKeyOptionsLoading = false;
+          if (!this.drawer) return;
+          const listEl = this.drawer.querySelector("#ssh-key-path-options");
+          this._applySSHKeyOptionsToList(listEl);
+        })
+        .catch(() => {
+          this._sshKeyOptionsLoading = false;
+        });
+    }
+
     /** @private */
     _renderSSHSections(profile) {
       const ssh = profile.ssh || {};
@@ -413,15 +462,7 @@
       // Key & Passphrase
       sections.push(
         this._renderSection("Key & Passphrase", [
-          this._field(
-            "text",
-            "ssh.privateKeyPath",
-            "Private Key Path",
-            ssh.privateKeyPath,
-            {
-              placeholder: "~/.ssh/id_ed25519",
-            },
-          ),
+          this._renderSSHKeyPathField(ssh.privateKeyPath),
           this._field(
             "select",
             "ssh.keySecretMode",
@@ -1522,12 +1563,74 @@
 
       group.appendChild(input);
 
+      if (opts.datalistId && input && input.tagName === "INPUT") {
+        input.setAttribute("list", opts.datalistId);
+      }
+
       // Help text
       if (opts.help) {
         group.appendChild(
           createElement("span", "form-hint", { textContent: opts.help }),
         );
       }
+
+      return group;
+    }
+
+    _renderSSHKeyPathField(value) {
+      const group = createElement("div", "form-group");
+      const labelEl = createElement("label", "form-label", {
+        textContent: "Private Key Path",
+        for: "field-ssh.privateKeyPath",
+      });
+      group.appendChild(labelEl);
+
+      const row = createElement("div", "key-path-row");
+      const input = createElement("input", "form-input", {
+        type: "text",
+        id: "field-ssh.privateKeyPath",
+        name: "ssh.privateKeyPath",
+        value: value || "",
+        placeholder: "/Users/username/.ssh/id_ed25519",
+      });
+      input.setAttribute("list", "ssh-key-path-options");
+      row.appendChild(input);
+
+      const browseBtn = createElement("button", "btn btn-sm btn-outline", {
+        textContent: "Browse",
+        type: "button",
+      });
+      browseBtn.addEventListener("mousedown", (e) => e.preventDefault());
+      browseBtn.addEventListener("click", () => {
+        if (!window.go || !window.go.api || !window.go.api.Service) return;
+        window.go.api.Service.SelectFile("Select SSH Private Key", "*")
+          .then((path) => {
+            if (path) input.value = path;
+          })
+          .catch((err) => {
+            this.app.notifications.error(
+              "Failed to open file dialog: " + (err.message || err),
+            );
+          });
+      });
+      row.appendChild(browseBtn);
+      group.appendChild(row);
+
+      const error = createElement("span", "form-error");
+      error.style.display = "none";
+      group.appendChild(error);
+
+      const success = createElement("span", "form-success");
+      success.style.display = "none";
+      group.appendChild(success);
+
+      this._attachKeyPathValidation(input, error, success);
+
+      group.appendChild(
+        createElement("span", "form-hint", {
+          textContent: "Select a key from your .ssh folder or type a full path",
+        }),
+      );
 
       return group;
     }
@@ -1551,15 +1654,41 @@
                     <input class="form-input form-input-sm" name="jumpHost-${i}-username" value="${escapeHtml(jh.username || "")}" placeholder="User" />
                 </div>
                 <div class="jump-host-fields">
-                    <input class="form-input form-input-sm" name="jumpHost-${i}-privateKeyPath" value="${escapeHtml(jh.privateKeyPath || "")}" placeholder="Private key path (optional)" style="flex:1" />
+                    <input class="form-input form-input-sm" name="jumpHost-${i}-privateKeyPath" value="${escapeHtml(jh.privateKeyPath || "")}" placeholder="Full key path (optional)" list="ssh-key-path-options" style="flex:1" />
+                    <button class="btn btn-sm btn-outline jump-host-browse" type="button" title="Browse">Browse</button>
                     <button class="btn btn-icon btn-danger jump-host-remove" data-index="${i}" title="Remove">&times;</button>
                 </div>
             `;
+        const keyInput = row.querySelector(`input[name="jumpHost-${i}-privateKeyPath"]`);
+        const browseBtn = row.querySelector(".jump-host-browse");
+        const error = createElement("span", "form-error");
+        error.style.display = "none";
+        const success = createElement("span", "form-success");
+        success.style.display = "none";
+
+        browseBtn.addEventListener("mousedown", (e) => e.preventDefault());
+        browseBtn.addEventListener("click", () => {
+          if (!window.go || !window.go.api || !window.go.api.Service) return;
+          window.go.api.Service.SelectFile("Select SSH Private Key", "*")
+            .then((path) => {
+              if (path) keyInput.value = path;
+              this._validateKeyPath(keyInput, error);
+            })
+            .catch((err) => {
+              this.app.notifications.error(
+                "Failed to open file dialog: " + (err.message || err),
+              );
+            });
+        });
+
+        this._attachKeyPathValidation(keyInput, error, success);
         row.querySelector(".jump-host-remove").addEventListener("click", () => {
           jumpHosts.splice(i, 1);
           this.render(this._profile, this._isNew);
         });
         wrapper.appendChild(row);
+        wrapper.appendChild(error);
+        wrapper.appendChild(success);
       }
 
       const addBtn = createElement("button", "btn btn-sm btn-outline", {
@@ -1579,6 +1708,82 @@
       wrapper.appendChild(addBtn);
 
       return wrapper;
+    }
+
+    _attachKeyPathValidation(input, errorEl, successEl) {
+      if (!input || !errorEl) return;
+      input.addEventListener("blur", () => this._validateKeyPath(input, errorEl, successEl));
+      input.addEventListener("input", () => {
+        errorEl.style.display = "none";
+        errorEl.textContent = "";
+        if (successEl) {
+          successEl.style.display = "none";
+          successEl.textContent = "";
+        }
+      });
+    }
+
+    _validateKeyPath(input, errorEl, successEl) {
+      const value = (input.value || "").trim();
+      if (!value) {
+        errorEl.style.display = "none";
+        errorEl.textContent = "";
+        if (successEl) {
+          successEl.style.display = "none";
+          successEl.textContent = "";
+        }
+        return;
+      }
+      if (value.startsWith("~")) {
+        errorEl.textContent = "Please use a full path (no ~).";
+        errorEl.style.display = "block";
+        if (successEl) {
+          successEl.style.display = "none";
+          successEl.textContent = "";
+        }
+        return;
+      }
+      if (!window.go || !window.go.api || !window.go.api.Service) {
+        return;
+      }
+      window.go.api.Service.FileExists(value)
+        .then((exists) => {
+          if (!exists) {
+            errorEl.textContent = "Key file not found.";
+            errorEl.style.display = "block";
+            if (successEl) {
+              successEl.style.display = "none";
+              successEl.textContent = "";
+            }
+            return;
+          }
+          return window.go.api.Service.FileIsPrivateKey(value)
+            .then((isKey) => {
+              if (!isKey) {
+                errorEl.textContent = "File is not a recognised private key.";
+                errorEl.style.display = "block";
+                if (successEl) {
+                  successEl.style.display = "none";
+                  successEl.textContent = "";
+                }
+                return;
+              }
+              errorEl.style.display = "none";
+              errorEl.textContent = "";
+              if (successEl) {
+                successEl.textContent = "Key verified.";
+                successEl.style.display = "block";
+              }
+            });
+        })
+        .catch(() => {
+          errorEl.textContent = "Could not verify this path.";
+          errorEl.style.display = "block";
+          if (successEl) {
+            successEl.style.display = "none";
+            successEl.textContent = "";
+          }
+        });
     }
 
     /**

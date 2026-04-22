@@ -94,9 +94,9 @@ build_target() {
 
     log "Building ${platform}…"
     if [ -n "$cc" ]; then
-        CC="$cc" CGO_ENABLED=1 wails build -platform "$platform"
+        CC="$cc" CGO_ENABLED=1 wails build -platform "$platform" -ldflags "-s -w"
     else
-        CGO_ENABLED=1 wails build -platform "$platform"
+        CGO_ENABLED=1 wails build -platform "$platform" -ldflags "-s -w"
     fi
 }
 

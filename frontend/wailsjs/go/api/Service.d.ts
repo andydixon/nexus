@@ -41,6 +41,10 @@ export function ExportProfiles(arg1:boolean):Promise<string>;
 
 export function ExportProfilesEncrypted(arg1:Array<string>,arg2:string):Promise<string>;
 
+export function FileExists(arg1:string):Promise<boolean>;
+
+export function FileIsPrivateKey(arg1:string):Promise<boolean>;
+
 export function GetAppInfo():Promise<Record<string, string>>;
 
 export function GetPreferences():Promise<models.AppPreferences>;
@@ -48,6 +52,8 @@ export function GetPreferences():Promise<models.AppPreferences>;
 export function GetProfile(arg1:string):Promise<models.Profile>;
 
 export function GetRecording(arg1:string):Promise<Record<string, any>>;
+
+export function GetSessionCwd(arg1:string):Promise<string>;
 
 export function GetSessionHistory(arg1:string):Promise<Array<Record<string, any>>>;
 
@@ -87,6 +93,8 @@ export function ListProfilesByTag(arg1:string):Promise<Array<models.Profile>>;
 
 export function ListRecordings():Promise<Array<Record<string, any>>>;
 
+export function ListSSHKeys():Promise<Array<string>>;
+
 export function ListSessions():Promise<Array<models.SessionInfo>>;
 
 export function ListSnippets():Promise<Array<models.Snippet>>;
@@ -119,7 +127,11 @@ export function SFTPRemove(arg1:string,arg2:string):Promise<void>;
 
 export function SFTPRename(arg1:string,arg2:string,arg3:string):Promise<void>;
 
+export function SFTPStat(arg1:string,arg2:string):Promise<Record<string, any>>;
+
 export function SFTPUpload(arg1:string,arg2:string):Promise<void>;
+
+export function SFTPUploadData(arg1:string,arg2:string,arg3:string,arg4:string):Promise<void>;
 
 export function SaveFile(arg1:string,arg2:string):Promise<string>;
 

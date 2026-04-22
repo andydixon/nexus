@@ -20,7 +20,7 @@ dev: deps
 
 # Production build
 build: deps
-	$(WAILS) build
+	$(WAILS) build -ldflags "-s -w"
 
 # Run tests
 test:

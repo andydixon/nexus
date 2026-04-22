@@ -31,20 +31,20 @@ Prefer a one-off session? Use **Cmd+Shift+Q** / **Ctrl+Shift+Q** to quick connec
 
 All shortcuts use **Cmd** on macOS and **Ctrl** on Windows/Linux.
 
-| Shortcut          | Action                            |
-| ----------------- | --------------------------------- |
-| Cmd + K           | Open command palette              |
-| Cmd + N           | New connection                    |
-| Cmd + W           | Close current tab                 |
-| Cmd + Tab         | Next tab                          |
-| Cmd + Shift + Tab | Previous tab                      |
-| Cmd + 1–9         | Switch to tab by number           |
-| Cmd + ,           | Open settings                     |
-| Cmd + F           | Find in terminal                  |
-| Cmd + Shift + D   | Split pane vertically             |
-| Cmd + Shift + E   | Split pane horizontally           |
-| Cmd + Shift + R   | Toggle session recording          |
-| Cmd + Shift + B   | Toggle broadcast input mode       |
-| Cmd + Shift + S   | Open snippet library              |
-| Cmd + Shift + Q   | Quick connect                     |
-| F11               | Toggle fullscreen (Windows/Linux) |
+| macOS Shortcut | Windows/Linux Shortcut | Action                            |
+| ------------- | ----------------------- | --------------------------------- |
+| Cmd + K       | Ctrl + K                 | Open command palette              |
+| Cmd + N       | Ctrl + N                 | New connection                    |
+| Cmd + W       | Ctrl + W                 | Close current tab                 |
+| Cmd + Tab     | Ctrl + Tab               | Next tab                          |
+| Cmd + Shift + Tab | Ctrl + Shift + Tab   | Previous tab                      |
+| Cmd + 1–9     | Ctrl + 1–9               | Switch to tab by number           |
+| Cmd + ,       | Ctrl + ,                 | Open settings                     |
+| Cmd + F       | Ctrl + F                 | Find in terminal                  |
+| Cmd + Shift + D | Ctrl + Shift + D       | Split pane vertically             |
+| Cmd + Shift + E | Ctrl + Shift + E       | Split pane horizontally           |
+| Cmd + Shift + R | Ctrl + Shift + R       | Toggle session recording          |
+| Cmd + Shift + B | Ctrl + Shift + B       | Toggle broadcast input mode       |
+| Cmd + Shift + S | Ctrl + Shift + S       | Open snippet library              |
+| Cmd + Shift + Q | Ctrl + Shift + Q       | Quick connect                     |
+| F11           | F11                      | Toggle fullscreen                 |

@@ -168,6 +168,14 @@
         );
         this.updateStatusBar();
 
+        const showDisconnectedOverlay =
+          payload.state === "disconnected" || payload.state === "error";
+        this.terminals.setDisconnectedOverlay(
+          payload.sessionID,
+          showDisconnectedOverlay,
+          payload.error,
+        );
+
         if (payload.state === "error" && payload.error) {
           this._handleSessionError(payload.sessionID, payload.error);
         }

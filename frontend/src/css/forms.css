@@ -459,6 +459,13 @@
     color: var(--danger);
 }
 
+.form-success {
+    font-size: var(--text-xs);
+    color: var(--success);
+    margin-top: var(--space-1);
+    line-height: var(--leading-relaxed);
+}
+
 /* -----------------------------------------------------------------------
    Toggle wrapper — label + toggle switch in a row
    ----------------------------------------------------------------------- */
@@ -682,6 +689,21 @@
 
 .totp-input-row .form-input {
     flex: 1;
+}
+
+/* SSH key path row */
+.key-path-row {
+    display: flex;
+    gap: var(--space-2);
+    align-items: center;
+}
+
+.key-path-row .form-input {
+    flex: 1;
+}
+
+.jump-hosts-list .form-error {
+    margin-bottom: var(--space-2);
 }
 
 .totp-toggle,

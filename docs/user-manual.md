@@ -122,7 +122,7 @@ Screenshot: Terminal context menu and search bar.
 
 ### Search
 
-Press **Cmd+F** to search in the active terminal. Toggle case sensitivity and regular expressions as needed.
+Press **Cmd+F** (macOS) or **Ctrl+F** (Windows/Linux) to search in the active terminal. Toggle case sensitivity and regular expressions as needed.
 
 ---
 
@@ -130,13 +130,13 @@ Press **Cmd+F** to search in the active terminal. Toggle case sensitivity and re
 
 ### Snippets
 
-Open the snippet library with **Cmd+Shift+S** and save frequently-used commands. Send a snippet to the active session with one click.
+Open the snippet library with **Cmd+Shift+S** (macOS) or **Ctrl+Shift+S** (Windows/Linux) and save frequently-used commands. Send a snippet to the active session with one click.
 
 Screenshot: Snippet library with search and folder grouping.
 
 ### Broadcast input
 
-Toggle broadcast mode with **Cmd+Shift+B**. While active, all input is sent to every connected session.
+Toggle broadcast mode with **Cmd+Shift+B** (macOS) or **Ctrl+Shift+B** (Windows/Linux). While active, all input is sent to every connected session.
 
 ---
 
@@ -184,7 +184,7 @@ Tip: Use the filter box to jump quickly to common folders.
 
 ## 10. Session recordings
 
-Toggle recording with **Cmd+Shift+R**. Recordings are saved as asciicast v2 files and can be replayed from the recordings panel.
+Toggle recording with **Cmd+Shift+R** (macOS) or **Ctrl+Shift+R** (Windows/Linux). Recordings are saved as asciicast v2 files and can be replayed from the recordings panel.
 
 Screenshot: Recordings list with playback controls.
 
@@ -216,7 +216,7 @@ Screenshot: TOTP configuration in the profile editor.
 
 ## 12. Settings
 
-Open settings with **Cmd+,** and configure:
+Open settings with **Cmd+,** (macOS) or **Ctrl+,** (Windows/Linux) and configure:
 
 - Terminal themes and fonts
 - Default behaviours
