@@ -9,6 +9,7 @@ Nexus Terminal helps you manage many connections at once, keep terminal work org
 - SSH, Telnet, RAW TCP, and GitHub sessions in one app
 - Tabbed sessions with split panes, pinning, and reordering
 - SFTP browser with drag-and-drop uploads and a directory picker
+- Disconnected overlay with one-click reconnect
 - Broadcast input, snippets, and terminal search
 - Session recording and playback
 - Secure credential storage with OS keychain and encrypted vault fallback
@@ -20,6 +21,8 @@ Nexus Terminal helps you manage many connections at once, keep terminal work org
 3. Click **Connect** to open a session in a new tab.
 
 Prefer a one-off session? Use **Cmd+Shift+Q** / **Ctrl+Shift+Q** to quick connect.
+
+If a session drops, use the **Reconnect** button in the disconnected overlay.
 
 ## Documentation
 

@@ -17,6 +17,7 @@ One-off session? Use **Cmd+Shift+Q** / **Ctrl+Shift+Q** for quick connect.
 - **Broadcast input**: Toggle with **Cmd+Shift+B** (macOS) or **Ctrl+Shift+B** (Windows/Linux) to send the same command to all connected sessions.
 - **Snippets**: Save common commands and run them with one click.
 - **Search**: Press **Cmd+F** (macOS) or **Ctrl+F** (Windows/Linux) to search within the active terminal.
+- **Reconnect quickly**: If a session drops, click **Reconnect** on the disconnected overlay.
 
 ## File transfers on SSH
 

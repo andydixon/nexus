@@ -58,7 +58,7 @@ Screenshot: New profile form with protocol selector and connection fields.
 
 ### Edit, duplicate, or delete
 
-Right-click a profile in the sidebar to edit, duplicate, or delete it.
+Right-click a profile in the sidebar to edit, duplicate, or delete it. You can also click the pencil icon on hover, or double-click the item to edit.
 
 ### Folders, tags, and favourites
 
@@ -228,6 +228,11 @@ Screenshot: Settings panel with appearance and security options.
 ---
 
 ## 13. Troubleshooting
+
+### Session shows as disconnected
+
+- The terminal is blurred and shows a **DISCONNECTED** overlay when the connection drops.
+- Click **Reconnect** to reopen the session with the same profile.
 
 ### Upload fails or is greyed out
 
