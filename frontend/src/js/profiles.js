@@ -1659,7 +1659,9 @@
                     <button class="btn btn-icon btn-danger jump-host-remove" data-index="${i}" title="Remove">&times;</button>
                 </div>
             `;
-        const keyInput = row.querySelector(`input[name="jumpHost-${i}-privateKeyPath"]`);
+        const keyInput = row.querySelector(
+          `input[name="jumpHost-${i}-privateKeyPath"]`,
+        );
         const browseBtn = row.querySelector(".jump-host-browse");
         const error = createElement("span", "form-error");
         error.style.display = "none";
@@ -1712,7 +1714,9 @@
 
     _attachKeyPathValidation(input, errorEl, successEl) {
       if (!input || !errorEl) return;
-      input.addEventListener("blur", () => this._validateKeyPath(input, errorEl, successEl));
+      input.addEventListener("blur", () =>
+        this._validateKeyPath(input, errorEl, successEl),
+      );
       input.addEventListener("input", () => {
         errorEl.style.display = "none";
         errorEl.textContent = "";
@@ -1757,24 +1761,23 @@
             }
             return;
           }
-          return window.go.api.Service.FileIsPrivateKey(value)
-            .then((isKey) => {
-              if (!isKey) {
-                errorEl.textContent = "File is not a recognised private key.";
-                errorEl.style.display = "block";
-                if (successEl) {
-                  successEl.style.display = "none";
-                  successEl.textContent = "";
-                }
-                return;
-              }
-              errorEl.style.display = "none";
-              errorEl.textContent = "";
+          return window.go.api.Service.FileIsPrivateKey(value).then((isKey) => {
+            if (!isKey) {
+              errorEl.textContent = "File is not a recognised private key.";
+              errorEl.style.display = "block";
               if (successEl) {
-                successEl.textContent = "Key verified.";
-                successEl.style.display = "block";
+                successEl.style.display = "none";
+                successEl.textContent = "";
               }
-            });
+              return;
+            }
+            errorEl.style.display = "none";
+            errorEl.textContent = "";
+            if (successEl) {
+              successEl.textContent = "Key verified.";
+              successEl.style.display = "block";
+            }
+          });
         })
         .catch(() => {
           errorEl.textContent = "Could not verify this path.";

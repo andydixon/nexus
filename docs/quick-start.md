@@ -42,18 +42,18 @@ The upload picker lists folders only and marks permissions:
 
 ## Common shortcuts
 
-| macOS Shortcut | Windows/Linux Shortcut | Action                   |
-| ------------- | ----------------------- | ------------------------ |
-| Cmd + K       | Ctrl + K                 | Command palette          |
-| Cmd + N       | Ctrl + N                 | New connection           |
-| Cmd + W       | Ctrl + W                 | Close tab                |
-| Cmd + F       | Ctrl + F                 | Find in terminal         |
-| Cmd + Shift + S | Ctrl + Shift + S        | Snippet library          |
-| Cmd + Shift + B | Ctrl + Shift + B        | Broadcast input          |
-| Cmd + Shift + Q | Ctrl + Shift + Q        | Quick connect            |
-| Cmd + Shift + R | Ctrl + Shift + R        | Toggle session recording |
-| Cmd + Shift + D | Ctrl + Shift + D        | Split pane vertically    |
-| Cmd + Shift + E | Ctrl + Shift + E        | Split pane horizontally  |
+| macOS Shortcut  | Windows/Linux Shortcut | Action                   |
+| --------------- | ---------------------- | ------------------------ |
+| Cmd + K         | Ctrl + K               | Command palette          |
+| Cmd + N         | Ctrl + N               | New connection           |
+| Cmd + W         | Ctrl + W               | Close tab                |
+| Cmd + F         | Ctrl + F               | Find in terminal         |
+| Cmd + Shift + S | Ctrl + Shift + S       | Snippet library          |
+| Cmd + Shift + B | Ctrl + Shift + B       | Broadcast input          |
+| Cmd + Shift + Q | Ctrl + Shift + Q       | Quick connect            |
+| Cmd + Shift + R | Ctrl + Shift + R       | Toggle session recording |
+| Cmd + Shift + D | Ctrl + Shift + D       | Split pane vertically    |
+| Cmd + Shift + E | Ctrl + Shift + E       | Split pane horizontally  |
 
 ## Need more detail?
 
