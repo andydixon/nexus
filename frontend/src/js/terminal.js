@@ -84,6 +84,14 @@
       const attachPasteGuard = () => {
         const inputEl = term.textarea || container.querySelector("textarea");
         if (!inputEl) return;
+        inputEl.addEventListener("keydown", (e) => {
+          const mod = e.ctrlKey || e.metaKey;
+          if (!mod || e.key !== "v") return;
+          // Block the native paste when we handle Cmd/Ctrl+V ourselves.
+          if (!suppressPasteEvent) return;
+          e.preventDefault();
+          e.stopPropagation();
+        });
         inputEl.addEventListener("paste", (e) => {
           if (!suppressPasteEvent) return;
           e.preventDefault();
@@ -182,7 +190,14 @@
 
         // Cmd/Ctrl+V — paste from clipboard
         if (mod && e.key === "v" && e.type === "keydown") {
+          const prefs = this.app.state.preferences || {};
+          if (prefs.useNativePaste === true) {
+            suppressPasteEvent = false;
+            return true;
+          }
           suppressPasteEvent = true;
+          e.preventDefault();
+          e.stopPropagation();
           setTimeout(() => {
             suppressPasteEvent = false;
           }, 250);

@@ -349,6 +349,14 @@
           },
         ),
       );
+      body.appendChild(
+        this._settingField(
+          "toggle",
+          "useNativePaste",
+          "Use native paste",
+          p.useNativePaste === true,
+        ),
+      );
     }
 
     /**
@@ -1022,6 +1030,7 @@
         "defaultFontSize",
         "defaultScrollback",
         "defaultCursorStyle",
+        "useNativePaste",
       ];
 
       for (const field of fields) {

@@ -49,6 +49,7 @@ func DefaultAppPreferences() AppPreferences {
 		DefaultFontSize:     DefaultFontSize,
 		DefaultScrollback:   DefaultScrollback,
 		DefaultCursorStyle:  DefaultCursorStyle,
+		UseNativePaste:      false,
 	}
 }
 

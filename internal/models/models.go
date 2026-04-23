@@ -263,6 +263,7 @@ type AppPreferences struct {
 	DefaultFontSize     int    `json:"defaultFontSize"`
 	DefaultScrollback   int    `json:"defaultScrollback"`
 	DefaultCursorStyle  string `json:"defaultCursorStyle"`
+	UseNativePaste      bool   `json:"useNativePaste"`
 }
 
 // AuditEntry records an auditable action within the application.

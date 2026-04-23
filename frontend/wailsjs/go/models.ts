@@ -12,6 +12,7 @@ export namespace models {
 	    defaultFontSize: number;
 	    defaultScrollback: number;
 	    defaultCursorStyle: string;
+	    useNativePaste: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new AppPreferences(source);
@@ -30,6 +31,7 @@ export namespace models {
 	        this.defaultFontSize = source["defaultFontSize"];
 	        this.defaultScrollback = source["defaultScrollback"];
 	        this.defaultCursorStyle = source["defaultCursorStyle"];
+	        this.useNativePaste = source["useNativePaste"];
 	    }
 	}
 	export class AuditEntry {
