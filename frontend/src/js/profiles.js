@@ -984,7 +984,6 @@
      * Renders a collapsible form section.
      * @param {string} title
      * @param {HTMLElement[]} fields
-     * @param {boolean} [startCollapsed=false]
      * @returns {HTMLElement}
      * @private
      */
@@ -997,15 +996,14 @@
     _renderTOTPSection(profile) {
       const section = createElement("div", "form-section");
       const header = createElement("div", "form-section-header");
-      let collapsed = true;
+      let collapsed = false;
 
       header.innerHTML = `
-            <span class="form-section-chevron">▸</span>
+            <span class="form-section-chevron">▾</span>
             <span class="form-section-title">TOTP / 2FA</span>
         `;
 
       const content = createElement("div", "form-section-content");
-      content.style.display = "none";
 
       const helpText = createElement("div", "form-help", {
         textContent:
@@ -1178,13 +1176,17 @@
         })();
       }
 
-      header.addEventListener("mousedown", (e) => e.preventDefault());
-      header.addEventListener("click", () => {
+      const toggleSection = () => {
         collapsed = !collapsed;
         content.style.display = collapsed ? "none" : "block";
         header.querySelector(".form-section-chevron").textContent = collapsed
           ? "▸"
           : "▾";
+      };
+      header.addEventListener("mousedown", (e) => {
+        if (e.button !== 0) return;
+        e.preventDefault();
+        toggleSection();
       });
 
       section.appendChild(header);
@@ -1202,15 +1204,14 @@
     _renderLoginScriptSection(prefix, steps) {
       const section = createElement("div", "form-section");
       const header = createElement("div", "form-section-header");
-      let collapsed = true;
+      let collapsed = false;
 
       header.innerHTML = `
-            <span class="form-section-chevron">▸</span>
+            <span class="form-section-chevron">▾</span>
             <span class="form-section-title">Login Script</span>
         `;
 
       const content = createElement("div", "form-section-content");
-      content.style.display = "none";
 
       const helpText = createElement("div", "form-help", {
         textContent:
@@ -1396,13 +1397,17 @@
       addRow.appendChild(addSendBtn);
       content.appendChild(addRow);
 
-      header.addEventListener("mousedown", (e) => e.preventDefault());
-      header.addEventListener("click", () => {
+      const toggleSection = () => {
         collapsed = !collapsed;
         content.style.display = collapsed ? "none" : "block";
         header.querySelector(".form-section-chevron").textContent = collapsed
           ? "▸"
           : "▾";
+      };
+      header.addEventListener("mousedown", (e) => {
+        if (e.button !== 0) return;
+        e.preventDefault();
+        toggleSection();
       });
 
       section.appendChild(header);
@@ -1410,10 +1415,10 @@
       return section;
     }
 
-    _renderSection(title, fields, startCollapsed = false) {
+    _renderSection(title, fields) {
       const section = createElement("div", "form-section");
       const header = createElement("div", "form-section-header");
-      let collapsed = startCollapsed;
+      let collapsed = false;
 
       header.innerHTML = `
             <span class="form-section-chevron">${collapsed ? "▸" : "▾"}</span>
@@ -1429,15 +1434,18 @@
         }
       }
 
-      // Prevent mousedown from starting a text selection gesture in WKWebView,
-      // which would swallow the first click and require a double-click.
-      header.addEventListener("mousedown", (e) => e.preventDefault());
-      header.addEventListener("click", () => {
+      const toggleSection = () => {
         collapsed = !collapsed;
         content.style.display = collapsed ? "none" : "block";
         header.querySelector(".form-section-chevron").textContent = collapsed
           ? "▸"
           : "▾";
+      };
+      // Handle toggle on mousedown to avoid first-click swallowing in WKWebView.
+      header.addEventListener("mousedown", (e) => {
+        if (e.button !== 0) return;
+        e.preventDefault();
+        toggleSection();
       });
 
       section.appendChild(header);

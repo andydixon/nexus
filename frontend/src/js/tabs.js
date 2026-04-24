@@ -118,6 +118,9 @@
 
       // Fit the terminal for the newly active session
       this.app.terminals.fitActive();
+      requestAnimationFrame(() => {
+        this.app.terminals.focusTerminal(sessionId);
+      });
     }
 
     /**

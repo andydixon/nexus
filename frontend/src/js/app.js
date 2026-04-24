@@ -519,6 +519,12 @@
           this.splitPanes.refitAll();
         }, 100),
       );
+
+      window.addEventListener("focus", () => {
+        requestAnimationFrame(() => {
+          this._focusVisibleTerminal();
+        });
+      });
     }
 
     // ── Split pane ─────────────────────────────────────────────────
@@ -1212,6 +1218,16 @@
           }
         });
       }
+    }
+
+    /**
+     * Focuses the currently visible xterm instance if one is active.
+     * @private
+     */
+    _focusVisibleTerminal() {
+      const sessionId = this.state.activeSessionId;
+      if (!sessionId) return;
+      this.terminals.focusTerminal(sessionId);
     }
 
     /**
