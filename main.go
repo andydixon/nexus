@@ -6,6 +6,8 @@ import (
 	"log"
 
 	"github.com/wailsapp/wails/v2"
+	"github.com/wailsapp/wails/v2/pkg/menu"
+	"github.com/wailsapp/wails/v2/pkg/menu/keys"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
 	"github.com/wailsapp/wails/v2/pkg/options/linux"
@@ -15,6 +17,31 @@ import (
 	application "github.com/andydixon/nexus/internal/app"
 	"github.com/andydixon/nexus/frontend"
 )
+
+func buildAppMenu(app *application.App) *menu.Menu {
+	mainMenu := menu.NewMenu()
+
+	appMenu := menu.NewMenu()
+	appMenu.AddText("About Nexus Terminal", nil, func(_ *menu.CallbackData) {
+		app.EmitOpenAbout()
+	})
+	appMenu.AddSeparator()
+	appMenu.AddText("Quit Nexus Terminal", keys.CmdOrCtrl("q"), func(_ *menu.CallbackData) {
+		app.RequestQuit()
+	})
+
+	helpMenu := menu.NewMenu()
+	helpMenu.AddText("About Nexus Terminal", nil, func(_ *menu.CallbackData) {
+		app.EmitOpenAbout()
+	})
+
+	mainMenu.Append(menu.SubMenu("Nexus Terminal", appMenu))
+	mainMenu.Append(menu.EditMenu())
+	mainMenu.Append(menu.WindowMenu())
+	mainMenu.Append(menu.SubMenu("Help", helpMenu))
+
+	return mainMenu
+}
 
 func main() {
 	nexus := application.NewApp()
@@ -35,13 +62,9 @@ func main() {
 		OnStartup:        nexus.Startup,
 		OnShutdown:       nexus.Shutdown,
 		OnDomReady:       nexus.DomReady,
+		Menu:             buildAppMenu(nexus),
 		// macOS: enable the green fullscreen traffic-light button.
-		Mac: &mac.Options{
-			About: &mac.AboutInfo{
-				Title:   "Nexus Terminal",
-				Message: "A premium desktop terminal client",
-			},
-		},
+		Mac: &mac.Options{},
 		// Windows: default decorations include maximise; fullscreen via F11.
 		Windows: &windows.Options{},
 		// Linux: use the default window manager decorations (fullscreen via WM).

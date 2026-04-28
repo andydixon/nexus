@@ -1,7 +1,9 @@
-.PHONY: all build dev clean test test-cover lint install deps frontend-deps run package help
+.PHONY: all build dev clean test test-cover lint install deps frontend-deps run package release help
 
 # Resolve the Wails binary. Prefer wails on PATH; fall back to GOPATH/bin.
 WAILS := $(or $(shell which wails 2>/dev/null),$(shell go env GOPATH)/bin/wails)
+VERSION := $(shell git describe --tags --abbrev=0 2>/dev/null || echo dev)-$(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
+LD_UPDATE_URL := $(if $(NEXUS_UPDATE_URL),-X github.com/andydixon/nexus/internal/api.appUpdateURL=$(NEXUS_UPDATE_URL),)
 
 # Default target
 all: build
@@ -20,7 +22,7 @@ dev: deps
 
 # Production build
 build: deps
-	$(WAILS) build -ldflags "-s -w"
+	$(WAILS) build -ldflags "-s -w -X github.com/andydixon/nexus/internal/api.appVersion=$(VERSION) $(LD_UPDATE_URL)"
 
 # Run tests
 test:
@@ -47,6 +49,10 @@ lint:
 package: build
 	@echo "Binary built at build/bin/"
 
+# Build and package release artefacts for all platforms
+release:
+	./release.sh
+
 # Help
 help:
 	@echo "Nexus Terminal — Build Targets"
@@ -59,4 +65,5 @@ help:
 	@echo "  make clean         — Clean build artefacts"
 	@echo "  make lint          — Run linter (requires golangci-lint)"
 	@echo "  make package       — Build and package for distribution"
+	@echo "  make release       — Build multi-platform release artefacts"
 	@echo "  make help          — Show this help"

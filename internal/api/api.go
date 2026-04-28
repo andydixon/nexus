@@ -36,6 +36,9 @@ import (
 // appVersion is set at build time via ldflags.
 var appVersion = "dev"
 
+// appUpdateURL is set at build time via ldflags.
+var appUpdateURL = ""
+
 // Service is the main API surface exposed to the frontend via Wails bindings.
 type Service struct {
 	store         *storage.Store
@@ -1298,8 +1301,17 @@ func (s *Service) ImportSSHConfig(configPath string, folder string) (int, error)
 
 // CheckForUpdates queries GitHub Releases for a newer version.
 func (s *Service) CheckForUpdates() (map[string]interface{}, error) {
-	checker := updater.NewChecker(appVersion)
-	info, err := checker.Check(context.Background())
+	ctx := context.Background()
+	var info *updater.UpdateInfo
+	var err error
+
+	if appUpdateURL != "" {
+		checker := updater.NewURLChecker(appUpdateURL, appVersion)
+		info, err = checker.Check(ctx)
+	} else {
+		checker := updater.NewChecker(appVersion)
+		info, err = checker.Check(ctx)
+	}
 	if err != nil {
 		return nil, err
 	}

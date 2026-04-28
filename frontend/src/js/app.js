@@ -40,6 +40,7 @@
       this.exportImport = new ExportImportUI(this);
       this.sftp = new SFTPBrowser(this);
       this.snippets = new SnippetLibrary(this);
+      this.updateInfo = null;
     }
 
     /**
@@ -61,6 +62,7 @@
       await this.loadPreferences();
       await this.checkSecretStore();
       this.updateStatusBar();
+      this.checkForUpdates(true);
     }
 
     /**
@@ -252,6 +254,11 @@
           payload.sessionID,
           payload.status,
         );
+      });
+
+      // App-wide commands from the native menu
+      window.runtime.EventsOn("app:open-about", () => {
+        this.settings.openTab("about");
       });
 
       // Port-forwarding events
@@ -502,6 +509,12 @@
       this._bindClick("btn-broadcast", () => this.toggleBroadcast());
       this._bindClick("btn-empty-connect", () => this.profileEditor.openNew());
       this._bindClick("btn-empty-quick", () => this.quickConnect());
+
+      const updateBtn = document.getElementById("status-update");
+      if (updateBtn) {
+        updateBtn.addEventListener("mousedown", (e) => e.preventDefault());
+        updateBtn.addEventListener("click", () => this.settings.openTab("about"));
+      }
 
       const searchInput = document.getElementById("profile-search");
       if (searchInput) {
@@ -851,6 +864,7 @@
       const connEl = document.getElementById("status-connection");
       const countEl = document.getElementById("status-session-count");
       const vaultEl = document.getElementById("status-vault");
+      const updateEl = document.getElementById("status-update");
       if (!connEl) return;
 
       const sessions = this.state.getAllSessions();
@@ -874,6 +888,44 @@
           ? "🔓 Unlocked"
           : "🔒 Locked";
       }
+
+      if (updateEl) {
+        if (this.updateInfo && this.updateInfo.available) {
+          const version = this.updateInfo.latestVersion
+            ? ` (${this.updateInfo.latestVersion})`
+            : "";
+          updateEl.textContent = `Update available${version}`;
+          updateEl.classList.remove("is-hidden");
+        } else {
+          updateEl.textContent = "Update available";
+          updateEl.classList.add("is-hidden");
+        }
+      }
+    }
+
+    async checkForUpdates(silent) {
+      if (!window.go || !window.go.api || !window.go.api.Service) {
+        return;
+      }
+
+      try {
+        const info = await window.go.api.Service.CheckForUpdates();
+        this.setUpdateInfo(info);
+        if (!silent && info && info.available) {
+          this.notifications.info(
+            `Update available: ${info.latestVersion || "new version"}`,
+          );
+        }
+      } catch (err) {
+        if (!silent) {
+          this.notifications.error("Update check failed: " + err);
+        }
+      }
+    }
+
+    setUpdateInfo(info) {
+      this.updateInfo = info || null;
+      this.updateStatusBar();
     }
 
     // ── Internal helpers ─────────────────────────────────────────────

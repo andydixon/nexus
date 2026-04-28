@@ -125,6 +125,27 @@
     flex: 1;
 }
 
+.status-update {
+    border: 1px solid var(--accent);
+    background: rgba(78, 205, 196, 0.12);
+    color: var(--accent);
+    font-size: var(--text-xs);
+    padding: 2px 8px;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background 150ms ease, color 150ms ease, border-color 150ms ease;
+}
+
+.status-update:hover {
+    background: rgba(78, 205, 196, 0.2);
+    color: var(--text-primary);
+    border-color: var(--accent-strong, var(--accent));
+}
+
+.status-update.is-hidden {
+    display: none;
+}
+
 /* Status bar indicator dots */
 .status-bar .status-dot {
     width: 6px;

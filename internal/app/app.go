@@ -146,3 +146,27 @@ func (a *App) DomReady(ctx context.Context) {
 	})
 	log.Println("DOM ready – backend:ready event emitted")
 }
+
+// EmitOpenAbout tells the frontend to open the About tab.
+func (a *App) EmitOpenAbout() {
+	a.mu.Lock()
+	ctx := a.ctx
+	a.mu.Unlock()
+	if ctx == nil {
+		log.Println("unable to open About: application context not initialised")
+		return
+	}
+	runtime.EventsEmit(ctx, "app:open-about", nil)
+}
+
+// RequestQuit asks the runtime to quit the application.
+func (a *App) RequestQuit() {
+	a.mu.Lock()
+	ctx := a.ctx
+	a.mu.Unlock()
+	if ctx == nil {
+		log.Println("unable to quit: application context not initialised")
+		return
+	}
+	runtime.Quit(ctx)
+}

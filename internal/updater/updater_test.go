@@ -1,6 +1,9 @@
 package updater
 
 import (
+	"context"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 )
@@ -62,5 +65,42 @@ func TestTruncateNotes(t *testing.T) {
 	}
 	if len([]rune(got)) != 501 { // 500 runes + "…"
 		t.Errorf("expected 501 runes, got %d", len([]rune(got)))
+	}
+}
+
+func TestURLCheckerManifestJSON(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"latestVersion":"1.2.3","releaseURL":"https://example.com/release"}`))
+	}))
+	defer server.Close()
+
+	checker := NewURLChecker(server.URL, "1.2.0")
+	info, err := checker.Check(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !info.Available {
+		t.Fatalf("expected update to be available")
+	}
+	if info.LatestVersion != "1.2.3" {
+		t.Fatalf("unexpected latest version: %s", info.LatestVersion)
+	}
+}
+
+func TestURLCheckerPlainText(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain")
+		_, _ = w.Write([]byte("2.0.0"))
+	}))
+	defer server.Close()
+
+	checker := NewURLChecker(server.URL, "1.9.0")
+	info, err := checker.Check(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !info.Available {
+		t.Fatalf("expected update to be available")
 	}
 }

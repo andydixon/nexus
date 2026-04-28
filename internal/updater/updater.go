@@ -10,6 +10,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -56,12 +57,40 @@ type Checker struct {
 	client  *http.Client
 }
 
+// Manifest describes a self-hosted update manifest.
+type Manifest struct {
+	LatestVersion string `json:"latestVersion"`
+	Version       string `json:"version"`
+	ReleaseURL    string `json:"releaseURL"`
+	ReleaseName   string `json:"releaseName"`
+	ReleaseNotes  string `json:"releaseNotes"`
+	PublishedAt   string `json:"publishedAt"`
+}
+
+// URLChecker performs version checks against a self-hosted update manifest.
+type URLChecker struct {
+	url     string
+	current string
+	client  *http.Client
+}
+
 // NewChecker creates an update checker for the given current version.
 // The version string should be a semver tag (e.g. "v1.2.3" or "1.2.3").
 func NewChecker(currentVersion string) *Checker {
 	return &Checker{
 		owner:   defaultOwner,
 		repo:    defaultRepo,
+		current: normaliseVersion(currentVersion),
+		client: &http.Client{
+			Timeout: requestTimeout,
+		},
+	}
+}
+
+// NewURLChecker creates a checker for a self-hosted update manifest URL.
+func NewURLChecker(url string, currentVersion string) *URLChecker {
+	return &URLChecker{
+		url:     url,
 		current: normaliseVersion(currentVersion),
 		client: &http.Client{
 			Timeout: requestTimeout,
@@ -134,11 +163,82 @@ func (c *Checker) Check(ctx context.Context) (*UpdateInfo, error) {
 	}, nil
 }
 
+// Check queries the update manifest URL and compares it to the current version.
+func (c *URLChecker) Check(ctx context.Context) (*UpdateInfo, error) {
+	if c.url == "" {
+		return nil, fmt.Errorf("updater: update manifest URL is empty")
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("updater: failed to create request: %w", err)
+	}
+	req.Header.Set("Accept", "application/json, text/plain")
+	req.Header.Set("User-Agent", "NexusTerminal-UpdateChecker")
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("updater: request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("updater: update server returned %d", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("updater: failed to read response: %w", err)
+	}
+
+	info, ok := parseManifest(body, c.current)
+	if ok {
+		return info, nil
+	}
+
+	latest := normaliseVersion(strings.TrimSpace(string(body)))
+	if latest == "" {
+		return nil, fmt.Errorf("updater: update manifest is empty")
+	}
+
+	return &UpdateInfo{
+		Available:      isNewer(latest, c.current),
+		CurrentVersion: c.current,
+		LatestVersion:  latest,
+	}, nil
+}
+
 // normaliseVersion strips a leading "v" and trims whitespace.
 func normaliseVersion(v string) string {
 	v = strings.TrimSpace(v)
 	v = strings.TrimPrefix(v, "v")
 	return v
+}
+
+func parseManifest(body []byte, current string) (*UpdateInfo, bool) {
+	var manifest Manifest
+	if err := json.Unmarshal(body, &manifest); err != nil {
+		return nil, false
+	}
+
+	latest := manifest.LatestVersion
+	if latest == "" {
+		latest = manifest.Version
+	}
+	latest = normaliseVersion(latest)
+	if latest == "" {
+		return nil, false
+	}
+
+	return &UpdateInfo{
+		Available:      isNewer(latest, current),
+		CurrentVersion: current,
+		LatestVersion:  latest,
+		ReleaseURL:     manifest.ReleaseURL,
+		ReleaseName:    manifest.ReleaseName,
+		ReleaseNotes:   manifest.ReleaseNotes,
+		PublishedAt:    manifest.PublishedAt,
+	}, true
 }
 
 // isNewer performs a simple string comparison of dot-separated version parts.

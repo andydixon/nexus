@@ -848,7 +848,7 @@
       body.innerHTML = `
             <div class="about-section">
                 <h3 class="about-title">Nexus Terminal</h3>
-                <p class="about-version">Version 1.0.0</p>
+                <p class="about-version" data-role="app-version">Version …</p>
                 <p class="about-desc">Developed by Andy Dixon - www.dixon.cx/nexus</p>
                 <div class="about-links">
                     <p>AES-256-GCM encrypted credential vault</p>
@@ -864,6 +864,22 @@
             </div>
         `;
 
+      const versionEl = body.querySelector("[data-role='app-version']");
+      if (versionEl) {
+        if (window.go && window.go.api && window.go.api.Service) {
+          window.go.api.Service.GetAppInfo()
+            .then((info) => {
+              const version = (info && info.version) || "dev";
+              versionEl.textContent = `Version ${version}`;
+            })
+            .catch(() => {
+              versionEl.textContent = "Version unavailable";
+            });
+        } else {
+          versionEl.textContent = "Version unavailable";
+        }
+      }
+
       const updateBtn = body.querySelector("#settings-check-update");
       if (updateBtn) {
         updateBtn.addEventListener("click", async () => {
@@ -872,6 +888,9 @@
           try {
             const info = await window.go.api.Service.CheckForUpdates();
             const resultEl = body.querySelector("#settings-update-result");
+            if (this.app && typeof this.app.setUpdateInfo === "function") {
+              this.app.setUpdateInfo(info);
+            }
             if (info.available) {
               resultEl.innerHTML =
                 `<span style="color:var(--accent)">Update available: <strong>${info.latestVersion}</strong></span>` +

@@ -16,6 +16,23 @@ log()  { echo -e "${GREEN}[nexus]${NC} $1"; }
 warn() { echo -e "${YELLOW}[nexus]${NC} $1"; }
 err()  { echo -e "${RED}[nexus]${NC} $1" >&2; }
 
+build_version() {
+    local tag
+    local commit
+    tag="$(git describe --tags --abbrev=0 2>/dev/null || echo "dev")"
+    commit="$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")"
+    echo "${tag}-${commit}"
+}
+
+build_ldflags() {
+    local version="$1"
+    local flags="-s -w -X github.com/andydixon/nexus/internal/api.appVersion=${version}"
+    if [ -n "${NEXUS_UPDATE_URL:-}" ]; then
+        flags="${flags} -X github.com/andydixon/nexus/internal/api.appUpdateURL=${NEXUS_UPDATE_URL}"
+    fi
+    echo "${flags}"
+}
+
 check_deps() {
     command -v go >/dev/null 2>&1 || { err "Go is not installed"; exit 1; }
     command -v node >/dev/null 2>&1 || { err "Node.js is not installed"; exit 1; }
@@ -80,6 +97,9 @@ build_target() {
     local target_os="$1"
     local target_arch="$2"
     local host="$3"
+    local version="$4"
+    local ldflags
+    ldflags="$(build_ldflags "${version}")"
 
     local platform="${target_os}/${target_arch}"
     local cc=""
@@ -94,15 +114,18 @@ build_target() {
 
     log "Building ${platform}…"
     if [ -n "$cc" ]; then
-        CC="$cc" CGO_ENABLED=1 wails build -platform "$platform" -ldflags "-s -w"
+        CC="$cc" CGO_ENABLED=1 wails build -platform "$platform" -ldflags "$ldflags"
     else
-        CGO_ENABLED=1 wails build -platform "$platform" -ldflags "-s -w"
+        CGO_ENABLED=1 wails build -platform "$platform" -ldflags "$ldflags"
     fi
 }
 
 main() {
     check_deps
     install_deps
+
+    local version
+    version="$(build_version)"
 
     local host
     host="$(host_os)"
@@ -112,15 +135,15 @@ main() {
     fi
 
     # Build host targets first
-    build_target "$host" "amd64" "$host"
-    build_target "$host" "arm64" "$host"
+    build_target "$host" "amd64" "$host" "$version"
+    build_target "$host" "arm64" "$host" "$version"
 
     # Cross-build Linux and Windows targets where toolchains are available
     if [ "$host" = "darwin" ] || [ "$host" = "linux" ]; then
-        build_target "linux" "amd64" "$host"
-        build_target "linux" "arm64" "$host"
-        build_target "windows" "amd64" "$host"
-        build_target "windows" "arm64" "$host"
+        build_target "linux" "amd64" "$host" "$version"
+        build_target "linux" "arm64" "$host" "$version"
+        build_target "windows" "amd64" "$host" "$version"
+        build_target "windows" "arm64" "$host" "$version"
     fi
 
     log "Builds complete. Output: build/bin/"

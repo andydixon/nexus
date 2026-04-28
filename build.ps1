@@ -48,6 +48,32 @@ function Install-Deps {
     Pop-Location
 }
 
+function Get-BuildVersion {
+    try {
+        $tag = & git describe --tags --abbrev=0 2>$null
+        if (-not $tag) { $tag = 'dev' }
+    } catch {
+        $tag = 'dev'
+    }
+
+    try {
+        $commit = & git rev-parse --short HEAD 2>$null
+        if (-not $commit) { $commit = 'unknown' }
+    } catch {
+        $commit = 'unknown'
+    }
+
+    return "$tag-$commit"
+}
+
+function Get-Ldflags([string]$Version) {
+    $flags = "-s -w -X github.com/andydixon/nexus/internal/api.appVersion=$Version"
+    if ($env:NEXUS_UPDATE_URL) {
+        $flags += " -X github.com/andydixon/nexus/internal/api.appUpdateURL=$($env:NEXUS_UPDATE_URL)"
+    }
+    return $flags
+}
+
 function Dev {
     $wailsPath = Check-Deps
     Install-Deps
@@ -58,10 +84,12 @@ function Dev {
 function Build {
     $wailsPath = Check-Deps
     Install-Deps
+    $version = Get-BuildVersion
+    $ldflags = Get-Ldflags $version
 
     $env:CGO_ENABLED = '1'
     Write-Info 'Building production binary (CGO_ENABLED=1)...'
-    & $wailsPath build -ldflags "-s -w"
+    & $wailsPath build -ldflags $ldflags
     Write-Info 'Build complete: build\bin\'
 }
 

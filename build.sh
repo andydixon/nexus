@@ -17,6 +17,23 @@ log()  { echo -e "${GREEN}[nexus]${NC} $1"; }
 warn() { echo -e "${YELLOW}[nexus]${NC} $1"; }
 err()  { echo -e "${RED}[nexus]${NC} $1" >&2; }
 
+build_version() {
+    local tag
+    local commit
+    tag="$(git describe --tags --abbrev=0 2>/dev/null || echo "dev")"
+    commit="$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")"
+    echo "${tag}-${commit}"
+}
+
+build_ldflags() {
+    local version="$1"
+    local flags="-s -w -X github.com/andydixon/nexus/internal/api.appVersion=${version}"
+    if [ -n "${NEXUS_UPDATE_URL:-}" ]; then
+        flags="${flags} -X github.com/andydixon/nexus/internal/api.appUpdateURL=${NEXUS_UPDATE_URL}"
+    fi
+    echo "${flags}"
+}
+
 # Check prerequisites
 check_deps() {
     command -v go >/dev/null 2>&1 || { err "Go is not installed"; exit 1; }
@@ -62,7 +79,9 @@ build() {
     check_deps
     install_deps
     log "Building production binary…"
-    wails build -ldflags "-s -w"
+    local version
+    version="$(build_version)"
+    wails build -ldflags "$(build_ldflags "${version}")"
     log "Build complete: build/bin/"
 }
 
