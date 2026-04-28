@@ -58,3 +58,8 @@ vault.json
 *.pem
 *.key
 !build/appicon.png
+
+
+# Builds
+build/releases/v*
+build/releases/manifest*

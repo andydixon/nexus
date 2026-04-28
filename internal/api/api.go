@@ -1306,7 +1306,10 @@ func (s *Service) CheckForUpdates() (map[string]interface{}, error) {
 	var err error
 
 	if appUpdateURL != "" {
-		checker := updater.NewURLChecker(appUpdateURL, appVersion)
+		url := strings.ReplaceAll(appUpdateURL, "{platform}", runtime.GOOS)
+		url = strings.ReplaceAll(url, "{os}", runtime.GOOS)
+		url = strings.ReplaceAll(url, "{arch}", runtime.GOARCH)
+		checker := updater.NewURLChecker(url, appVersion)
 		info, err = checker.Check(ctx)
 	} else {
 		checker := updater.NewChecker(appVersion)

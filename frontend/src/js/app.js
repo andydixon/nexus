@@ -513,7 +513,9 @@
       const updateBtn = document.getElementById("status-update");
       if (updateBtn) {
         updateBtn.addEventListener("mousedown", (e) => e.preventDefault());
-        updateBtn.addEventListener("click", () => this.settings.openTab("about"));
+        updateBtn.addEventListener("click", () =>
+          this.settings.openTab("about"),
+        );
       }
 
       const searchInput = document.getElementById("profile-search");

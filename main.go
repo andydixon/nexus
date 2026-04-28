@@ -14,8 +14,8 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/options/mac"
 	"github.com/wailsapp/wails/v2/pkg/options/windows"
 
-	application "github.com/andydixon/nexus/internal/app"
 	"github.com/andydixon/nexus/frontend"
+	application "github.com/andydixon/nexus/internal/app"
 )
 
 func buildAppMenu(app *application.App) *menu.Menu {

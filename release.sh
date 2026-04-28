@@ -11,6 +11,9 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m'
 
+DEFAULT_UPDATE_URL="https://dixon.cx/downloads/nexus/manifest-{platform}-{arch}.json"
+DEFAULT_RELEASE_BASE_URL="https://dixon.cx/downloads/nexus"
+
 log()  { echo -e "${GREEN}[nexus]${NC} $1"; }
 warn() { echo -e "${YELLOW}[nexus]${NC} $1"; }
 err()  { echo -e "${RED}[nexus]${NC} $1" >&2; }
@@ -62,6 +65,10 @@ pick_cc() {
     local target_arch="$2"
 
     if [ "$target_os" = "windows" ]; then
+        if command -v zig >/dev/null 2>&1; then
+            echo "zig:${target_arch}"
+            return
+        fi
         if [ "$target_arch" = "amd64" ]; then
             echo "x86_64-w64-mingw32-gcc"
         else
@@ -71,6 +78,10 @@ pick_cc() {
     fi
 
     if [ "$target_os" = "linux" ]; then
+        if command -v zig >/dev/null 2>&1; then
+            echo "zig:${target_arch}"
+            return
+        fi
         if [ "$target_arch" = "amd64" ]; then
             echo "x86_64-linux-gnu-gcc"
         else
@@ -92,6 +103,17 @@ build_target() {
     local cc
     cc="$(pick_cc "$target_os" "$target_arch")"
 
+    local zig_target=""
+    if [[ "$cc" == zig:* ]]; then
+        zig_target="${cc#zig:}"
+        if [ "$zig_target" = "amd64" ]; then
+            zig_target="x86_64"
+        elif [ "$zig_target" = "arm64" ]; then
+            zig_target="aarch64"
+        fi
+        cc="zig"
+    fi
+
     if [ -n "$cc" ] && ! command -v "$cc" >/dev/null 2>&1; then
         warn "Skipping ${platform} (missing C compiler: ${cc})"
         return 0
@@ -111,18 +133,75 @@ build_target() {
     local ldflags
     ldflags="$(build_ldflags "$version")"
     if [ -n "$cc" ]; then
-        CC="$cc" CGO_ENABLED=1 wails build -platform "$platform" -ldflags "$ldflags" -o "$output_path"
+        local cc_cmd="$cc"
+        if [ -n "$zig_target" ]; then
+            if [ "$target_os" = "linux" ]; then
+                cc_cmd="zig cc -target ${zig_target}-linux-gnu"
+            elif [ "$target_os" = "windows" ]; then
+                cc_cmd="zig cc -target ${zig_target}-windows-gnu"
+            fi
+        fi
+        if ! CC="$cc_cmd" CGO_ENABLED=1 wails build -platform "$platform" -ldflags "$ldflags" -o "$output_path"; then
+            warn "Build failed for ${platform}"
+            return 1
+        fi
     else
-        CGO_ENABLED=1 wails build -platform "$platform" -ldflags "$ldflags" -o "$output_path"
+        if ! CGO_ENABLED=1 wails build -platform "$platform" -ldflags "$ldflags" -o "$output_path"; then
+            warn "Build failed for ${platform}"
+            return 1
+        fi
     fi
 
-    local zip_name="${out_dir}/${output_base}.zip"
+    local expected_path=""
+    local build_bin="build/bin"
     if [ "$target_os" = "darwin" ]; then
-        (cd "$out_dir" && zip -r "${output_base}.zip" "${output_base}.app" >/dev/null)
+        expected_path="${out_dir}/${output_base}.app"
+        if [ ! -d "$expected_path" ]; then
+            local source_app
+            source_app="$(find "$build_bin" -type d -name "*.app" -print0 | xargs -0 ls -td 2>/dev/null | head -1)"
+            if [ -z "$source_app" ]; then
+                warn "Built .app not found for ${platform}"
+                return 1
+            fi
+            log "Using app bundle: ${source_app}"
+            cp -R "$source_app" "$expected_path"
+        fi
+        if ! (cd "$out_dir" && zip -r "${output_base}.zip" "${output_base}.app" >/dev/null); then
+            warn "Zip failed for ${platform}"
+            return 1
+        fi
     elif [ "$target_os" = "windows" ]; then
-        (cd "$out_dir" && zip -j "${output_base}.zip" "${output_base}.exe" >/dev/null)
+        expected_path="${out_dir}/${output_base}.exe"
+        if [ ! -f "$expected_path" ]; then
+            local source_exe
+            source_exe="$(find "$build_bin" -type f -name "${output_base}.exe" -print0 | xargs -0 ls -t 2>/dev/null | head -1)"
+            if [ -z "$source_exe" ]; then
+                warn "Built .exe not found for ${platform}"
+                return 1
+            fi
+            log "Using executable: ${source_exe}"
+            cp "$source_exe" "$expected_path"
+        fi
+        if ! (cd "$out_dir" && zip -j "${output_base}.zip" "${output_base}.exe" >/dev/null); then
+            warn "Zip failed for ${platform}"
+            return 1
+        fi
     else
-        (cd "$out_dir" && zip -j "${output_base}.zip" "${output_base}" >/dev/null)
+        expected_path="${out_dir}/${output_base}"
+        if [ ! -f "$expected_path" ]; then
+            local source_bin
+            source_bin="$(find "$build_bin" -type f -name "${output_base}" -print0 | xargs -0 ls -t 2>/dev/null | head -1)"
+            if [ -z "$source_bin" ] || [ ! -f "$source_bin" ]; then
+                warn "Built binary not found for ${platform}"
+                return 1
+            fi
+            log "Using binary: ${source_bin}"
+            cp "$source_bin" "$expected_path"
+        fi
+        if ! (cd "$out_dir" && zip -j "${output_base}.zip" "${output_base}" >/dev/null); then
+            warn "Zip failed for ${platform}"
+            return 1
+        fi
     fi
 
     echo "$target_os|$target_arch|$output_base.zip" >> "${out_dir}/.release-files"
@@ -131,49 +210,44 @@ build_target() {
 write_manifest() {
     local version="$1"
     local out_dir="$2"
-    local manifest_path="$3"
-    local version_path="$4"
+    local release_root="$3"
     local base_url="${NEXUS_RELEASE_BASE_URL:-}"
 
     local published_at
     published_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 
-    echo "$version" > "$version_path"
-
-    {
-        echo "{"
-        echo "  \"latestVersion\": \"${version}\","
-        echo "  \"publishedAt\": \"${published_at}\","
+    while IFS='|' read -r os arch filename; do
+        [ -z "$os" ] && continue
+        local manifest_path="${release_root}/manifest-${os}-${arch}.json"
+        local version_path="${release_root}/version-${os}-${arch}.txt"
+        local file_path="${out_dir}/${filename}"
+        local sha
+        sha="$(shasum -a 256 "$file_path" | awk '{print $1}')"
+        local size
+        size="$(wc -c < "$file_path" | tr -d ' ')"
+        local url=""
         if [ -n "$base_url" ]; then
-            echo "  \"releaseURL\": \"${base_url}/\","
-        else
-            echo "  \"releaseURL\": \"\","
+            url="${base_url}/${filename}"
         fi
-        echo "  \"files\": ["
 
-        local first=1
-        while IFS='|' read -r os arch filename; do
-            [ -z "$os" ] && continue
-            local file_path="${out_dir}/${filename}"
-            local sha
-            sha="$(shasum -a 256 "$file_path" | awk '{print $1}')"
-            local size
-            size="$(wc -c < "$file_path" | tr -d ' ')"
-            local url=""
+        echo "$version" > "$version_path"
+
+        {
+            echo "{"
+            echo "  \"latestVersion\": \"${version}\","
+            echo "  \"publishedAt\": \"${published_at}\","
             if [ -n "$base_url" ]; then
-                url="${base_url}/${filename}"
+                echo "  \"releaseURL\": \"${base_url}/\","
+            else
+                echo "  \"releaseURL\": \"\","
             fi
-
-            if [ $first -eq 0 ]; then
-                echo ","
-            fi
-            first=0
+            echo "  \"files\": ["
             printf "    {\"platform\":\"%s\",\"arch\":\"%s\",\"filename\":\"%s\",\"url\":\"%s\",\"sha256\":\"%s\",\"size\":%s}" "$os" "$arch" "$filename" "$url" "$sha" "$size"
-        done < "${out_dir}/.release-files"
-        echo
-        echo "  ]"
-        echo "}"
-    } > "$manifest_path"
+            echo
+            echo "  ]"
+            echo "}"
+        } > "$manifest_path"
+    done < "${out_dir}/.release-files"
 
     rm -f "${out_dir}/.release-files"
 }
@@ -186,7 +260,10 @@ main() {
     version="$(build_version)"
 
     if [ -z "${NEXUS_UPDATE_URL:-}" ]; then
-        warn "NEXUS_UPDATE_URL is not set; updates will default to GitHub in this build"
+        NEXUS_UPDATE_URL="${DEFAULT_UPDATE_URL}"
+    fi
+    if [ -z "${NEXUS_RELEASE_BASE_URL:-}" ]; then
+        NEXUS_RELEASE_BASE_URL="${DEFAULT_RELEASE_BASE_URL}"
     fi
 
     local release_root="build/releases"
@@ -196,20 +273,24 @@ main() {
     log "Building release ${version}..."
     : > "${out_dir}/.release-files"
 
-    build_target "darwin" "amd64" "$version" "$out_dir"
-    build_target "darwin" "arm64" "$version" "$out_dir"
-    build_target "linux" "amd64" "$version" "$out_dir"
-    build_target "linux" "arm64" "$version" "$out_dir"
-    build_target "windows" "amd64" "$version" "$out_dir"
-    build_target "windows" "arm64" "$version" "$out_dir"
+    local errors=0
+    if ! build_target "darwin" "amd64" "$version" "$out_dir"; then errors=1; fi
+    if ! build_target "darwin" "arm64" "$version" "$out_dir"; then errors=1; fi
+    if ! build_target "linux" "amd64" "$version" "$out_dir"; then errors=1; fi
+    if ! build_target "linux" "arm64" "$version" "$out_dir"; then errors=1; fi
+    if ! build_target "windows" "amd64" "$version" "$out_dir"; then errors=1; fi
+    if ! build_target "windows" "arm64" "$version" "$out_dir"; then errors=1; fi
 
-    local manifest_path="${release_root}/manifest.json"
-    local version_path="${release_root}/version.txt"
-    write_manifest "$version" "$out_dir" "$manifest_path" "$version_path"
+    write_manifest "$version" "$out_dir" "$release_root"
 
     log "Release artefacts written to ${out_dir}"
-    log "Manifest: ${manifest_path}"
-    log "Version: ${version_path}"
+    log "Manifests: ${release_root}/manifest-<platform>-<arch>.json"
+    log "Versions: ${release_root}/version-<platform>-<arch>.txt"
+
+    if [ $errors -ne 0 ]; then
+        err "One or more targets failed. Manifest and version were still generated."
+        exit 12
+    fi
 }
 
 main "$@"

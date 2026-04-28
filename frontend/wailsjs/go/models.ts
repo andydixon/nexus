@@ -36,8 +36,7 @@ export namespace models {
 	}
 	export class AuditEntry {
 	    id: string;
-	    // Go type: time
-	    timestamp: any;
+	    timestamp: string;
 	    action: string;
 	    profileId?: string;
 	    sessionId?: string;
@@ -50,30 +49,12 @@ export namespace models {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
-	        this.timestamp = this.convertValues(source["timestamp"], null);
+	        this.timestamp = source["timestamp"];
 	        this.action = source["action"];
 	        this.profileId = source["profileId"];
 	        this.sessionId = source["sessionId"];
 	        this.details = source["details"];
 	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
 	}
 	export class GitHubConfig {
 	    baseURL: string;
@@ -160,10 +141,8 @@ export namespace models {
 	    keyType: string;
 	    fingerprint: string;
 	    publicKey: string;
-	    // Go type: time
-	    firstSeen: any;
-	    // Go type: time
-	    lastSeen: any;
+	    firstSeen: string;
+	    lastSeen: string;
 	    trusted: boolean;
 	
 	    static createFrom(source: any = {}) {
@@ -178,28 +157,10 @@ export namespace models {
 	        this.keyType = source["keyType"];
 	        this.fingerprint = source["fingerprint"];
 	        this.publicKey = source["publicKey"];
-	        this.firstSeen = this.convertValues(source["firstSeen"], null);
-	        this.lastSeen = this.convertValues(source["lastSeen"], null);
+	        this.firstSeen = source["firstSeen"];
+	        this.lastSeen = source["lastSeen"];
 	        this.trusted = source["trusted"];
 	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
 	}
 	export class LoginScriptStep {
 	    type: string;
@@ -436,14 +397,11 @@ export namespace models {
 	    environment: string;
 	    notes: string;
 	    favourite: boolean;
-	    // Go type: time
-	    lastConnected?: any;
+	    lastConnected?: string;
 	    connectTimeout: number;
 	    readTimeout: number;
-	    // Go type: time
-	    createdAt: any;
-	    // Go type: time
-	    updatedAt: any;
+	    createdAt: string;
+	    updatedAt: string;
 	    terminalFontFamily: string;
 	    terminalFontSize: number;
 	    terminalScrollback: number;
@@ -471,11 +429,11 @@ export namespace models {
 	        this.environment = source["environment"];
 	        this.notes = source["notes"];
 	        this.favourite = source["favourite"];
-	        this.lastConnected = this.convertValues(source["lastConnected"], null);
+	        this.lastConnected = source["lastConnected"];
 	        this.connectTimeout = source["connectTimeout"];
 	        this.readTimeout = source["readTimeout"];
-	        this.createdAt = this.convertValues(source["createdAt"], null);
-	        this.updatedAt = this.convertValues(source["updatedAt"], null);
+	        this.createdAt = source["createdAt"];
+	        this.updatedAt = source["updatedAt"];
 	        this.terminalFontFamily = source["terminalFontFamily"];
 	        this.terminalFontSize = source["terminalFontSize"];
 	        this.terminalScrollback = source["terminalScrollback"];
@@ -516,8 +474,7 @@ export namespace models {
 	    state: string;
 	    tabName: string;
 	    pinned: boolean;
-	    // Go type: time
-	    connectedAt: any;
+	    connectedAt: string;
 	    error?: string;
 	
 	    static createFrom(source: any = {}) {
@@ -535,27 +492,9 @@ export namespace models {
 	        this.state = source["state"];
 	        this.tabName = source["tabName"];
 	        this.pinned = source["pinned"];
-	        this.connectedAt = this.convertValues(source["connectedAt"], null);
+	        this.connectedAt = source["connectedAt"];
 	        this.error = source["error"];
 	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
 	}
 	export class Snippet {
 	    id: string;
@@ -564,10 +503,8 @@ export namespace models {
 	    description: string;
 	    folder: string;
 	    tags: string[];
-	    // Go type: time
-	    createdAt: any;
-	    // Go type: time
-	    updatedAt: any;
+	    createdAt: string;
+	    updatedAt: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new Snippet(source);
@@ -581,27 +518,9 @@ export namespace models {
 	        this.description = source["description"];
 	        this.folder = source["folder"];
 	        this.tags = source["tags"];
-	        this.createdAt = this.convertValues(source["createdAt"], null);
-	        this.updatedAt = this.convertValues(source["updatedAt"], null);
+	        this.createdAt = source["createdAt"];
+	        this.updatedAt = source["updatedAt"];
 	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
 	}
 
 }

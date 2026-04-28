@@ -57,11 +57,11 @@ type Profile struct {
 	Environment    string     `json:"environment"`
 	Notes          string     `json:"notes"`
 	Favourite      bool       `json:"favourite"`
-	LastConnected  *time.Time `json:"lastConnected"`
+	LastConnected  *time.Time `json:"lastConnected" ts_type:"string"`
 	ConnectTimeout int        `json:"connectTimeout"` // seconds
 	ReadTimeout    int        `json:"readTimeout"`    // seconds
-	CreatedAt      time.Time  `json:"createdAt"`
-	UpdatedAt      time.Time  `json:"updatedAt"`
+	CreatedAt      time.Time  `json:"createdAt" ts_type:"string"`
+	UpdatedAt      time.Time  `json:"updatedAt" ts_type:"string"`
 
 	// Terminal preferences
 	TerminalFontFamily  string `json:"terminalFontFamily"`
@@ -233,7 +233,7 @@ type SessionInfo struct {
 	State       SessionState `json:"state"`
 	TabName     string       `json:"tabName"`
 	Pinned      bool         `json:"pinned"`
-	ConnectedAt time.Time    `json:"connectedAt"`
+	ConnectedAt time.Time    `json:"connectedAt" ts_type:"string"`
 	Error       string       `json:"error,omitempty"`
 }
 
@@ -245,8 +245,8 @@ type KnownHost struct {
 	KeyType     string    `json:"keyType"`
 	Fingerprint string    `json:"fingerprint"`
 	PublicKey   string    `json:"publicKey"`
-	FirstSeen   time.Time `json:"firstSeen"`
-	LastSeen    time.Time `json:"lastSeen"`
+	FirstSeen   time.Time `json:"firstSeen" ts_type:"string"`
+	LastSeen    time.Time `json:"lastSeen" ts_type:"string"`
 	Trusted     bool      `json:"trusted"`
 }
 
@@ -269,7 +269,7 @@ type AppPreferences struct {
 // AuditEntry records an auditable action within the application.
 type AuditEntry struct {
 	ID        string    `json:"id"`
-	Timestamp time.Time `json:"timestamp"`
+	Timestamp time.Time `json:"timestamp" ts_type:"string"`
 	Action    string    `json:"action"`
 	ProfileID string    `json:"profileId,omitempty"`
 	SessionID string    `json:"sessionId,omitempty"`
@@ -284,6 +284,6 @@ type Snippet struct {
 	Description string    `json:"description"`
 	Folder      string    `json:"folder"`
 	Tags        []string  `json:"tags"`
-	CreatedAt   time.Time `json:"createdAt"`
-	UpdatedAt   time.Time `json:"updatedAt"`
+	CreatedAt   time.Time `json:"createdAt" ts_type:"string"`
+	UpdatedAt   time.Time `json:"updatedAt" ts_type:"string"`
 }
