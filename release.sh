@@ -18,6 +18,53 @@ log()  { echo -e "${GREEN}[nexus]${NC} $1"; }
 warn() { echo -e "${YELLOW}[nexus]${NC} $1"; }
 err()  { echo -e "${RED}[nexus]${NC} $1" >&2; }
 
+host_os() {
+    case "$(uname -s)" in
+        Darwin) echo "darwin" ;;
+        Linux) echo "linux" ;;
+        *) echo "unknown" ;;
+    esac
+}
+
+host_arch() {
+    case "$(uname -m)" in
+        x86_64|amd64) echo "amd64" ;;
+        arm64|aarch64) echo "arm64" ;;
+        *) echo "unknown" ;;
+    esac
+}
+
+build_tags() {
+    if command -v pkg-config >/dev/null 2>&1 \
+        && pkg-config --exists webkit2gtk-4.1 \
+        && ! pkg-config --exists webkit2gtk-4.0; then
+        echo "webkit2_41"
+    fi
+}
+
+default_targets() {
+    local os
+    local arch
+    os="$(host_os)"
+    arch="$(host_arch)"
+
+    if [ "$os" = "unknown" ] || [ "$arch" = "unknown" ]; then
+        err "Unsupported host platform: $(uname -s)/$(uname -m)"
+        exit 1
+    fi
+
+    echo "${os}/${arch}"
+}
+
+release_targets() {
+    if [ -n "${NEXUS_RELEASE_TARGETS:-}" ]; then
+        echo "$NEXUS_RELEASE_TARGETS" | tr ',' '\n' | sed '/^[[:space:]]*$/d'
+        return
+    fi
+
+    default_targets
+}
+
 check_deps() {
     command -v go >/dev/null 2>&1 || { err "Go is not installed"; exit 1; }
     command -v node >/dev/null 2>&1 || { err "Node.js is not installed"; exit 1; }
@@ -132,6 +179,8 @@ build_target() {
     log "Building ${platform}..."
     local ldflags
     ldflags="$(build_ldflags "$version")"
+    local tags
+    tags="$(build_tags)"
     if [ -n "$cc" ]; then
         local cc_cmd="$cc"
         if [ -n "$zig_target" ]; then
@@ -141,12 +190,22 @@ build_target() {
                 cc_cmd="zig cc -target ${zig_target}-windows-gnu"
             fi
         fi
-        if ! CC="$cc_cmd" CGO_ENABLED=1 wails build -platform "$platform" -ldflags "$ldflags" -o "$output_path"; then
+        if [ -n "$tags" ]; then
+            if ! CC="$cc_cmd" CGO_ENABLED=1 wails build -platform "$platform" -tags "$tags" -ldflags "$ldflags" -o "$output_path"; then
+                warn "Build failed for ${platform}"
+                return 1
+            fi
+        elif ! CC="$cc_cmd" CGO_ENABLED=1 wails build -platform "$platform" -ldflags "$ldflags" -o "$output_path"; then
             warn "Build failed for ${platform}"
             return 1
         fi
     else
-        if ! CGO_ENABLED=1 wails build -platform "$platform" -ldflags "$ldflags" -o "$output_path"; then
+        if [ -n "$tags" ]; then
+            if ! CGO_ENABLED=1 wails build -platform "$platform" -tags "$tags" -ldflags "$ldflags" -o "$output_path"; then
+                warn "Build failed for ${platform}"
+                return 1
+            fi
+        elif ! CGO_ENABLED=1 wails build -platform "$platform" -ldflags "$ldflags" -o "$output_path"; then
             warn "Build failed for ${platform}"
             return 1
         fi
@@ -273,13 +332,27 @@ main() {
     log "Building release ${version}..."
     : > "${out_dir}/.release-files"
 
+    local targets
+    mapfile -t targets < <(release_targets)
+    if [ "${#targets[@]}" -eq 0 ]; then
+        err "No release targets selected."
+        exit 1
+    fi
+
     local errors=0
-    if ! build_target "darwin" "amd64" "$version" "$out_dir"; then errors=1; fi
-    if ! build_target "darwin" "arm64" "$version" "$out_dir"; then errors=1; fi
-    if ! build_target "linux" "amd64" "$version" "$out_dir"; then errors=1; fi
-    if ! build_target "linux" "arm64" "$version" "$out_dir"; then errors=1; fi
-    if ! build_target "windows" "amd64" "$version" "$out_dir"; then errors=1; fi
-    if ! build_target "windows" "arm64" "$version" "$out_dir"; then errors=1; fi
+    local target
+    for target in "${targets[@]}"; do
+        local target_os="${target%%/*}"
+        local target_arch="${target##*/}"
+        if [ "$target_os" = "$target_arch" ] || [ -z "$target_os" ] || [ -z "$target_arch" ]; then
+            err "Invalid release target: ${target}"
+            errors=1
+            continue
+        fi
+        if ! build_target "$target_os" "$target_arch" "$version" "$out_dir"; then
+            errors=1
+        fi
+    done
 
     write_manifest "$version" "$out_dir" "$release_root"
 

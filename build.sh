@@ -17,6 +17,14 @@ log()  { echo -e "${GREEN}[nexus]${NC} $1"; }
 warn() { echo -e "${YELLOW}[nexus]${NC} $1"; }
 err()  { echo -e "${RED}[nexus]${NC} $1" >&2; }
 
+build_tags() {
+    if command -v pkg-config >/dev/null 2>&1 \
+        && pkg-config --exists webkit2gtk-4.1 \
+        && ! pkg-config --exists webkit2gtk-4.0; then
+        echo "webkit2_41"
+    fi
+}
+
 build_version() {
     local tag
     local commit
@@ -81,7 +89,14 @@ build() {
     log "Building production binary…"
     local version
     version="$(build_version)"
-    wails build -ldflags "$(build_ldflags "${version}")"
+    local tags
+    tags="$(build_tags)"
+    if [ -n "$tags" ]; then
+        log "Using Wails build tags: ${tags}"
+        wails build -tags "$tags" -ldflags "$(build_ldflags "${version}")"
+    else
+        wails build -ldflags "$(build_ldflags "${version}")"
+    fi
     log "Build complete: build/bin/"
 }
 
