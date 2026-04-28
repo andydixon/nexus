@@ -214,8 +214,8 @@ if (!$platform && !$arch) {
         <div class="meta">Latest version: <span class="badge"><?php echo h($latest); ?></span><?php if ($platformLabel) {
                                                                                                     echo ' • ' . h($platformLabel);
                                                                                                 } ?><?php if ($published) {
-                                                                                                    echo ' • Published ' . h($published);
-                                                                                                } ?></div>
+                                                                                                        echo ' • Published ' . h($published);
+                                                                                                    } ?></div>
 
         <div class="card">
             <h2 style="margin:0 0 10px;font-size:18px;">Release files</h2>
