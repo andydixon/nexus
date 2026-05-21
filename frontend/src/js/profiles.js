@@ -65,6 +65,27 @@
         refreshIntervalSecs: 300,
       },
     },
+    vnc: {
+      port: 5900,
+      protocol: "vnc",
+      vnc: {
+        vncHost: "",
+        vncPort: 5900,
+        secretMode: "prompt",
+        viewOnly: false,
+        scaleToFit: true,
+        quality: 6,
+        sharedSession: true,
+        sshTunnel: false,
+        sshHost: "",
+        sshPort: 22,
+        sshUsername: "",
+        sshAuthMethod: "publickey",
+        sshSecretMode: "saved",
+        sshPrivateKey: "",
+        sshAgentAuth: false,
+      },
+    },
   };
 
   class ProfileEditor {
@@ -141,7 +162,7 @@
       drawer.appendChild(header);
 
       // ── Protocol selector tabs ──────────────────────────────
-      const protocols = ["ssh", "telnet", "raw", "github"];
+      const protocols = ["ssh", "telnet", "raw", "github", "vnc"];
       const tabBar = createElement("div", "drawer-protocol-tabs");
       for (const proto of protocols) {
         const label = proto === "github" ? "GitHub" : proto.toUpperCase();
@@ -184,10 +205,15 @@
             body.appendChild(s),
           );
           break;
+        case "vnc":
+          this._renderVNCSections(profile).forEach((s) =>
+            body.appendChild(s),
+          );
+          break;
       }
 
       // Terminal section (SSH and Telnet only)
-      if (profile.protocol !== "raw" && profile.protocol !== "github") {
+      if (profile.protocol !== "raw" && profile.protocol !== "github" && profile.protocol !== "vnc") {
         body.appendChild(this._renderTerminalSection(profile));
       }
 
@@ -914,6 +940,131 @@
             {
               min: 60,
               max: 3600,
+            },
+          ),
+        ]),
+      );
+
+      return sections;
+    }
+
+    /** @private */
+    _renderVNCSections(profile) {
+      const sections = [];
+      const vnc = profile.vnc || DEFAULTS.vnc.vnc;
+
+      // VNC connection settings
+      sections.push(
+        this._renderSection("VNC Server", [
+          this._field("text", "vnc.vncHost", "VNC Host", vnc.vncHost, {
+            placeholder: "192.168.1.100",
+          }),
+          this._field("number", "vnc.vncPort", "VNC Port", vnc.vncPort, {
+            min: 1,
+            max: 65535,
+          }),
+          this._field(
+            "select",
+            "vnc.secretMode",
+            "Password Storage",
+            vnc.secretMode,
+            {
+              options: [
+                { value: "saved", label: "Save to keychain" },
+                { value: "session-only", label: "Remember for session" },
+                { value: "prompt", label: "Ask every time" },
+              ],
+            },
+          ),
+        ]),
+      );
+
+      // Display settings
+      sections.push(
+        this._renderSection("Display", [
+          this._field("checkbox", "vnc.viewOnly", "View Only", vnc.viewOnly),
+          this._field(
+            "checkbox",
+            "vnc.scaleToFit",
+            "Scale to Fit",
+            vnc.scaleToFit,
+          ),
+          this._field(
+            "checkbox",
+            "vnc.sharedSession",
+            "Shared Session",
+            vnc.sharedSession,
+          ),
+          this._field("number", "vnc.quality", "Quality (1-9)", vnc.quality, {
+            min: 1,
+            max: 9,
+          }),
+        ]),
+      );
+
+      // SSH tunnel section
+      sections.push(
+        this._renderSection("SSH Tunnel", [
+          this._field(
+            "checkbox",
+            "vnc.sshTunnel",
+            "Enable SSH Tunnel",
+            vnc.sshTunnel,
+          ),
+          this._field("text", "vnc.sshHost", "SSH Host", vnc.sshHost, {
+            placeholder: "jump.example.com",
+          }),
+          this._field("number", "vnc.sshPort", "SSH Port", vnc.sshPort, {
+            min: 1,
+            max: 65535,
+          }),
+          this._field(
+            "text",
+            "vnc.sshUsername",
+            "SSH Username",
+            vnc.sshUsername,
+            {
+              placeholder: "admin",
+            },
+          ),
+          this._field(
+            "select",
+            "vnc.sshAuthMethod",
+            "SSH Auth Method",
+            vnc.sshAuthMethod,
+            {
+              options: [
+                { value: "publickey", label: "Public Key" },
+                { value: "password", label: "Password" },
+              ],
+            },
+          ),
+          this._field(
+            "text",
+            "vnc.sshPrivateKey",
+            "SSH Private Key Path",
+            vnc.sshPrivateKey,
+            {
+              placeholder: "~/.ssh/id_ed25519",
+            },
+          ),
+          this._field(
+            "checkbox",
+            "vnc.sshAgentAuth",
+            "Use SSH Agent",
+            vnc.sshAgentAuth,
+          ),
+          this._field(
+            "select",
+            "vnc.sshSecretMode",
+            "SSH Secret Storage",
+            vnc.sshSecretMode,
+            {
+              options: [
+                { value: "saved", label: "Save to keychain" },
+                { value: "session-only", label: "Remember for session" },
+                { value: "prompt", label: "Ask every time" },
+              ],
             },
           ),
         ]),
@@ -2102,6 +2253,26 @@
         p.github.secretMode = val("github.secretMode") || "saved";
         p.github.refreshIntervalSecs = val("github.refreshIntervalSecs") || 300;
       }
+
+      // VNC-specific
+      if (p.protocol === "vnc") {
+        if (!p.vnc) p.vnc = {};
+        p.vnc.vncHost = val("vnc.vncHost") || "";
+        p.vnc.vncPort = val("vnc.vncPort") || 5900;
+        p.vnc.secretMode = val("vnc.secretMode") || "prompt";
+        p.vnc.viewOnly = val("vnc.viewOnly") || false;
+        p.vnc.scaleToFit = val("vnc.scaleToFit") !== false;
+        p.vnc.quality = val("vnc.quality") || 6;
+        p.vnc.sharedSession = val("vnc.sharedSession") !== false;
+        p.vnc.sshTunnel = val("vnc.sshTunnel") || false;
+        p.vnc.sshHost = val("vnc.sshHost") || "";
+        p.vnc.sshPort = val("vnc.sshPort") || 22;
+        p.vnc.sshUsername = val("vnc.sshUsername") || "";
+        p.vnc.sshAuthMethod = val("vnc.sshAuthMethod") || "publickey";
+        p.vnc.sshPrivateKey = val("vnc.sshPrivateKey") || "";
+        p.vnc.sshAgentAuth = val("vnc.sshAgentAuth") || false;
+        p.vnc.sshSecretMode = val("vnc.sshSecretMode") || "saved";
+      }
     }
 
     // ── Validation ───────────────────────────────────────────────────
@@ -2114,7 +2285,12 @@
      */
     _validate(profile) {
       const errors = [];
-      if (!profile.host || !profile.host.trim()) {
+      if (profile.protocol === "vnc") {
+        const vncHost = (profile.vnc && profile.vnc.vncHost) || profile.host;
+        if (!vncHost || !vncHost.trim()) {
+          errors.push("VNC Host is required (in General or VNC Server section).");
+        }
+      } else if (!profile.host || !profile.host.trim()) {
         errors.push("Host is required.");
       }
       if (!profile.port || profile.port < 1 || profile.port > 65535) {
@@ -2283,6 +2459,8 @@
         ssh: null,
         telnet: null,
         raw: null,
+        github: null,
+        vnc: null,
       };
 
       const defaults = DEFAULTS[protocol] || {};

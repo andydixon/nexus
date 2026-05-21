@@ -110,15 +110,16 @@ func (s *Store) CreateProfile(p *models.Profile) error {
 	telnetJSON, _ := json.Marshal(p.Telnet)
 	rawJSON, _ := json.Marshal(p.RAW)
 	githubJSON, _ := json.Marshal(p.GitHub)
+	vncJSON, _ := json.Marshal(p.VNC)
 
 	_, err := s.db.Exec(`INSERT INTO profiles (
 		id, display_name, description, protocol, host, port, username,
 		tags, folder, environment, notes, favourite, last_connected,
 		connect_timeout, read_timeout,
 		terminal_font_family, terminal_font_size, terminal_scrollback, terminal_cursor_style,
-		ssh_config, telnet_config, raw_config, github_config,
+		ssh_config, telnet_config, raw_config, github_config, vnc_config,
 		created_at, updated_at
-	) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+	) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		p.ID, p.DisplayName, p.Description, string(p.Protocol),
 		p.Host, p.Port, p.Username,
 		string(tagsJSON), p.Folder, p.Environment, p.Notes,
@@ -126,7 +127,7 @@ func (s *Store) CreateProfile(p *models.Profile) error {
 		p.ConnectTimeout, p.ReadTimeout,
 		p.TerminalFontFamily, p.TerminalFontSize, p.TerminalScrollback, p.TerminalCursorStyle,
 		nullableJSON(p.SSH, sshJSON), nullableJSON(p.Telnet, telnetJSON), nullableJSON(p.RAW, rawJSON),
-		nullableJSON(p.GitHub, githubJSON),
+		nullableJSON(p.GitHub, githubJSON), nullableJSON(p.VNC, vncJSON),
 		p.CreatedAt.Format(time.RFC3339), p.UpdatedAt.Format(time.RFC3339),
 	)
 	if err != nil {
@@ -142,7 +143,7 @@ func (s *Store) GetProfile(id string) (*models.Profile, error) {
 		tags, folder, environment, notes, favourite, last_connected,
 		connect_timeout, read_timeout,
 		terminal_font_family, terminal_font_size, terminal_scrollback, terminal_cursor_style,
-		ssh_config, telnet_config, raw_config, github_config,
+		ssh_config, telnet_config, raw_config, github_config, vnc_config,
 		created_at, updated_at
 	FROM profiles WHERE id = ?`, id)
 
@@ -163,13 +164,14 @@ func (s *Store) UpdateProfile(p *models.Profile) error {
 	telnetJSON, _ := json.Marshal(p.Telnet)
 	rawJSON, _ := json.Marshal(p.RAW)
 	githubJSON, _ := json.Marshal(p.GitHub)
+	vncJSON, _ := json.Marshal(p.VNC)
 
 	res, err := s.db.Exec(`UPDATE profiles SET
 		display_name=?, description=?, protocol=?, host=?, port=?, username=?,
 		tags=?, folder=?, environment=?, notes=?, favourite=?, last_connected=?,
 		connect_timeout=?, read_timeout=?,
 		terminal_font_family=?, terminal_font_size=?, terminal_scrollback=?, terminal_cursor_style=?,
-		ssh_config=?, telnet_config=?, raw_config=?, github_config=?,
+		ssh_config=?, telnet_config=?, raw_config=?, github_config=?, vnc_config=?,
 		updated_at=?
 	WHERE id=?`,
 		p.DisplayName, p.Description, string(p.Protocol),
@@ -179,7 +181,7 @@ func (s *Store) UpdateProfile(p *models.Profile) error {
 		p.ConnectTimeout, p.ReadTimeout,
 		p.TerminalFontFamily, p.TerminalFontSize, p.TerminalScrollback, p.TerminalCursorStyle,
 		nullableJSON(p.SSH, sshJSON), nullableJSON(p.Telnet, telnetJSON), nullableJSON(p.RAW, rawJSON),
-		nullableJSON(p.GitHub, githubJSON),
+		nullableJSON(p.GitHub, githubJSON), nullableJSON(p.VNC, vncJSON),
 		p.UpdatedAt.Format(time.RFC3339),
 		p.ID,
 	)
@@ -213,7 +215,7 @@ func (s *Store) ListProfiles() ([]*models.Profile, error) {
 		tags, folder, environment, notes, favourite, last_connected,
 		connect_timeout, read_timeout,
 		terminal_font_family, terminal_font_size, terminal_scrollback, terminal_cursor_style,
-		ssh_config, telnet_config, raw_config, github_config,
+		ssh_config, telnet_config, raw_config, github_config, vnc_config,
 		created_at, updated_at
 	FROM profiles ORDER BY display_name`)
 	if err != nil {
@@ -232,7 +234,7 @@ func (s *Store) SearchProfiles(query string) ([]*models.Profile, error) {
 		tags, folder, environment, notes, favourite, last_connected,
 		connect_timeout, read_timeout,
 		terminal_font_family, terminal_font_size, terminal_scrollback, terminal_cursor_style,
-		ssh_config, telnet_config, raw_config, github_config,
+		ssh_config, telnet_config, raw_config, github_config, vnc_config,
 		created_at, updated_at
 	FROM profiles
 	WHERE display_name LIKE ? OR host LIKE ? OR tags LIKE ?
@@ -251,7 +253,7 @@ func (s *Store) ListProfilesByProtocol(protocol string) ([]*models.Profile, erro
 		tags, folder, environment, notes, favourite, last_connected,
 		connect_timeout, read_timeout,
 		terminal_font_family, terminal_font_size, terminal_scrollback, terminal_cursor_style,
-		ssh_config, telnet_config, raw_config, github_config,
+		ssh_config, telnet_config, raw_config, github_config, vnc_config,
 		created_at, updated_at
 	FROM profiles WHERE protocol = ? ORDER BY display_name`, protocol)
 	if err != nil {
@@ -269,7 +271,7 @@ func (s *Store) ListProfilesByTag(tag string) ([]*models.Profile, error) {
 		tags, folder, environment, notes, favourite, last_connected,
 		connect_timeout, read_timeout,
 		terminal_font_family, terminal_font_size, terminal_scrollback, terminal_cursor_style,
-		ssh_config, telnet_config, raw_config, github_config,
+		ssh_config, telnet_config, raw_config, github_config, vnc_config,
 		created_at, updated_at
 	FROM profiles WHERE tags LIKE ? ORDER BY display_name`, q)
 	if err != nil {
@@ -286,7 +288,7 @@ func (s *Store) ListProfilesByFolder(folder string) ([]*models.Profile, error) {
 		tags, folder, environment, notes, favourite, last_connected,
 		connect_timeout, read_timeout,
 		terminal_font_family, terminal_font_size, terminal_scrollback, terminal_cursor_style,
-		ssh_config, telnet_config, raw_config, github_config,
+		ssh_config, telnet_config, raw_config, github_config, vnc_config,
 		created_at, updated_at
 	FROM profiles WHERE folder = ? ORDER BY display_name`, folder)
 	if err != nil {
@@ -303,7 +305,7 @@ func (s *Store) ListFavourites() ([]*models.Profile, error) {
 		tags, folder, environment, notes, favourite, last_connected,
 		connect_timeout, read_timeout,
 		terminal_font_family, terminal_font_size, terminal_scrollback, terminal_cursor_style,
-		ssh_config, telnet_config, raw_config, github_config,
+		ssh_config, telnet_config, raw_config, github_config, vnc_config,
 		created_at, updated_at
 	FROM profiles WHERE favourite = 1 ORDER BY display_name`)
 	if err != nil {
@@ -566,7 +568,7 @@ func scanProfile(row *sql.Row) (*models.Profile, error) {
 	p := &models.Profile{}
 	var (
 		protocol, tagsJSON                              string
-		sshJSON, telnetJSON, rawJSON, githubJSON        sql.NullString
+		sshJSON, telnetJSON, rawJSON, githubJSON, vncJSON sql.NullString
 		lastConn                                        sql.NullString
 		favourite                                       int
 		createdAt, updatedAt                            string
@@ -579,7 +581,7 @@ func scanProfile(row *sql.Row) (*models.Profile, error) {
 		&favourite, &lastConn,
 		&p.ConnectTimeout, &p.ReadTimeout,
 		&p.TerminalFontFamily, &p.TerminalFontSize, &p.TerminalScrollback, &p.TerminalCursorStyle,
-		&sshJSON, &telnetJSON, &rawJSON, &githubJSON,
+		&sshJSON, &telnetJSON, &rawJSON, &githubJSON, &vncJSON,
 		&createdAt, &updatedAt,
 	)
 	if err != nil {
@@ -618,6 +620,10 @@ func scanProfile(row *sql.Row) (*models.Profile, error) {
 		p.GitHub = &models.GitHubConfig{}
 		_ = json.Unmarshal([]byte(githubJSON.String), p.GitHub)
 	}
+	if vncJSON.Valid && vncJSON.String != "" {
+		p.VNC = &models.VNCConfig{}
+		_ = json.Unmarshal([]byte(vncJSON.String), p.VNC)
+	}
 
 	return p, nil
 }
@@ -629,7 +635,7 @@ func scanProfiles(rows *sql.Rows) ([]*models.Profile, error) {
 		p := &models.Profile{}
 		var (
 			protocol, tagsJSON                              string
-			sshJSON, telnetJSON, rawJSON, githubJSON        sql.NullString
+			sshJSON, telnetJSON, rawJSON, githubJSON, vncJSON sql.NullString
 			lastConn                                        sql.NullString
 			favourite                                       int
 			createdAt, updatedAt                            string
@@ -642,7 +648,7 @@ func scanProfiles(rows *sql.Rows) ([]*models.Profile, error) {
 			&favourite, &lastConn,
 			&p.ConnectTimeout, &p.ReadTimeout,
 			&p.TerminalFontFamily, &p.TerminalFontSize, &p.TerminalScrollback, &p.TerminalCursorStyle,
-			&sshJSON, &telnetJSON, &rawJSON, &githubJSON,
+			&sshJSON, &telnetJSON, &rawJSON, &githubJSON, &vncJSON,
 			&createdAt, &updatedAt,
 		)
 		if err != nil {
@@ -680,6 +686,10 @@ func scanProfiles(rows *sql.Rows) ([]*models.Profile, error) {
 		if githubJSON.Valid && githubJSON.String != "" {
 			p.GitHub = &models.GitHubConfig{}
 			_ = json.Unmarshal([]byte(githubJSON.String), p.GitHub)
+		}
+		if vncJSON.Valid && vncJSON.String != "" {
+			p.VNC = &models.VNCConfig{}
+			_ = json.Unmarshal([]byte(vncJSON.String), p.VNC)
 		}
 
 		result = append(result, p)

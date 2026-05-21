@@ -164,6 +164,40 @@
 }
 
 /* -----------------------------------------------------------------------
+   Activity indicator — pulses when background tab has new output
+   ----------------------------------------------------------------------- */
+.tab-activity {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--accent);
+  opacity: 0;
+  transition: opacity 150ms ease;
+}
+
+.tab-has-activity .tab-activity {
+  opacity: 1;
+  animation: pulse-dot 1.5s ease infinite;
+}
+
+.tab-active .tab-activity {
+  opacity: 0;
+}
+
+/* Trigger flash — brief glow when a trigger rule matches */
+.tab-trigger-flash {
+  animation: trigger-flash 2s ease;
+}
+
+@keyframes trigger-flash {
+  0%, 100% { background: var(--bg-hover); }
+  15% { background: rgba(239, 83, 80, 0.25); }
+  30% { background: var(--bg-hover); }
+  45% { background: rgba(239, 83, 80, 0.15); }
+}
+
+/* -----------------------------------------------------------------------
    SFTP toggle button — revealed on hover (SSH tabs only)
    ----------------------------------------------------------------------- */
 .tab-sftp {

@@ -20,6 +20,8 @@
     ExportImportUI,
     SFTPBrowser,
     SnippetLibrary,
+    SSHKeyManager,
+    TriggerEngine,
     stateLabel,
   } = window.NexusTerminal;
 
@@ -40,6 +42,8 @@
       this.exportImport = new ExportImportUI(this);
       this.sftp = new SFTPBrowser(this);
       this.snippets = new SnippetLibrary(this);
+      this.sshKeys = new SSHKeyManager(this);
+      this.triggers = new TriggerEngine(this);
       this.updateInfo = null;
     }
 
@@ -159,6 +163,12 @@
       // Incoming session data (terminal output)
       window.runtime.EventsOn("session:data", (payload) => {
         this.terminals.handleData(payload.sessionID, payload.data);
+        this.tabs.markActivity(payload.sessionID);
+        // Check trigger rules against decoded text
+        try {
+          const raw = atob(payload.data);
+          this.triggers.check(payload.sessionID, raw);
+        } catch (_) { /* noop */ }
       });
 
       // Session state transitions (connecting → connected → reconnecting → disconnected)
@@ -225,6 +235,7 @@
       // Session closed by backend
       window.runtime.EventsOn("session:closed", (payload) => {
         this.sftp.close(payload.sessionID);
+        this.triggers.cleanup(payload.sessionID);
         this.tabs.handleSessionClosed(payload.sessionID);
         this.updateStatusBar();
       });
@@ -256,6 +267,14 @@
         window.NexusTerminal.GitHubViewer.setStatus(
           payload.sessionID,
           payload.status,
+        );
+      });
+
+      // VNC WebSocket proxy ready — connect the viewer
+      window.runtime.EventsOn("session:vnc:ready", (payload) => {
+        window.NexusTerminal.VNCViewer.connect(
+          payload.sessionID,
+          payload.wsURL,
         );
       });
 
@@ -362,6 +381,7 @@
       this.terminals.destroyTerminal(sessionId);
       this.rawViewer.destroyViewer(sessionId);
       window.NexusTerminal.GitHubViewer.destroyViewer(sessionId);
+      window.NexusTerminal.VNCViewer.destroyViewer(sessionId);
       this.state.removeSession(sessionId);
       this.tabs.removeTab(sessionId);
       this.updateStatusBar();
@@ -509,6 +529,7 @@
     setupUI() {
       var btnEl = document.getElementById("btn-new-connection");
       this._bindClick("btn-new-connection", () => this.profileEditor.openNew());
+      this._bindClick("btn-command-palette", () => this.commandPalette.toggle());
       this._bindClick("btn-settings", () => this.settings.open());
       this._bindClick("btn-import", () => this.importProfiles());
       this._bindClick("btn-export", () => this.exportProfiles());
@@ -761,6 +782,15 @@
               sessionInfo.id,
               container,
               profile.displayName || profile.host,
+            );
+          }
+        } else if (profile.protocol === "vnc") {
+          const container = document.getElementById(panelId);
+          if (container) {
+            window.NexusTerminal.VNCViewer.createViewer(
+              sessionInfo.id,
+              container,
+              profile,
             );
           }
         } else {

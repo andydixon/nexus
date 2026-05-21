@@ -1020,3 +1020,198 @@
   margin: var(--space-1) 0;
   background: var(--border-subtle);
 }
+
+/* =======================================================================
+   SSH KEY MANAGER
+   ======================================================================= */
+
+.sshkey-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: var(--space-3);
+}
+
+.sshkey-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.sshkey-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-2) var(--space-3);
+  background: var(--bg-base);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  gap: var(--space-3);
+}
+
+.sshkey-row:hover {
+  border-color: var(--border-strong);
+}
+
+.sshkey-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.sshkey-name {
+  font-weight: var(--weight-medium);
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sshkey-meta {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
+.sshkey-actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+.sshkey-loading,
+.sshkey-empty,
+.sshkey-error {
+  padding: var(--space-4);
+  text-align: center;
+  color: var(--text-tertiary);
+  font-size: var(--text-sm);
+}
+
+.sshkey-error {
+  color: var(--error);
+}
+
+.sshkey-generate-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  background: var(--bg-base);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-3);
+}
+
+.sshkey-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+/* =======================================================================
+   TRIGGER RULES
+   ======================================================================= */
+
+.trigger-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: var(--space-3);
+}
+
+.trigger-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.trigger-empty {
+  padding: var(--space-4);
+  text-align: center;
+  color: var(--text-tertiary);
+  font-size: var(--text-sm);
+}
+
+.trigger-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  background: var(--bg-base);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+
+.trigger-row:hover {
+  border-color: var(--border-strong);
+}
+
+.trigger-toggle {
+  flex-shrink: 0;
+}
+
+.trigger-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.trigger-name {
+  font-weight: var(--weight-medium);
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.trigger-meta {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
+.trigger-pattern {
+  font-size: var(--text-xs);
+  color: var(--accent);
+  background: var(--bg-overlay);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.trigger-actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+.trigger-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  background: var(--bg-base);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-3);
+}
+
+.trigger-form .form-row {
+  display: flex;
+  gap: var(--space-3);
+}
+
+.trigger-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}

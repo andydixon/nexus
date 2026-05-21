@@ -100,9 +100,12 @@
     setActive(sessionId) {
       this.app.state.setActiveSession(sessionId);
 
-      // Highlight active tab
+      // Highlight active tab and clear activity indicator
       this.tabList.querySelectorAll(".tab").forEach((t) => {
         t.classList.toggle("tab-active", t.dataset.sessionId === sessionId);
+        if (t.dataset.sessionId === sessionId) {
+          t.classList.remove("tab-has-activity");
+        }
       });
 
       // Show corresponding panel, hide others
@@ -426,6 +429,21 @@
     }
 
     /**
+     * Marks a background tab as having new activity.
+     * Does nothing if the session is currently active.
+     * @param {string} sessionId
+     */
+    markActivity(sessionId) {
+      if (sessionId === this.app.state.activeSessionId) return;
+      const tabEl = this.tabList.querySelector(
+        `[data-session-id="${sessionId}"]`,
+      );
+      if (tabEl && !tabEl.classList.contains("tab-has-activity")) {
+        tabEl.classList.add("tab-has-activity");
+      }
+    }
+
+    /**
      * Returns the session ID of the next tab (wrapping round).
      * @returns {string|null}
      */
@@ -487,6 +505,10 @@
         },
       );
       tab.appendChild(status);
+
+      // Activity indicator (hidden by default, shown when background tab has output)
+      const activity = createElement("span", "tab-activity");
+      tab.appendChild(activity);
 
       // Pin indicator
       if (sessionInfo.pinned) {

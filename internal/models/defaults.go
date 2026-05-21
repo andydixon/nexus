@@ -12,6 +12,7 @@ const (
 	DefaultTelnetPort = 23
 	DefaultRAWPort    = 23
 	DefaultGitHubPort = 443
+	DefaultVNCPort    = 5900
 )
 
 // Default timeout values (in seconds).
@@ -107,6 +108,18 @@ func NewProfile(protocol Protocol) Profile {
 			BaseURL:             "https://api.github.com",
 			SecretMode:          SecretModeSaved,
 			RefreshIntervalSecs: 300,
+		}
+	case ProtocolVNC:
+		p.Port = DefaultVNCPort
+		p.VNC = &VNCConfig{
+			VNCPort:       DefaultVNCPort,
+			SecretMode:    SecretModeSaved,
+			ScaleToFit:    true,
+			SharedSession: true,
+			Quality:       6,
+			SSHPort:       DefaultSSHPort,
+			SSHAuthMethod: "publickey",
+			SSHSecretMode: SecretModeSaved,
 		}
 	}
 

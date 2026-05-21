@@ -12,6 +12,7 @@ const (
 	ProtocolTelnet Protocol = "telnet"
 	ProtocolRAW    Protocol = "raw"
 	ProtocolGitHub Protocol = "github"
+	ProtocolVNC    Protocol = "vnc"
 )
 
 // HostKeyPolicy determines how unknown or changed SSH host keys are handled.
@@ -80,6 +81,9 @@ type Profile struct {
 
 	// GitHub-specific configuration
 	GitHub *GitHubConfig `json:"github,omitempty"`
+
+	// VNC-specific configuration
+	VNC *VNCConfig `json:"vnc,omitempty"`
 }
 
 // SSHConfig holds SSH-specific settings for a connection profile.
@@ -190,6 +194,40 @@ type GitHubConfig struct {
 	// RefreshIntervalSecs controls the auto-refresh period in seconds.
 	// Defaults to 300 (5 minutes).
 	RefreshIntervalSecs int `json:"refreshIntervalSecs"`
+}
+
+// VNCConfig holds VNC-specific settings for a connection profile.
+type VNCConfig struct {
+	// VNCHost is the VNC server address (defaults to profile.Host if empty).
+	VNCHost string `json:"vncHost"`
+
+	// VNCPort is the VNC server port (5900 + display number, default 5900).
+	VNCPort int `json:"vncPort"`
+
+	// SecretMode controls how the VNC password is stored.
+	SecretMode SecretMode `json:"secretMode"`
+
+	// ViewOnly disables sending keyboard and mouse events to the server.
+	ViewOnly bool `json:"viewOnly"`
+
+	// ScaleToFit scales the remote framebuffer to fit the panel.
+	ScaleToFit bool `json:"scaleToFit"`
+
+	// Quality controls JPEG compression quality (1-9, 0 = default).
+	Quality int `json:"quality"`
+
+	// SharedSession allows other VNC viewers to remain connected.
+	SharedSession bool `json:"sharedSession"`
+
+	// SSH tunnel settings — if enabled, VNC traffic is tunnelled through an SSH connection.
+	SSHTunnel       bool       `json:"sshTunnel"`
+	SSHHost         string     `json:"sshHost"`
+	SSHPort         int        `json:"sshPort"`
+	SSHUsername     string     `json:"sshUsername"`
+	SSHAuthMethod   string     `json:"sshAuthMethod"`   // password, publickey
+	SSHSecretMode   SecretMode `json:"sshSecretMode"`
+	SSHPrivateKey   string     `json:"sshPrivateKeyPath"`
+	SSHAgentAuth    bool       `json:"sshAgentAuth"`
 }
 
 // GitHubRepo is a single repository returned to the frontend for display.

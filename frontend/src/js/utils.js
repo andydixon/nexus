@@ -211,6 +211,7 @@ function protocolColour(protocol) {
         case 'telnet': return 'proto-telnet';
         case 'raw': return 'proto-raw';
         case 'github': return 'proto-github';
+        case 'vnc': return 'proto-vnc';
         default: return '';
     }
 }

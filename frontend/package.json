@@ -5,15 +5,20 @@
   "description": "Frontend for Nexus Terminal desktop SSH client",
   "scripts": {
     "install:assets": "node scripts/copy-assets.js",
+    "bundle:novnc": "node scripts/bundle-novnc.js",
     "build": "node scripts/build.js",
     "dev": "node scripts/build.js --watch",
-    "postinstall": "npm run install:assets"
+    "postinstall": "npm run install:assets && npm run bundle:novnc"
   },
   "dependencies": {
+    "@novnc/novnc": "^1.5.0",
     "xterm": "5.3.0",
     "xterm-addon-fit": "0.8.0",
     "xterm-addon-search": "0.13.0",
     "xterm-addon-unicode11": "0.6.0",
     "xterm-addon-web-links": "0.9.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.24.0"
   }
 }

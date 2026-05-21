@@ -7,6 +7,8 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"net"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -24,6 +26,7 @@ import (
 	"github.com/andydixon/nexus/internal/sshclient"
 	"github.com/andydixon/nexus/internal/storage"
 	"github.com/andydixon/nexus/internal/telnetclient"
+	"github.com/andydixon/nexus/internal/vncclient"
 )
 
 // Session wraps a protocol client with metadata and state.
@@ -34,6 +37,7 @@ type Session struct {
 	rawClient      *rawclient.Client
 	githubClient   *githubclient.Client
 	githubCancel   context.CancelFunc // stops the auto-refresh goroutine
+	vncClient      *vncclient.Client  // VNC proxy client, nil for non-VNC sessions
 	sftpClient     *sftpclient.Client // SFTP subsystem, nil until requested
 	profile        *models.Profile
 	recorder       *recording.Recorder // active recording, nil if not recording
@@ -123,6 +127,8 @@ func (m *Manager) Connect(profile *models.Profile, getSecret func(prompt string)
 			err = m.connectRAW(sess)
 		case models.ProtocolGitHub:
 			err = m.connectGitHub(sess, getSecret)
+		case models.ProtocolVNC:
+			err = m.connectVNC(sess, getSecret)
 		default:
 			err = fmt.Errorf("unsupported protocol %q", profile.Protocol)
 		}
@@ -867,6 +873,116 @@ func (m *Manager) DownloadGitHubArchive(sessionID string, fullName string, ref s
 	return nil
 }
 
+// connectVNC establishes a VNC connection (with optional SSH tunnel) and
+// emits the local WebSocket proxy URL to the frontend.
+func (m *Manager) connectVNC(sess *Session, getSecret func(prompt string) (string, error)) error {
+	profile := sess.profile
+	vncConf := profile.VNC
+	if vncConf == nil {
+		return fmt.Errorf("VNC configuration missing")
+	}
+
+	// Fall back to the profile-level host if VNC-specific host is empty.
+	vncHost := vncConf.VNCHost
+	if vncHost == "" {
+		vncHost = profile.Host
+	}
+
+	cfg := vncclient.Config{
+		VNCHost: vncHost,
+		VNCPort: vncConf.VNCPort,
+		OnError: func(err error) {
+			m.emitEvent("session:state", map[string]interface{}{
+				"sessionID": sess.Info.ID,
+				"state":     string(models.SessionError),
+				"error":     err.Error(),
+			})
+		},
+	}
+
+	// SSH tunnel configuration
+	if vncConf.SSHTunnel {
+		cfg.SSHTunnel = true
+		cfg.SSHHost = vncConf.SSHHost
+		cfg.SSHPort = vncConf.SSHPort
+		cfg.SSHUsername = vncConf.SSHUsername
+		cfg.SSHAuthMethod = vncConf.SSHAuthMethod
+		cfg.SSHAgentAuth = vncConf.SSHAgentAuth
+
+		// Resolve SSH credentials
+		switch vncConf.SSHAuthMethod {
+		case "password":
+			getPass := m.buildSecretCallback(profile.ID, "vnc-ssh-password", vncConf.SSHSecretMode, getSecret)
+			password, err := getPass()
+			if err != nil {
+				return fmt.Errorf("SSH password: %w", err)
+			}
+			cfg.SSHPassword = password
+		case "publickey":
+			if vncConf.SSHPrivateKey != "" {
+				keyData, err := os.ReadFile(vncConf.SSHPrivateKey)
+				if err != nil {
+					return fmt.Errorf("reading SSH key: %w", err)
+				}
+				cfg.SSHPrivateKey = keyData
+				// Get passphrase if needed
+				getPassphrase := m.buildSecretCallback(profile.ID, "vnc-ssh-passphrase", vncConf.SSHSecretMode, getSecret)
+				passphrase, _ := getPassphrase()
+				cfg.SSHPassphrase = passphrase
+			}
+		}
+
+		// SSH agent support
+		if vncConf.SSHAgentAuth {
+			socketPath := os.Getenv("SSH_AUTH_SOCK")
+			if socketPath != "" {
+				agentConn, err := net.Dial("unix", socketPath)
+				if err == nil {
+					cfg.SSHAgentConn = agentConn
+				}
+			}
+		}
+	} else {
+		// Direct VNC — may need a VNC password
+		getVNCPass := m.buildSecretCallback(profile.ID, "vnc-password", vncConf.SecretMode, getSecret)
+		password, _ := getVNCPass()
+		// VNC auth is handled by the RFB protocol in the frontend (noVNC),
+		// but we store it in case we need server-side auth negotiation later.
+		_ = password
+	}
+
+	client := vncclient.NewClient(cfg)
+	wsURL, err := client.Connect(cfg)
+	if err != nil {
+		return err
+	}
+
+	sess.vncClient = client
+
+	// Emit the WebSocket URL so the frontend can connect noVNC.
+	m.emitEvent("session:vnc:ready", map[string]interface{}{
+		"sessionID": sess.Info.ID,
+		"wsURL":     wsURL,
+	})
+
+	return nil
+}
+
+// GetVNCWebSocketURL returns the local WebSocket proxy URL for a VNC session.
+func (m *Manager) GetVNCWebSocketURL(sessionID string) (string, error) {
+	m.mu.RLock()
+	sess, ok := m.sessions[sessionID]
+	m.mu.RUnlock()
+
+	if !ok {
+		return "", fmt.Errorf("sessions: session %q not found", sessionID)
+	}
+	if sess.vncClient == nil {
+		return "", fmt.Errorf("sessions: session %q is not a VNC connection", sessionID)
+	}
+	return sess.vncClient.WSURL(), nil
+}
+
 // ---------------------------------------------------------------------------
 // Session recording
 // ---------------------------------------------------------------------------
@@ -1369,6 +1485,10 @@ func (m *Manager) closeSession(sess *Session) {
 	}
 	if sess.githubCancel != nil {
 		sess.githubCancel()
+	}
+	if sess.vncClient != nil {
+		sess.vncClient.Close()
+		sess.vncClient = nil
 	}
 
 	m.mu.Lock()

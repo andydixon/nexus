@@ -95,6 +95,8 @@ func ValidateProfile(p *models.Profile) error {
 		}
 	case models.ProtocolGitHub:
 		// GitHub profiles require no host-level validation beyond the common checks.
+	case models.ProtocolVNC:
+		// VNC profiles use vnc.vncHost or the profile-level host; validated at connect time.
 	default:
 		errs.Add("protocol", fmt.Sprintf("unsupported protocol %q", p.Protocol))
 	}

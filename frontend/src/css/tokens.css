@@ -57,6 +57,7 @@
     --protocol-telnet: #ffa726;
     --protocol-raw:    #ab47bc;
     --protocol-github: #7c8aff;
+    --protocol-vnc:    #e85d4a;
 
     /* -----------------------------------------------------------------------
        Spacing scale (4 px base unit)

@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"runtime"
@@ -913,6 +914,16 @@ func (s *Service) DownloadGitHubRepoArchive(sessionID string, fullName string, r
 }
 
 // ---------------------------------------------------------------------------
+// VNC
+// ---------------------------------------------------------------------------
+
+// GetVNCWebSocketURL returns the local WebSocket proxy URL for a VNC session.
+// The frontend connects noVNC to this URL for display.
+func (s *Service) GetVNCWebSocketURL(sessionID string) (string, error) {
+	return s.sessions.GetVNCWebSocketURL(sessionID)
+}
+
+// ---------------------------------------------------------------------------
 // Port forwarding
 // ---------------------------------------------------------------------------
 
@@ -1456,4 +1467,197 @@ func derefProfiles(ptrs []*models.Profile) []models.Profile {
 		result[i] = *p
 	}
 	return result
+}
+
+// ---------------------------------------------------------------------------
+// SSH Key Management
+// ---------------------------------------------------------------------------
+
+// SSHKeyInfo describes a key found in ~/.ssh/.
+type SSHKeyInfo struct {
+	Name       string `json:"name"`
+	Type       string `json:"type"`
+	Bits       string `json:"bits"`
+	PublicKey  string `json:"publicKey"`
+	PrivateKey string `json:"privateKeyPath"`
+}
+
+// ListSSHKeyPairs returns detailed info about SSH key pairs in ~/.ssh/.
+func (s *Service) ListSSHKeyPairs() ([]SSHKeyInfo, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return nil, fmt.Errorf("unable to determine home directory: %w", err)
+	}
+	sshDir := filepath.Join(home, ".ssh")
+
+	entries, err := os.ReadDir(sshDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return []SSHKeyInfo{}, nil
+		}
+		return nil, fmt.Errorf("unable to read .ssh directory: %w", err)
+	}
+
+	var keys []SSHKeyInfo
+	seen := make(map[string]bool)
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		name := entry.Name()
+		// Look for .pub files and match them with private keys
+		if !strings.HasSuffix(name, ".pub") {
+			continue
+		}
+		baseName := strings.TrimSuffix(name, ".pub")
+		privPath := filepath.Join(sshDir, baseName)
+
+		// Verify private key exists
+		if _, err := os.Stat(privPath); err != nil {
+			continue
+		}
+
+		if seen[baseName] {
+			continue
+		}
+		seen[baseName] = true
+
+		// Read public key content
+		pubBytes, err := os.ReadFile(filepath.Join(sshDir, name))
+		if err != nil {
+			continue
+		}
+		pubContent := strings.TrimSpace(string(pubBytes))
+
+		// Determine key type from public key content
+		keyType := "unknown"
+		parts := strings.Fields(pubContent)
+		if len(parts) >= 1 {
+			switch {
+			case strings.Contains(parts[0], "ed25519"):
+				keyType = "ed25519"
+			case strings.Contains(parts[0], "ecdsa"):
+				keyType = "ecdsa"
+			case strings.Contains(parts[0], "rsa"):
+				keyType = "rsa"
+			case strings.Contains(parts[0], "dsa"):
+				keyType = "dsa"
+			}
+		}
+
+		keys = append(keys, SSHKeyInfo{
+			Name:       baseName,
+			Type:       keyType,
+			PublicKey:  pubContent,
+			PrivateKey: privPath,
+		})
+	}
+
+	if keys == nil {
+		keys = []SSHKeyInfo{}
+	}
+	return keys, nil
+}
+
+// GenerateSSHKey generates a new SSH key pair.
+func (s *Service) GenerateSSHKey(name string, keyType string, bits int, passphrase string) error {
+	if name == "" {
+		return fmt.Errorf("key name is required")
+	}
+	// Sanitise name — only allow alphanumeric, hyphens, underscores
+	for _, ch := range name {
+		if !((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == '-' || ch == '_') {
+			return fmt.Errorf("key name contains invalid characters (use alphanumeric, hyphens, underscores)")
+		}
+	}
+
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("unable to determine home directory: %w", err)
+	}
+	sshDir := filepath.Join(home, ".ssh")
+
+	// Ensure .ssh directory exists
+	if err := os.MkdirAll(sshDir, 0700); err != nil {
+		return fmt.Errorf("unable to create .ssh directory: %w", err)
+	}
+
+	keyPath := filepath.Join(sshDir, name)
+	// Check if key already exists
+	if _, err := os.Stat(keyPath); err == nil {
+		return fmt.Errorf("key %q already exists", name)
+	}
+
+	if keyType == "" {
+		keyType = "ed25519"
+	}
+
+	// Build ssh-keygen arguments
+	args := []string{"-t", keyType, "-f", keyPath, "-C", name + "@nexus-terminal"}
+	if passphrase != "" {
+		args = append(args, "-N", passphrase)
+	} else {
+		args = append(args, "-N", "")
+	}
+	if keyType == "rsa" && bits > 0 {
+		args = append(args, "-b", fmt.Sprintf("%d", bits))
+	}
+
+	// #nosec G204 — arguments are sanitised above
+	cmd := exec.Command("ssh-keygen", args...)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("ssh-keygen failed: %s", stderr.String())
+	}
+
+	return nil
+}
+
+// GetSSHPublicKey returns the content of a public key file.
+func (s *Service) GetSSHPublicKey(name string) (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("unable to determine home directory: %w", err)
+	}
+	pubPath := filepath.Join(home, ".ssh", name+".pub")
+	data, err := os.ReadFile(pubPath)
+	if err != nil {
+		return "", fmt.Errorf("unable to read public key: %w", err)
+	}
+	return strings.TrimSpace(string(data)), nil
+}
+
+// DeleteSSHKey removes an SSH key pair.
+func (s *Service) DeleteSSHKey(name string) error {
+	if name == "" {
+		return fmt.Errorf("key name is required")
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("unable to determine home directory: %w", err)
+	}
+	sshDir := filepath.Join(home, ".ssh")
+	privPath := filepath.Join(sshDir, name)
+	pubPath := privPath + ".pub"
+
+	// Verify paths are within .ssh directory (prevent directory traversal)
+	absPriv, _ := filepath.Abs(privPath)
+	absSsh, _ := filepath.Abs(sshDir)
+	if !strings.HasPrefix(absPriv, absSsh+string(os.PathSeparator)) {
+		return fmt.Errorf("invalid key name")
+	}
+
+	var errs []string
+	if err := os.Remove(privPath); err != nil && !os.IsNotExist(err) {
+		errs = append(errs, "private key: "+err.Error())
+	}
+	if err := os.Remove(pubPath); err != nil && !os.IsNotExist(err) {
+		errs = append(errs, "public key: "+err.Error())
+	}
+	if len(errs) > 0 {
+		return fmt.Errorf("failed to delete: %s", strings.Join(errs, "; "))
+	}
+	return nil
 }
