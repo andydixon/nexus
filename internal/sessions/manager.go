@@ -18,6 +18,7 @@ import (
 
 	"github.com/andydixon/nexus/internal/audit"
 	"github.com/andydixon/nexus/internal/githubclient"
+	"github.com/andydixon/nexus/internal/localshell"
 	"github.com/andydixon/nexus/internal/models"
 	"github.com/andydixon/nexus/internal/rawclient"
 	"github.com/andydixon/nexus/internal/recording"
@@ -38,6 +39,7 @@ type Session struct {
 	githubClient   *githubclient.Client
 	githubCancel   context.CancelFunc // stops the auto-refresh goroutine
 	vncClient      *vncclient.Client  // VNC proxy client, nil for non-VNC sessions
+	localClient    *localshell.Client // local shell PTY, nil for non-local sessions
 	sftpClient     *sftpclient.Client // SFTP subsystem, nil until requested
 	profile        *models.Profile
 	recorder       *recording.Recorder // active recording, nil if not recording
@@ -163,6 +165,104 @@ func (m *Manager) Connect(profile *models.Profile, getSecret func(prompt string)
 	return sessionID, nil
 }
 
+// ConnectLocal creates a local shell session without a saved profile.
+// The shell path is resolved from the given parameter or falls back to the system default.
+func (m *Manager) ConnectLocal(shell string) (string, error) {
+	sessionID := uuid.New().String()
+	now := time.Now()
+
+	info := models.SessionInfo{
+		ID:          sessionID,
+		ProfileID:   "",
+		ProfileName: "Local Machine",
+		Protocol:    models.ProtocolLocal,
+		Host:        "localhost",
+		Port:        0,
+		State:       models.SessionConnecting,
+		TabName:     "Local",
+		ConnectedAt: now,
+	}
+
+	sess := &Session{
+		Info: info,
+	}
+
+	m.mu.Lock()
+	m.sessions[sessionID] = sess
+	m.mu.Unlock()
+
+	m.emitEvent("session:state", map[string]interface{}{
+		"sessionID": sessionID,
+		"state":     string(models.SessionConnecting),
+	})
+
+	go func() {
+		client := localshell.NewClient(localshell.Config{
+			Shell: shell,
+			Cols:  80,
+			Rows:  24,
+			OnData: func(data []byte) {
+				m.emitEvent("session:data", map[string]interface{}{
+					"sessionID": sessionID,
+					"data":      base64.StdEncoding.EncodeToString(data),
+				})
+				// Write to active recording if present.
+				m.mu.RLock()
+				rec := sess.recorder
+				m.mu.RUnlock()
+				if rec != nil {
+					rec.WriteOutput(data)
+				}
+			},
+			OnError: func(err error) {
+				m.mu.Lock()
+				sess.Info.State = models.SessionError
+				sess.Info.Error = err.Error()
+				m.mu.Unlock()
+
+				m.emitEvent("session:state", map[string]interface{}{
+					"sessionID": sessionID,
+					"state":     string(models.SessionError),
+					"error":     err.Error(),
+				})
+			},
+			OnClose: func() {
+				m.handleSessionClosed(sessionID)
+			},
+		})
+
+		if err := client.Start(); err != nil {
+			m.mu.Lock()
+			sess.Info.State = models.SessionError
+			sess.Info.Error = err.Error()
+			m.mu.Unlock()
+
+			m.emitEvent("session:state", map[string]interface{}{
+				"sessionID": sessionID,
+				"state":     string(models.SessionError),
+				"error":     err.Error(),
+			})
+			return
+		}
+
+		sess.localClient = client
+
+		m.mu.Lock()
+		sess.Info.State = models.SessionConnected
+		sess.Info.ConnectedAt = time.Now()
+		m.mu.Unlock()
+
+		m.emitEvent("session:state", map[string]interface{}{
+			"sessionID": sessionID,
+			"state":     string(models.SessionConnected),
+		})
+
+		m.auditLog.LogConnect("", sessionID, "local", "localhost")
+	}()
+
+	return sessionID, nil
+}
+
 // Disconnect closes a specific session.
 func (m *Manager) Disconnect(sessionID string) error {
 	m.mu.Lock()
@@ -240,6 +340,8 @@ func (m *Manager) WriteToSession(sessionID string, data []byte) error {
 		return sess.telnetClient.Write(data)
 	case sess.rawClient != nil:
 		return sess.rawClient.Write(data)
+	case sess.localClient != nil:
+		return sess.localClient.Write(data)
 	}
 	return fmt.Errorf("sessions: no active client for session %q", sessionID)
 }
@@ -259,6 +361,8 @@ func (m *Manager) ResizeSession(sessionID string, cols, rows int) error {
 		return sess.sshClient.Resize(cols, rows)
 	case sess.telnetClient != nil:
 		return sess.telnetClient.Resize(cols, rows)
+	case sess.localClient != nil:
+		return sess.localClient.Resize(uint16(cols), uint16(rows))
 	}
 	// RAW sessions have no concept of terminal size.
 	return nil
@@ -1489,6 +1593,10 @@ func (m *Manager) closeSession(sess *Session) {
 	if sess.vncClient != nil {
 		sess.vncClient.Close()
 		sess.vncClient = nil
+	}
+	if sess.localClient != nil {
+		sess.localClient.Close()
+		sess.localClient = nil
 	}
 
 	m.mu.Lock()

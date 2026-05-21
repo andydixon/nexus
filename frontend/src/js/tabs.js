@@ -480,7 +480,9 @@
       const protoLabel =
         sessionInfo.protocol === "github"
           ? "GitHub"
-          : sessionInfo.protocol.toUpperCase();
+          : sessionInfo.protocol === "local"
+            ? "Local"
+            : sessionInfo.protocol.toUpperCase();
       const badge = createElement(
         "span",
         `tab-badge badge-${sessionInfo.protocol}`,

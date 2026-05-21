@@ -114,6 +114,14 @@
   background: rgba(124, 138, 255, 0.15);
   color: var(--protocol-github);
 }
+.tab-badge.badge-vnc {
+  background: rgba(232, 93, 74, 0.15);
+  color: var(--protocol-vnc);
+}
+.tab-badge.badge-local {
+  background: rgba(139, 195, 74, 0.15);
+  color: var(--protocol-local);
+}
 
 /* -----------------------------------------------------------------------
    Status dot (connection state)

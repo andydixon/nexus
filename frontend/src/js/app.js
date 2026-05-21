@@ -541,6 +541,9 @@
       this._bindClick("btn-new-tab", () => this.profileEditor.openNew());
       this._bindClick("btn-broadcast", () => this.toggleBroadcast());
 
+      // Wire the "Local Machine" sidebar button
+      this.sidebar.onConnectLocal = () => this.connectLocal();
+
       // Right-click on broadcast button opens target selector
       const broadcastBtn = document.getElementById("btn-broadcast");
       if (broadcastBtn) {
@@ -806,6 +809,30 @@
         );
       } catch (err) {
         this.notifications.error("Connection failed: " + err);
+      }
+    }
+
+    /**
+     * Opens a local terminal session.
+     */
+    async connectLocal() {
+      try {
+        const sessionInfo = await window.go.api.Service.ConnectLocal();
+        this.state.addSession(sessionInfo);
+        this.tabs.addTab(sessionInfo);
+
+        const panelId = `panel-${sessionInfo.id}`;
+        const prefs = this.state.preferences || {};
+        this.terminals.createTerminal(sessionInfo.id, panelId, {
+          terminalFontFamily: prefs.defaultFontFamily,
+          terminalFontSize: prefs.defaultFontSize,
+          terminalScrollback: prefs.defaultScrollback,
+          terminalCursorStyle: prefs.defaultCursorStyle,
+        });
+
+        this.notifications.info("Opening local terminal…");
+      } catch (err) {
+        this.notifications.error("Local terminal failed: " + err);
       }
     }
 

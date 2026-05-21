@@ -1,3 +1,28 @@
+export namespace api {
+	
+	export class SSHKeyInfo {
+	    name: string;
+	    type: string;
+	    bits: string;
+	    publicKey: string;
+	    privateKeyPath: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SSHKeyInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.type = source["type"];
+	        this.bits = source["bits"];
+	        this.publicKey = source["publicKey"];
+	        this.privateKeyPath = source["privateKeyPath"];
+	    }
+	}
+
+}
+
 export namespace models {
 	
 	export class AppPreferences {
@@ -13,6 +38,7 @@ export namespace models {
 	    defaultScrollback: number;
 	    defaultCursorStyle: string;
 	    useNativePaste: boolean;
+	    localShell: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new AppPreferences(source);
@@ -32,6 +58,7 @@ export namespace models {
 	        this.defaultScrollback = source["defaultScrollback"];
 	        this.defaultCursorStyle = source["defaultCursorStyle"];
 	        this.useNativePaste = source["useNativePaste"];
+	        this.localShell = source["localShell"];
 	    }
 	}
 	export class AuditEntry {
@@ -222,6 +249,46 @@ export namespace models {
 	        this.label = source["label"];
 	    }
 	}
+	export class VNCConfig {
+	    vncHost: string;
+	    vncPort: number;
+	    secretMode: string;
+	    viewOnly: boolean;
+	    scaleToFit: boolean;
+	    quality: number;
+	    sharedSession: boolean;
+	    sshTunnel: boolean;
+	    sshHost: string;
+	    sshPort: number;
+	    sshUsername: string;
+	    sshAuthMethod: string;
+	    sshSecretMode: string;
+	    sshPrivateKeyPath: string;
+	    sshAgentAuth: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new VNCConfig(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.vncHost = source["vncHost"];
+	        this.vncPort = source["vncPort"];
+	        this.secretMode = source["secretMode"];
+	        this.viewOnly = source["viewOnly"];
+	        this.scaleToFit = source["scaleToFit"];
+	        this.quality = source["quality"];
+	        this.sharedSession = source["sharedSession"];
+	        this.sshTunnel = source["sshTunnel"];
+	        this.sshHost = source["sshHost"];
+	        this.sshPort = source["sshPort"];
+	        this.sshUsername = source["sshUsername"];
+	        this.sshAuthMethod = source["sshAuthMethod"];
+	        this.sshSecretMode = source["sshSecretMode"];
+	        this.sshPrivateKeyPath = source["sshPrivateKeyPath"];
+	        this.sshAgentAuth = source["sshAgentAuth"];
+	    }
+	}
 	export class RAWConfig {
 	    autoReconnect: boolean;
 	    lineEnding: string;
@@ -410,6 +477,7 @@ export namespace models {
 	    telnet?: TelnetConfig;
 	    raw?: RAWConfig;
 	    github?: GitHubConfig;
+	    vnc?: VNCConfig;
 	
 	    static createFrom(source: any = {}) {
 	        return new Profile(source);
@@ -442,6 +510,7 @@ export namespace models {
 	        this.telnet = this.convertValues(source["telnet"], TelnetConfig);
 	        this.raw = this.convertValues(source["raw"], RAWConfig);
 	        this.github = this.convertValues(source["github"], GitHubConfig);
+	        this.vnc = this.convertValues(source["vnc"], VNCConfig);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -522,6 +591,7 @@ export namespace models {
 	        this.updatedAt = source["updatedAt"];
 	    }
 	}
+	
 
 }
 

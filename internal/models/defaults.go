@@ -51,6 +51,7 @@ func DefaultAppPreferences() AppPreferences {
 		DefaultScrollback:   DefaultScrollback,
 		DefaultCursorStyle:  DefaultCursorStyle,
 		UseNativePaste:      false,
+		LocalShell:          "", // empty means use system default
 	}
 }
 

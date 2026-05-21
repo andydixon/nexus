@@ -13,6 +13,7 @@ const (
 	ProtocolRAW    Protocol = "raw"
 	ProtocolGitHub Protocol = "github"
 	ProtocolVNC    Protocol = "vnc"
+	ProtocolLocal  Protocol = "local"
 )
 
 // HostKeyPolicy determines how unknown or changed SSH host keys are handled.
@@ -302,6 +303,7 @@ type AppPreferences struct {
 	DefaultScrollback   int    `json:"defaultScrollback"`
 	DefaultCursorStyle  string `json:"defaultCursorStyle"`
 	UseNativePaste      bool   `json:"useNativePaste"`
+	LocalShell          string `json:"localShell"` // path to shell binary for local terminal
 }
 
 // AuditEntry records an auditable action within the application.

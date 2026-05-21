@@ -24,6 +24,7 @@ import (
 
 	"github.com/andydixon/nexus/internal/audit"
 	"github.com/andydixon/nexus/internal/exportimport"
+	"github.com/andydixon/nexus/internal/localshell"
 	"github.com/andydixon/nexus/internal/models"
 	"github.com/andydixon/nexus/internal/preferences"
 	"github.com/andydixon/nexus/internal/secrets"
@@ -359,6 +360,24 @@ func (s *Service) ConnectQuick(profile models.Profile) (models.SessionInfo, erro
 		profile.ID = uuid.New().String()
 	}
 	sessionID, err := s.sessions.Connect(&profile, s.promptSecret)
+	if err != nil {
+		return models.SessionInfo{}, err
+	}
+	info := s.sessions.GetSessionInfo(sessionID)
+	if info == nil {
+		return models.SessionInfo{}, fmt.Errorf("session created but info not found")
+	}
+	return *info, nil
+}
+
+// ConnectLocal opens a local shell session using the configured (or default) shell.
+func (s *Service) ConnectLocal() (models.SessionInfo, error) {
+	shell := ""
+	if s.prefs != nil {
+		prefs := s.prefs.Get()
+		shell = prefs.LocalShell
+	}
+	sessionID, err := s.sessions.ConnectLocal(shell)
 	if err != nil {
 		return models.SessionInfo{}, err
 	}
@@ -921,6 +940,29 @@ func (s *Service) DownloadGitHubRepoArchive(sessionID string, fullName string, r
 // The frontend connects noVNC to this URL for display.
 func (s *Service) GetVNCWebSocketURL(sessionID string) (string, error) {
 	return s.sessions.GetVNCWebSocketURL(sessionID)
+}
+
+// ---------------------------------------------------------------------------
+// Local shell
+// ---------------------------------------------------------------------------
+
+// GetDefaultShell returns the system's default shell path.
+func (s *Service) GetDefaultShell() string {
+	return localshell.DefaultShell()
+}
+
+// BrowseForShell opens a file dialog to select a shell binary.
+func (s *Service) BrowseForShell() (string, error) {
+	if s.ctx == nil {
+		return "", fmt.Errorf("application context not set")
+	}
+	path, err := wailsRuntime.OpenFileDialog(s.ctx, wailsRuntime.OpenDialogOptions{
+		Title: "Select Shell Binary",
+	})
+	if err != nil {
+		return "", fmt.Errorf("file dialog failed: %w", err)
+	}
+	return path, nil
 }
 
 // ---------------------------------------------------------------------------

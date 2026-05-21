@@ -53,6 +53,12 @@
         this._knownHosts = [];
       }
 
+      try {
+        this._defaultShell = await window.go.api.Service.GetDefaultShell();
+      } catch (_) {
+        this._defaultShell = "";
+      }
+
       this._render();
     }
 
@@ -281,6 +287,45 @@
           { min: 180, max: 500 },
         ),
       );
+
+      // Local shell path with browse button
+      const shellGroup = createElement("div", "form-group settings-field");
+      const shellLabel = createElement("label", "form-label", {
+        textContent: "Local shell",
+        for: "setting-localShell",
+      });
+      shellGroup.appendChild(shellLabel);
+
+      const shellRow = createElement("div", "settings-shell-row");
+      const shellInput = createElement("input", "form-input", {
+        type: "text",
+        id: "setting-localShell",
+        name: "setting-localShell",
+        value: p.localShell || "",
+        placeholder: this._defaultShell || "/bin/zsh",
+      });
+      shellRow.appendChild(shellInput);
+
+      const browseBtn = createElement("button", "btn btn-sm btn-secondary", {
+        textContent: "Browse…",
+        type: "button",
+      });
+      browseBtn.addEventListener("click", async () => {
+        try {
+          const path = await window.go.api.Service.BrowseForShell();
+          if (path) {
+            shellInput.value = path;
+          }
+        } catch (_) {}
+      });
+      shellRow.appendChild(browseBtn);
+      shellGroup.appendChild(shellRow);
+
+      const shellHint = createElement("span", "form-hint", {
+        textContent: "Leave empty to use system default",
+      });
+      shellGroup.appendChild(shellHint);
+      body.appendChild(shellGroup);
     }
 
     /**
@@ -1050,6 +1095,7 @@
         "defaultScrollback",
         "defaultCursorStyle",
         "useNativePaste",
+        "localShell",
       ];
 
       for (const field of fields) {

@@ -68,6 +68,9 @@
         this.el.appendChild(this._renderBulkActions());
       }
 
+      // Local Machine quick-connect button
+      this.el.appendChild(this._renderLocalMachineItem());
+
       // Favourites
       const favourites = profiles.filter((p) => p.favourite);
       if (favourites.length > 0) {
@@ -529,6 +532,36 @@
       return this.app.state.profiles.filter((p) =>
         this.selectedProfiles.has(p.id),
       );
+    }
+
+    /** @private */
+    _renderLocalMachineItem() {
+      const item = createElement("div", "sidebar-item sidebar-item-local");
+      item.addEventListener("mousedown", (e) => e.preventDefault());
+
+      const indicator = createElement(
+        "span",
+        "protocol-indicator proto-local",
+        {
+          title: "Local",
+        },
+      );
+      item.appendChild(indicator);
+
+      const textWrapper = createElement("div", "sidebar-item-text");
+      const nameEl = createElement("span", "sidebar-item-name", {
+        textContent: "Local Machine",
+      });
+      textWrapper.appendChild(nameEl);
+      item.appendChild(textWrapper);
+
+      item.addEventListener("click", () => {
+        if (this.onConnectLocal) {
+          this.onConnectLocal();
+        }
+      });
+
+      return item;
     }
 
     /** @private */

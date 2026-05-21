@@ -107,6 +107,14 @@
         action: () => this.app.quickConnect(),
       });
 
+      // Local terminal
+      cmds.push({
+        id: "local-terminal",
+        label: "Open Local Terminal",
+        section: "Actions",
+        action: () => this.app.connectLocal(),
+      });
+
       // Tab actions
       cmds.push({
         id: "close-tab",
