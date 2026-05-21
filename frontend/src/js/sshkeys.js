@@ -63,11 +63,15 @@
       });
 
       // Events
-      modal.querySelector(".modal-close").addEventListener("click", () => this.close());
+      modal
+        .querySelector(".modal-close")
+        .addEventListener("click", () => this.close());
       backdrop.addEventListener("click", (e) => {
         if (e.target === backdrop) this.close();
       });
-      modal.querySelector(".sshkey-generate-btn").addEventListener("click", () => this._showGenerateForm());
+      modal
+        .querySelector(".sshkey-generate-btn")
+        .addEventListener("click", () => this._showGenerateForm());
     }
 
     async _loadKeys() {
@@ -79,7 +83,8 @@
       try {
         const keys = await window.go.api.Service.ListSSHKeyPairs();
         if (keys.length === 0) {
-          list.innerHTML = '<div class="sshkey-empty">No SSH keys found in ~/.ssh/</div>';
+          list.innerHTML =
+            '<div class="sshkey-empty">No SSH keys found in ~/.ssh/</div>';
           return;
         }
         list.innerHTML = "";
@@ -95,7 +100,9 @@
       const row = createElement("div", "sshkey-row");
 
       const info = createElement("div", "sshkey-info");
-      const name = createElement("div", "sshkey-name", { textContent: key.name });
+      const name = createElement("div", "sshkey-name", {
+        textContent: key.name,
+      });
       const meta = createElement("div", "sshkey-meta", {
         textContent: key.type.toUpperCase() + (key.bits ? ` ${key.bits}` : ""),
       });
@@ -104,11 +111,15 @@
 
       const actions = createElement("div", "sshkey-actions");
 
-      const copyBtn = createElement("button", "btn btn-xs", { textContent: "Copy Public Key" });
+      const copyBtn = createElement("button", "btn btn-xs", {
+        textContent: "Copy Public Key",
+      });
       copyBtn.addEventListener("mousedown", (e) => e.preventDefault());
       copyBtn.addEventListener("click", () => this._copyPublicKey(key));
 
-      const deleteBtn = createElement("button", "btn btn-xs btn-danger", { textContent: "Delete" });
+      const deleteBtn = createElement("button", "btn btn-xs btn-danger", {
+        textContent: "Delete",
+      });
       deleteBtn.addEventListener("mousedown", (e) => e.preventDefault());
       deleteBtn.addEventListener("click", () => this._confirmDelete(key));
 
@@ -208,28 +219,40 @@
         list.style.display = "";
       });
 
-      form.querySelector(".sshkey-create-btn").addEventListener("click", async () => {
-        const nameInput = form.querySelector(".sshkey-name-input");
-        const name = nameInput.value.trim();
-        const keyType = typeSelect.value;
-        const bits = parseInt(form.querySelector(".sshkey-bits-select").value, 10);
-        const passphrase = form.querySelector(".sshkey-pass-input").value;
+      form
+        .querySelector(".sshkey-create-btn")
+        .addEventListener("click", async () => {
+          const nameInput = form.querySelector(".sshkey-name-input");
+          const name = nameInput.value.trim();
+          const keyType = typeSelect.value;
+          const bits = parseInt(
+            form.querySelector(".sshkey-bits-select").value,
+            10,
+          );
+          const passphrase = form.querySelector(".sshkey-pass-input").value;
 
-        if (!name) {
-          this.app.notifications.error("Key name is required");
-          return;
-        }
+          if (!name) {
+            this.app.notifications.error("Key name is required");
+            return;
+          }
 
-        try {
-          await window.go.api.Service.GenerateSSHKey(name, keyType, bits, passphrase);
-          this.app.notifications.success(`Key "${name}" generated successfully`);
-          form.remove();
-          list.style.display = "";
-          this._loadKeys();
-        } catch (err) {
-          this.app.notifications.error("Generation failed: " + err);
-        }
-      });
+          try {
+            await window.go.api.Service.GenerateSSHKey(
+              name,
+              keyType,
+              bits,
+              passphrase,
+            );
+            this.app.notifications.success(
+              `Key "${name}" generated successfully`,
+            );
+            form.remove();
+            list.style.display = "";
+            this._loadKeys();
+          } catch (err) {
+            this.app.notifications.error("Generation failed: " + err);
+          }
+        });
 
       form.querySelector(".sshkey-name-input").focus();
     }
@@ -266,9 +289,15 @@
           setTimeout(() => backdrop.remove(), 200);
           resolve(val);
         };
-        modal.querySelector(".modal-close").addEventListener("click", () => close(false));
-        modal.querySelector(".confirm-cancel").addEventListener("click", () => close(false));
-        modal.querySelector(".confirm-ok").addEventListener("click", () => close(true));
+        modal
+          .querySelector(".modal-close")
+          .addEventListener("click", () => close(false));
+        modal
+          .querySelector(".confirm-cancel")
+          .addEventListener("click", () => close(false));
+        modal
+          .querySelector(".confirm-ok")
+          .addEventListener("click", () => close(true));
         backdrop.addEventListener("click", (e) => {
           if (e.target === backdrop) close(false);
         });

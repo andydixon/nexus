@@ -91,16 +91,24 @@
       });
       ctrlAltDel.addEventListener("click", () => this._sendCtrlAltDel());
 
-      const clipboardBtn = createElement("button", "btn btn-sm btn-vnc-action", {
-        textContent: "Clipboard",
-        title: "Sync clipboard",
-      });
+      const clipboardBtn = createElement(
+        "button",
+        "btn btn-sm btn-vnc-action",
+        {
+          textContent: "Clipboard",
+          title: "Sync clipboard",
+        },
+      );
       clipboardBtn.addEventListener("click", () => this._syncClipboard());
 
-      const fullscreenBtn = createElement("button", "btn btn-sm btn-vnc-action", {
-        textContent: "Fullscreen",
-        title: "Toggle fullscreen",
-      });
+      const fullscreenBtn = createElement(
+        "button",
+        "btn btn-sm btn-vnc-action",
+        {
+          textContent: "Fullscreen",
+          title: "Toggle fullscreen",
+        },
+      );
       fullscreenBtn.addEventListener("click", () => this._toggleFullscreen());
 
       this.statusEl = createElement("span", "vnc-status", {

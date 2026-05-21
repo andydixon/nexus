@@ -92,7 +92,9 @@
           }
         } else {
           const haystack = rule.caseSensitive ? clean : clean.toLowerCase();
-          const needle = rule.caseSensitive ? rule.pattern : rule.pattern.toLowerCase();
+          const needle = rule.caseSensitive
+            ? rule.pattern
+            : rule.pattern.toLowerCase();
           matched = haystack.includes(needle);
         }
 
@@ -101,13 +103,19 @@
         // Fire actions
         if (rule.action === "notify" || rule.action === "both") {
           const session = this.app.state.getSession(sessionId);
-          const label = session ? (session.tabName || session.profileName) : sessionId;
-          this.app.notifications.info(`[${label}] Trigger: ${rule.name || rule.pattern}`);
+          const label = session
+            ? session.tabName || session.profileName
+            : sessionId;
+          this.app.notifications.info(
+            `[${label}] Trigger: ${rule.name || rule.pattern}`,
+          );
         }
 
         if (rule.action === "highlight" || rule.action === "both") {
           // Flash the tab briefly
-          const tabEl = document.querySelector(`.tab[data-session-id="${sessionId}"]`);
+          const tabEl = document.querySelector(
+            `.tab[data-session-id="${sessionId}"]`,
+          );
           if (tabEl) {
             tabEl.classList.add("tab-trigger-flash");
             setTimeout(() => tabEl.classList.remove("tab-trigger-flash"), 2000);
@@ -186,11 +194,15 @@
         modal.classList.add("is-visible");
       });
 
-      modal.querySelector(".modal-close").addEventListener("click", () => this.close());
+      modal
+        .querySelector(".modal-close")
+        .addEventListener("click", () => this.close());
       backdrop.addEventListener("click", (e) => {
         if (e.target === backdrop) this.close();
       });
-      modal.querySelector(".trigger-add-btn").addEventListener("click", () => this._addRule());
+      modal
+        .querySelector(".trigger-add-btn")
+        .addEventListener("click", () => this._addRule());
 
       this._renderList();
     }
@@ -201,7 +213,8 @@
       list.innerHTML = "";
 
       if (this._rules.length === 0) {
-        list.innerHTML = '<div class="trigger-empty">No trigger rules defined</div>';
+        list.innerHTML =
+          '<div class="trigger-empty">No trigger rules defined</div>';
         return;
       }
 
@@ -236,11 +249,15 @@
       });
 
       const actions = createElement("div", "trigger-actions");
-      const editBtn = createElement("button", "btn btn-xs", { textContent: "Edit" });
+      const editBtn = createElement("button", "btn btn-xs", {
+        textContent: "Edit",
+      });
       editBtn.addEventListener("mousedown", (e) => e.preventDefault());
       editBtn.addEventListener("click", () => this._editRule(index));
 
-      const delBtn = createElement("button", "btn btn-xs btn-danger", { textContent: "✕" });
+      const delBtn = createElement("button", "btn btn-xs btn-danger", {
+        textContent: "✕",
+      });
       delBtn.addEventListener("mousedown", (e) => e.preventDefault());
       delBtn.addEventListener("click", () => {
         this._rules.splice(index, 1);
@@ -287,7 +304,7 @@
       form.innerHTML = `
         <div class="form-group">
           <label class="form-label">Name (optional)</label>
-          <input type="text" class="form-input trigger-name-input" placeholder="e.g. Error alert" value="${existing ? (existing.name || "") : ""}" />
+          <input type="text" class="form-input trigger-name-input" placeholder="e.g. Error alert" value="${existing ? existing.name || "" : ""}" />
         </div>
         <div class="form-group">
           <label class="form-label">Pattern</label>
@@ -325,14 +342,18 @@
 
       list.parentNode.insertBefore(form, list);
 
-      form.querySelector(".trigger-cancel-btn").addEventListener("click", () => {
-        form.remove();
-        list.style.display = "";
-        if (toolbar) toolbar.style.display = "";
-      });
+      form
+        .querySelector(".trigger-cancel-btn")
+        .addEventListener("click", () => {
+          form.remove();
+          list.style.display = "";
+          if (toolbar) toolbar.style.display = "";
+        });
 
       form.querySelector(".trigger-save-btn").addEventListener("click", () => {
-        const pattern = form.querySelector(".trigger-pattern-input").value.trim();
+        const pattern = form
+          .querySelector(".trigger-pattern-input")
+          .value.trim();
         if (!pattern) {
           this.app.notifications.error("Pattern is required");
           return;

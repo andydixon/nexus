@@ -11,7 +11,14 @@ const esbuild = require("esbuild");
 const path = require("path");
 
 const entryPoint = path.resolve(__dirname, "novnc-entry.js");
-const outFile = path.resolve(__dirname, "..", "src", "js", "lib", "novnc.min.js");
+const outFile = path.resolve(
+  __dirname,
+  "..",
+  "src",
+  "js",
+  "lib",
+  "novnc.min.js",
+);
 
 esbuild
   .build({
@@ -26,7 +33,9 @@ esbuild
     footer: { js: "})();" },
   })
   .then(() => {
-    console.log("[bundle-novnc] noVNC bundled successfully → src/js/lib/novnc.min.js");
+    console.log(
+      "[bundle-novnc] noVNC bundled successfully → src/js/lib/novnc.min.js",
+    );
   })
   .catch((err) => {
     console.error("[bundle-novnc] Failed:", err.message);

@@ -191,10 +191,19 @@
 }
 
 @keyframes trigger-flash {
-  0%, 100% { background: var(--bg-hover); }
-  15% { background: rgba(239, 83, 80, 0.25); }
-  30% { background: var(--bg-hover); }
-  45% { background: rgba(239, 83, 80, 0.15); }
+  0%,
+  100% {
+    background: var(--bg-hover);
+  }
+  15% {
+    background: rgba(239, 83, 80, 0.25);
+  }
+  30% {
+    background: var(--bg-hover);
+  }
+  45% {
+    background: rgba(239, 83, 80, 0.15);
+  }
 }
 
 /* -----------------------------------------------------------------------

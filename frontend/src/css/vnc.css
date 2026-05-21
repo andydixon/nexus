@@ -40,7 +40,9 @@
   border: 1px solid var(--border-subtle);
   color: var(--text-secondary);
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  transition:
+    background 0.15s,
+    color 0.15s;
 }
 
 .btn-vnc-action:hover {

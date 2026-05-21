@@ -168,7 +168,9 @@
         try {
           const raw = atob(payload.data);
           this.triggers.check(payload.sessionID, raw);
-        } catch (_) { /* noop */ }
+        } catch (_) {
+          /* noop */
+        }
       });
 
       // Session state transitions (connecting → connected → reconnecting → disconnected)
@@ -529,7 +531,9 @@
     setupUI() {
       var btnEl = document.getElementById("btn-new-connection");
       this._bindClick("btn-new-connection", () => this.profileEditor.openNew());
-      this._bindClick("btn-command-palette", () => this.commandPalette.toggle());
+      this._bindClick("btn-command-palette", () =>
+        this.commandPalette.toggle(),
+      );
       this._bindClick("btn-settings", () => this.settings.open());
       this._bindClick("btn-import", () => this.importProfiles());
       this._bindClick("btn-export", () => this.exportProfiles());

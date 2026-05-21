@@ -206,14 +206,16 @@
           );
           break;
         case "vnc":
-          this._renderVNCSections(profile).forEach((s) =>
-            body.appendChild(s),
-          );
+          this._renderVNCSections(profile).forEach((s) => body.appendChild(s));
           break;
       }
 
       // Terminal section (SSH and Telnet only)
-      if (profile.protocol !== "raw" && profile.protocol !== "github" && profile.protocol !== "vnc") {
+      if (
+        profile.protocol !== "raw" &&
+        profile.protocol !== "github" &&
+        profile.protocol !== "vnc"
+      ) {
         body.appendChild(this._renderTerminalSection(profile));
       }
 
@@ -2288,7 +2290,9 @@
       if (profile.protocol === "vnc") {
         const vncHost = (profile.vnc && profile.vnc.vncHost) || profile.host;
         if (!vncHost || !vncHost.trim()) {
-          errors.push("VNC Host is required (in General or VNC Server section).");
+          errors.push(
+            "VNC Host is required (in General or VNC Server section).",
+          );
         }
       } else if (!profile.host || !profile.host.trim()) {
         errors.push("Host is required.");
