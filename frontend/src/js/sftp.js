@@ -236,7 +236,9 @@
       actions.appendChild(goToBtn);
 
       var bookmarkBtn = this._toolbarBtn("★", "Bookmarks", "");
-      bookmarkBtn.addEventListener("click", () => this._showBookmarks(sessionId));
+      bookmarkBtn.addEventListener("click", () =>
+        this._showBookmarks(sessionId),
+      );
       actions.appendChild(bookmarkBtn);
 
       var mkdirBtn = this._toolbarBtn("＋", "New folder", "is-accent");
@@ -496,12 +498,17 @@
         }
       } else {
         // Single click without modifier — clear all, select this one
-        state.el.querySelectorAll(".sftp-file-row.is-selected").forEach(function (r) {
-          r.classList.remove("is-selected");
-        });
+        state.el
+          .querySelectorAll(".sftp-file-row.is-selected")
+          .forEach(function (r) {
+            r.classList.remove("is-selected");
+          });
 
         // If clicking the same entry (and it was the only selection), deselect
-        if (state.selectedFiles.size === 1 && state.selectedFiles.has(entry.path)) {
+        if (
+          state.selectedFiles.size === 1 &&
+          state.selectedFiles.has(entry.path)
+        ) {
           state.selectedFiles.clear();
           state.selected = null;
           var ctxBar = this._getCtxBar(sessionId);
@@ -540,16 +547,25 @@
 
       var label = createElement("span", "sftp-ctx-label", {
         textContent: isSingle ? entry.name : count + " items selected",
-        title: isSingle ? entry.path : entries.map(function (e) { return e.name; }).join(", "),
+        title: isSingle
+          ? entry.path
+          : entries
+              .map(function (e) {
+                return e.name;
+              })
+              .join(", "),
       });
       ctxBar.appendChild(label);
 
       // Download button — only for files (single or batch)
-      var downloadableFiles = entries.filter(function (e) { return !e.isDir; });
+      var downloadableFiles = entries.filter(function (e) {
+        return !e.isDir;
+      });
       if (downloadableFiles.length > 0) {
-        var dlLabel = downloadableFiles.length === 1
-          ? "↓ Download"
-          : "↓ Download (" + downloadableFiles.length + ")";
+        var dlLabel =
+          downloadableFiles.length === 1
+            ? "↓ Download"
+            : "↓ Download (" + downloadableFiles.length + ")";
         var dlBtn = createElement("button", "sftp-ctx-btn is-accent", {
           textContent: dlLabel,
         });
@@ -664,14 +680,19 @@
         }
       }
       if (failed === 0) {
-        this.app.notifications.success("All " + files.length + " files downloaded");
+        this.app.notifications.success(
+          "All " + files.length + " files downloaded",
+        );
       }
     }
 
     _confirmDeleteBatch(sessionId, entries) {
       this._showConfirmModal({
         title: "Delete " + entries.length + " Items",
-        message: "Permanently delete <strong>" + entries.length + " selected items</strong>?",
+        message:
+          "Permanently delete <strong>" +
+          entries.length +
+          " selected items</strong>?",
         confirmLabel: "Delete All",
         isDanger: true,
         onConfirm: function () {
@@ -913,13 +934,25 @@
 
       var listHtml = "";
       if (bookmarks.length === 0) {
-        listHtml = '<div style="color:var(--text-tertiary);font-size:var(--text-sm);text-align:center;padding:var(--space-3);">No bookmarks yet. Navigate to a directory and click "Bookmark Current".</div>';
+        listHtml =
+          '<div style="color:var(--text-tertiary);font-size:var(--text-sm);text-align:center;padding:var(--space-3);">No bookmarks yet. Navigate to a directory and click "Bookmark Current".</div>';
       } else {
         for (var i = 0; i < bookmarks.length; i++) {
-          listHtml += '<div class="sftp-bookmark-row" data-index="' + i + '" data-path="' + escapeHtml(bookmarks[i]) + '">';
-          listHtml += '<span style="flex:1;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(bookmarks[i]) + '</span>';
-          listHtml += '<button class="btn btn-xs btn-ghost sftp-bookmark-del" data-index="' + i + '" title="Remove">✕</button>';
-          listHtml += '</div>';
+          listHtml +=
+            '<div class="sftp-bookmark-row" data-index="' +
+            i +
+            '" data-path="' +
+            escapeHtml(bookmarks[i]) +
+            '">';
+          listHtml +=
+            '<span style="flex:1;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' +
+            escapeHtml(bookmarks[i]) +
+            "</span>";
+          listHtml +=
+            '<button class="btn btn-xs btn-ghost sftp-bookmark-del" data-index="' +
+            i +
+            '" title="Remove">✕</button>';
+          listHtml += "</div>";
         }
       }
 
@@ -927,14 +960,16 @@
         '<div class="modal-header">' +
         '<span class="modal-title">Directory Bookmarks</span>' +
         '<button class="modal-close btn btn-icon btn-xs btn-ghost">✕</button>' +
-        '</div>' +
+        "</div>" +
         '<div class="modal-body">' +
-        '<div class="sftp-bookmark-list">' + listHtml + '</div>' +
-        '</div>' +
+        '<div class="sftp-bookmark-list">' +
+        listHtml +
+        "</div>" +
+        "</div>" +
         '<div class="modal-footer">' +
         '<button class="btn btn-sm btn-ghost sftp-modal-cancel">Close</button>' +
         '<button class="btn btn-sm btn-primary sftp-bookmark-add">★ Bookmark Current</button>' +
-        '</div>';
+        "</div>";
 
       backdrop.appendChild(modal);
       document.body.appendChild(backdrop);
@@ -950,12 +985,18 @@
         closed = true;
         backdrop.classList.remove("is-visible");
         modal.classList.remove("is-visible");
-        setTimeout(function () { backdrop.remove(); }, 200);
+        setTimeout(function () {
+          backdrop.remove();
+        }, 200);
       }
 
       modal.querySelector(".modal-close").addEventListener("click", close);
-      modal.querySelector(".sftp-modal-cancel").addEventListener("click", close);
-      backdrop.addEventListener("click", function (e) { if (e.target === backdrop) close(); });
+      modal
+        .querySelector(".sftp-modal-cancel")
+        .addEventListener("click", close);
+      backdrop.addEventListener("click", function (e) {
+        if (e.target === backdrop) close();
+      });
 
       // Navigate to bookmark on click
       modal.querySelectorAll(".sftp-bookmark-row").forEach(function (row) {
@@ -965,7 +1006,9 @@
           close();
           self._navigate(sessionId, path);
         });
-        row.addEventListener("mousedown", function (e) { e.preventDefault(); });
+        row.addEventListener("mousedown", function (e) {
+          e.preventDefault();
+        });
       });
 
       // Delete bookmark
@@ -980,11 +1023,13 @@
       });
 
       // Add current directory as bookmark
-      modal.querySelector(".sftp-bookmark-add").addEventListener("click", function () {
-        self._addBookmark(sessionId, state.cwd);
-        close();
-        self._showBookmarks(sessionId);
-      });
+      modal
+        .querySelector(".sftp-bookmark-add")
+        .addEventListener("click", function () {
+          self._addBookmark(sessionId, state.cwd);
+          close();
+          self._showBookmarks(sessionId);
+        });
     }
 
     _getBookmarks(sessionId) {
@@ -1001,7 +1046,10 @@
       var bookmarks = this._getBookmarks(sessionId);
       if (bookmarks.indexOf(path) === -1) {
         bookmarks.push(path);
-        localStorage.setItem("sftp-bookmarks-" + sessionId, JSON.stringify(bookmarks));
+        localStorage.setItem(
+          "sftp-bookmarks-" + sessionId,
+          JSON.stringify(bookmarks),
+        );
         this.app.notifications.success("Bookmarked: " + path);
       } else {
         this.app.notifications.info("Already bookmarked");
@@ -1011,7 +1059,10 @@
     _removeBookmark(sessionId, index) {
       var bookmarks = this._getBookmarks(sessionId);
       bookmarks.splice(index, 1);
-      localStorage.setItem("sftp-bookmarks-" + sessionId, JSON.stringify(bookmarks));
+      localStorage.setItem(
+        "sftp-bookmarks-" + sessionId,
+        JSON.stringify(bookmarks),
+      );
     }
 
     /* ── Transfer progress queue ─────────────────────────────────── */

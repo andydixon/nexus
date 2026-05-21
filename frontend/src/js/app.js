@@ -604,9 +604,11 @@
      */
     selectBroadcastTargets() {
       const { createElement, escapeHtml } = window.NexusTerminal;
-      const sessions = this.state.getAllSessions().filter(
-        (s) => s.state === "connected" && s.id !== this.state.activeSessionId,
-      );
+      const sessions = this.state
+        .getAllSessions()
+        .filter(
+          (s) => s.state === "connected" && s.id !== this.state.activeSessionId,
+        );
 
       if (sessions.length === 0) {
         this.notifications.error("No other connected sessions to broadcast to");
@@ -620,8 +622,13 @@
       let listHtml = "";
       for (const s of sessions) {
         const profile = this.state.getProfile(s.profileId);
-        const label = profile ? (profile.displayName || profile.host) : s.id.substring(0, 8);
-        const checked = currentTargets.size === 0 || currentTargets.has(s.id) ? "checked" : "";
+        const label = profile
+          ? profile.displayName || profile.host
+          : s.id.substring(0, 8);
+        const checked =
+          currentTargets.size === 0 || currentTargets.has(s.id)
+            ? "checked"
+            : "";
         listHtml += `
           <label style="display:flex;align-items:center;gap:var(--space-2);padding:var(--space-1) 0;font-size:var(--text-sm);cursor:pointer;">
             <input type="checkbox" class="broadcast-target-check" data-session-id="${s.id}" ${checked} />
@@ -663,10 +670,14 @@
 
       modal.querySelector(".modal-close").addEventListener("click", close);
       modal.querySelector(".broadcast-cancel").addEventListener("click", close);
-      backdrop.addEventListener("click", (e) => { if (e.target === backdrop) close(); });
+      backdrop.addEventListener("click", (e) => {
+        if (e.target === backdrop) close();
+      });
 
       modal.querySelector(".broadcast-all").addEventListener("click", () => {
-        modal.querySelectorAll(".broadcast-target-check").forEach((cb) => { cb.checked = true; });
+        modal.querySelectorAll(".broadcast-target-check").forEach((cb) => {
+          cb.checked = true;
+        });
       });
 
       modal.querySelector(".broadcast-apply").addEventListener("click", () => {
@@ -682,11 +693,15 @@
         }
 
         // If all are selected, use null (broadcast to all)
-        this.state.broadcastTargets = selected.size === sessions.length ? null : selected;
+        this.state.broadcastTargets =
+          selected.size === sessions.length ? null : selected;
         if (!this.state.broadcastMode) {
           this.toggleBroadcast();
         } else {
-          const targetLabel = selected.size === sessions.length ? "all sessions" : selected.size + " sessions";
+          const targetLabel =
+            selected.size === sessions.length
+              ? "all sessions"
+              : selected.size + " sessions";
           this.notifications.info("Broadcasting to " + targetLabel);
         }
         close();
@@ -1001,7 +1016,11 @@
 
       // Latency indicator — only show for connected SSH sessions.
       if (latencyEl) {
-        if (activeSession && activeSession.state === "connected" && activeSession.protocol === "ssh") {
+        if (
+          activeSession &&
+          activeSession.state === "connected" &&
+          activeSession.protocol === "ssh"
+        ) {
           this._startLatencyPing(activeSession.id);
         } else {
           this._stopLatencyPing();
@@ -1043,12 +1062,20 @@
           const el = document.getElementById("status-latency");
           if (el && this._latencySessionID === sessionID) {
             el.textContent = ms + " ms";
-            el.className = ms < 100 ? "latency-good" : ms < 250 ? "latency-warn" : "latency-bad";
+            el.className =
+              ms < 100
+                ? "latency-good"
+                : ms < 250
+                  ? "latency-warn"
+                  : "latency-bad";
           }
         } catch (_) {
           // Session may have disconnected — clear indicator.
           const el = document.getElementById("status-latency");
-          if (el) { el.textContent = ""; el.className = ""; }
+          if (el) {
+            el.textContent = "";
+            el.className = "";
+          }
           this._stopLatencyPing();
         }
       };
@@ -1370,7 +1397,9 @@
                   const re = new RegExp(query, caseSensitive ? "g" : "gi");
                   const m = text.match(re);
                   if (m) total += m.length;
-                } catch (_) { /* invalid regex */ }
+                } catch (_) {
+                  /* invalid regex */
+                }
               } else {
                 const searchText = caseSensitive ? text : text.toLowerCase();
                 const searchQuery = caseSensitive ? query : query.toLowerCase();

@@ -195,6 +195,20 @@ class CommandPalette {
         // Terminal actions (only when a session is active)
         if (this.app.state.activeSessionId) {
             cmds.push({
+                id: 'split-vertical',
+                label: 'Split Pane Right',
+                section: 'Terminal',
+                shortcut: '⌘⇧D',
+                action: () => this.app.splitPane('vertical'),
+            });
+            cmds.push({
+                id: 'split-horizontal',
+                label: 'Split Pane Down',
+                section: 'Terminal',
+                shortcut: '⌘⇧E',
+                action: () => this.app.splitPane('horizontal'),
+            });
+            cmds.push({
                 id: 'clear-terminal',
                 label: 'Clear Terminal',
                 section: 'Terminal',

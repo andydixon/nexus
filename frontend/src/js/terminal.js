@@ -575,6 +575,17 @@
         },
         { divider: true },
         {
+          label: "Split Right",
+          shortcut: modKey + "⇧D",
+          action: () => this.app.splitPane("vertical"),
+        },
+        {
+          label: "Split Down",
+          shortcut: modKey + "⇧E",
+          action: () => this.app.splitPane("horizontal"),
+        },
+        { divider: true },
+        {
           label: "Export Output",
           action: () => this._exportTerminalOutput(sessionId, term),
         },
@@ -1236,7 +1247,9 @@
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      this.app.notifications.success("Terminal output exported & copied to clipboard");
+      this.app.notifications.success(
+        "Terminal output exported & copied to clipboard",
+      );
     }
 
     /**
@@ -1248,7 +1261,9 @@
       const { createElement, escapeHtml } = window.NexusTerminal;
       const session = this.app.state.getSession(sessionId);
       if (!session || session.protocol !== "ssh") {
-        this.app.notifications.error("Port forwarding is only available for SSH sessions");
+        this.app.notifications.error(
+          "Port forwarding is only available for SSH sessions",
+        );
         return;
       }
 
@@ -1297,24 +1312,30 @@
       };
 
       modal.querySelector(".modal-close").addEventListener("click", close);
-      backdrop.addEventListener("click", (e) => { if (e.target === backdrop) close(); });
+      backdrop.addEventListener("click", (e) => {
+        if (e.target === backdrop) close();
+      });
 
       const listEl = modal.querySelector(".portfwd-list");
       const self = this;
 
       const renderForwards = async () => {
         try {
-          const forwards = await window.go.api.Service.ListPortForwards(sessionId) || [];
+          const forwards =
+            (await window.go.api.Service.ListPortForwards(sessionId)) || [];
           listEl.innerHTML = "";
           if (forwards.length === 0) {
-            listEl.innerHTML = '<div style="color:var(--text-tertiary);font-size:var(--text-sm);padding:var(--space-2);">No active port forwards</div>';
+            listEl.innerHTML =
+              '<div style="color:var(--text-tertiary);font-size:var(--text-sm);padding:var(--space-2);">No active port forwards</div>';
             return;
           }
           for (const fwd of forwards) {
             const row = createElement("div", "", {});
-            row.style.cssText = "display:flex;align-items:center;gap:var(--space-2);padding:var(--space-1) 0;border-bottom:1px solid var(--border-subtle);";
+            row.style.cssText =
+              "display:flex;align-items:center;gap:var(--space-2);padding:var(--space-1) 0;border-bottom:1px solid var(--border-subtle);";
             const dirLabel = fwd.direction === "local" ? "L" : "R";
-            const dirColor = fwd.direction === "local" ? "var(--accent)" : "var(--warning)";
+            const dirColor =
+              fwd.direction === "local" ? "var(--accent)" : "var(--warning)";
             row.innerHTML = `
               <span style="font-size:var(--text-xs);font-weight:var(--weight-semibold);color:${dirColor};width:16px;">${dirLabel}</span>
               <span style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-primary);flex:1;">
@@ -1322,21 +1343,26 @@
               </span>
               ${fwd.label ? `<span style="font-size:var(--text-xs);color:var(--text-tertiary);">${escapeHtml(fwd.label)}</span>` : ""}
             `;
-            const stopBtn = createElement("button", "btn btn-xs btn-danger", { textContent: "Stop" });
+            const stopBtn = createElement("button", "btn btn-xs btn-danger", {
+              textContent: "Stop",
+            });
             stopBtn.addEventListener("click", async () => {
               try {
                 await window.go.api.Service.StopPortForward(sessionId, fwd.id);
                 self.app.notifications.info("Forward stopped");
                 renderForwards();
               } catch (err) {
-                self.app.notifications.error("Failed to stop: " + (err.message || err));
+                self.app.notifications.error(
+                  "Failed to stop: " + (err.message || err),
+                );
               }
             });
             row.appendChild(stopBtn);
             listEl.appendChild(row);
           }
         } catch (err) {
-          listEl.innerHTML = '<div style="color:var(--error);font-size:var(--text-sm);">Failed to load forwards</div>';
+          listEl.innerHTML =
+            '<div style="color:var(--error);font-size:var(--text-sm);">Failed to load forwards</div>';
         }
       };
 
@@ -1345,14 +1371,24 @@
       // Add forward button
       modal.querySelector(".pf-add-btn").addEventListener("click", async () => {
         const direction = modal.querySelector(".pf-direction").value;
-        const bindHost = modal.querySelector(".pf-bind-host").value.trim() || "127.0.0.1";
-        const bindPort = parseInt(modal.querySelector(".pf-bind-port").value, 10);
-        const destHost = modal.querySelector(".pf-dest-host").value.trim() || "localhost";
-        const destPort = parseInt(modal.querySelector(".pf-dest-port").value, 10);
+        const bindHost =
+          modal.querySelector(".pf-bind-host").value.trim() || "127.0.0.1";
+        const bindPort = parseInt(
+          modal.querySelector(".pf-bind-port").value,
+          10,
+        );
+        const destHost =
+          modal.querySelector(".pf-dest-host").value.trim() || "localhost";
+        const destPort = parseInt(
+          modal.querySelector(".pf-dest-port").value,
+          10,
+        );
         const label = modal.querySelector(".pf-label").value.trim();
 
         if (!bindPort || !destPort) {
-          self.app.notifications.error("Bind port and destination port are required");
+          self.app.notifications.error(
+            "Bind port and destination port are required",
+          );
           return;
         }
 
@@ -1373,7 +1409,9 @@
           modal.querySelector(".pf-label").value = "";
           renderForwards();
         } catch (err) {
-          self.app.notifications.error("Failed to start forward: " + (err.message || err));
+          self.app.notifications.error(
+            "Failed to start forward: " + (err.message || err),
+          );
         }
       });
     }

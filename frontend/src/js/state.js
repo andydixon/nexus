@@ -1,38 +1,38 @@
-(function() {
-/**
- * Nexus Terminal — application state management.
- * Provides a centralised store for profiles, sessions, and preferences,
- * emitting change events so the UI stays in sync.
- */
+(function () {
+  /**
+   * Nexus Terminal — application state management.
+   * Provides a centralised store for profiles, sessions, and preferences,
+   * emitting change events so the UI stays in sync.
+   */
 
-class State {
+  class State {
     constructor() {
-        /** @type {Array<Object>} */
-        this.profiles = [];
+      /** @type {Array<Object>} */
+      this.profiles = [];
 
-        /** @type {Map<string, Object>} sessionId → SessionInfo */
-        this.sessions = new Map();
+      /** @type {Map<string, Object>} sessionId → SessionInfo */
+      this.sessions = new Map();
 
-        /** @type {string|null} */
-        this.activeSessionId = null;
+      /** @type {string|null} */
+      this.activeSessionId = null;
 
-        /** @type {Object} */
-        this.preferences = {};
+      /** @type {Object} */
+      this.preferences = {};
 
-        /** @type {boolean} */
-        this.secretStoreUnlocked = false;
+      /** @type {boolean} */
+      this.secretStoreUnlocked = false;
 
-        /** @type {boolean} */
-        this.secretStoreInitialised = false;
+      /** @type {boolean} */
+      this.secretStoreInitialised = false;
 
-        /** @type {boolean} Whether broadcast mode is active (keystrokes to all sessions). */
-        this.broadcastMode = false;
+      /** @type {boolean} Whether broadcast mode is active (keystrokes to all sessions). */
+      this.broadcastMode = false;
 
-        /** @type {Set<string>|null} Session IDs to broadcast to. Null means all. */
-        this.broadcastTargets = null;
+      /** @type {Set<string>|null} Session IDs to broadcast to. Null means all. */
+      this.broadcastTargets = null;
 
-        /** @type {Map<string, Set<Function>>} event name → callbacks */
-        this._listeners = new Map();
+      /** @type {Map<string, Set<Function>>} event name → callbacks */
+      this._listeners = new Map();
     }
 
     // ── Event emitter ────────────────────────────────────────────────
@@ -43,10 +43,10 @@ class State {
      * @param {Function} callback
      */
     on(event, callback) {
-        if (!this._listeners.has(event)) {
-            this._listeners.set(event, new Set());
-        }
-        this._listeners.get(event).add(callback);
+      if (!this._listeners.has(event)) {
+        this._listeners.set(event, new Set());
+      }
+      this._listeners.get(event).add(callback);
     }
 
     /**
@@ -55,10 +55,10 @@ class State {
      * @param {Function} callback
      */
     off(event, callback) {
-        const set = this._listeners.get(event);
-        if (set) {
-            set.delete(callback);
-        }
+      const set = this._listeners.get(event);
+      if (set) {
+        set.delete(callback);
+      }
     }
 
     /**
@@ -67,16 +67,16 @@ class State {
      * @param {*} data
      */
     emit(event, data) {
-        const set = this._listeners.get(event);
-        if (set) {
-            for (const cb of set) {
-                try {
-                    cb(data);
-                } catch (err) {
-                    console.error(`State listener error [${event}]:`, err);
-                }
-            }
+      const set = this._listeners.get(event);
+      if (set) {
+        for (const cb of set) {
+          try {
+            cb(data);
+          } catch (err) {
+            console.error(`State listener error [${event}]:`, err);
+          }
         }
+      }
     }
 
     // ── Profiles ─────────────────────────────────────────────────────
@@ -86,8 +86,8 @@ class State {
      * @param {Array<Object>} profiles
      */
     setProfiles(profiles) {
-        this.profiles = profiles;
-        this.emit('profiles:changed', this.profiles);
+      this.profiles = profiles;
+      this.emit("profiles:changed", this.profiles);
     }
 
     /**
@@ -95,9 +95,9 @@ class State {
      * @param {Object} profile
      */
     addProfile(profile) {
-        this.profiles.push(profile);
-        this.emit('profiles:changed', this.profiles);
-        this.emit('profile:added', profile);
+      this.profiles.push(profile);
+      this.emit("profiles:changed", this.profiles);
+      this.emit("profile:added", profile);
     }
 
     /**
@@ -105,12 +105,12 @@ class State {
      * @param {Object} profile
      */
     updateProfile(profile) {
-        const idx = this.profiles.findIndex((p) => p.id === profile.id);
-        if (idx !== -1) {
-            this.profiles[idx] = profile;
-        }
-        this.emit('profiles:changed', this.profiles);
-        this.emit('profile:updated', profile);
+      const idx = this.profiles.findIndex((p) => p.id === profile.id);
+      if (idx !== -1) {
+        this.profiles[idx] = profile;
+      }
+      this.emit("profiles:changed", this.profiles);
+      this.emit("profile:updated", profile);
     }
 
     /**
@@ -118,9 +118,9 @@ class State {
      * @param {string} id
      */
     removeProfile(id) {
-        this.profiles = this.profiles.filter((p) => p.id !== id);
-        this.emit('profiles:changed', this.profiles);
-        this.emit('profile:removed', id);
+      this.profiles = this.profiles.filter((p) => p.id !== id);
+      this.emit("profiles:changed", this.profiles);
+      this.emit("profile:removed", id);
     }
 
     /**
@@ -129,7 +129,7 @@ class State {
      * @returns {Object|undefined}
      */
     getProfile(id) {
-        return this.profiles.find((p) => p.id === id);
+      return this.profiles.find((p) => p.id === id);
     }
 
     // ── Sessions ─────────────────────────────────────────────────────
@@ -139,9 +139,9 @@ class State {
      * @param {Object} sessionInfo
      */
     addSession(sessionInfo) {
-        this.sessions.set(sessionInfo.id, sessionInfo);
-        this.emit('sessions:changed', this.sessions);
-        this.emit('session:added', sessionInfo);
+      this.sessions.set(sessionInfo.id, sessionInfo);
+      this.emit("sessions:changed", this.sessions);
+      this.emit("session:added", sessionInfo);
     }
 
     /**
@@ -150,12 +150,12 @@ class State {
      * @param {Object} updates
      */
     updateSession(id, updates) {
-        const existing = this.sessions.get(id);
-        if (existing) {
-            Object.assign(existing, updates);
-            this.emit('sessions:changed', this.sessions);
-            this.emit('session:updated', existing);
-        }
+      const existing = this.sessions.get(id);
+      if (existing) {
+        Object.assign(existing, updates);
+        this.emit("sessions:changed", this.sessions);
+        this.emit("session:updated", existing);
+      }
     }
 
     /**
@@ -163,14 +163,15 @@ class State {
      * @param {string} id
      */
     removeSession(id) {
-        this.sessions.delete(id);
-        if (this.activeSessionId === id) {
-            // Activate the most recent remaining session, or null
-            const remaining = [...this.sessions.keys()];
-            this.activeSessionId = remaining.length > 0 ? remaining[remaining.length - 1] : null;
-        }
-        this.emit('sessions:changed', this.sessions);
-        this.emit('session:removed', id);
+      this.sessions.delete(id);
+      if (this.activeSessionId === id) {
+        // Activate the most recent remaining session, or null
+        const remaining = [...this.sessions.keys()];
+        this.activeSessionId =
+          remaining.length > 0 ? remaining[remaining.length - 1] : null;
+      }
+      this.emit("sessions:changed", this.sessions);
+      this.emit("session:removed", id);
     }
 
     /**
@@ -179,7 +180,7 @@ class State {
      * @returns {Object|undefined}
      */
     getSession(id) {
-        return this.sessions.get(id);
+      return this.sessions.get(id);
     }
 
     /**
@@ -187,8 +188,8 @@ class State {
      * @param {string|null} id
      */
     setActiveSession(id) {
-        this.activeSessionId = id;
-        this.emit('session:activated', id);
+      this.activeSessionId = id;
+      this.emit("session:activated", id);
     }
 
     /**
@@ -196,7 +197,7 @@ class State {
      * @returns {Array<Object>}
      */
     getAllSessions() {
-        return [...this.sessions.values()];
+      return [...this.sessions.values()];
     }
 
     // ── Preferences ──────────────────────────────────────────────────
@@ -206,8 +207,8 @@ class State {
      * @param {Object} prefs
      */
     setPreferences(prefs) {
-        this.preferences = prefs;
-        this.emit('preferences:changed', this.preferences);
+      this.preferences = prefs;
+      this.emit("preferences:changed", this.preferences);
     }
 
     // ── Secret store ─────────────────────────────────────────────────
@@ -217,8 +218,8 @@ class State {
      * @param {boolean} unlocked
      */
     setSecretStoreState(unlocked) {
-        this.secretStoreUnlocked = unlocked;
-        this.emit('secretStore:changed', unlocked);
+      this.secretStoreUnlocked = unlocked;
+      this.emit("secretStore:changed", unlocked);
     }
 
     /**
@@ -226,12 +227,11 @@ class State {
      * @param {boolean} initialised
      */
     setSecretStoreInitialised(initialised) {
-        this.secretStoreInitialised = initialised;
-        this.emit('secretStore:init', initialised);
+      this.secretStoreInitialised = initialised;
+      this.emit("secretStore:init", initialised);
     }
-}
+  }
 
-window.NexusTerminal = window.NexusTerminal || {};
-window.NexusTerminal.State = State;
-
+  window.NexusTerminal = window.NexusTerminal || {};
+  window.NexusTerminal.State = State;
 })();
