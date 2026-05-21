@@ -34,13 +34,13 @@
 }
 
 /* Active tab */
-.tab.active {
-  background: var(--bg-elevated);
+.tab.tab-active {
+  background: var(--bg-active);
   color: var(--text-primary);
 }
 
 /* Active indicator — accent bar at the bottom */
-.tab.active::after {
+.tab.tab-active::after {
   content: "";
   position: absolute;
   bottom: 0;
@@ -65,7 +65,7 @@
   color: var(--text-tertiary);
 }
 
-.tab.active .tab-icon {
+.tab.tab-active .tab-icon {
   color: var(--text-secondary);
 }
 
