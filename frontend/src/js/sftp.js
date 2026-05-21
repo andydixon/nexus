@@ -795,7 +795,8 @@
       if (!state) {
         // Panel not open — still track so we can show a notification on completion
         if (payload.done) {
-          var dir = payload.direction === "upload" ? "↑ Uploaded" : "↓ Downloaded";
+          var dir =
+            payload.direction === "upload" ? "↑ Uploaded" : "↓ Downloaded";
           var name = payload.path.split("/").pop() || payload.path;
           this.app.notifications.success(dir + " " + name);
         }
@@ -873,9 +874,13 @@
 
         var progress = createElement("div", "sftp-transfer-progress");
         var bar = createElement("div", "sftp-transfer-bar");
-        var pct = transfer.total > 0
-          ? Math.min(100, Math.round((transfer.transferred / transfer.total) * 100))
-          : 0;
+        var pct =
+          transfer.total > 0
+            ? Math.min(
+                100,
+                Math.round((transfer.transferred / transfer.total) * 100),
+              )
+            : 0;
         bar.style.width = pct + "%";
         progress.appendChild(bar);
         info.appendChild(progress);
@@ -883,7 +888,8 @@
         var meta = createElement("span", "sftp-transfer-meta");
         var transferredStr = formatBytes(transfer.transferred);
         var totalStr = transfer.total > 0 ? formatBytes(transfer.total) : "?";
-        meta.textContent = transferredStr + " / " + totalStr + " (" + pct + "%)";
+        meta.textContent =
+          transferredStr + " / " + totalStr + " (" + pct + "%)";
         info.appendChild(meta);
 
         row.appendChild(info);
