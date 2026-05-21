@@ -29,6 +29,8 @@ class SnippetLibrary {
 
     /**
      * Sends a snippet command to the active session.
+     * Supports {{variable}} placeholders that prompt the user for values.
+     * Built-in variables: {{hostname}}, {{date}}, {{time}}, {{timestamp}}.
      * @param {string} command
      */
     sendToActiveSession(command) {
@@ -42,6 +44,51 @@ class SnippetLibrary {
             this.app.notifications.error('Session is not connected');
             return;
         }
+
+        // Check for template variables
+        const varPattern = /\{\{([^}]+)\}\}/g;
+        const matches = [];
+        let match;
+        while ((match = varPattern.exec(command)) !== null) {
+            matches.push(match[1].trim());
+        }
+
+        // Resolve built-in variables first
+        const builtins = {
+            hostname: (session.host || 'unknown'),
+            date: new Date().toISOString().split('T')[0],
+            time: new Date().toTimeString().split(' ')[0],
+            timestamp: Math.floor(Date.now() / 1000).toString(),
+        };
+
+        let resolved = command;
+        const userVars = [];
+        for (const varName of matches) {
+            const lower = varName.toLowerCase();
+            if (builtins[lower] !== undefined) {
+                resolved = resolved.replace('{{' + varName + '}}', builtins[lower]);
+            } else if (!userVars.includes(varName)) {
+                userVars.push(varName);
+            }
+        }
+
+        if (userVars.length === 0) {
+            this._sendCommand(sessionId, resolved);
+            return;
+        }
+
+        // Prompt for user-defined variables
+        this._promptVariables(userVars, (values) => {
+            let final = resolved;
+            for (let i = 0; i < userVars.length; i++) {
+                final = final.split('{{' + userVars[i] + '}}').join(values[i] || '');
+            }
+            this._sendCommand(sessionId, final);
+        });
+    }
+
+    /** @private */
+    _sendCommand(sessionId, command) {
         try {
             const b64 = btoa(command + '\n');
             window.go.api.Service.WriteSession(sessionId, b64);
@@ -49,6 +96,69 @@ class SnippetLibrary {
         } catch (err) {
             this.app.notifications.error('Failed to send snippet: ' + err);
         }
+    }
+
+    /** @private */
+    _promptVariables(varNames, onConfirm) {
+        const backdrop = createElement('div', 'modal-backdrop');
+        const modal = createElement('div', 'modal modal-sm');
+
+        let inputsHtml = '';
+        for (const v of varNames) {
+            inputsHtml += `
+                <div class="form-group" style="margin-bottom:var(--space-2);">
+                    <label class="form-label">${escapeHtml(v)}</label>
+                    <input type="text" class="form-input snippet-var-input" data-var="${escapeHtml(v)}" placeholder="Enter value for ${escapeHtml(v)}" />
+                </div>
+            `;
+        }
+
+        modal.innerHTML = `
+            <div class="modal-header">
+                <h3 class="modal-title">Snippet Variables</h3>
+                <button class="btn btn-icon btn-xs modal-close">&times;</button>
+            </div>
+            <div class="modal-body">${inputsHtml}</div>
+            <div class="modal-footer">
+                <button class="btn btn-sm btn-ghost snippet-var-cancel">Cancel</button>
+                <button class="btn btn-sm btn-primary snippet-var-send">Send</button>
+            </div>
+        `;
+
+        backdrop.appendChild(modal);
+        document.body.appendChild(backdrop);
+        requestAnimationFrame(() => {
+            backdrop.classList.add('is-visible');
+            modal.classList.add('is-visible');
+            const firstInput = modal.querySelector('.snippet-var-input');
+            if (firstInput) firstInput.focus();
+        });
+
+        const close = () => {
+            backdrop.classList.remove('is-visible');
+            modal.classList.remove('is-visible');
+            setTimeout(() => backdrop.remove(), 200);
+        };
+
+        modal.querySelector('.modal-close').addEventListener('click', close);
+        modal.querySelector('.snippet-var-cancel').addEventListener('click', close);
+        backdrop.addEventListener('click', (e) => { if (e.target === backdrop) close(); });
+
+        modal.querySelector('.snippet-var-send').addEventListener('click', () => {
+            const inputs = modal.querySelectorAll('.snippet-var-input');
+            const values = Array.from(inputs).map((inp) => inp.value);
+            close();
+            onConfirm(values);
+        });
+
+        // Enter to send
+        modal.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                modal.querySelector('.snippet-var-send').click();
+            }
+            if (e.key === 'Escape') close();
+        });
     }
 
     // ── Data ─────────────────────────────────────────────────────────

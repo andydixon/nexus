@@ -169,6 +169,20 @@
   background: var(--text-tertiary);
 }
 
+/* Latency indicator */
+#status-latency {
+  font-variant-numeric: tabular-nums;
+}
+#status-latency.latency-good {
+  color: var(--success);
+}
+#status-latency.latency-warn {
+  color: var(--warning);
+}
+#status-latency.latency-bad {
+  color: var(--error);
+}
+
 /* -----------------------------------------------------------------------
    Resize handle (between sidebar and workspace)
    ----------------------------------------------------------------------- */

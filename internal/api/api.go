@@ -931,6 +931,11 @@ func (s *Service) StopPortForward(sessionID string, forwardID string) error {
 	return s.sessions.StopPortForward(sessionID, forwardID)
 }
 
+// PingSession sends a keepalive request and returns the round-trip time in milliseconds.
+func (s *Service) PingSession(sessionID string) (int64, error) {
+	return s.sessions.PingSession(sessionID)
+}
+
 // ---------------------------------------------------------------------------
 // Session recording
 // ---------------------------------------------------------------------------

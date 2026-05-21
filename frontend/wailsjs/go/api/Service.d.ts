@@ -105,6 +105,8 @@ export function NewProfile(arg1:string):Promise<models.Profile>;
 
 export function PinSession(arg1:string,arg2:boolean):Promise<void>;
 
+export function PingSession(arg1:string):Promise<number>;
+
 export function ReconnectSession(arg1:string):Promise<void>;
 
 export function RefreshGitHubRepos(arg1:string):Promise<Array<models.GitHubRepo>>;

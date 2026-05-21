@@ -206,6 +206,10 @@ export function PinSession(arg1, arg2) {
   return window['go']['api']['Service']['PinSession'](arg1, arg2);
 }
 
+export function PingSession(arg1) {
+  return window['go']['api']['Service']['PingSession'](arg1);
+}
+
 export function ReconnectSession(arg1) {
   return window['go']['api']['Service']['ReconnectSession'](arg1);
 }

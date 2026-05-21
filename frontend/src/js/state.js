@@ -28,6 +28,9 @@ class State {
         /** @type {boolean} Whether broadcast mode is active (keystrokes to all sessions). */
         this.broadcastMode = false;
 
+        /** @type {Set<string>|null} Session IDs to broadcast to. Null means all. */
+        this.broadcastTargets = null;
+
         /** @type {Map<string, Set<Function>>} event name → callbacks */
         this._listeners = new Map();
     }

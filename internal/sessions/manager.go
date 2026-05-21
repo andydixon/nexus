@@ -1205,6 +1205,22 @@ func (m *Manager) StopPortForward(sessionID string, forwardID string) error {
 	return nil
 }
 
+// PingSession sends a keepalive request to the server and returns the RTT in milliseconds.
+func (m *Manager) PingSession(sessionID string) (int64, error) {
+	m.mu.RLock()
+	sess, ok := m.sessions[sessionID]
+	m.mu.RUnlock()
+
+	if !ok {
+		return 0, fmt.Errorf("sessions: session %q not found", sessionID)
+	}
+	if sess.sshClient == nil {
+		return 0, fmt.Errorf("sessions: session %q is not an SSH connection", sessionID)
+	}
+
+	return sess.sshClient.Ping()
+}
+
 // ---------------------------------------------------------------------------
 // Internal: helpers
 // ---------------------------------------------------------------------------

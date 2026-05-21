@@ -515,6 +515,15 @@
       this._bindClick("btn-recordings", () => this.recordings.openBrowser());
       this._bindClick("btn-new-tab", () => this.profileEditor.openNew());
       this._bindClick("btn-broadcast", () => this.toggleBroadcast());
+
+      // Right-click on broadcast button opens target selector
+      const broadcastBtn = document.getElementById("btn-broadcast");
+      if (broadcastBtn) {
+        broadcastBtn.addEventListener("contextmenu", (e) => {
+          e.preventDefault();
+          this.selectBroadcastTargets();
+        });
+      }
       this._bindClick("btn-empty-connect", () => this.profileEditor.openNew());
       this._bindClick("btn-empty-quick", () => this.quickConnect());
 
@@ -573,6 +582,9 @@
      */
     toggleBroadcast() {
       this.state.broadcastMode = !this.state.broadcastMode;
+      if (!this.state.broadcastMode) {
+        this.state.broadcastTargets = null;
+      }
       const btn = document.getElementById("btn-broadcast");
       if (btn) {
         btn.classList.toggle("is-active", this.state.broadcastMode);
@@ -585,6 +597,100 @@
           ? "Broadcast mode enabled — input sent to all sessions"
           : "Broadcast mode disabled",
       );
+    }
+
+    /**
+     * Opens a modal to select which sessions receive broadcast input.
+     */
+    selectBroadcastTargets() {
+      const { createElement, escapeHtml } = window.NexusTerminal;
+      const sessions = this.state.getAllSessions().filter(
+        (s) => s.state === "connected" && s.id !== this.state.activeSessionId,
+      );
+
+      if (sessions.length === 0) {
+        this.notifications.error("No other connected sessions to broadcast to");
+        return;
+      }
+
+      const backdrop = createElement("div", "modal-backdrop");
+      const modal = createElement("div", "modal modal-sm");
+      const currentTargets = this.state.broadcastTargets || new Set();
+
+      let listHtml = "";
+      for (const s of sessions) {
+        const profile = this.state.getProfile(s.profileId);
+        const label = profile ? (profile.displayName || profile.host) : s.id.substring(0, 8);
+        const checked = currentTargets.size === 0 || currentTargets.has(s.id) ? "checked" : "";
+        listHtml += `
+          <label style="display:flex;align-items:center;gap:var(--space-2);padding:var(--space-1) 0;font-size:var(--text-sm);cursor:pointer;">
+            <input type="checkbox" class="broadcast-target-check" data-session-id="${s.id}" ${checked} />
+            <span style="color:var(--text-primary);">${escapeHtml(label)}</span>
+          </label>
+        `;
+      }
+
+      modal.innerHTML = `
+        <div class="modal-header">
+          <h3 class="modal-title">Broadcast Targets</h3>
+          <button class="btn btn-icon btn-xs modal-close">&times;</button>
+        </div>
+        <div class="modal-body">
+          <p style="font-size:var(--text-xs);color:var(--text-tertiary);margin-bottom:var(--space-2);">
+            Select which sessions should receive broadcast input:
+          </p>
+          ${listHtml}
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-sm btn-ghost broadcast-cancel">Cancel</button>
+          <button class="btn btn-sm btn-secondary broadcast-all">Select All</button>
+          <button class="btn btn-sm btn-primary broadcast-apply">Apply & Enable</button>
+        </div>
+      `;
+
+      backdrop.appendChild(modal);
+      document.body.appendChild(backdrop);
+      requestAnimationFrame(() => {
+        backdrop.classList.add("is-visible");
+        modal.classList.add("is-visible");
+      });
+
+      const close = () => {
+        backdrop.classList.remove("is-visible");
+        modal.classList.remove("is-visible");
+        setTimeout(() => backdrop.remove(), 200);
+      };
+
+      modal.querySelector(".modal-close").addEventListener("click", close);
+      modal.querySelector(".broadcast-cancel").addEventListener("click", close);
+      backdrop.addEventListener("click", (e) => { if (e.target === backdrop) close(); });
+
+      modal.querySelector(".broadcast-all").addEventListener("click", () => {
+        modal.querySelectorAll(".broadcast-target-check").forEach((cb) => { cb.checked = true; });
+      });
+
+      modal.querySelector(".broadcast-apply").addEventListener("click", () => {
+        const checks = modal.querySelectorAll(".broadcast-target-check");
+        const selected = new Set();
+        checks.forEach((cb) => {
+          if (cb.checked) selected.add(cb.dataset.sessionId);
+        });
+
+        if (selected.size === 0) {
+          this.notifications.error("Select at least one target session");
+          return;
+        }
+
+        // If all are selected, use null (broadcast to all)
+        this.state.broadcastTargets = selected.size === sessions.length ? null : selected;
+        if (!this.state.broadcastMode) {
+          this.toggleBroadcast();
+        } else {
+          const targetLabel = selected.size === sessions.length ? "all sessions" : selected.size + " sessions";
+          this.notifications.info("Broadcasting to " + targetLabel);
+        }
+        close();
+      });
     }
 
     // ── Connection lifecycle ─────────────────────────────────────────
@@ -873,6 +979,7 @@
     updateStatusBar() {
       const connEl = document.getElementById("status-connection");
       const countEl = document.getElementById("status-session-count");
+      const latencyEl = document.getElementById("status-latency");
       const vaultEl = document.getElementById("status-vault");
       const updateEl = document.getElementById("status-update");
       if (!connEl) return;
@@ -890,6 +997,16 @@
       } else {
         connEl.innerHTML =
           '<span class="status-dot is-disconnected"></span> No active session';
+      }
+
+      // Latency indicator — only show for connected SSH sessions.
+      if (latencyEl) {
+        if (activeSession && activeSession.state === "connected" && activeSession.protocol === "ssh") {
+          this._startLatencyPing(activeSession.id);
+        } else {
+          this._stopLatencyPing();
+          latencyEl.textContent = "";
+        }
       }
 
       if (countEl) countEl.textContent = `${connected}/${total} sessions`;
@@ -911,6 +1028,41 @@
           updateEl.classList.add("is-hidden");
         }
       }
+    }
+
+    _startLatencyPing(sessionID) {
+      // Don't restart if already pinging the same session.
+      if (this._latencySessionID === sessionID && this._latencyTimer) return;
+      this._stopLatencyPing();
+      this._latencySessionID = sessionID;
+
+      const doPing = async () => {
+        if (!window.go || !window.go.api || !window.go.api.Service) return;
+        try {
+          const ms = await window.go.api.Service.PingSession(sessionID);
+          const el = document.getElementById("status-latency");
+          if (el && this._latencySessionID === sessionID) {
+            el.textContent = ms + " ms";
+            el.className = ms < 100 ? "latency-good" : ms < 250 ? "latency-warn" : "latency-bad";
+          }
+        } catch (_) {
+          // Session may have disconnected — clear indicator.
+          const el = document.getElementById("status-latency");
+          if (el) { el.textContent = ""; el.className = ""; }
+          this._stopLatencyPing();
+        }
+      };
+
+      doPing();
+      this._latencyTimer = setInterval(doPing, 10000);
+    }
+
+    _stopLatencyPing() {
+      if (this._latencyTimer) {
+        clearInterval(this._latencyTimer);
+        this._latencyTimer = null;
+      }
+      this._latencySessionID = null;
     }
 
     async checkForUpdates(silent) {
@@ -1191,29 +1343,74 @@
 
       const searchOpts = () => ({ caseSensitive, regex: useRegex });
 
+      let matchIndex = 0;
+      let totalMatches = 0;
+
+      const updateCount = (found) => {
+        if (!input.value) {
+          count.textContent = "";
+          matchIndex = 0;
+          totalMatches = 0;
+          return;
+        }
+        if (found) {
+          matchIndex++;
+          // Count total matches by searching the full buffer
+          const entry = this.terminals.terminals.get(sessionId);
+          if (entry) {
+            const buffer = entry.term.buffer.active;
+            let total = 0;
+            const query = input.value;
+            for (let i = 0; i < buffer.length; i++) {
+              const line = buffer.getLine(i);
+              if (!line) continue;
+              const text = line.translateToString(true);
+              if (useRegex) {
+                try {
+                  const re = new RegExp(query, caseSensitive ? "g" : "gi");
+                  const m = text.match(re);
+                  if (m) total += m.length;
+                } catch (_) { /* invalid regex */ }
+              } else {
+                const searchText = caseSensitive ? text : text.toLowerCase();
+                const searchQuery = caseSensitive ? query : query.toLowerCase();
+                let pos = 0;
+                while ((pos = searchText.indexOf(searchQuery, pos)) !== -1) {
+                  total++;
+                  pos += searchQuery.length;
+                }
+              }
+            }
+            totalMatches = total;
+            if (matchIndex > totalMatches) matchIndex = 1;
+            count.textContent = matchIndex + " of " + totalMatches;
+          } else {
+            count.textContent = "Match found";
+          }
+        } else {
+          matchIndex = 0;
+          totalMatches = 0;
+          count.textContent = "No matches";
+        }
+        count.style.color = found ? "" : "var(--error)";
+      };
+
       const doSearch = () => {
         const found = this.terminals.search(
           sessionId,
           input.value,
           searchOpts(),
         );
-        count.textContent = input.value
-          ? found
-            ? "Match found"
-            : "No matches"
-          : "";
+        updateCount(found);
       };
       const doPrev = () => {
+        matchIndex = Math.max(0, matchIndex - 2);
         const found = this.terminals.searchPrevious(
           sessionId,
           input.value,
           searchOpts(),
         );
-        count.textContent = input.value
-          ? found
-            ? "Match found"
-            : "No matches"
-          : "";
+        updateCount(found);
       };
 
       const closeSearch = () => {

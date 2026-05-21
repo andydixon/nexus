@@ -116,10 +116,17 @@
         this.app.sidebar.highlightActive(session.profileId);
       }
 
-      // Fit the terminal for the newly active session
-      this.app.terminals.fitActive();
+      // Fit and refresh the terminal for the newly active session.
+      // Double-RAF ensures the panel has layout dimensions before fitting.
       requestAnimationFrame(() => {
-        this.app.terminals.focusTerminal(sessionId);
+        this.app.terminals.fitSession(sessionId);
+        const entry = this.app.terminals.terminals.get(sessionId);
+        if (entry) {
+          entry.term.refresh(0, entry.term.rows - 1);
+        }
+        requestAnimationFrame(() => {
+          this.app.terminals.focusTerminal(sessionId);
+        });
       });
     }
 

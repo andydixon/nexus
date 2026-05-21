@@ -262,6 +262,24 @@ func (c *Client) Resize(cols, rows int) error {
 	return session.WindowChange(rows, cols)
 }
 
+// Ping sends a keepalive request and returns the round-trip time in milliseconds.
+func (c *Client) Ping() (int64, error) {
+	c.mu.Lock()
+	if !c.connected || c.sshClient == nil {
+		c.mu.Unlock()
+		return 0, fmt.Errorf("not connected")
+	}
+	client := c.sshClient
+	c.mu.Unlock()
+
+	start := time.Now()
+	_, _, err := client.SendRequest("keepalive@openssh.com", true, nil)
+	if err != nil {
+		return 0, err
+	}
+	return time.Since(start).Milliseconds(), nil
+}
+
 // RunCommand executes a single command using a new SSH session.
 func (c *Client) RunCommand(command string) (string, error) {
 	c.mu.Lock()

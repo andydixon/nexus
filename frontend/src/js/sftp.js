@@ -231,6 +231,14 @@
 
       var actions = createElement("div", "sftp-toolbar-actions");
 
+      var goToBtn = this._toolbarBtn("⤳", "Go to path", "");
+      goToBtn.addEventListener("click", () => this._promptGoToPath(sessionId));
+      actions.appendChild(goToBtn);
+
+      var bookmarkBtn = this._toolbarBtn("★", "Bookmarks", "");
+      bookmarkBtn.addEventListener("click", () => this._showBookmarks(sessionId));
+      actions.appendChild(bookmarkBtn);
+
       var mkdirBtn = this._toolbarBtn("＋", "New folder", "is-accent");
       mkdirBtn.addEventListener("click", () => this._promptMkdir(sessionId));
       actions.appendChild(mkdirBtn);
@@ -426,7 +434,7 @@
       if (!isParent) {
         row.addEventListener("click", function (e) {
           e.stopPropagation();
-          self._selectFile(sessionId, entry, row);
+          self._selectFile(sessionId, entry, row, e);
         });
       }
 
@@ -468,65 +476,109 @@
 
     /* ── Selection & context actions ──────────────────────────────── */
 
-    _selectFile(sessionId, entry, rowEl) {
+    _selectFile(sessionId, entry, rowEl, event) {
       var state = this.panels.get(sessionId);
       if (!state) return;
 
-      // Deselect previous
-      var prev = state.el.querySelector(".sftp-file-row.is-selected");
-      if (prev) prev.classList.remove("is-selected");
+      // Initialise multi-select set if needed
+      if (!state.selectedFiles) state.selectedFiles = new Map();
 
-      // If clicking the same entry, deselect
-      if (state.selected === entry.path) {
-        state.selected = null;
-        var ctxBar = this._getCtxBar(sessionId);
-        if (ctxBar) ctxBar.style.display = "none";
-        return;
+      var multiKey = event && (event.metaKey || event.ctrlKey);
+
+      if (multiKey) {
+        // Toggle this entry in the multi-selection
+        if (state.selectedFiles.has(entry.path)) {
+          state.selectedFiles.delete(entry.path);
+          rowEl.classList.remove("is-selected");
+        } else {
+          state.selectedFiles.set(entry.path, entry);
+          rowEl.classList.add("is-selected");
+        }
+      } else {
+        // Single click without modifier — clear all, select this one
+        state.el.querySelectorAll(".sftp-file-row.is-selected").forEach(function (r) {
+          r.classList.remove("is-selected");
+        });
+
+        // If clicking the same entry (and it was the only selection), deselect
+        if (state.selectedFiles.size === 1 && state.selectedFiles.has(entry.path)) {
+          state.selectedFiles.clear();
+          state.selected = null;
+          var ctxBar = this._getCtxBar(sessionId);
+          if (ctxBar) ctxBar.style.display = "none";
+          return;
+        }
+
+        state.selectedFiles.clear();
+        state.selectedFiles.set(entry.path, entry);
+        rowEl.classList.add("is-selected");
       }
 
-      state.selected = entry.path;
-      rowEl.classList.add("is-selected");
-      this._showContextBar(sessionId, entry);
+      state.selected = state.selectedFiles.size > 0 ? entry.path : null;
+      this._showContextBar(sessionId, null);
     }
 
-    _showContextBar(sessionId, entry) {
+    _showContextBar(sessionId, _unused) {
+      var state = this.panels.get(sessionId);
+      if (!state) return;
       var ctxBar = this._getCtxBar(sessionId);
       if (!ctxBar) return;
+
+      if (!state.selectedFiles || state.selectedFiles.size === 0) {
+        ctxBar.style.display = "none";
+        return;
+      }
 
       ctxBar.innerHTML = "";
       ctxBar.style.display = "flex";
 
+      var self = this;
+      var entries = Array.from(state.selectedFiles.values());
+      var count = entries.length;
+      var isSingle = count === 1;
+      var entry = entries[0];
+
       var label = createElement("span", "sftp-ctx-label", {
-        textContent: entry.name,
-        title: entry.path,
+        textContent: isSingle ? entry.name : count + " items selected",
+        title: isSingle ? entry.path : entries.map(function (e) { return e.name; }).join(", "),
       });
       ctxBar.appendChild(label);
 
-      var self = this;
-
-      if (!entry.isDir) {
+      // Download button — only for files (single or batch)
+      var downloadableFiles = entries.filter(function (e) { return !e.isDir; });
+      if (downloadableFiles.length > 0) {
+        var dlLabel = downloadableFiles.length === 1
+          ? "↓ Download"
+          : "↓ Download (" + downloadableFiles.length + ")";
         var dlBtn = createElement("button", "sftp-ctx-btn is-accent", {
-          textContent: "↓ Download",
+          textContent: dlLabel,
         });
         dlBtn.addEventListener("click", function () {
-          self._download(sessionId, entry.path);
+          self._downloadBatch(sessionId, downloadableFiles);
         });
         ctxBar.appendChild(dlBtn);
       }
 
-      var renameBtn = createElement("button", "sftp-ctx-btn", {
-        textContent: "✎ Rename",
-      });
-      renameBtn.addEventListener("click", function () {
-        self._promptRename(sessionId, entry);
-      });
-      ctxBar.appendChild(renameBtn);
+      if (isSingle) {
+        var renameBtn = createElement("button", "sftp-ctx-btn", {
+          textContent: "✎ Rename",
+        });
+        renameBtn.addEventListener("click", function () {
+          self._promptRename(sessionId, entry);
+        });
+        ctxBar.appendChild(renameBtn);
+      }
 
+      var delLabel = isSingle ? "✕ Delete" : "✕ Delete (" + count + ")";
       var delBtn = createElement("button", "sftp-ctx-btn is-danger", {
-        textContent: "✕ Delete",
+        textContent: delLabel,
       });
       delBtn.addEventListener("click", function () {
-        self._confirmDelete(sessionId, entry);
+        if (isSingle) {
+          self._confirmDelete(sessionId, entry);
+        } else {
+          self._confirmDeleteBatch(sessionId, entries);
+        }
       });
       ctxBar.appendChild(delBtn);
     }
@@ -596,6 +648,54 @@
       } catch (err) {
         this.app.notifications.error("Delete failed: " + (err.message || err));
       }
+    }
+
+    async _downloadBatch(sessionId, files) {
+      this.app.notifications.info("Downloading " + files.length + " files…");
+      var failed = 0;
+      for (var i = 0; i < files.length; i++) {
+        try {
+          await window.go.api.Service.SFTPDownload(sessionId, files[i].path);
+        } catch (err) {
+          failed++;
+          this.app.notifications.error(
+            "Download failed: " + files[i].name + " — " + (err.message || err),
+          );
+        }
+      }
+      if (failed === 0) {
+        this.app.notifications.success("All " + files.length + " files downloaded");
+      }
+    }
+
+    _confirmDeleteBatch(sessionId, entries) {
+      this._showConfirmModal({
+        title: "Delete " + entries.length + " Items",
+        message: "Permanently delete <strong>" + entries.length + " selected items</strong>?",
+        confirmLabel: "Delete All",
+        isDanger: true,
+        onConfirm: function () {
+          this._deleteBatch(sessionId, entries);
+        }.bind(this),
+      });
+    }
+
+    async _deleteBatch(sessionId, entries) {
+      var failed = 0;
+      for (var i = 0; i < entries.length; i++) {
+        try {
+          await window.go.api.Service.SFTPRemove(sessionId, entries[i].path);
+        } catch (err) {
+          failed++;
+          this.app.notifications.error(
+            "Delete failed: " + entries[i].name + " — " + (err.message || err),
+          );
+        }
+      }
+      if (failed === 0) {
+        this.app.notifications.success("Deleted " + entries.length + " items");
+      }
+      await this._refresh(sessionId);
     }
 
     /* ── Modal dialogs (no prompt/confirm/alert) ──────────────────── */
@@ -782,6 +882,136 @@
       backdrop.addEventListener("click", function (e) {
         if (e.target === backdrop) close(false);
       });
+    }
+
+    /* ── Go to path & Bookmarks ───────────────────────────────────── */
+
+    _promptGoToPath(sessionId) {
+      var state = this.panels.get(sessionId);
+      if (!state) return;
+      this._showInputModal({
+        title: "Go to Path",
+        placeholder: "/path/to/directory",
+        initialValue: state.cwd,
+        confirmLabel: "Navigate",
+        onConfirm: function (value) {
+          var path = value.trim();
+          if (path) this._navigate(sessionId, path);
+        }.bind(this),
+      });
+    }
+
+    _showBookmarks(sessionId) {
+      var state = this.panels.get(sessionId);
+      if (!state) return;
+
+      var self = this;
+      var bookmarks = this._getBookmarks(sessionId);
+
+      var backdrop = createElement("div", "modal-backdrop");
+      var modal = createElement("div", "modal modal-sm");
+
+      var listHtml = "";
+      if (bookmarks.length === 0) {
+        listHtml = '<div style="color:var(--text-tertiary);font-size:var(--text-sm);text-align:center;padding:var(--space-3);">No bookmarks yet. Navigate to a directory and click "Bookmark Current".</div>';
+      } else {
+        for (var i = 0; i < bookmarks.length; i++) {
+          listHtml += '<div class="sftp-bookmark-row" data-index="' + i + '" data-path="' + escapeHtml(bookmarks[i]) + '">';
+          listHtml += '<span style="flex:1;font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(bookmarks[i]) + '</span>';
+          listHtml += '<button class="btn btn-xs btn-ghost sftp-bookmark-del" data-index="' + i + '" title="Remove">✕</button>';
+          listHtml += '</div>';
+        }
+      }
+
+      modal.innerHTML =
+        '<div class="modal-header">' +
+        '<span class="modal-title">Directory Bookmarks</span>' +
+        '<button class="modal-close btn btn-icon btn-xs btn-ghost">✕</button>' +
+        '</div>' +
+        '<div class="modal-body">' +
+        '<div class="sftp-bookmark-list">' + listHtml + '</div>' +
+        '</div>' +
+        '<div class="modal-footer">' +
+        '<button class="btn btn-sm btn-ghost sftp-modal-cancel">Close</button>' +
+        '<button class="btn btn-sm btn-primary sftp-bookmark-add">★ Bookmark Current</button>' +
+        '</div>';
+
+      backdrop.appendChild(modal);
+      document.body.appendChild(backdrop);
+
+      requestAnimationFrame(function () {
+        backdrop.classList.add("is-visible");
+        modal.classList.add("is-visible");
+      });
+
+      var closed = false;
+      function close() {
+        if (closed) return;
+        closed = true;
+        backdrop.classList.remove("is-visible");
+        modal.classList.remove("is-visible");
+        setTimeout(function () { backdrop.remove(); }, 200);
+      }
+
+      modal.querySelector(".modal-close").addEventListener("click", close);
+      modal.querySelector(".sftp-modal-cancel").addEventListener("click", close);
+      backdrop.addEventListener("click", function (e) { if (e.target === backdrop) close(); });
+
+      // Navigate to bookmark on click
+      modal.querySelectorAll(".sftp-bookmark-row").forEach(function (row) {
+        row.addEventListener("click", function (e) {
+          if (e.target.classList.contains("sftp-bookmark-del")) return;
+          var path = row.dataset.path;
+          close();
+          self._navigate(sessionId, path);
+        });
+        row.addEventListener("mousedown", function (e) { e.preventDefault(); });
+      });
+
+      // Delete bookmark
+      modal.querySelectorAll(".sftp-bookmark-del").forEach(function (btn) {
+        btn.addEventListener("click", function (e) {
+          e.stopPropagation();
+          var idx = parseInt(btn.dataset.index, 10);
+          self._removeBookmark(sessionId, idx);
+          close();
+          self._showBookmarks(sessionId);
+        });
+      });
+
+      // Add current directory as bookmark
+      modal.querySelector(".sftp-bookmark-add").addEventListener("click", function () {
+        self._addBookmark(sessionId, state.cwd);
+        close();
+        self._showBookmarks(sessionId);
+      });
+    }
+
+    _getBookmarks(sessionId) {
+      try {
+        var key = "sftp-bookmarks-" + sessionId;
+        var stored = localStorage.getItem(key);
+        return stored ? JSON.parse(stored) : [];
+      } catch (_) {
+        return [];
+      }
+    }
+
+    _addBookmark(sessionId, path) {
+      var bookmarks = this._getBookmarks(sessionId);
+      if (bookmarks.indexOf(path) === -1) {
+        bookmarks.push(path);
+        localStorage.setItem("sftp-bookmarks-" + sessionId, JSON.stringify(bookmarks));
+        this.app.notifications.success("Bookmarked: " + path);
+      } else {
+        this.app.notifications.info("Already bookmarked");
+      }
+    }
+
+    _removeBookmark(sessionId, index) {
+      var bookmarks = this._getBookmarks(sessionId);
+      bookmarks.splice(index, 1);
+      localStorage.setItem("sftp-bookmarks-" + sessionId, JSON.stringify(bookmarks));
     }
 
     /* ── Transfer progress queue ─────────────────────────────────── */

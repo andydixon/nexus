@@ -152,10 +152,13 @@
           const b64 = btoa(data);
           window.go.api.Service.WriteSession(sessionId, b64);
 
-          // Broadcast to all other connected sessions if enabled
+          // Broadcast to other connected sessions if enabled
           if (this.app.state.broadcastMode) {
+            const targets = this.app.state.broadcastTargets;
             for (const [otherId] of this.terminals) {
               if (otherId === sessionId) continue;
+              // If targets are set, only broadcast to selected sessions
+              if (targets && !targets.has(otherId)) continue;
               const otherSession = this.app.state.getSession(otherId);
               if (otherSession && otherSession.state === "connected") {
                 try {
@@ -566,7 +569,15 @@
           label: "Send Snippet…",
           action: () => this.app.snippets.open(),
         },
+        {
+          label: "Port Forwards…",
+          action: () => this._showPortForwardPanel(sessionId),
+        },
         { divider: true },
+        {
+          label: "Export Output",
+          action: () => this._exportTerminalOutput(sessionId, term),
+        },
         {
           label: "Clear Terminal",
           shortcut: modKey + "K",
@@ -1184,6 +1195,187 @@
         binary += String.fromCharCode.apply(null, chunk);
       }
       return btoa(binary);
+    }
+
+    /**
+     * Exports the terminal scrollback buffer as plain text.
+     * @param {string} sessionId
+     * @param {Terminal} term
+     * @private
+     */
+    _exportTerminalOutput(sessionId, term) {
+      const { createElement } = window.NexusTerminal;
+      const buffer = term.buffer.active;
+      const lines = [];
+      for (let i = 0; i < buffer.length; i++) {
+        const line = buffer.getLine(i);
+        if (line) lines.push(line.translateToString(true));
+      }
+      const text = lines.join("\n").trimEnd();
+
+      // Use Wails save dialog if available
+      if (window.runtime && window.runtime.SaveFileDialog) {
+        // Copy to clipboard as a fallback
+      }
+
+      // Copy to clipboard
+      if (window.runtime && window.runtime.ClipboardSetText) {
+        window.runtime.ClipboardSetText(text);
+      } else {
+        navigator.clipboard.writeText(text).catch(function () {});
+      }
+
+      // Also offer download via blob
+      const blob = new Blob([text], { type: "text/plain" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "terminal-output-" + sessionId.substring(0, 8) + ".txt";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      this.app.notifications.success("Terminal output exported & copied to clipboard");
+    }
+
+    /**
+     * Shows the port forwarding management panel for an SSH session.
+     * @param {string} sessionId
+     * @private
+     */
+    _showPortForwardPanel(sessionId) {
+      const { createElement, escapeHtml } = window.NexusTerminal;
+      const session = this.app.state.getSession(sessionId);
+      if (!session || session.protocol !== "ssh") {
+        this.app.notifications.error("Port forwarding is only available for SSH sessions");
+        return;
+      }
+
+      const backdrop = createElement("div", "modal-backdrop");
+      const modal = createElement("div", "modal modal-lg");
+
+      modal.innerHTML = `
+        <div class="modal-header">
+          <h3 class="modal-title">Port Forwards</h3>
+          <button class="btn btn-icon btn-xs modal-close">&times;</button>
+        </div>
+        <div class="modal-body" style="min-height:200px;">
+          <div class="portfwd-list" style="margin-bottom:var(--space-3);"></div>
+          <div class="portfwd-add" style="border-top:1px solid var(--border-subtle);padding-top:var(--space-3);">
+            <div style="font-weight:var(--weight-medium);font-size:var(--text-sm);margin-bottom:var(--space-2);">Add New Forward</div>
+            <div style="display:grid;grid-template-columns:auto 1fr 60px 20px 1fr 60px;gap:var(--space-2);align-items:center;">
+              <select class="form-input pf-direction" style="height:28px;font-size:var(--text-xs);">
+                <option value="local">Local →</option>
+                <option value="remote">Remote ←</option>
+              </select>
+              <input class="form-input pf-bind-host" type="text" placeholder="127.0.0.1" value="127.0.0.1" style="height:28px;font-size:var(--text-xs);" />
+              <input class="form-input pf-bind-port" type="number" placeholder="Port" style="height:28px;font-size:var(--text-xs);" />
+              <span style="text-align:center;color:var(--text-tertiary);">→</span>
+              <input class="form-input pf-dest-host" type="text" placeholder="localhost" value="localhost" style="height:28px;font-size:var(--text-xs);" />
+              <input class="form-input pf-dest-port" type="number" placeholder="Port" style="height:28px;font-size:var(--text-xs);" />
+            </div>
+            <div style="display:flex;gap:var(--space-2);margin-top:var(--space-2);">
+              <input class="form-input pf-label" type="text" placeholder="Label (optional)" style="flex:1;height:28px;font-size:var(--text-xs);" />
+              <button class="btn btn-sm btn-primary pf-add-btn">Start Forward</button>
+            </div>
+          </div>
+        </div>
+      `;
+
+      backdrop.appendChild(modal);
+      document.body.appendChild(backdrop);
+      requestAnimationFrame(() => {
+        backdrop.classList.add("is-visible");
+        modal.classList.add("is-visible");
+      });
+
+      const close = () => {
+        backdrop.classList.remove("is-visible");
+        modal.classList.remove("is-visible");
+        setTimeout(() => backdrop.remove(), 200);
+      };
+
+      modal.querySelector(".modal-close").addEventListener("click", close);
+      backdrop.addEventListener("click", (e) => { if (e.target === backdrop) close(); });
+
+      const listEl = modal.querySelector(".portfwd-list");
+      const self = this;
+
+      const renderForwards = async () => {
+        try {
+          const forwards = await window.go.api.Service.ListPortForwards(sessionId) || [];
+          listEl.innerHTML = "";
+          if (forwards.length === 0) {
+            listEl.innerHTML = '<div style="color:var(--text-tertiary);font-size:var(--text-sm);padding:var(--space-2);">No active port forwards</div>';
+            return;
+          }
+          for (const fwd of forwards) {
+            const row = createElement("div", "", {});
+            row.style.cssText = "display:flex;align-items:center;gap:var(--space-2);padding:var(--space-1) 0;border-bottom:1px solid var(--border-subtle);";
+            const dirLabel = fwd.direction === "local" ? "L" : "R";
+            const dirColor = fwd.direction === "local" ? "var(--accent)" : "var(--warning)";
+            row.innerHTML = `
+              <span style="font-size:var(--text-xs);font-weight:var(--weight-semibold);color:${dirColor};width:16px;">${dirLabel}</span>
+              <span style="font-family:var(--font-mono);font-size:var(--text-xs);color:var(--text-primary);flex:1;">
+                ${escapeHtml(fwd.bindHost || "127.0.0.1")}:${fwd.bindPort} → ${escapeHtml(fwd.destHost || "localhost")}:${fwd.destPort}
+              </span>
+              ${fwd.label ? `<span style="font-size:var(--text-xs);color:var(--text-tertiary);">${escapeHtml(fwd.label)}</span>` : ""}
+            `;
+            const stopBtn = createElement("button", "btn btn-xs btn-danger", { textContent: "Stop" });
+            stopBtn.addEventListener("click", async () => {
+              try {
+                await window.go.api.Service.StopPortForward(sessionId, fwd.id);
+                self.app.notifications.info("Forward stopped");
+                renderForwards();
+              } catch (err) {
+                self.app.notifications.error("Failed to stop: " + (err.message || err));
+              }
+            });
+            row.appendChild(stopBtn);
+            listEl.appendChild(row);
+          }
+        } catch (err) {
+          listEl.innerHTML = '<div style="color:var(--error);font-size:var(--text-sm);">Failed to load forwards</div>';
+        }
+      };
+
+      renderForwards();
+
+      // Add forward button
+      modal.querySelector(".pf-add-btn").addEventListener("click", async () => {
+        const direction = modal.querySelector(".pf-direction").value;
+        const bindHost = modal.querySelector(".pf-bind-host").value.trim() || "127.0.0.1";
+        const bindPort = parseInt(modal.querySelector(".pf-bind-port").value, 10);
+        const destHost = modal.querySelector(".pf-dest-host").value.trim() || "localhost";
+        const destPort = parseInt(modal.querySelector(".pf-dest-port").value, 10);
+        const label = modal.querySelector(".pf-label").value.trim();
+
+        if (!bindPort || !destPort) {
+          self.app.notifications.error("Bind port and destination port are required");
+          return;
+        }
+
+        try {
+          await window.go.api.Service.StartPortForward(sessionId, {
+            id: "",
+            direction: direction,
+            bindHost: bindHost,
+            bindPort: bindPort,
+            destHost: destHost,
+            destPort: destPort,
+            enabled: true,
+            label: label,
+          });
+          self.app.notifications.success("Forward started");
+          modal.querySelector(".pf-bind-port").value = "";
+          modal.querySelector(".pf-dest-port").value = "";
+          modal.querySelector(".pf-label").value = "";
+          renderForwards();
+        } catch (err) {
+          self.app.notifications.error("Failed to start forward: " + (err.message || err));
+        }
+      });
     }
 
     /**
