@@ -97,6 +97,17 @@ build() {
     else
         wails build -ldflags "$(build_ldflags "${version}")"
     fi
+
+    # Replace Wails-generated icon with custom app icon on macOS.
+    if [[ "$OSTYPE" == darwin* ]]; then
+        local app_bundle="build/bin/nexus-terminal.app"
+        local custom_icns="build/darwin/AppIcon.icns"
+        if [ -d "$app_bundle" ] && [ -f "$custom_icns" ]; then
+            cp "$custom_icns" "$app_bundle/Contents/Resources/iconfile.icns"
+            log "Replaced app icon with custom AppIcon.icns"
+        fi
+    fi
+
     log "Build complete: build/bin/"
 }
 
