@@ -784,6 +784,113 @@
       });
     }
 
+    /* ── Transfer progress queue ─────────────────────────────────── */
+
+    /**
+     * Handles a transfer progress event from the backend.
+     * @param {Object} payload - { sessionID, direction, transferred, total, path, done }
+     */
+    handleTransferProgress(payload) {
+      var state = this.panels.get(payload.sessionID);
+      if (!state) {
+        // Panel not open — still track so we can show a notification on completion
+        if (payload.done) {
+          var dir = payload.direction === "upload" ? "↑ Uploaded" : "↓ Downloaded";
+          var name = payload.path.split("/").pop() || payload.path;
+          this.app.notifications.success(dir + " " + name);
+        }
+        return;
+      }
+
+      // Initialise transfers map if needed
+      if (!state.transfers) state.transfers = new Map();
+
+      var key = payload.direction + ":" + payload.path;
+
+      if (payload.done) {
+        state.transfers.delete(key);
+        this._renderTransferQueue(payload.sessionID);
+        // Refresh file list after upload completes
+        if (payload.direction === "upload") {
+          this._refresh(payload.sessionID);
+        }
+        return;
+      }
+
+      state.transfers.set(key, {
+        direction: payload.direction,
+        path: payload.path,
+        name: payload.path.split("/").pop() || payload.path,
+        transferred: payload.transferred,
+        total: payload.total,
+      });
+
+      this._renderTransferQueue(payload.sessionID);
+    }
+
+    /**
+     * Renders the transfer queue panel showing active transfers.
+     */
+    _renderTransferQueue(sessionId) {
+      var state = this.panels.get(sessionId);
+      if (!state) return;
+
+      var queue = state.el.querySelector(".sftp-transfer-queue");
+
+      if (!state.transfers || state.transfers.size === 0) {
+        if (queue) queue.remove();
+        return;
+      }
+
+      if (!queue) {
+        queue = createElement("div", "sftp-transfer-queue");
+        // Insert between toolbar and file-list
+        var fileList = state.el.querySelector(".sftp-file-list");
+        state.el.insertBefore(queue, fileList);
+      }
+
+      queue.innerHTML = "";
+
+      var header = createElement("div", "sftp-transfer-header");
+      header.textContent = "Transfers (" + state.transfers.size + ")";
+      queue.appendChild(header);
+
+      var self = this;
+      state.transfers.forEach(function (transfer) {
+        var row = createElement("div", "sftp-transfer-row");
+
+        var icon = createElement("span", "sftp-transfer-icon");
+        icon.textContent = transfer.direction === "upload" ? "↑" : "↓";
+        row.appendChild(icon);
+
+        var info = createElement("div", "sftp-transfer-info");
+
+        var nameEl = createElement("span", "sftp-transfer-name", {
+          textContent: transfer.name,
+          title: transfer.path,
+        });
+        info.appendChild(nameEl);
+
+        var progress = createElement("div", "sftp-transfer-progress");
+        var bar = createElement("div", "sftp-transfer-bar");
+        var pct = transfer.total > 0
+          ? Math.min(100, Math.round((transfer.transferred / transfer.total) * 100))
+          : 0;
+        bar.style.width = pct + "%";
+        progress.appendChild(bar);
+        info.appendChild(progress);
+
+        var meta = createElement("span", "sftp-transfer-meta");
+        var transferredStr = formatBytes(transfer.transferred);
+        var totalStr = transfer.total > 0 ? formatBytes(transfer.total) : "?";
+        meta.textContent = transferredStr + " / " + totalStr + " (" + pct + "%)";
+        info.appendChild(meta);
+
+        row.appendChild(info);
+        queue.appendChild(row);
+      });
+    }
+
     /* ── Resize handle ────────────────────────────────────────────── */
 
     _setupResize(sessionId, state) {

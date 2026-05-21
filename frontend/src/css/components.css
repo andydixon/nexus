@@ -899,3 +899,81 @@
 @keyframes spin {
     to { transform: rotate(360deg); }
 }
+
+/* =======================================================================
+   CONTEXT MENUS
+   ======================================================================= */
+
+.context-menu {
+    position: fixed;
+    z-index: var(--z-modal, 1000);
+    min-width: 180px;
+    max-width: 260px;
+    padding: var(--space-1) 0;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    box-shadow:
+        0 4px 16px rgba(0, 0, 0, 0.35),
+        0 1px 4px rgba(0, 0, 0, 0.2);
+    overflow: hidden;
+}
+
+.context-menu-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 6px var(--space-3);
+    border: none;
+    background: none;
+    color: var(--text-primary);
+    font-size: var(--text-sm);
+    text-align: left;
+    cursor: pointer;
+    transition: background var(--transition-fast);
+    gap: var(--space-3);
+}
+
+.context-menu-item:hover {
+    background: var(--bg-hover);
+}
+
+.context-menu-item:active {
+    background: var(--bg-active);
+}
+
+.context-menu-item.context-menu-disabled {
+    color: var(--text-disabled);
+    cursor: not-allowed;
+}
+
+.context-menu-item.context-menu-disabled:hover {
+    background: none;
+}
+
+.context-menu-item.context-menu-danger {
+    color: var(--error);
+}
+
+.context-menu-item.context-menu-danger:hover {
+    background: rgba(239, 83, 80, 0.1);
+}
+
+.context-menu-label {
+    flex: 1;
+    min-width: 0;
+}
+
+.context-menu-shortcut {
+    font-size: 11px;
+    color: var(--text-tertiary);
+    flex-shrink: 0;
+    margin-left: var(--space-3);
+}
+
+.context-menu-divider {
+    height: 1px;
+    margin: var(--space-1) 0;
+    background: var(--border-subtle);
+}

@@ -47,6 +47,8 @@
         allowProposedApi: true,
         convertEol: false,
         windowsMode: false,
+        scrollOnUserInput: true,
+        altClickMovesCursor: true,
       });
 
       // Load addons
@@ -504,6 +506,8 @@
       const { createElement, dismissContextMenus } = window.NexusTerminal;
       dismissContextMenus();
 
+      const isMac = navigator.platform.indexOf("Mac") !== -1;
+      const modKey = isMac ? "⌘" : "Ctrl+";
       const hasSelection = term.hasSelection();
       const menu = createElement("div", "context-menu");
       menu.style.left = `${x}px`;
@@ -512,6 +516,7 @@
       const items = [
         {
           label: "Copy",
+          shortcut: modKey + "C",
           disabled: !hasSelection,
           action: () => {
             const text = term.getSelection();
@@ -527,6 +532,7 @@
         },
         {
           label: "Paste",
+          shortcut: modKey + "V",
           action: () => {
             if (window.runtime && window.runtime.ClipboardGetText) {
               window.runtime
@@ -548,10 +554,12 @@
         { divider: true },
         {
           label: "Select All",
+          shortcut: modKey + "A",
           action: () => term.selectAll(),
         },
         {
           label: "Find…",
+          shortcut: modKey + "F",
           action: () => this.app._openTerminalSearch(),
         },
         {
@@ -561,6 +569,7 @@
         { divider: true },
         {
           label: "Clear Terminal",
+          shortcut: modKey + "K",
           action: () => term.clear(),
         },
         {
@@ -574,9 +583,17 @@
           menu.appendChild(createElement("div", "context-menu-divider"));
           continue;
         }
-        const btn = createElement("button", "context-menu-item", {
+        const btn = createElement("button", "context-menu-item");
+        const labelSpan = createElement("span", "context-menu-label", {
           textContent: entry.label,
         });
+        btn.appendChild(labelSpan);
+        if (entry.shortcut) {
+          const shortcutSpan = createElement("span", "context-menu-shortcut", {
+            textContent: entry.shortcut,
+          });
+          btn.appendChild(shortcutSpan);
+        }
         if (entry.disabled) {
           btn.disabled = true;
           btn.classList.add("context-menu-disabled");

@@ -1069,6 +1069,7 @@ func (m *Manager) SFTPDownload(sessionID, remotePath, localPath string) error {
 	return sc.Download(remotePath, localPath, func(p sftpclient.TransferProgress) {
 		m.emitEvent("session:sftp:progress", map[string]interface{}{
 			"sessionID":   sessionID,
+			"direction":   "download",
 			"transferred": p.Transferred,
 			"total":       p.Total,
 			"path":        p.Path,
@@ -1086,6 +1087,7 @@ func (m *Manager) SFTPUpload(sessionID, localPath, remotePath string) error {
 	return sc.Upload(localPath, remotePath, func(p sftpclient.TransferProgress) {
 		m.emitEvent("session:sftp:progress", map[string]interface{}{
 			"sessionID":   sessionID,
+			"direction":   "upload",
 			"transferred": p.Transferred,
 			"total":       p.Total,
 			"path":        p.Path,
@@ -1103,6 +1105,7 @@ func (m *Manager) SFTPUploadBytes(sessionID, remotePath string, data []byte) err
 	return sc.UploadBytes(remotePath, data, func(p sftpclient.TransferProgress) {
 		m.emitEvent("session:sftp:progress", map[string]interface{}{
 			"sessionID":   sessionID,
+			"direction":   "upload",
 			"transferred": p.Transferred,
 			"total":       p.Total,
 			"path":        p.Path,

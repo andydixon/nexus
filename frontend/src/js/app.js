@@ -213,9 +213,12 @@
             }
           }
           // Also re-fit to catch any layout changes that occurred while connecting.
+          // Multiple delays help byobu/tmux render correctly after its status
+          // bar initialisation completes.
           const fit = () => this.terminals.fitSession(payload.sessionID);
           setTimeout(fit, 50);
           setTimeout(fit, 300);
+          setTimeout(fit, 800);
         }
       });
 
@@ -317,6 +320,11 @@
             accepted: false,
           });
         }
+      });
+
+      // SFTP transfer progress events
+      window.runtime.EventsOn("session:sftp:progress", (payload) => {
+        this.sftp.handleTransferProgress(payload);
       });
 
       // Password/passphrase prompt requests from the backend

@@ -419,3 +419,74 @@
   font-size: 10px;
   color: var(--text-tertiary);
 }
+
+/* -----------------------------------------------------------------------
+   Transfer progress queue
+   ----------------------------------------------------------------------- */
+.sftp-transfer-queue {
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-elevated);
+  max-height: 140px;
+  overflow-y: auto;
+}
+
+.sftp-transfer-header {
+  font-size: 10px;
+  font-weight: var(--weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-tertiary);
+  padding: var(--space-1) var(--space-2) 0;
+}
+
+.sftp-transfer-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 4px var(--space-2);
+}
+
+.sftp-transfer-icon {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--accent);
+  flex-shrink: 0;
+  width: 16px;
+  text-align: center;
+}
+
+.sftp-transfer-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sftp-transfer-name {
+  font-size: var(--text-xs);
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sftp-transfer-progress {
+  height: 3px;
+  background: var(--border-subtle);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.sftp-transfer-bar {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+  transition: width 0.15s ease-out;
+}
+
+.sftp-transfer-meta {
+  font-size: 10px;
+  color: var(--text-tertiary);
+}

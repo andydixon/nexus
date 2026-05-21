@@ -159,8 +159,9 @@ func (c *Client) connectInternal(
 	rows := 24
 	modes := ssh.TerminalModes{
 		ssh.ECHO:          1,
-		ssh.TTY_OP_ISPEED: 14400,
-		ssh.TTY_OP_OSPEED: 14400,
+		ssh.TTY_OP_ISPEED: 115200,
+		ssh.TTY_OP_OSPEED: 115200,
+		ssh.IUTF8:         1,
 	}
 
 	if err := session.RequestPty(termType, rows, cols, modes); err != nil {
