@@ -384,8 +384,8 @@
       this.rawViewer.destroyViewer(sessionId);
       window.NexusTerminal.GitHubViewer.destroyViewer(sessionId);
       window.NexusTerminal.VNCViewer.destroyViewer(sessionId);
-      this.state.removeSession(sessionId);
       this.tabs.removeTab(sessionId);
+      this.state.removeSession(sessionId);
       this.updateStatusBar();
     }
 

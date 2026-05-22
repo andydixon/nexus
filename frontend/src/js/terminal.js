@@ -112,6 +112,34 @@
         });
       }
 
+      // Alternate-screen scroll passthrough for screen/tmux/byobu.
+      // When the terminal is in the alternate buffer (used by multiplexers),
+      // convert mouse-wheel events into arrow-key sequences so the remote
+      // application handles scrollback instead of xterm.js (which has no
+      // scrollback content in alternate mode).
+      const viewportEl = container.querySelector(".xterm-viewport");
+      if (viewportEl) {
+        viewportEl.addEventListener("wheel", (e) => {
+          if (term.buffer.active !== term.buffer.alternate) return;
+          // Only intercept when mouse tracking is NOT active (if mouse mode
+          // is on, xterm.js already forwards events correctly).
+          if (term.modes && term.modes.mouseTrackingMode &&
+              term.modes.mouseTrackingMode !== "none") return;
+
+          e.preventDefault();
+          e.stopPropagation();
+          const lines = Math.max(1, Math.round(Math.abs(e.deltaY) / 40));
+          const seq = e.deltaY < 0 ? "\x1b[A" : "\x1b[B";
+          const data = seq.repeat(lines);
+          const b64 = btoa(data);
+          try {
+            window.go.api.Service.WriteSession(sessionId, b64);
+          } catch (_) {
+            /* non-critical */
+          }
+        }, { passive: false });
+      }
+
       // Drag-and-drop file handling
       container.addEventListener("dragover", (e) => {
         if (

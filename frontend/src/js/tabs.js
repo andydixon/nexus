@@ -65,6 +65,7 @@
      */
     removeTab(sessionId) {
       const idx = this.order.indexOf(sessionId);
+      const wasActive = this.app.state.activeSessionId === sessionId;
       if (idx !== -1) this.order.splice(idx, 1);
 
       // Remove tab element
@@ -77,8 +78,8 @@
       const panel = document.getElementById(`panel-${sessionId}`);
       if (panel) panel.remove();
 
-      // If this was the active tab, activate the nearest neighbour
-      if (this.app.state.activeSessionId === sessionId) {
+      // Activate the nearest neighbour
+      if (wasActive) {
         const next =
           this.order.length > 0
             ? this.order[Math.min(idx, this.order.length - 1)]
@@ -176,8 +177,8 @@
       this.app.terminals.destroyTerminal(sessionId);
       this.app.rawViewer.destroyViewer(sessionId);
       window.NexusTerminal.GitHubViewer.destroyViewer(sessionId);
-      this.app.state.removeSession(sessionId);
       this.removeTab(sessionId);
+      this.app.state.removeSession(sessionId);
     }
 
     /**
