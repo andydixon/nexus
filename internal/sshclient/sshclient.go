@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/andydixon/nexus/internal/models"
+	"github.com/andydixon/nexus/internal/terminalenv"
 	"github.com/pquerna/otp/totp"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/net/proxy"
@@ -23,21 +24,21 @@ import (
 // It handles connection establishment, authentication, PTY allocation,
 // terminal resize propagation, port forwarding, and clean shutdown.
 type Client struct {
-	mu        sync.Mutex
-	config    *models.Profile
-	sshClient *ssh.Client
-	session   *ssh.Session
-	stdin     io.WriteCloser
-	stdout    io.Reader
-	stderr    io.Reader
-	connected bool
-	onData    func(data []byte)
-	onError   func(err error)
-	onClose   func()
-	ctx       context.Context
-	cancel    context.CancelFunc
-	forwards  *ForwardManager // port forwarding tunnels
-	agentCleanup func()       // closes agent socket connection
+	mu           sync.Mutex
+	config       *models.Profile
+	sshClient    *ssh.Client
+	session      *ssh.Session
+	stdin        io.WriteCloser
+	stdout       io.Reader
+	stderr       io.Reader
+	connected    bool
+	onData       func(data []byte)
+	onError      func(err error)
+	onClose      func()
+	ctx          context.Context
+	cancel       context.CancelFunc
+	forwards     *ForwardManager // port forwarding tunnels
+	agentCleanup func()          // closes agent socket connection
 }
 
 // NewClient creates a new SSH client bound to the given profile.
@@ -162,6 +163,14 @@ func (c *Client) connectInternal(
 		ssh.TTY_OP_ISPEED: 115200,
 		ssh.TTY_OP_OSPEED: 115200,
 		ssh.IUTF8:         1,
+	}
+
+	sessionEnv := terminalenv.SSHEnvVars(sc.EnvVars)
+	for _, key := range terminalenv.SortedEnvKeys(sessionEnv) {
+		// Servers may reject env requests unless AcceptEnv permits them. Locale
+		// requests improve Unicode input when accepted, but rejection should not
+		// prevent the terminal session from starting.
+		_ = session.Setenv(key, sessionEnv[key])
 	}
 
 	if err := session.RequestPty(termType, rows, cols, modes); err != nil {

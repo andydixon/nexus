@@ -9,21 +9,22 @@ import (
 	"runtime"
 	"sync"
 
+	"github.com/andydixon/nexus/internal/terminalenv"
 	"github.com/creack/pty"
 )
 
 // Client manages a local shell PTY session.
 type Client struct {
-	mu       sync.Mutex
-	cmd      *exec.Cmd
-	ptmx     *os.File
-	shell    string
-	onData   func([]byte)
-	onError  func(error)
-	onClose  func()
-	closed   bool
-	cols     uint16
-	rows     uint16
+	mu      sync.Mutex
+	cmd     *exec.Cmd
+	ptmx    *os.File
+	shell   string
+	onData  func([]byte)
+	onError func(error)
+	onClose func()
+	closed  bool
+	cols    uint16
+	rows    uint16
 }
 
 // Config holds configuration for a local shell session.
@@ -67,10 +68,10 @@ func NewClient(cfg Config) *Client {
 		rows = 24
 	}
 	return &Client{
-		shell:  shell,
-		cols:   cols,
-		rows:   rows,
-		onData: cfg.OnData,
+		shell:   shell,
+		cols:    cols,
+		rows:    rows,
+		onData:  cfg.OnData,
 		onError: cfg.OnError,
 		onClose: cfg.OnClose,
 	}
@@ -86,15 +87,12 @@ func (c *Client) Start() error {
 	}
 
 	cmd := exec.Command(c.shell)
-	cmd.Env = os.Environ()
+	cmd.Env = terminalenv.LocalShellEnv(os.Environ())
 
 	// Start in the user's home directory.
 	if home, err := os.UserHomeDir(); err == nil {
 		cmd.Dir = home
 	}
-
-	// Set TERM for proper terminal behaviour.
-	cmd.Env = append(cmd.Env, "TERM=xterm-256color")
 
 	ptmx, err := pty.StartWithSize(cmd, &pty.Winsize{
 		Cols: c.cols,
