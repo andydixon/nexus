@@ -57,14 +57,17 @@ type Session struct {
 // It coordinates between protocol clients, the storage layer,
 // the secret store, and the Wails runtime for event emission.
 type Manager struct {
-	mu            sync.RWMutex
-	sessions      map[string]*Session
-	store         *storage.Store
-	secretStore   *secrets.SecretStore
-	keychainStore *secrets.KeychainStore
-	auditLog      *audit.Logger
-	recordStore   *recording.Store
-	ctx           context.Context // Wails app context for event emission
+	mu                        sync.RWMutex
+	sessions                  map[string]*Session
+	store                     *storage.Store
+	secretStore               *secrets.SecretStore
+	keychainStore             *secrets.KeychainStore
+	auditLog                  *audit.Logger
+	recordStore               *recording.Store
+	ctx                       context.Context // Wails app context for event emission
+	hostKeyMu                 sync.Mutex
+	hostKeyChans              map[string]chan bool
+	hostKeyListenerRegistered bool
 }
 
 // NewManager creates a Manager wired to the given backing services.
@@ -82,6 +85,7 @@ func NewManager(store *storage.Store, secretStore *secrets.SecretStore, keychain
 // SetContext stores the Wails runtime context for event emission.
 func (m *Manager) SetContext(ctx context.Context) {
 	m.ctx = ctx
+	m.registerHostKeyResponseListener()
 }
 
 // Connect creates a new session from a profile and connects it.
@@ -1465,25 +1469,18 @@ func (m *Manager) promptHostKey(sessionID string, host string, keyType string, f
 
 	requestID := uuid.New().String()
 	ch := make(chan bool, 1)
-	cancel := wailsRuntime.EventsOn(m.ctx, "session:hostkey:response", func(optionalData ...interface{}) {
-		if len(optionalData) == 0 {
-			return
-		}
-		data, ok := optionalData[0].(map[string]interface{})
-		if !ok {
-			return
-		}
-		rid, _ := data["requestID"].(string)
-		if rid != requestID {
-			return
-		}
-		accepted, _ := data["accepted"].(bool)
-		select {
-		case ch <- accepted:
-		default:
-		}
-	})
-	defer cancel()
+
+	m.hostKeyMu.Lock()
+	if m.hostKeyChans == nil {
+		m.hostKeyChans = make(map[string]chan bool)
+	}
+	m.hostKeyChans[requestID] = ch
+	m.hostKeyMu.Unlock()
+	defer func() {
+		m.hostKeyMu.Lock()
+		delete(m.hostKeyChans, requestID)
+		m.hostKeyMu.Unlock()
+	}()
 
 	m.emitEvent("session:hostkey:verify", map[string]interface{}{
 		"requestID":   requestID,
@@ -1496,8 +1493,51 @@ func (m *Manager) promptHostKey(sessionID string, host string, keyType string, f
 	select {
 	case accepted := <-ch:
 		return accepted, nil
-	case <-time.After(5 * time.Minute):
-		return false, fmt.Errorf("host key prompt timed out")
+	case <-time.After(60 * time.Second):
+		return false, fmt.Errorf("host key prompt timed out waiting for user response")
+	}
+}
+
+func (m *Manager) registerHostKeyResponseListener() {
+	ctx := m.ctx
+	if ctx == nil {
+		return
+	}
+
+	m.hostKeyMu.Lock()
+	if m.hostKeyChans == nil {
+		m.hostKeyChans = make(map[string]chan bool)
+	}
+	if m.hostKeyListenerRegistered {
+		m.hostKeyMu.Unlock()
+		return
+	}
+	m.hostKeyListenerRegistered = true
+	m.hostKeyMu.Unlock()
+
+	wailsRuntime.EventsOn(ctx, "session:hostkey:response", m.handleHostKeyResponse)
+}
+
+func (m *Manager) handleHostKeyResponse(optionalData ...interface{}) {
+	if len(optionalData) == 0 {
+		return
+	}
+	data, ok := optionalData[0].(map[string]interface{})
+	if !ok {
+		return
+	}
+	requestID, _ := data["requestID"].(string)
+	accepted, _ := data["accepted"].(bool)
+
+	m.hostKeyMu.Lock()
+	ch, exists := m.hostKeyChans[requestID]
+	m.hostKeyMu.Unlock()
+
+	if exists {
+		select {
+		case ch <- accepted:
+		default:
+		}
 	}
 }
 

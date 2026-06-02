@@ -280,7 +280,11 @@ class SecretPrompt {
             document.body.appendChild(overlay);
             this._overlay = overlay;
 
-            acceptBtn.focus();
+            requestAnimationFrame(() => {
+                overlay.classList.add('is-visible');
+                modal.classList.add('is-visible');
+                acceptBtn.focus();
+            });
 
             acceptBtn.addEventListener('click', () => {
                 this._close();

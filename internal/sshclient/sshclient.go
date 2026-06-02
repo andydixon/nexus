@@ -167,10 +167,9 @@ func (c *Client) connectInternal(
 
 	sessionEnv := terminalenv.SSHEnvVars(sc.EnvVars)
 	for _, key := range terminalenv.SortedEnvKeys(sessionEnv) {
-		// Servers may reject env requests unless AcceptEnv permits them. Locale
-		// requests improve Unicode input when accepted, but rejection should not
-		// prevent the terminal session from starting.
-		_ = session.Setenv(key, sessionEnv[key])
+		// Some SSH servers never reply to env requests. Send them without
+		// requiring a reply so optional locale/profile env cannot stall login.
+		sendSessionEnv(session, key, sessionEnv[key])
 	}
 
 	if err := session.RequestPty(termType, rows, cols, modes); err != nil {
@@ -242,6 +241,16 @@ func (c *Client) connectInternal(
 	}
 
 	return nil
+}
+
+func sendSessionEnv(session *ssh.Session, name, value string) {
+	_, _ = session.SendRequest("env", false, ssh.Marshal(struct {
+		Name  string
+		Value string
+	}{
+		Name:  name,
+		Value: value,
+	}))
 }
 
 // Write sends data to the SSH session's stdin.

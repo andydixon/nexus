@@ -189,6 +189,43 @@ func TestHostKeyCallbackStrictRejectsUnknownHost(t *testing.T) {
 	}
 }
 
+func TestHandleHostKeyResponseRoutesByRequestID(t *testing.T) {
+	mgr := NewManager(nil, nil, nil, nil, nil)
+	ch := make(chan bool, 1)
+	mgr.hostKeyChans = map[string]chan bool{"request-1": ch}
+
+	mgr.handleHostKeyResponse(map[string]interface{}{
+		"requestID": "request-1",
+		"accepted":  true,
+	})
+
+	select {
+	case accepted := <-ch:
+		if !accepted {
+			t.Fatal("accepted = false, want true")
+		}
+	default:
+		t.Fatal("expected host key response to be routed")
+	}
+}
+
+func TestHandleHostKeyResponseIgnoresOtherRequestIDs(t *testing.T) {
+	mgr := NewManager(nil, nil, nil, nil, nil)
+	ch := make(chan bool, 1)
+	mgr.hostKeyChans = map[string]chan bool{"request-1": ch}
+
+	mgr.handleHostKeyResponse(map[string]interface{}{
+		"requestID": "request-2",
+		"accepted":  true,
+	})
+
+	select {
+	case <-ch:
+		t.Fatal("unexpected host key response routed")
+	default:
+	}
+}
+
 func testPublicKey(t *testing.T) ssh.PublicKey {
 	t.Helper()
 	pub, _, err := ed25519.GenerateKey(rand.Reader)
