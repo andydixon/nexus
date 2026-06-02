@@ -7,6 +7,20 @@
 
   /* global Terminal, FitAddon, SearchAddon, WebLinksAddon, Unicode11Addon */
 
+  /**
+   * Encode a string as UTF-8 bytes then base64-encode them.
+   * Unlike bare btoa(), this handles characters above U+007F correctly
+   * (e.g. degree symbol °, emoji) and won't throw InvalidCharacterError.
+   */
+  function utf8ToBase64(str) {
+    const bytes = new TextEncoder().encode(str);
+    let binary = '';
+    for (let i = 0; i < bytes.length; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary);
+  }
+
   class TerminalManager {
     /**
      * @param {App} app
@@ -119,25 +133,33 @@
       // scrollback content in alternate mode).
       const viewportEl = container.querySelector(".xterm-viewport");
       if (viewportEl) {
-        viewportEl.addEventListener("wheel", (e) => {
-          if (term.buffer.active !== term.buffer.alternate) return;
-          // Only intercept when mouse tracking is NOT active (if mouse mode
-          // is on, xterm.js already forwards events correctly).
-          if (term.modes && term.modes.mouseTrackingMode &&
-              term.modes.mouseTrackingMode !== "none") return;
+        viewportEl.addEventListener(
+          "wheel",
+          (e) => {
+            if (term.buffer.active !== term.buffer.alternate) return;
+            // Only intercept when mouse tracking is NOT active (if mouse mode
+            // is on, xterm.js already forwards events correctly).
+            if (
+              term.modes &&
+              term.modes.mouseTrackingMode &&
+              term.modes.mouseTrackingMode !== "none"
+            )
+              return;
 
-          e.preventDefault();
-          e.stopPropagation();
-          const lines = Math.max(1, Math.round(Math.abs(e.deltaY) / 40));
-          const seq = e.deltaY < 0 ? "\x1b[A" : "\x1b[B";
-          const data = seq.repeat(lines);
-          const b64 = btoa(data);
-          try {
-            window.go.api.Service.WriteSession(sessionId, b64);
-          } catch (_) {
-            /* non-critical */
-          }
-        }, { passive: false });
+            e.preventDefault();
+            e.stopPropagation();
+            const lines = Math.max(1, Math.round(Math.abs(e.deltaY) / 40));
+            const seq = e.deltaY < 0 ? "\x1b[A" : "\x1b[B";
+            const data = seq.repeat(lines);
+            const b64 = utf8ToBase64(data);
+            try {
+              window.go.api.Service.WriteSession(sessionId, b64);
+            } catch (_) {
+              /* non-critical */
+            }
+          },
+          { passive: false },
+        );
       }
 
       // Drag-and-drop file handling
@@ -177,7 +199,7 @@
       // Forward user keystrokes to the backend
       term.onData((data) => {
         try {
-          const b64 = btoa(data);
+          const b64 = utf8ToBase64(data);
           window.go.api.Service.WriteSession(sessionId, b64);
 
           // Broadcast to other connected sessions if enabled

@@ -236,7 +236,11 @@ class RawViewer {
         }
 
         try {
-            const b64 = btoa(dataToSend);
+            // For hex/escaped, data is already raw bytes (0-255) so btoa is correct.
+            // For text mode, UTF-8 encode so non-ASCII characters are transmitted properly.
+            const b64 = (format === 'hex' || format === 'escaped')
+                ? btoa(dataToSend)
+                : window.NexusTerminal.utf8ToBase64(dataToSend);
             await window.go.api.Service.WriteSession(sessionId, b64);
             input.value = '';
 

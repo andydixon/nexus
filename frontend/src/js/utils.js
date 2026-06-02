@@ -164,6 +164,21 @@
   }
 
   /**
+   * UTF-8-encodes a string and then base64-encodes the bytes.
+   * Unlike bare btoa(), this handles characters above U+007F correctly.
+   * @param {string} str
+   * @returns {string}
+   */
+  function utf8ToBase64(str) {
+    const bytes = new TextEncoder().encode(str);
+    let binary = '';
+    for (let i = 0; i < bytes.length; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary);
+  }
+
+  /**
    * Base64-decodes a string.
    * @param {string} str
    * @returns {string}
@@ -295,6 +310,7 @@
     debounce,
     fuzzyMatch,
     base64Encode,
+    utf8ToBase64,
     base64Decode,
     generateId,
     formatBytes,

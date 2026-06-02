@@ -91,7 +91,7 @@
     /** @private */
     _sendCommand(sessionId, command) {
       try {
-        const b64 = btoa(command + "\n");
+        const b64 = window.NexusTerminal.utf8ToBase64(command + "\n");
         window.go.api.Service.WriteSession(sessionId, b64);
         this.app.notifications.info("Snippet sent");
       } catch (err) {
