@@ -171,7 +171,7 @@
    */
   function utf8ToBase64(str) {
     const bytes = new TextEncoder().encode(str);
-    let binary = '';
+    let binary = "";
     for (let i = 0; i < bytes.length; i++) {
       binary += String.fromCharCode(bytes[i]);
     }
