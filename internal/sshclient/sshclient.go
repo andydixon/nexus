@@ -596,12 +596,7 @@ func (c *Client) connectViaJumpHosts(sc models.SSHConfig, finalConfig *ssh.Clien
 			jumpAuth = append(jumpAuth, ssh.PublicKeys(signer))
 		}
 
-		jumpConfig := &ssh.ClientConfig{
-			User:            jump.Username,
-			Auth:            jumpAuth,
-			HostKeyCallback: ssh.InsecureIgnoreHostKey(),
-			Timeout:         finalConfig.Timeout,
-		}
+		jumpConfig := jumpHostClientConfig(jump, jumpAuth, finalConfig)
 
 		if currentClient == nil {
 			client, err := ssh.Dial("tcp", jumpAddr, jumpConfig)
@@ -646,6 +641,15 @@ func (c *Client) connectViaJumpHosts(sc models.SSHConfig, finalConfig *ssh.Clien
 	}
 
 	return ssh.NewClient(ncc, chans, reqs), nil
+}
+
+func jumpHostClientConfig(jump models.JumpHost, auth []ssh.AuthMethod, finalConfig *ssh.ClientConfig) *ssh.ClientConfig {
+	return &ssh.ClientConfig{
+		User:            jump.Username,
+		Auth:            auth,
+		HostKeyCallback: finalConfig.HostKeyCallback,
+		Timeout:         finalConfig.Timeout,
+	}
 }
 
 // parsePrivateKey loads and parses an SSH private key file. If the key is

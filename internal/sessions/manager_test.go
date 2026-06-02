@@ -1,9 +1,14 @@
 package sessions
 
 import (
+	"crypto/ed25519"
+	"crypto/rand"
+	"path/filepath"
 	"testing"
 
 	"github.com/andydixon/nexus/internal/models"
+	"github.com/andydixon/nexus/internal/storage"
+	"golang.org/x/crypto/ssh"
 )
 
 // ---------------------------------------------------------------------------
@@ -147,4 +152,62 @@ func TestCloseAllEmpty(t *testing.T) {
 	if len(mgr.ListSessions()) != 0 {
 		t.Error("expected 0 sessions after CloseAll")
 	}
+}
+
+func TestHostKeyCallbackAcceptNewStoresHost(t *testing.T) {
+	store := newSessionTestStore(t)
+	mgr := NewManager(store, nil, nil, nil, nil)
+	callback := mgr.hostKeyCallback("session-1", models.HostKeyAcceptNew)
+
+	key := testPublicKey(t)
+	if err := callback("jump.example:2222", nil, key); err != nil {
+		t.Fatalf("HostKeyCallback() error = %v", err)
+	}
+
+	saved, err := store.GetKnownHost("jump.example", 2222)
+	if err != nil {
+		t.Fatalf("GetKnownHost() error = %v", err)
+	}
+	if saved == nil {
+		t.Fatal("expected host key to be saved")
+	}
+	if saved.Host != "jump.example" {
+		t.Fatalf("saved host = %q, want jump.example", saved.Host)
+	}
+	if saved.Port != 2222 {
+		t.Fatalf("saved port = %d, want 2222", saved.Port)
+	}
+}
+
+func TestHostKeyCallbackStrictRejectsUnknownHost(t *testing.T) {
+	mgr := NewManager(newSessionTestStore(t), nil, nil, nil, nil)
+	callback := mgr.hostKeyCallback("session-1", models.HostKeyStrict)
+
+	err := callback("unknown.example:22", nil, testPublicKey(t))
+	if err == nil {
+		t.Fatal("expected strict policy to reject unknown host")
+	}
+}
+
+func testPublicKey(t *testing.T) ssh.PublicKey {
+	t.Helper()
+	pub, _, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatalf("GenerateKey() error = %v", err)
+	}
+	key, err := ssh.NewPublicKey(pub)
+	if err != nil {
+		t.Fatalf("NewPublicKey() error = %v", err)
+	}
+	return key
+}
+
+func newSessionTestStore(t *testing.T) *storage.Store {
+	t.Helper()
+	store, err := storage.NewStore(filepath.Join(t.TempDir(), "test.db"))
+	if err != nil {
+		t.Fatalf("NewStore() error = %v", err)
+	}
+	t.Cleanup(func() { store.Close() })
+	return store
 }

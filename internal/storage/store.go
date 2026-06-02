@@ -346,12 +346,14 @@ func (s *Store) UpdateLastConnected(id string) error {
 }
 
 // ExportProfiles serialises all profiles as JSON. If includeSecrets is false
-// the export omits credential-related fields (currently a placeholder — all
-// secrets live in the SecretStore, not in profiles).
+// the export omits inline credential-related fields.
 func (s *Store) ExportProfiles(includeSecrets bool) ([]byte, error) {
 	profiles, err := s.ListProfiles()
 	if err != nil {
 		return nil, fmt.Errorf("storage: export failed: %w", err)
+	}
+	if !includeSecrets {
+		profiles = redactProfileSecrets(profiles)
 	}
 	return json.MarshalIndent(profiles, "", "  ")
 }
@@ -567,11 +569,11 @@ func (s *Store) SavePreferences(prefs *models.AppPreferences) error {
 func scanProfile(row *sql.Row) (*models.Profile, error) {
 	p := &models.Profile{}
 	var (
-		protocol, tagsJSON                              string
+		protocol, tagsJSON                                string
 		sshJSON, telnetJSON, rawJSON, githubJSON, vncJSON sql.NullString
-		lastConn                                        sql.NullString
-		favourite                                       int
-		createdAt, updatedAt                            string
+		lastConn                                          sql.NullString
+		favourite                                         int
+		createdAt, updatedAt                              string
 	)
 
 	err := row.Scan(
@@ -634,11 +636,11 @@ func scanProfiles(rows *sql.Rows) ([]*models.Profile, error) {
 	for rows.Next() {
 		p := &models.Profile{}
 		var (
-			protocol, tagsJSON                              string
+			protocol, tagsJSON                                string
 			sshJSON, telnetJSON, rawJSON, githubJSON, vncJSON sql.NullString
-			lastConn                                        sql.NullString
-			favourite                                       int
-			createdAt, updatedAt                            string
+			lastConn                                          sql.NullString
+			favourite                                         int
+			createdAt, updatedAt                              string
 		)
 
 		err := rows.Scan(
@@ -718,6 +720,21 @@ func nullableJSON(ptr interface{}, data []byte) interface{} {
 		return nil
 	}
 	return string(data)
+}
+
+func redactProfileSecrets(profiles []*models.Profile) []*models.Profile {
+	redacted := make([]*models.Profile, len(profiles))
+	for i, profile := range profiles {
+		cp := *profile
+		if cp.SSH != nil {
+			sshCfg := *cp.SSH
+			sshCfg.ProxyPassword = ""
+			sshCfg.TOTPSecret = ""
+			cp.SSH = &sshCfg
+		}
+		redacted[i] = &cp
+	}
+	return redacted
 }
 
 // ---------------------------------------------------------------------------

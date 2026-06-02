@@ -332,11 +332,13 @@
             payload.fingerprint,
           );
           window.runtime.EventsEmit("session:hostkey:response", {
+            requestID: payload.requestID,
             sessionID: payload.sessionID,
             accepted,
           });
         } catch (_) {
           window.runtime.EventsEmit("session:hostkey:response", {
+            requestID: payload.requestID,
             sessionID: payload.sessionID,
             accepted: false,
           });

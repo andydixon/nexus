@@ -4,6 +4,8 @@ package vncclient
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"net"
 	"net/http"
@@ -17,14 +19,14 @@ import (
 
 // Client manages a VNC session, optionally tunnelled through SSH.
 type Client struct {
-	mu         sync.Mutex
-	ctx        context.Context
-	cancel     context.CancelFunc
-	listener   net.Listener
-	sshClient  *ssh.Client
-	wsURL      string
-	connected  bool
-	onError    func(error)
+	mu        sync.Mutex
+	ctx       context.Context
+	cancel    context.CancelFunc
+	listener  net.Listener
+	sshClient *ssh.Client
+	wsURL     string
+	connected bool
+	onError   func(error)
 }
 
 // Config holds the configuration for a VNC connection.
@@ -34,16 +36,17 @@ type Config struct {
 	VNCPort int
 
 	// SSH tunnel settings
-	SSHTunnel     bool
-	SSHHost       string
-	SSHPort       int
-	SSHUsername   string
-	SSHAuthMethod string // "password", "publickey"
-	SSHPassword   string
-	SSHPrivateKey []byte
-	SSHPassphrase string
-	SSHAgentAuth  bool
-	SSHAgentConn  net.Conn
+	SSHTunnel          bool
+	SSHHost            string
+	SSHPort            int
+	SSHUsername        string
+	SSHAuthMethod      string // "password", "publickey"
+	SSHPassword        string
+	SSHPrivateKey      []byte
+	SSHPassphrase      string
+	SSHAgentAuth       bool
+	SSHAgentConn       net.Conn
+	SSHHostKeyCallback ssh.HostKeyCallback
 
 	// Callbacks
 	OnError func(error)
@@ -83,9 +86,12 @@ func (c *Client) Connect(cfg Config) (string, error) {
 	if cfg.SSHTunnel {
 		// Establish SSH connection first
 		sshAddr := fmt.Sprintf("%s:%d", cfg.SSHHost, cfg.SSHPort)
+		if cfg.SSHHostKeyCallback == nil {
+			return "", fmt.Errorf("SSH host key callback is required")
+		}
 		sshConfig := &ssh.ClientConfig{
 			User:            cfg.SSHUsername,
-			HostKeyCallback: ssh.InsecureIgnoreHostKey(), // TODO: use known hosts
+			HostKeyCallback: cfg.SSHHostKeyCallback,
 			Timeout:         15 * time.Second,
 		}
 
@@ -162,13 +168,19 @@ func (c *Client) startProxy(vncConn net.Conn) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	token, err := newProxyToken()
+	if err != nil {
+		listener.Close()
+		return "", err
+	}
 	c.listener = listener
 
 	port := listener.Addr().(*net.TCPAddr).Port
-	wsURL := fmt.Sprintf("ws://127.0.0.1:%d", port)
+	proxyPath := "/" + token
+	wsURL := fmt.Sprintf("ws://127.0.0.1:%d%s", port, proxyPath)
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc(proxyPath, func(w http.ResponseWriter, r *http.Request) {
 		ws, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
 			return
@@ -238,6 +250,14 @@ func (c *Client) startProxy(vncConn net.Conn) (string, error) {
 	}()
 
 	return wsURL, nil
+}
+
+func newProxyToken() (string, error) {
+	token := make([]byte, 16)
+	if _, err := rand.Read(token); err != nil {
+		return "", fmt.Errorf("generate proxy token: %w", err)
+	}
+	return hex.EncodeToString(token), nil
 }
 
 // Close shuts down the VNC proxy and any SSH tunnel.

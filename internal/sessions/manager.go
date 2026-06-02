@@ -15,6 +15,7 @@ import (
 
 	"github.com/google/uuid"
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
+	"golang.org/x/crypto/ssh"
 
 	"github.com/andydixon/nexus/internal/audit"
 	"github.com/andydixon/nexus/internal/githubclient"
@@ -653,7 +654,7 @@ func (m *Manager) connectSSH(sess *Session, getSecret func(prompt string) (strin
 		}
 	}
 
-	if err := client.Connect(getPassword, getPassphrase); err != nil {
+	if err := client.ConnectWithHostKeyCallback(m.hostKeyCallback(sess.Info.ID, sshConf.HostKeyPolicy), getPassword, getPassphrase); err != nil {
 		return err
 	}
 
@@ -1012,6 +1013,7 @@ func (m *Manager) connectVNC(sess *Session, getSecret func(prompt string) (strin
 		cfg.SSHUsername = vncConf.SSHUsername
 		cfg.SSHAuthMethod = vncConf.SSHAuthMethod
 		cfg.SSHAgentAuth = vncConf.SSHAgentAuth
+		cfg.SSHHostKeyCallback = m.hostKeyCallback(sess.Info.ID, models.HostKeyAsk)
 
 		// Resolve SSH credentials
 		switch vncConf.SSHAuthMethod {
@@ -1445,6 +1447,60 @@ func (m *Manager) PingSession(sessionID string) (int64, error) {
 // Internal: helpers
 // ---------------------------------------------------------------------------
 
+func (m *Manager) hostKeyCallback(sessionID string, policy models.HostKeyPolicy) ssh.HostKeyCallback {
+	if policy == "" {
+		policy = models.HostKeyAsk
+	}
+	verifier := sshclient.NewHostKeyVerifier(m.store, policy)
+	verifier.SetPromptHandler(func(host string, keyType string, fingerprint string) (bool, error) {
+		return m.promptHostKey(sessionID, host, keyType, fingerprint)
+	})
+	return verifier.HostKeyCallback()
+}
+
+func (m *Manager) promptHostKey(sessionID string, host string, keyType string, fingerprint string) (bool, error) {
+	if m.ctx == nil {
+		return false, fmt.Errorf("host key prompt unavailable")
+	}
+
+	requestID := uuid.New().String()
+	ch := make(chan bool, 1)
+	cancel := wailsRuntime.EventsOn(m.ctx, "session:hostkey:response", func(optionalData ...interface{}) {
+		if len(optionalData) == 0 {
+			return
+		}
+		data, ok := optionalData[0].(map[string]interface{})
+		if !ok {
+			return
+		}
+		rid, _ := data["requestID"].(string)
+		if rid != requestID {
+			return
+		}
+		accepted, _ := data["accepted"].(bool)
+		select {
+		case ch <- accepted:
+		default:
+		}
+	})
+	defer cancel()
+
+	m.emitEvent("session:hostkey:verify", map[string]interface{}{
+		"requestID":   requestID,
+		"sessionID":   sessionID,
+		"host":        host,
+		"keyType":     keyType,
+		"fingerprint": fingerprint,
+	})
+
+	select {
+	case accepted := <-ch:
+		return accepted, nil
+	case <-time.After(5 * time.Minute):
+		return false, fmt.Errorf("host key prompt timed out")
+	}
+}
+
 // buildSecretCallback returns a func() (string, error) that resolves a
 // credential according to the profile's SecretMode:
 //   - "saved": check keychain/vault first, prompt if missing, then persist
@@ -1806,11 +1862,11 @@ func (m *Manager) scheduleReconnect(sess *Session, sessionID string) {
 	}
 
 	m.emitEvent("session:state", map[string]interface{}{
-		"sessionID": sessionID,
-		"state":     string(models.SessionReconnecting),
-		"attempt":   attempt,
+		"sessionID":  sessionID,
+		"state":      string(models.SessionReconnecting),
+		"attempt":    attempt,
 		"maxRetries": maxTries,
-		"delaySec":  delaySec,
+		"delaySec":   delaySec,
 	})
 
 	go func() {

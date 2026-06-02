@@ -680,6 +680,9 @@ func (s *Service) ExportProfiles(includeSecrets bool) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to list profiles for export: %w", err)
 	}
+	if !includeSecrets {
+		profiles = redactProfileSecrets(profiles)
+	}
 
 	data, err := json.MarshalIndent(profiles, "", "  ")
 	if err != nil {
@@ -1604,28 +1607,17 @@ func (s *Service) ListSSHKeyPairs() ([]SSHKeyInfo, error) {
 
 // GenerateSSHKey generates a new SSH key pair.
 func (s *Service) GenerateSSHKey(name string, keyType string, bits int, passphrase string) error {
-	if name == "" {
-		return fmt.Errorf("key name is required")
-	}
-	// Sanitise name — only allow alphanumeric, hyphens, underscores
-	for _, ch := range name {
-		if !((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == '-' || ch == '_') {
-			return fmt.Errorf("key name contains invalid characters (use alphanumeric, hyphens, underscores)")
-		}
-	}
-
-	home, err := os.UserHomeDir()
+	keyPath, _, err := sshKeyPairPaths(name)
 	if err != nil {
-		return fmt.Errorf("unable to determine home directory: %w", err)
+		return err
 	}
-	sshDir := filepath.Join(home, ".ssh")
+	sshDir := filepath.Dir(keyPath)
 
 	// Ensure .ssh directory exists
 	if err := os.MkdirAll(sshDir, 0700); err != nil {
 		return fmt.Errorf("unable to create .ssh directory: %w", err)
 	}
 
-	keyPath := filepath.Join(sshDir, name)
 	// Check if key already exists
 	if _, err := os.Stat(keyPath); err == nil {
 		return fmt.Errorf("key %q already exists", name)
@@ -1659,11 +1651,10 @@ func (s *Service) GenerateSSHKey(name string, keyType string, bits int, passphra
 
 // GetSSHPublicKey returns the content of a public key file.
 func (s *Service) GetSSHPublicKey(name string) (string, error) {
-	home, err := os.UserHomeDir()
+	_, pubPath, err := sshKeyPairPaths(name)
 	if err != nil {
-		return "", fmt.Errorf("unable to determine home directory: %w", err)
+		return "", err
 	}
-	pubPath := filepath.Join(home, ".ssh", name+".pub")
 	data, err := os.ReadFile(pubPath)
 	if err != nil {
 		return "", fmt.Errorf("unable to read public key: %w", err)
@@ -1673,22 +1664,9 @@ func (s *Service) GetSSHPublicKey(name string) (string, error) {
 
 // DeleteSSHKey removes an SSH key pair.
 func (s *Service) DeleteSSHKey(name string) error {
-	if name == "" {
-		return fmt.Errorf("key name is required")
-	}
-	home, err := os.UserHomeDir()
+	privPath, pubPath, err := sshKeyPairPaths(name)
 	if err != nil {
-		return fmt.Errorf("unable to determine home directory: %w", err)
-	}
-	sshDir := filepath.Join(home, ".ssh")
-	privPath := filepath.Join(sshDir, name)
-	pubPath := privPath + ".pub"
-
-	// Verify paths are within .ssh directory (prevent directory traversal)
-	absPriv, _ := filepath.Abs(privPath)
-	absSsh, _ := filepath.Abs(sshDir)
-	if !strings.HasPrefix(absPriv, absSsh+string(os.PathSeparator)) {
-		return fmt.Errorf("invalid key name")
+		return err
 	}
 
 	var errs []string
@@ -1702,4 +1680,47 @@ func (s *Service) DeleteSSHKey(name string) error {
 		return fmt.Errorf("failed to delete: %s", strings.Join(errs, "; "))
 	}
 	return nil
+}
+
+func sshKeyPairPaths(name string) (string, string, error) {
+	keyName, err := validateSSHKeyName(name)
+	if err != nil {
+		return "", "", err
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", "", fmt.Errorf("unable to determine home directory: %w", err)
+	}
+	sshDir := filepath.Join(home, ".ssh")
+	privPath := filepath.Join(sshDir, keyName)
+	pubPath := privPath + ".pub"
+	return privPath, pubPath, nil
+}
+
+func validateSSHKeyName(name string) (string, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return "", fmt.Errorf("key name is required")
+	}
+	for _, ch := range name {
+		if !((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == '-' || ch == '_') {
+			return "", fmt.Errorf("key name contains invalid characters (use alphanumeric, hyphens, underscores)")
+		}
+	}
+	return name, nil
+}
+
+func redactProfileSecrets(profiles []*models.Profile) []*models.Profile {
+	redacted := make([]*models.Profile, len(profiles))
+	for i, profile := range profiles {
+		cp := *profile
+		if cp.SSH != nil {
+			sshCfg := *cp.SSH
+			sshCfg.ProxyPassword = ""
+			sshCfg.TOTPSecret = ""
+			cp.SSH = &sshCfg
+		}
+		redacted[i] = &cp
+	}
+	return redacted
 }

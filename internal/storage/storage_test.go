@@ -3,6 +3,7 @@ package storage
 import (
 	"encoding/json"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -452,6 +453,32 @@ func TestExportProfiles(t *testing.T) {
 	}
 	if len(profiles) != 2 {
 		t.Errorf("expected 2 exported profiles, got %d", len(profiles))
+	}
+}
+
+func TestExportProfilesRedactsInlineSSHSecrets(t *testing.T) {
+	store := setupTestStore(t)
+	profile := makeSSHProfile("Export Secret", "secret.example.com")
+	profile.SSH.ProxyPassword = "proxy-secret"
+	profile.SSH.TOTPSecret = "totp-secret"
+	if err := store.CreateProfile(profile); err != nil {
+		t.Fatalf("CreateProfile() error = %v", err)
+	}
+
+	data, err := store.ExportProfiles(false)
+	if err != nil {
+		t.Fatalf("ExportProfiles(false) error = %v", err)
+	}
+	if strings.Contains(string(data), "proxy-secret") || strings.Contains(string(data), "totp-secret") {
+		t.Fatalf("ExportProfiles(false) leaked inline SSH secrets: %s", string(data))
+	}
+
+	data, err = store.ExportProfiles(true)
+	if err != nil {
+		t.Fatalf("ExportProfiles(true) error = %v", err)
+	}
+	if !strings.Contains(string(data), "proxy-secret") || !strings.Contains(string(data), "totp-secret") {
+		t.Fatalf("ExportProfiles(true) did not include inline SSH secrets: %s", string(data))
 	}
 }
 

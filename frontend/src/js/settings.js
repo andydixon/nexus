@@ -937,11 +937,29 @@
               this.app.setUpdateInfo(info);
             }
             if (info.available) {
-              resultEl.innerHTML =
-                `<span style="color:var(--accent)">Update available: <strong>${info.latestVersion}</strong></span>` +
-                (info.releaseURL
-                  ? ` — <a href="#" onclick="window.runtime.BrowserOpenURL('${info.releaseURL}');return false;" style="color:var(--accent)">View release</a>`
-                  : "");
+              resultEl.textContent = "";
+              const updateText = createElement("span");
+              updateText.style.color = "var(--accent)";
+              updateText.appendChild(document.createTextNode("Update available: "));
+              const versionText = createElement("strong");
+              versionText.textContent = String(info.latestVersion || "");
+              updateText.appendChild(versionText);
+              resultEl.appendChild(updateText);
+              if (info.releaseURL) {
+                resultEl.appendChild(document.createTextNode(" - "));
+                const releaseLink = createElement("a", "", {
+                  href: "#",
+                  textContent: "View release",
+                });
+                releaseLink.style.color = "var(--accent)";
+                releaseLink.addEventListener("click", (e) => {
+                  e.preventDefault();
+                  if (window.runtime && window.runtime.BrowserOpenURL) {
+                    window.runtime.BrowserOpenURL(String(info.releaseURL));
+                  }
+                });
+                resultEl.appendChild(releaseLink);
+              }
             } else {
               resultEl.textContent = "You are running the latest version.";
             }
