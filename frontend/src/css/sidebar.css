@@ -401,6 +401,52 @@
 /* -----------------------------------------------------------------------
    Sidebar empty list placeholder
    ----------------------------------------------------------------------- */
+.sidebar-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--space-6) var(--space-3) 0;
+  padding: var(--space-5) var(--space-3);
+  color: var(--text-tertiary);
+  text-align: center;
+}
+
+.sidebar-empty-icon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--bg-elevated);
+  color: var(--accent);
+  font-size: var(--text-xl);
+  font-weight: var(--weight-semibold);
+  line-height: 1;
+}
+
+.sidebar-empty-title {
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  line-height: var(--leading-tight);
+}
+
+.sidebar-empty-text {
+  max-width: 190px;
+  margin: 0;
+  color: var(--text-tertiary);
+  font-size: var(--text-xs);
+  line-height: var(--leading-normal);
+}
+
+.sidebar-empty-actions {
+  display: flex;
+  justify-content: center;
+  margin-top: var(--space-1);
+}
+
 .sidebar-list-empty {
   padding: var(--space-3) var(--space-2);
   font-size: var(--text-xs);

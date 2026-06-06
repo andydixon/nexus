@@ -117,11 +117,7 @@
 
       // Empty state
       if (profiles.length === 0) {
-        const empty = createElement("div", "sidebar-empty");
-        empty.innerHTML = `
-                <p class="sidebar-empty-text">No profiles found</p>
-            `;
-        this.el.appendChild(empty);
+        this.el.appendChild(this._renderEmptyState());
       }
     }
 
@@ -161,6 +157,53 @@
     }
 
     // ── Rendering helpers ────────────────────────────────────────────
+
+    /**
+     * Renders the sidebar empty state for first-run and no-search-results cases.
+     * @returns {HTMLElement}
+     * @private
+     */
+    _renderEmptyState() {
+      const isSearching = this.searchQuery.length > 0;
+      const empty = createElement("div", "sidebar-empty");
+
+      const icon = createElement("div", "sidebar-empty-icon", {
+        textContent: isSearching ? "⌕" : "+",
+        "aria-hidden": "true",
+      });
+      empty.appendChild(icon);
+
+      empty.appendChild(
+        createElement("div", "sidebar-empty-title", {
+          textContent: isSearching ? "No matching profiles" : "No saved profiles",
+        }),
+      );
+
+      empty.appendChild(
+        createElement("p", "sidebar-empty-text", {
+          textContent: isSearching
+            ? "Try a different name, host, group, or protocol."
+            : "Create a profile for the servers and tools you use often.",
+        }),
+      );
+
+      if (!isSearching) {
+        const actions = createElement("div", "sidebar-empty-actions");
+        const addButton = createElement("button", "btn btn-primary btn-sm", {
+          type: "button",
+          textContent: "New Profile",
+        });
+        addButton.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          this.app.profileEditor.openNew();
+        });
+        actions.appendChild(addButton);
+        empty.appendChild(actions);
+      }
+
+      return empty;
+    }
 
     /**
      * Renders a collapsible section of profiles.

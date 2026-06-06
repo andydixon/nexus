@@ -17,6 +17,106 @@ log()  { echo -e "${GREEN}[nexus]${NC} $1"; }
 warn() { echo -e "${YELLOW}[nexus]${NC} $1"; }
 err()  { echo -e "${RED}[nexus]${NC} $1" >&2; }
 
+MIN_GO_VERSION="1.25.0"
+WAILS_VERSION="$(awk '$1 == "github.com/wailsapp/wails/v2" { print $2; exit }' go.mod)"
+WAILS_BIN=""
+WAILS_USE_GO_RUN=0
+
+if [ -x "$SCRIPT_DIR/.tools/go/bin/go" ]; then
+    export PATH="$SCRIPT_DIR/.tools/go/bin:$PATH"
+fi
+export GOCACHE="${GOCACHE:-$SCRIPT_DIR/.cache/go-build}"
+export GOPATH="${GOPATH:-$SCRIPT_DIR/.cache/go}"
+mkdir -p "$GOCACHE" "$GOPATH"
+
+version_at_least() {
+    local have="${1#go}"
+    local want="$2"
+    local IFS=.
+    local have_parts want_parts
+    read -r -a have_parts <<< "$have"
+    read -r -a want_parts <<< "$want"
+    for i in 0 1 2; do
+        local h="${have_parts[$i]:-0}"
+        local w="${want_parts[$i]:-0}"
+        if (( h > w )); then return 0; fi
+        if (( h < w )); then return 1; fi
+    done
+    return 0
+}
+
+check_go() {
+    command -v go >/dev/null 2>&1 || { err "Go is not installed"; exit 1; }
+
+    local version
+    version="$(go env GOVERSION 2>/dev/null || go version | awk '{print $3}')"
+    if ! version_at_least "$version" "$MIN_GO_VERSION"; then
+        err "Go ${MIN_GO_VERSION}+ is required by go.mod; found ${version} at $(command -v go)"
+        err "Install a newer Go, or place it at .tools/go/bin/go for this project."
+        exit 1
+    fi
+}
+
+resolve_wails() {
+    if WAILS_BIN="$(command -v wails 2>/dev/null)"; then
+        WAILS_USE_GO_RUN=0
+        return
+    fi
+
+    local gopath
+    gopath="$(go env GOPATH 2>/dev/null || true)"
+    if [ -n "$gopath" ] && [ -x "$gopath/bin/wails" ]; then
+        WAILS_BIN="$gopath/bin/wails"
+        WAILS_USE_GO_RUN=0
+        return
+    fi
+
+    if [ -n "$WAILS_VERSION" ]; then
+        WAILS_BIN="github.com/wailsapp/wails/v2/cmd/wails@${WAILS_VERSION}"
+        WAILS_USE_GO_RUN=1
+        warn "Wails CLI not found; using pinned ${WAILS_BIN} via go run"
+        return
+    fi
+
+    err "Wails is not installed and no Wails version was found in go.mod"
+    exit 1
+}
+
+wails_cmd() {
+    if [ "$WAILS_USE_GO_RUN" -eq 1 ]; then
+        go run "$WAILS_BIN" "$@"
+    else
+        "$WAILS_BIN" "$@"
+    fi
+}
+
+check_linux_deps() {
+    if [ "$(uname -s)" != "Linux" ]; then
+        return
+    fi
+
+    command -v pkg-config >/dev/null 2>&1 || {
+        err "pkg-config is required for Linux Wails builds."
+        err "On Ubuntu/Pop!_OS install: sudo apt-get install -y build-essential pkg-config libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev"
+        exit 1
+    }
+
+    local missing=()
+    pkg-config --exists gtk+-3.0 || missing+=("gtk+-3.0")
+    if ! pkg-config --exists webkit2gtk-4.1 && ! pkg-config --exists webkit2gtk-4.0; then
+        missing+=("webkit2gtk-4.1 or webkit2gtk-4.0")
+    fi
+    if ! pkg-config --exists ayatana-appindicator3-0.1 && ! pkg-config --exists appindicator3-0.1; then
+        missing+=("ayatana-appindicator3-0.1 or appindicator3-0.1")
+    fi
+
+    if [ "${#missing[@]}" -gt 0 ]; then
+        err "Missing Linux build dependencies: ${missing[*]}"
+        err "On Ubuntu/Pop!_OS install: sudo apt-get install -y build-essential pkg-config libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev"
+        exit 1
+    fi
+}
+
 build_tags() {
     if command -v pkg-config >/dev/null 2>&1 \
         && pkg-config --exists webkit2gtk-4.1 \
@@ -44,23 +144,16 @@ build_ldflags() {
 
 # Check prerequisites
 check_deps() {
-    command -v go >/dev/null 2>&1 || { err "Go is not installed"; exit 1; }
+    check_go
     command -v node >/dev/null 2>&1 || { err "Node.js is not installed"; exit 1; }
     command -v npm >/dev/null 2>&1 || { err "npm is not installed"; exit 1; }
-
-    if ! command -v wails >/dev/null 2>&1; then
-        if [ -f "$HOME/go/bin/wails" ]; then
-            export PATH="$PATH:$HOME/go/bin"
-        else
-            err "Wails is not installed. Run: go install github.com/wailsapp/wails/v2/cmd/wails@latest"
-            exit 1
-        fi
-    fi
+    check_linux_deps
+    resolve_wails
 
     log "All prerequisites found"
     log "Go:    $(go version)"
     log "Node:  $(node --version)"
-    log "Wails: $(wails version 2>/dev/null | head -1)"
+    log "Wails: $(wails_cmd version 2>/dev/null | head -1)"
 }
 
 # Install dependencies
@@ -69,7 +162,11 @@ install_deps() {
     go mod download
 
     log "Installing frontend dependencies…"
-    cd frontend && npm install && cd ..
+    if [ -f frontend/package-lock.json ]; then
+        (cd frontend && npm ci)
+    else
+        (cd frontend && npm install)
+    fi
 
     log "Dependencies installed"
 }
@@ -79,7 +176,7 @@ dev() {
     check_deps
     install_deps
     log "Starting development mode…"
-    wails dev
+    wails_cmd dev
 }
 
 # Production build
@@ -93,9 +190,9 @@ build() {
     tags="$(build_tags)"
     if [ -n "$tags" ]; then
         log "Using Wails build tags: ${tags}"
-        wails build -tags "$tags" -ldflags "$(build_ldflags "${version}")"
+        wails_cmd build -tags "$tags" -ldflags "$(build_ldflags "${version}")"
     else
-        wails build -ldflags "$(build_ldflags "${version}")"
+        wails_cmd build -ldflags "$(build_ldflags "${version}")"
     fi
 
     # Replace Wails-generated icon with custom app icon on macOS.
@@ -113,6 +210,7 @@ build() {
 
 # Run tests
 run_tests() {
+    check_go
     log "Running tests…"
     go test ./... -v -count=1
 }
@@ -123,8 +221,9 @@ clean() {
     rm -rf build/bin
     rm -rf frontend/node_modules
     rm -rf frontend/src/js/lib
-    rm -rf frontend/src/css/lib
-    go clean -testcache
+    if command -v go >/dev/null 2>&1; then
+        go clean -testcache
+    fi
     log "Clean complete"
 }
 

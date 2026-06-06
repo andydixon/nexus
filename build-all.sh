@@ -16,6 +16,92 @@ log()  { echo -e "${GREEN}[nexus]${NC} $1"; }
 warn() { echo -e "${YELLOW}[nexus]${NC} $1"; }
 err()  { echo -e "${RED}[nexus]${NC} $1" >&2; }
 
+MIN_GO_VERSION="1.25.0"
+WAILS_VERSION="$(awk '$1 == "github.com/wailsapp/wails/v2" { print $2; exit }' go.mod)"
+WAILS_BIN=""
+WAILS_USE_GO_RUN=0
+BUILT_TARGETS=0
+SKIPPED_TARGETS=0
+
+if [ -x "$SCRIPT_DIR/.tools/go/bin/go" ]; then
+    export PATH="$SCRIPT_DIR/.tools/go/bin:$PATH"
+fi
+export GOCACHE="${GOCACHE:-$SCRIPT_DIR/.cache/go-build}"
+export GOPATH="${GOPATH:-$SCRIPT_DIR/.cache/go}"
+mkdir -p "$GOCACHE" "$GOPATH"
+
+version_at_least() {
+    local have="${1#go}"
+    local want="$2"
+    local IFS=.
+    local have_parts want_parts
+    read -r -a have_parts <<< "$have"
+    read -r -a want_parts <<< "$want"
+    for i in 0 1 2; do
+        local h="${have_parts[$i]:-0}"
+        local w="${want_parts[$i]:-0}"
+        if (( h > w )); then return 0; fi
+        if (( h < w )); then return 1; fi
+    done
+    return 0
+}
+
+check_go() {
+    command -v go >/dev/null 2>&1 || { err "Go is not installed"; exit 1; }
+
+    local version
+    version="$(go env GOVERSION 2>/dev/null || go version | awk '{print $3}')"
+    if ! version_at_least "$version" "$MIN_GO_VERSION"; then
+        err "Go ${MIN_GO_VERSION}+ is required by go.mod; found ${version} at $(command -v go)"
+        err "Install a newer Go, or place it at .tools/go/bin/go for this project."
+        exit 1
+    fi
+}
+
+resolve_wails() {
+    if WAILS_BIN="$(command -v wails 2>/dev/null)"; then
+        WAILS_USE_GO_RUN=0
+        return
+    fi
+
+    local gopath
+    gopath="$(go env GOPATH 2>/dev/null || true)"
+    if [ -n "$gopath" ] && [ -x "$gopath/bin/wails" ]; then
+        WAILS_BIN="$gopath/bin/wails"
+        WAILS_USE_GO_RUN=0
+        return
+    fi
+
+    if [ -n "$WAILS_VERSION" ]; then
+        WAILS_BIN="github.com/wailsapp/wails/v2/cmd/wails@${WAILS_VERSION}"
+        WAILS_USE_GO_RUN=1
+        warn "Wails CLI not found; using pinned ${WAILS_BIN} via go run"
+        return
+    fi
+
+    err "Wails is not installed and no Wails version was found in go.mod"
+    exit 1
+}
+
+wails_cmd() {
+    if [ "$WAILS_USE_GO_RUN" -eq 1 ]; then
+        go run "$WAILS_BIN" "$@"
+    else
+        "$WAILS_BIN" "$@"
+    fi
+}
+
+linux_deps_ok() {
+    command -v pkg-config >/dev/null 2>&1 || return 1
+    pkg-config --exists gtk+-3.0 || return 1
+    if ! pkg-config --exists webkit2gtk-4.1 && ! pkg-config --exists webkit2gtk-4.0; then
+        return 1
+    fi
+    if ! pkg-config --exists ayatana-appindicator3-0.1 && ! pkg-config --exists appindicator3-0.1; then
+        return 1
+    fi
+}
+
 build_tags() {
     if command -v pkg-config >/dev/null 2>&1 \
         && pkg-config --exists webkit2gtk-4.1 \
@@ -42,22 +128,14 @@ build_ldflags() {
 }
 
 check_deps() {
-    command -v go >/dev/null 2>&1 || { err "Go is not installed"; exit 1; }
+    check_go
     command -v node >/dev/null 2>&1 || { err "Node.js is not installed"; exit 1; }
     command -v npm >/dev/null 2>&1 || { err "npm is not installed"; exit 1; }
-
-    if ! command -v wails >/dev/null 2>&1; then
-        if [ -f "$HOME/go/bin/wails" ]; then
-            export PATH="$PATH:$HOME/go/bin"
-        else
-            err "Wails is not installed. Run: go install github.com/wailsapp/wails/v2/cmd/wails@latest"
-            exit 1
-        fi
-    fi
+    resolve_wails
 
     log "Go:    $(go version)"
     log "Node:  $(node --version)"
-    log "Wails: $(wails version 2>/dev/null | head -1)"
+    log "Wails: $(wails_cmd version 2>/dev/null | head -1)"
 }
 
 install_deps() {
@@ -65,13 +143,25 @@ install_deps() {
     go mod download
 
     log "Installing frontend dependencies…"
-    cd frontend && npm install && cd ..
+    if [ -f frontend/package-lock.json ]; then
+        (cd frontend && npm ci)
+    else
+        (cd frontend && npm install)
+    fi
 }
 
 host_os() {
     case "$(uname -s)" in
         Darwin) echo "darwin" ;;
         Linux) echo "linux" ;;
+        *) echo "unknown" ;;
+    esac
+}
+
+host_arch() {
+    case "$(uname -m)" in
+        x86_64|amd64) echo "amd64" ;;
+        arm64|aarch64) echo "arm64" ;;
         *) echo "unknown" ;;
     esac
 }
@@ -105,7 +195,8 @@ build_target() {
     local target_os="$1"
     local target_arch="$2"
     local host="$3"
-    local version="$4"
+    local host_arch_value="$4"
+    local version="$5"
     local ldflags
     ldflags="$(build_ldflags "${version}")"
     local tags
@@ -114,10 +205,17 @@ build_target() {
     local platform="${target_os}/${target_arch}"
     local cc=""
 
-    if [ "$target_os" != "$host" ]; then
+    if [ "$target_os" = "linux" ] && ! linux_deps_ok; then
+        warn "Skipping ${platform} (missing Linux GTK/WebKit build dependencies)"
+        ((SKIPPED_TARGETS += 1))
+        return 0
+    fi
+
+    if [ "$target_os" != "$host" ] || [ "$target_arch" != "$host_arch_value" ]; then
         cc="$(pick_cc "$target_os" "$target_arch")"
         if [ -n "$cc" ] && ! command -v "$cc" >/dev/null 2>&1; then
             warn "Skipping ${platform} (missing C compiler: ${cc})"
+            ((SKIPPED_TARGETS += 1))
             return 0
         fi
     fi
@@ -125,17 +223,18 @@ build_target() {
     log "Building ${platform}…"
     if [ -n "$cc" ]; then
         if [ -n "$tags" ]; then
-            CC="$cc" CGO_ENABLED=1 wails build -platform "$platform" -tags "$tags" -ldflags "$ldflags"
+            CC="$cc" CGO_ENABLED=1 wails_cmd build -platform "$platform" -tags "$tags" -ldflags "$ldflags"
         else
-            CC="$cc" CGO_ENABLED=1 wails build -platform "$platform" -ldflags "$ldflags"
+            CC="$cc" CGO_ENABLED=1 wails_cmd build -platform "$platform" -ldflags "$ldflags"
         fi
     else
         if [ -n "$tags" ]; then
-            CGO_ENABLED=1 wails build -platform "$platform" -tags "$tags" -ldflags "$ldflags"
+            CGO_ENABLED=1 wails_cmd build -platform "$platform" -tags "$tags" -ldflags "$ldflags"
         else
-            CGO_ENABLED=1 wails build -platform "$platform" -ldflags "$ldflags"
+            CGO_ENABLED=1 wails_cmd build -platform "$platform" -ldflags "$ldflags"
         fi
     fi
+    ((BUILT_TARGETS += 1))
 }
 
 main() {
@@ -147,24 +246,33 @@ main() {
 
     local host
     host="$(host_os)"
-    if [ "$host" = "unknown" ]; then
-        err "Unsupported host OS for this script. Use macOS or Linux."
+    local arch
+    arch="$(host_arch)"
+    if [ "$host" = "unknown" ] || [ "$arch" = "unknown" ]; then
+        err "Unsupported host platform: $(uname -s)/$(uname -m)"
         exit 1
     fi
 
-    # Build host targets first
-    build_target "$host" "amd64" "$host" "$version"
-    build_target "$host" "arm64" "$host" "$version"
+    build_target "$host" "$arch" "$host" "$arch" "$version"
 
     # Cross-build Linux and Windows targets where toolchains are available
     if [ "$host" = "darwin" ] || [ "$host" = "linux" ]; then
-        build_target "linux" "amd64" "$host" "$version"
-        build_target "linux" "arm64" "$host" "$version"
-        build_target "windows" "amd64" "$host" "$version"
-        build_target "windows" "arm64" "$host" "$version"
+        for target in linux/amd64 linux/arm64 windows/amd64 windows/arm64; do
+            local target_os="${target%%/*}"
+            local target_arch="${target##*/}"
+            if [ "$target_os" = "$host" ] && [ "$target_arch" = "$arch" ]; then
+                continue
+            fi
+            build_target "$target_os" "$target_arch" "$host" "$arch" "$version"
+        done
     fi
 
-    log "Builds complete. Output: build/bin/"
+    if [ "$BUILT_TARGETS" -eq 0 ]; then
+        err "No targets were built; ${SKIPPED_TARGETS} target(s) were skipped because required system toolchains are missing."
+        exit 1
+    fi
+
+    log "Builds complete (${BUILT_TARGETS} built, ${SKIPPED_TARGETS} skipped). Output: build/bin/"
 }
 
 main "$@"
