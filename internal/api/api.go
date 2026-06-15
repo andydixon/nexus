@@ -32,6 +32,7 @@ import (
 	"github.com/andydixon/nexus/internal/sshconfig"
 	"github.com/andydixon/nexus/internal/storage"
 	"github.com/andydixon/nexus/internal/updater"
+	"github.com/andydixon/nexus/internal/validation"
 	"github.com/google/uuid"
 )
 
@@ -40,6 +41,11 @@ var appVersion = "dev"
 
 // appUpdateURL is set at build time via ldflags.
 var appUpdateURL = ""
+
+const (
+	maxProfileImportJSONBytes = 5 * 1024 * 1024
+	maxInlineSFTPUploadBytes  = 25 * 1024 * 1024
+)
 
 // Service is the main API surface exposed to the frontend via Wails bindings.
 type Service struct {
@@ -90,6 +96,7 @@ func (s *Service) CreateProfile(profile models.Profile) (models.Profile, error) 
 	if profile.ID == "" {
 		profile.ID = uuid.New().String()
 	}
+	normaliseProfileForSave(&profile)
 	now := time.Now()
 	profile.CreatedAt = now
 	profile.UpdatedAt = now
@@ -98,6 +105,9 @@ func (s *Service) CreateProfile(profile models.Profile) (models.Profile, error) 
 		profile.Tags = []string{}
 	}
 
+	if err := validation.ValidateProfile(&profile); err != nil {
+		return models.Profile{}, err
+	}
 	if err := s.store.CreateProfile(&profile); err != nil {
 		return models.Profile{}, fmt.Errorf("failed to create profile: %w", err)
 	}
@@ -116,7 +126,11 @@ func (s *Service) GetProfile(id string) (models.Profile, error) {
 
 // UpdateProfile persists changes to an existing profile.
 func (s *Service) UpdateProfile(profile models.Profile) (models.Profile, error) {
+	normaliseProfileForSave(&profile)
 	profile.UpdatedAt = time.Now()
+	if err := validation.ValidateProfile(&profile); err != nil {
+		return models.Profile{}, err
+	}
 	if err := s.store.UpdateProfile(&profile); err != nil {
 		return models.Profile{}, fmt.Errorf("failed to update profile: %w", err)
 	}
@@ -699,9 +713,19 @@ func (s *Service) ExportProfiles(includeSecrets bool) (string, error) {
 //   - "overwrite" replaces existing profiles
 //   - "duplicate" always creates a new profile with a fresh ID
 func (s *Service) ImportProfiles(jsonData string, strategy string) (int, error) {
+	if len(jsonData) > maxProfileImportJSONBytes {
+		return 0, fmt.Errorf("import data is too large (max %d bytes)", maxProfileImportJSONBytes)
+	}
 	var profiles []*models.Profile
 	if err := json.Unmarshal([]byte(jsonData), &profiles); err != nil {
 		return 0, fmt.Errorf("invalid JSON: %w", err)
+	}
+
+	if err := validateImportStrategy(strategy); err != nil {
+		return 0, err
+	}
+	if err := validateImportProfiles(profiles); err != nil {
+		return 0, err
 	}
 
 	imported := 0
@@ -1154,6 +1178,17 @@ func (s *Service) ImportProfilesEncrypted(password string, strategy string) (int
 		return 0, err
 	}
 
+	if err := validateImportStrategy(strategy); err != nil {
+		return 0, err
+	}
+	profilePtrs := make([]*models.Profile, len(profiles))
+	for i := range profiles {
+		profilePtrs[i] = &profiles[i]
+	}
+	if err := validateImportProfiles(profilePtrs); err != nil {
+		return 0, err
+	}
+
 	// Import using the existing strategy logic.
 	imported := 0
 	for _, p := range profiles {
@@ -1302,10 +1337,16 @@ func (s *Service) SFTPUploadData(sessionID string, remoteDir string, fileName st
 	if base64Data == "" {
 		return fmt.Errorf("empty upload payload")
 	}
+	if base64.StdEncoding.DecodedLen(len(base64Data)) > maxInlineSFTPUploadBytes {
+		return fmt.Errorf("upload payload is too large (max %d bytes)", maxInlineSFTPUploadBytes)
+	}
 
 	data, err := base64.StdEncoding.DecodeString(base64Data)
 	if err != nil {
 		return fmt.Errorf("failed to decode upload data: %w", err)
+	}
+	if len(data) > maxInlineSFTPUploadBytes {
+		return fmt.Errorf("upload payload is too large (max %d bytes)", maxInlineSFTPUploadBytes)
 	}
 
 	safeName := filepath.Base(fileName)
@@ -1708,6 +1749,45 @@ func validateSSHKeyName(name string) (string, error) {
 		}
 	}
 	return name, nil
+}
+
+func validateImportStrategy(strategy string) error {
+	switch strategy {
+	case "skip", "overwrite", "duplicate":
+		return nil
+	default:
+		return fmt.Errorf("unknown import strategy %q (expected skip, overwrite, or duplicate)", strategy)
+	}
+}
+
+func validateImportProfiles(profiles []*models.Profile) error {
+	for i, p := range profiles {
+		if p == nil {
+			return fmt.Errorf("profile import entry %d is null", i)
+		}
+		normaliseProfileForSave(p)
+		if err := validation.ValidateProfile(p); err != nil {
+			return fmt.Errorf("profile import entry %d is invalid: %w", i, err)
+		}
+	}
+	return nil
+}
+
+func normaliseProfileForSave(profile *models.Profile) {
+	if profile == nil {
+		return
+	}
+	if profile.Tags == nil {
+		profile.Tags = []string{}
+	}
+	if profile.VNC != nil {
+		if profile.VNC.SecretMode == "prompt" {
+			profile.VNC.SecretMode = models.SecretModeAskEveryTime
+		}
+		if profile.VNC.SSHSecretMode == "prompt" {
+			profile.VNC.SSHSecretMode = models.SecretModeAskEveryTime
+		}
+	}
 }
 
 func redactProfileSecrets(profiles []*models.Profile) []*models.Profile {

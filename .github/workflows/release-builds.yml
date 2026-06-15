@@ -64,10 +64,10 @@ jobs:
                   node-version: "20"
 
             - name: Install Wails
-              run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
+              run: go install github.com/wailsapp/wails/v2/cmd/wails@$(go list -m -f '{{.Version}}' github.com/wailsapp/wails/v2)
 
             - name: Install frontend dependencies
-              run: npm install
+              run: npm ci
               working-directory: frontend
 
             - name: Install Linux build dependencies

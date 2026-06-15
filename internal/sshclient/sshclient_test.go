@@ -9,6 +9,16 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
+func TestConnectRequiresHostKeyCallback(t *testing.T) {
+	profile := models.NewProfile(models.ProtocolSSH)
+	client := NewClient(&profile)
+
+	err := client.Connect(nil, nil)
+	if err == nil {
+		t.Fatal("expected Connect to reject missing host key callback")
+	}
+}
+
 func TestJumpHostClientConfigUsesFinalHostKeyCallback(t *testing.T) {
 	called := false
 	hostKeyCallback := func(hostname string, _ net.Addr, _ ssh.PublicKey) error {

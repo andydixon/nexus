@@ -13,6 +13,7 @@ NC='\033[0m'
 
 DEFAULT_UPDATE_URL="https://dixon.cx/downloads/nexus/manifest-{platform}-{arch}.json"
 DEFAULT_RELEASE_BASE_URL="https://dixon.cx/downloads/nexus"
+WAILS_VERSION="$(awk '$1 == "github.com/wailsapp/wails/v2" { print $2; exit }' go.mod)"
 
 log()  { echo -e "${GREEN}[nexus]${NC} $1"; }
 warn() { echo -e "${YELLOW}[nexus]${NC} $1"; }
@@ -76,8 +77,13 @@ check_deps() {
         if [ -f "$HOME/go/bin/wails" ]; then
             export PATH="$PATH:$HOME/go/bin"
         else
-            err "Wails is not installed. Run: go install github.com/wailsapp/wails/v2/cmd/wails@latest"
-            exit 1
+            if [ -z "$WAILS_VERSION" ]; then
+                err "Wails is not installed and no pinned Wails version was found in go.mod"
+                exit 1
+            fi
+            log "Installing pinned Wails CLI ${WAILS_VERSION}..."
+            go install "github.com/wailsapp/wails/v2/cmd/wails@${WAILS_VERSION}"
+            export PATH="$PATH:$(go env GOPATH)/bin"
         fi
     fi
 }
@@ -87,7 +93,11 @@ install_deps() {
     go mod download
 
     log "Installing frontend dependencies..."
-    cd frontend && npm install && cd ..
+    if [ -f frontend/package-lock.json ]; then
+        (cd frontend && npm ci)
+    else
+        (cd frontend && npm install)
+    fi
 }
 
 build_version() {

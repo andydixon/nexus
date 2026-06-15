@@ -561,9 +561,7 @@ func TestImportDuplicateHandling(t *testing.T) {
 
 func TestImportInvalidStrategy(t *testing.T) {
 	store := setupTestStore(t)
-	// The strategy check is inside the per-profile loop, so we need at least
-	// one profile in the import data for it to trigger.
-	data := []byte(`[{"id":"x","displayName":"X","protocol":"ssh","host":"h","port":22,"tags":[],"createdAt":"2024-01-01T00:00:00Z","updatedAt":"2024-01-01T00:00:00Z"}]`)
+	data := []byte(`[]`)
 	_, err := store.ImportProfiles(data, "badstrategy")
 	if err == nil {
 		t.Error("expected error for invalid import strategy")
@@ -575,6 +573,17 @@ func TestImportInvalidJSON(t *testing.T) {
 	_, err := store.ImportProfiles([]byte("not json"), "skip")
 	if err == nil {
 		t.Error("expected error for invalid JSON import data")
+	}
+}
+
+func TestImportRejectsNullProfileEntry(t *testing.T) {
+	store := setupTestStore(t)
+	_, err := store.ImportProfiles([]byte(`[null]`), "skip")
+	if err == nil {
+		t.Fatal("expected error for null profile entry")
+	}
+	if !strings.Contains(err.Error(), "entry 0 is null") {
+		t.Fatalf("error = %q, want null entry detail", err.Error())
 	}
 }
 

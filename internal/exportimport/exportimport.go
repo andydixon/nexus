@@ -33,6 +33,8 @@ const (
 
 	saltLength  = 32
 	nonceLength = 12 // AES-GCM standard nonce size
+
+	maxEncryptedImportBytes = 10 * 1024 * 1024
 )
 
 // ExportBundle is the cleartext payload that gets encrypted.
@@ -129,6 +131,14 @@ func EncryptAndExport(profiles []models.Profile, password, filePath string) erro
 func DecryptAndImport(filePath, password string) ([]models.Profile, error) {
 	if password == "" {
 		return nil, errors.New("exportimport: password cannot be empty")
+	}
+
+	info, err := os.Stat(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("exportimport: failed to stat file: %w", err)
+	}
+	if info.Size() > maxEncryptedImportBytes {
+		return nil, fmt.Errorf("exportimport: file is too large (max %d bytes)", maxEncryptedImportBytes)
 	}
 
 	data, err := os.ReadFile(filePath)

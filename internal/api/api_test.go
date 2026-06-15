@@ -1,11 +1,14 @@
 package api
 
 import (
+	"encoding/base64"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/andydixon/nexus/internal/audit"
 	"github.com/andydixon/nexus/internal/models"
+	"github.com/andydixon/nexus/internal/storage"
 )
 
 func TestSSHKeyPairPathsAcceptsSafeName(t *testing.T) {
@@ -64,4 +67,58 @@ func TestRedactProfileSecretsClearsInlineSSHSecrets(t *testing.T) {
 	if profile.SSH.ProxyPassword == "" || profile.SSH.TOTPSecret == "" {
 		t.Fatal("redaction mutated the original profile")
 	}
+}
+
+func TestCreateProfileRejectsUnsafeGitHubBaseURL(t *testing.T) {
+	svc := newTestService(t)
+	profile := models.NewProfile(models.ProtocolGitHub)
+	profile.DisplayName = "Unsafe GitHub"
+	profile.GitHub.BaseURL = "http://evil.example/api/v3"
+
+	if _, err := svc.CreateProfile(profile); err == nil {
+		t.Fatal("expected unsafe GitHub base URL to be rejected")
+	}
+}
+
+func TestImportProfilesRejectsNullEntry(t *testing.T) {
+	svc := newTestService(t)
+	_, err := svc.ImportProfiles(`[null]`, "skip")
+	if err == nil {
+		t.Fatal("expected null import entry to be rejected")
+	}
+	if !strings.Contains(err.Error(), "entry 0 is null") {
+		t.Fatalf("error = %q, want null entry detail", err.Error())
+	}
+}
+
+func TestImportProfilesRejectsOversizedJSON(t *testing.T) {
+	svc := newTestService(t)
+	oversized := strings.Repeat(" ", maxProfileImportJSONBytes+1)
+	_, err := svc.ImportProfiles(oversized, "skip")
+	if err == nil {
+		t.Fatal("expected oversized import JSON to be rejected")
+	}
+}
+
+func TestSFTPUploadDataRejectsOversizedPayloadBeforeSessionLookup(t *testing.T) {
+	svc := newTestService(t)
+	payload := base64.StdEncoding.EncodeToString(make([]byte, maxInlineSFTPUploadBytes+1))
+
+	err := svc.SFTPUploadData("missing-session", "/", "large.bin", payload)
+	if err == nil {
+		t.Fatal("expected oversized upload payload to be rejected")
+	}
+	if !strings.Contains(err.Error(), "too large") {
+		t.Fatalf("error = %q, want too large", err.Error())
+	}
+}
+
+func newTestService(t *testing.T) *Service {
+	t.Helper()
+	store, err := storage.NewStore(filepath.Join(t.TempDir(), "test.db"))
+	if err != nil {
+		t.Fatalf("NewStore() error = %v", err)
+	}
+	t.Cleanup(func() { store.Close() })
+	return NewService(store, nil, nil, nil, audit.NewLogger(store), nil)
 }

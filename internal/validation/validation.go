@@ -5,6 +5,7 @@ package validation
 import (
 	"fmt"
 	"net"
+	"net/url"
 	"strings"
 
 	"github.com/andydixon/nexus/internal/models"
@@ -50,21 +51,20 @@ func (e *ValidationErrors) Add(field, message string) {
 func ValidateProfile(p *models.Profile) error {
 	errs := &ValidationErrors{}
 
+	if p == nil {
+		return &ValidationError{Field: "profile", Message: "profile must not be nil"}
+	}
+
 	if strings.TrimSpace(p.ID) == "" {
 		errs.Add("id", "profile ID must not be empty")
 	}
 	if strings.TrimSpace(p.DisplayName) == "" {
 		errs.Add("displayName", "display name must not be empty")
 	}
-	if err := ValidateHost(p.Host); err != nil {
-		errs.Add("host", err.(*ValidationError).Message)
-	}
-	if err := ValidatePort(p.Port); err != nil {
-		errs.Add("port", err.(*ValidationError).Message)
-	}
 
 	switch p.Protocol {
 	case models.ProtocolSSH:
+		validateProfileHostPort(errs, p.Host, p.Port)
 		if strings.TrimSpace(p.Username) == "" {
 			errs.Add("username", "username is required for SSH connections")
 		} else if err := ValidateUsername(p.Username); err != nil {
@@ -78,6 +78,7 @@ func ValidateProfile(p *models.Profile) error {
 			}
 		}
 	case models.ProtocolTelnet:
+		validateProfileHostPort(errs, p.Host, p.Port)
 		if p.Telnet == nil {
 			errs.Add("telnet", "Telnet configuration is required for Telnet protocol")
 		} else if err := ValidateTelnetConfig(p.Telnet); err != nil {
@@ -86,6 +87,7 @@ func ValidateProfile(p *models.Profile) error {
 			}
 		}
 	case models.ProtocolRAW:
+		validateProfileHostPort(errs, p.Host, p.Port)
 		if p.RAW == nil {
 			errs.Add("raw", "RAW configuration is required for RAW protocol")
 		} else if err := ValidateRAWConfig(p.RAW); err != nil {
@@ -94,9 +96,21 @@ func ValidateProfile(p *models.Profile) error {
 			}
 		}
 	case models.ProtocolGitHub:
-		// GitHub profiles require no host-level validation beyond the common checks.
+		if p.GitHub == nil {
+			errs.Add("github", "GitHub configuration is required for GitHub protocol")
+		} else if err := ValidateGitHubConfig(p.GitHub); err != nil {
+			if ve, ok := err.(*ValidationErrors); ok {
+				errs.Errors = append(errs.Errors, ve.Errors...)
+			}
+		}
 	case models.ProtocolVNC:
-		// VNC profiles use vnc.vncHost or the profile-level host; validated at connect time.
+		if p.VNC == nil {
+			errs.Add("vnc", "VNC configuration is required for VNC protocol")
+		} else if err := ValidateVNCConfig(p.Host, p.VNC); err != nil {
+			if ve, ok := err.(*ValidationErrors); ok {
+				errs.Errors = append(errs.Errors, ve.Errors...)
+			}
+		}
 	default:
 		errs.Add("protocol", fmt.Sprintf("unsupported protocol %q", p.Protocol))
 	}
@@ -118,6 +132,15 @@ func ValidateProfile(p *models.Profile) error {
 		return errs
 	}
 	return nil
+}
+
+func validateProfileHostPort(errs *ValidationErrors, host string, port int) {
+	if err := ValidateHost(host); err != nil {
+		errs.Add("host", err.(*ValidationError).Message)
+	}
+	if err := ValidatePort(port); err != nil {
+		errs.Add("port", err.(*ValidationError).Message)
+	}
 }
 
 // ValidateHost ensures the host string is non-empty and syntactically valid.
@@ -297,4 +320,94 @@ func ValidateRAWConfig(cfg *models.RAWConfig) error {
 		return errs
 	}
 	return nil
+}
+
+// ValidateGitHubConfig validates GitHub API settings before tokens are sent.
+func ValidateGitHubConfig(cfg *models.GitHubConfig) error {
+	errs := &ValidationErrors{}
+
+	if cfg == nil {
+		return &ValidationError{Field: "github", Message: "GitHub configuration must not be nil"}
+	}
+
+	u, err := url.Parse(strings.TrimSpace(cfg.BaseURL))
+	if err != nil || u.Scheme == "" || u.Host == "" {
+		errs.Add("github.baseURL", "API base URL must be an absolute HTTPS URL")
+	} else {
+		if u.User != nil {
+			errs.Add("github.baseURL", "API base URL must not include credentials")
+		}
+		if u.Scheme != "https" && !(u.Scheme == "http" && isLoopbackHost(u.Hostname())) {
+			errs.Add("github.baseURL", "API base URL must use HTTPS unless it points to loopback")
+		}
+	}
+
+	validSecret := map[models.SecretMode]bool{
+		models.SecretModeSaved: true, models.SecretModeSessionOnly: true, models.SecretModeAskEveryTime: true,
+	}
+	if !validSecret[cfg.SecretMode] {
+		errs.Add("github.secretMode", fmt.Sprintf("unsupported secret mode %q", cfg.SecretMode))
+	}
+	if cfg.RefreshIntervalSecs != 0 && cfg.RefreshIntervalSecs < 60 {
+		errs.Add("github.refreshIntervalSecs", "refresh interval must be at least 60 seconds")
+	}
+
+	if errs.HasErrors() {
+		return errs
+	}
+	return nil
+}
+
+// ValidateVNCConfig validates VNC connection settings.
+func ValidateVNCConfig(profileHost string, cfg *models.VNCConfig) error {
+	errs := &ValidationErrors{}
+
+	if cfg == nil {
+		return &ValidationError{Field: "vnc", Message: "VNC configuration must not be nil"}
+	}
+
+	vncHost := strings.TrimSpace(cfg.VNCHost)
+	if vncHost == "" {
+		vncHost = strings.TrimSpace(profileHost)
+	}
+	if err := ValidateHost(vncHost); err != nil {
+		errs.Add("vnc.vncHost", err.(*ValidationError).Message)
+	}
+	if err := ValidatePort(cfg.VNCPort); err != nil {
+		errs.Add("vnc.vncPort", err.(*ValidationError).Message)
+	}
+	if cfg.Quality < 0 || cfg.Quality > 9 {
+		errs.Add("vnc.quality", "quality must be between 0 and 9")
+	}
+
+	if cfg.SSHTunnel {
+		if err := ValidateHost(cfg.SSHHost); err != nil {
+			errs.Add("vnc.sshHost", err.(*ValidationError).Message)
+		}
+		if err := ValidatePort(cfg.SSHPort); err != nil {
+			errs.Add("vnc.sshPort", err.(*ValidationError).Message)
+		}
+		if strings.TrimSpace(cfg.SSHUsername) == "" {
+			errs.Add("vnc.sshUsername", "SSH username is required when tunnelling")
+		} else if err := ValidateUsername(cfg.SSHUsername); err != nil {
+			errs.Add("vnc.sshUsername", err.(*ValidationError).Message)
+		}
+		if cfg.SSHAuthMethod != "password" && cfg.SSHAuthMethod != "publickey" {
+			errs.Add("vnc.sshAuthMethod", fmt.Sprintf("unsupported SSH auth method %q", cfg.SSHAuthMethod))
+		}
+	}
+
+	if errs.HasErrors() {
+		return errs
+	}
+	return nil
+}
+
+func isLoopbackHost(host string) bool {
+	h := strings.ToLower(strings.TrimSpace(host))
+	if h == "localhost" {
+		return true
+	}
+	ip := net.ParseIP(h)
+	return ip != nil && ip.IsLoopback()
 }

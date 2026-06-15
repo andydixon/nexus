@@ -129,3 +129,24 @@ func TestDecryptCorruptFile(t *testing.T) {
 		t.Fatal("expected error for corrupt file, got nil")
 	}
 }
+
+func TestDecryptRejectsOversizedFile(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "huge.nexus")
+	f, err := os.Create(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Truncate(maxEncryptedImportBytes + 1); err != nil {
+		f.Close()
+		t.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = DecryptAndImport(path, "password")
+	if err == nil {
+		t.Fatal("expected error for oversized file, got nil")
+	}
+}

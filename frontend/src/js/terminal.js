@@ -7,6 +7,8 @@
 
   /* global Terminal, FitAddon, SearchAddon, WebLinksAddon, Unicode11Addon */
 
+  const MAX_INLINE_UPLOAD_BYTES = 25 * 1024 * 1024;
+
   /**
    * Encode a string as UTF-8 bytes then base64-encode them.
    * Unlike bare btoa(), this handles characters above U+007F correctly
@@ -716,7 +718,7 @@
     }
 
     _promptFileDropAction(files, canUpload) {
-      const { createElement, formatBytes } = window.NexusTerminal;
+      const { createElement, escapeHtml, formatBytes } = window.NexusTerminal;
       return new Promise((resolve) => {
         const backdrop = createElement("div", "modal-backdrop");
         const modal = createElement("div", "modal modal-sm");
@@ -736,7 +738,7 @@
                 </div>
                 <div class="modal-body">
                     <p style="font-size:var(--text-sm);color:var(--text-secondary)">
-                        <strong>${title}</strong>${count === 1 && sizeLabel ? " (" + sizeLabel + ")" : ""}
+                        <strong>${escapeHtml(title)}</strong>${count === 1 && sizeLabel ? " (" + sizeLabel + ")" : ""}
                     </p>
                     <p style="font-size:var(--text-sm);color:var(--text-tertiary)">
                       Choose what to do with the dropped ${count === 1 ? "file" : "files"}.
@@ -826,8 +828,24 @@
 
         for (let i = 0; i < files.length; i += 1) {
           const file = files[i];
+          if (typeof file.size === "number" && file.size > MAX_INLINE_UPLOAD_BYTES) {
+            this.app.notifications.error(
+              "Upload failed for " +
+                file.name +
+                ": file is too large for drag-and-drop upload. Use SFTP Upload for files over 25 MB.",
+            );
+            return;
+          }
           try {
             const buffer = await this._readFileBuffer(file);
+            if (buffer && buffer.byteLength > MAX_INLINE_UPLOAD_BYTES) {
+              this.app.notifications.error(
+                "Upload failed for " +
+                  file.name +
+                  ": file is too large for drag-and-drop upload. Use SFTP Upload for files over 25 MB.",
+              );
+              return;
+            }
             const base64Data = this._arrayBufferToBase64(buffer);
             await window.go.api.Service.SFTPUploadData(
               sessionId,

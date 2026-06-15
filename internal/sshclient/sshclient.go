@@ -69,10 +69,10 @@ func (c *Client) sshConf() models.SSHConfig {
 	return models.SSHConfig{}
 }
 
-// Connect establishes the SSH connection using the default (insecure)
-// host-key callback. Prefer ConnectWithHostKeyCallback for production use.
+// Connect refuses to connect without an explicit host-key callback. Use
+// ConnectWithHostKeyCallback so all callers make host-key policy visible.
 func (c *Client) Connect(getPassword func() (string, error), getPassphrase func() (string, error)) error {
-	return c.connectInternal(ssh.InsecureIgnoreHostKey(), getPassword, getPassphrase)
+	return fmt.Errorf("sshclient: host key callback is required; use ConnectWithHostKeyCallback")
 }
 
 // ConnectWithHostKeyCallback applies a custom HostKeyCallback (e.g. from

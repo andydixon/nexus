@@ -363,13 +363,23 @@ func (s *Store) ExportProfiles(includeSecrets bool) ([]byte, error) {
 // and "duplicate" creates new entries with fresh IDs. Returns the number of
 // profiles imported.
 func (s *Store) ImportProfiles(data []byte, strategy string) (int, error) {
+	switch strategy {
+	case "skip", "overwrite", "duplicate":
+	default:
+		return 0, fmt.Errorf("storage: unknown import strategy %q", strategy)
+	}
+
 	var profiles []*models.Profile
 	if err := json.Unmarshal(data, &profiles); err != nil {
 		return 0, fmt.Errorf("storage: invalid import data: %w", err)
 	}
 
 	imported := 0
-	for _, p := range profiles {
+	for i, p := range profiles {
+		if p == nil {
+			return imported, fmt.Errorf("storage: import profile entry %d is null", i)
+		}
+
 		existing, _ := s.GetProfile(p.ID)
 
 		switch strategy {
@@ -391,8 +401,6 @@ func (s *Store) ImportProfiles(data []byte, strategy string) (int, error) {
 				p.CreatedAt = time.Now()
 				p.UpdatedAt = time.Now()
 			}
-		default:
-			return 0, fmt.Errorf("storage: unknown import strategy %q", strategy)
 		}
 
 		if err := s.CreateProfile(p); err != nil {

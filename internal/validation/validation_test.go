@@ -127,6 +127,14 @@ func TestValidateProfile(t *testing.T) {
 		return &p
 	}
 
+	validVNC := func() *models.Profile {
+		p := models.NewProfile(models.ProtocolVNC)
+		p.DisplayName = "Test VNC"
+		p.Host = ""
+		p.VNC.VNCHost = "desktop.local"
+		return &p
+	}
+
 	tests := []struct {
 		name    string
 		profile *models.Profile
@@ -135,6 +143,8 @@ func TestValidateProfile(t *testing.T) {
 		{name: "full valid SSH profile", profile: validSSH(), wantErr: false},
 		{name: "full valid Telnet profile", profile: validTelnet(), wantErr: false},
 		{name: "full valid RAW profile", profile: validRAW(), wantErr: false},
+		{name: "valid VNC profile with VNC-specific host", profile: validVNC(), wantErr: false},
+		{name: "nil profile", profile: nil, wantErr: true},
 		{
 			name: "missing host",
 			profile: func() *models.Profile {
@@ -205,6 +215,138 @@ func TestValidateProfile(t *testing.T) {
 			err := ValidateProfile(tt.profile)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ValidateProfile() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+// ---------------------------------------------------------------------------
+// ValidateGitHubConfig
+// ---------------------------------------------------------------------------
+
+func TestValidateGitHubConfig(t *testing.T) {
+	tests := []struct {
+		name    string
+		cfg     *models.GitHubConfig
+		wantErr bool
+	}{
+		{
+			name: "valid github.com API URL",
+			cfg: &models.GitHubConfig{
+				BaseURL:             "https://api.github.com",
+				SecretMode:          models.SecretModeSaved,
+				RefreshIntervalSecs: 300,
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid loopback HTTP URL",
+			cfg: &models.GitHubConfig{
+				BaseURL:             "http://localhost:3000/api/v3",
+				SecretMode:          models.SecretModeAskEveryTime,
+				RefreshIntervalSecs: 60,
+			},
+			wantErr: false,
+		},
+		{
+			name: "rejects non-HTTPS remote URL",
+			cfg: &models.GitHubConfig{
+				BaseURL:             "http://evil.example/api/v3",
+				SecretMode:          models.SecretModeSaved,
+				RefreshIntervalSecs: 300,
+			},
+			wantErr: true,
+		},
+		{
+			name: "rejects URL credentials",
+			cfg: &models.GitHubConfig{
+				BaseURL:             "https://token@example.com/api/v3",
+				SecretMode:          models.SecretModeSaved,
+				RefreshIntervalSecs: 300,
+			},
+			wantErr: true,
+		},
+		{
+			name: "rejects aggressive refresh interval",
+			cfg: &models.GitHubConfig{
+				BaseURL:             "https://api.github.com",
+				SecretMode:          models.SecretModeSaved,
+				RefreshIntervalSecs: 1,
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateGitHubConfig(tt.cfg)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ValidateGitHubConfig() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+// ---------------------------------------------------------------------------
+// ValidateVNCConfig
+// ---------------------------------------------------------------------------
+
+func TestValidateVNCConfig(t *testing.T) {
+	tests := []struct {
+		name        string
+		profileHost string
+		cfg         *models.VNCConfig
+		wantErr     bool
+	}{
+		{
+			name:        "uses VNC-specific host",
+			profileHost: "",
+			cfg: &models.VNCConfig{
+				VNCHost: "desktop.local",
+				VNCPort: 5900,
+				Quality: 6,
+			},
+			wantErr: false,
+		},
+		{
+			name:        "uses profile host fallback",
+			profileHost: "desktop.local",
+			cfg: &models.VNCConfig{
+				VNCPort: 5900,
+				Quality: 6,
+			},
+			wantErr: false,
+		},
+		{
+			name:        "rejects missing host",
+			profileHost: "",
+			cfg: &models.VNCConfig{
+				VNCPort: 5900,
+				Quality: 6,
+			},
+			wantErr: true,
+		},
+		{
+			name:        "rejects invalid SSH tunnel auth method",
+			profileHost: "desktop.local",
+			cfg: &models.VNCConfig{
+				VNCPort:       5900,
+				Quality:       6,
+				SSHTunnel:     true,
+				SSHHost:       "jump.local",
+				SSHPort:       22,
+				SSHUsername:   "admin",
+				SSHAuthMethod: "token",
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateVNCConfig(tt.profileHost, tt.cfg)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ValidateVNCConfig() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
