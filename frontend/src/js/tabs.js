@@ -32,7 +32,13 @@
       /** @type {string[]} Ordered list of session IDs. */
       this.order = [];
 
+      this.tooltip = null;
+      this.tooltipTimer = null;
+      this.tooltipSessionId = null;
+
       this._setupDragAndDrop();
+      this._setupScrolling();
+      this._setupTooltip();
     }
 
     // ── Public API ───────────────────────────────────────────────────
@@ -56,6 +62,7 @@
       // Hide the empty-state BEFORE activating the panel so the
       // panel-container gets the full workspace height immediately.
       this._updateEmptyState();
+      this._updateScrollState();
       this.setActive(sessionInfo.id);
     }
 
@@ -64,6 +71,7 @@
      * @param {string} sessionId
      */
     removeTab(sessionId) {
+      this._hideTabTooltip();
       const idx = this.order.indexOf(sessionId);
       const wasActive = this.app.state.activeSessionId === sessionId;
       if (idx !== -1) this.order.splice(idx, 1);
@@ -92,6 +100,7 @@
       }
 
       this._updateEmptyState();
+      this._updateScrollState();
     }
 
     /**
@@ -120,6 +129,7 @@
         this.app.sidebar.highlightActive(session.profileId);
       }
       this.app.leviathan?.handleTabFocus?.(sessionId);
+      this._scrollTabIntoView(sessionId);
 
       // Fit and refresh the terminal for the newly active session.
       // Double-RAF ensures the panel has layout dimensions before fitting.
@@ -157,12 +167,14 @@
      * @param {string} sessionId
      */
     async closeTab(sessionId) {
+      this._hideTabTooltip();
       const session = this.app.state.getSession(sessionId);
 
       // Ask for confirmation if connected and the preference is set
       if (
         session &&
         session.state === "connected" &&
+        session.protocol !== "leviathan" &&
         this.app.state.preferences.confirmOnDisconnect
       ) {
         const ok = await this._confirmClose(sessionId);
@@ -191,7 +203,7 @@
      */
     _confirmClose(sessionId) {
       const createElement = window.NexusTerminal.createElement;
-      const label = this._tabLabel(sessionId);
+      const label = escapeHtml(this._tabLabel(sessionId));
       return new Promise((resolve) => {
         const backdrop = createElement("div", "modal-backdrop");
         const modal = createElement("div", "modal modal-sm");
@@ -479,6 +491,18 @@
         draggable: "true",
       });
 
+      // Close button
+      const closeBtn = createElement("button", "tab-close", {
+        textContent: "×",
+        "aria-label": "Close tab",
+      });
+      closeBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this._hideTabTooltip();
+        this.closeTab(sessionInfo.id);
+      });
+      tab.appendChild(closeBtn);
+
       // Protocol badge
       const protoLabel =
         sessionInfo.protocol === "github"
@@ -534,17 +558,6 @@
         tab.appendChild(sftpBtn);
       }
 
-      // Close button
-      const closeBtn = createElement("button", "tab-close", {
-        textContent: "×",
-        "aria-label": "Close tab",
-      });
-      closeBtn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        this.closeTab(sessionInfo.id);
-      });
-      tab.appendChild(closeBtn);
-
       // Click → activate
       tab.addEventListener("click", () => this.setActive(sessionInfo.id));
 
@@ -579,6 +592,7 @@
         const el = this.tabList.querySelector(`[data-session-id="${id}"]`);
         if (el) this.tabList.appendChild(el);
       }
+      this._updateScrollState();
     }
 
     /**
@@ -593,6 +607,210 @@
       );
       if (tabEl && session) {
         tabEl.classList.toggle("tab-pinned", !!session.pinned);
+      }
+    }
+
+    /**
+     * Makes the tab strip usable when the tab list overflows horizontally.
+     * @private
+     */
+    _setupScrolling() {
+      if (!this.tabList) return;
+      this.tabList.addEventListener(
+        "wheel",
+        (event) => {
+          if (this.tabList.scrollWidth <= this.tabList.clientWidth) return;
+          const delta = Math.abs(event.deltaX) > Math.abs(event.deltaY)
+            ? event.deltaX
+            : event.deltaY;
+          if (!delta) return;
+          event.preventDefault();
+          this.tabList.scrollLeft += delta;
+          this._updateScrollState();
+        },
+        { passive: false },
+      );
+      this.tabList.addEventListener("scroll", () => this._updateScrollState(), {
+        passive: true,
+      });
+      window.addEventListener("resize", () => this._updateScrollState());
+    }
+
+    /**
+     * Keeps the active tab visible inside the scrollable tab list.
+     * @param {string} sessionId
+     * @private
+     */
+    _scrollTabIntoView(sessionId) {
+      const tab = this.tabList?.querySelector(`[data-session-id="${sessionId}"]`);
+      if (!tab) return;
+      requestAnimationFrame(() => {
+        tab.scrollIntoView({
+          behavior: "smooth",
+          block: "nearest",
+          inline: "nearest",
+        });
+        this._updateScrollState();
+      });
+    }
+
+    /**
+     * Reflects whether tab overflow exists at either edge.
+     * @private
+     */
+    _updateScrollState() {
+      if (!this.tabList || !this.tabBar) return;
+      const max = this.tabList.scrollWidth - this.tabList.clientWidth;
+      this.tabBar.classList.toggle("has-tab-overflow", max > 1);
+      this.tabBar.classList.toggle("has-overflow-left", this.tabList.scrollLeft > 1);
+      this.tabBar.classList.toggle(
+        "has-overflow-right",
+        max > 1 && this.tabList.scrollLeft < max - 1,
+      );
+    }
+
+    /**
+     * Shows a custom hover hint for tabs with full names and connection start.
+     * @private
+     */
+    _setupTooltip() {
+      if (!this.tabList) return;
+      this.tooltip = createElement("div", "tooltip tab-tooltip", {
+        role: "tooltip",
+      });
+      document.body.appendChild(this.tooltip);
+
+      this.tabList.addEventListener("pointerover", (event) => {
+        const tab = event.target.closest(".tab");
+        if (!tab || !this.tabList.contains(tab)) return;
+        if (tab.contains(event.relatedTarget)) return;
+        this._clearTabTooltipTimer();
+        this.tooltipTimer = setTimeout(() => {
+          this.tooltipTimer = null;
+          this._showTabTooltip(tab.dataset.sessionId, tab);
+        }, 250);
+      });
+
+      this.tabList.addEventListener("pointerdown", () => this._hideTabTooltip());
+
+      this.tabList.addEventListener("pointermove", (event) => {
+        const tab = event.target.closest(".tab");
+        if (!tab || !this.tooltip?.classList.contains("is-visible")) return;
+        this._positionTabTooltip(tab);
+      });
+
+      this.tabList.addEventListener("pointerout", (event) => {
+        const tab = event.target.closest(".tab");
+        if (!tab || tab.contains(event.relatedTarget)) return;
+        this._hideTabTooltip();
+      });
+
+      this.tabList.addEventListener("scroll", () => this._hideTabTooltip(), {
+        passive: true,
+      });
+      window.addEventListener("blur", () => this._hideTabTooltip());
+      document.addEventListener("visibilitychange", () => {
+        if (document.hidden) this._hideTabTooltip();
+      });
+    }
+
+    /**
+     * Renders and positions the tab hover tooltip.
+     * @param {string} sessionId
+     * @param {HTMLElement} tab
+     * @private
+     */
+    _showTabTooltip(sessionId, tab) {
+      const session = this.app.state.getSession(sessionId);
+      if (!session || !this.tooltip || !tab?.isConnected || !this.tabList.contains(tab)) {
+        this._hideTabTooltip();
+        return;
+      }
+      this.tooltip.replaceChildren();
+      this.tooltip.appendChild(
+        createElement("div", "tab-tooltip-title", {
+          textContent: this._tabLabel(sessionId),
+        }),
+      );
+      if (
+        session.protocol !== "leviathan" &&
+        session.state === "connected" &&
+        session.connectedAt
+      ) {
+        const connected = this._formatConnectedSince(session.connectedAt);
+        if (connected) {
+          this.tooltip.appendChild(
+            createElement("div", "tab-tooltip-meta", {
+              textContent: `Connected since: ${connected}`,
+            }),
+          );
+        }
+      }
+      this._positionTabTooltip(tab);
+      this.tooltipSessionId = sessionId;
+      this.tooltip.classList.add("is-visible");
+    }
+
+    /**
+     * Positions the tab tooltip under the hovered tab.
+     * @param {HTMLElement} tab
+     * @private
+     */
+    _positionTabTooltip(tab) {
+      if (!this.tooltip) return;
+      if (!tab?.isConnected || !this.tabList.contains(tab)) {
+        this._hideTabTooltip();
+        return;
+      }
+      const rect = tab.getBoundingClientRect();
+      const tooltipRect = this.tooltip.getBoundingClientRect();
+      const left = Math.min(
+        Math.max(8, rect.left + rect.width / 2 - tooltipRect.width / 2),
+        window.innerWidth - tooltipRect.width - 8,
+      );
+      const top = Math.min(rect.bottom + 8, window.innerHeight - tooltipRect.height - 8);
+      this.tooltip.style.left = `${left}px`;
+      this.tooltip.style.top = `${top}px`;
+    }
+
+    /**
+     * Hides the tab hover tooltip.
+     * @private
+     */
+    _hideTabTooltip() {
+      this._clearTabTooltipTimer();
+      this.tooltipSessionId = null;
+      if (!this.tooltip) return;
+      this.tooltip.classList.remove("is-visible");
+      this.tooltip.replaceChildren();
+    }
+
+    /**
+     * Cancels any pending tab tooltip show timer.
+     * @private
+     */
+    _clearTabTooltipTimer() {
+      if (!this.tooltipTimer) return;
+      clearTimeout(this.tooltipTimer);
+      this.tooltipTimer = null;
+    }
+
+    /**
+     * Formats a session connection timestamp for the tab tooltip.
+     * @param {string} value
+     * @returns {string}
+     * @private
+     */
+    _formatConnectedSince(value) {
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime()) || date.getFullYear() <= 1) return "";
+      try {
+        return date.toLocaleString([], {
+          dateStyle: "medium",
+          timeStyle: "short",
+        });
+      } catch (_) {
+        return date.toLocaleString();
       }
     }
 

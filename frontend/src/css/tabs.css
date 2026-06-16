@@ -240,7 +240,7 @@
 }
 
 .tab:hover .tab-sftp,
-.tab.active .tab-sftp {
+.tab.tab-active .tab-sftp {
   opacity: 1;
 }
 
@@ -268,11 +268,15 @@
     background var(--transition-fast),
     color var(--transition-fast);
   cursor: pointer;
-  margin-left: 2px;
+  margin: 0 2px 0 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  line-height: 1;
 }
 
 .tab:hover .tab-close,
-.tab.active .tab-close {
+.tab.tab-active .tab-close {
   opacity: 1;
 }
 
@@ -454,6 +458,28 @@
   inset: 0;
   z-index: 1;
   /* Transparent hit area for right-click context menu */
+}
+
+/* -----------------------------------------------------------------------
+   Tab hover tooltip
+   ----------------------------------------------------------------------- */
+.tab-tooltip {
+  max-width: 360px;
+  white-space: normal;
+}
+
+.tab-tooltip-title {
+  max-width: 320px;
+  overflow: hidden;
+  color: var(--text-primary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tab-tooltip-meta {
+  margin-top: 2px;
+  color: var(--text-tertiary);
+  font-weight: var(--weight-normal);
 }
 
 /* -----------------------------------------------------------------------

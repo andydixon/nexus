@@ -40,6 +40,7 @@
 .tab-bar {
   grid-column: 2;
   grid-row: 1;
+  position: relative;
   background: var(--bg-surface);
   border-bottom: 1px solid var(--border-subtle);
   display: flex;
@@ -53,13 +54,51 @@
   display: flex;
   align-items: center;
   flex: 1;
+  height: 100%;
   min-width: 0;
   overflow-x: auto;
   overflow-y: hidden;
-  scrollbar-width: none; /* Firefox */
+  scrollbar-width: thin;
+  scrollbar-gutter: stable;
+  scroll-behavior: smooth;
 }
 .tab-list::-webkit-scrollbar {
-  display: none;
+  height: 6px;
+}
+.tab-list::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: var(--radius-full);
+}
+.tab-list::-webkit-scrollbar-thumb:hover {
+  background: var(--text-tertiary);
+}
+
+.tab-bar::before,
+.tab-bar::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 1px;
+  z-index: 2;
+  width: 18px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+
+.tab-bar::before {
+  left: 0;
+  background: linear-gradient(90deg, var(--bg-surface), transparent);
+}
+
+.tab-bar::after {
+  right: calc(var(--tab-bar-height) * 2);
+  background: linear-gradient(-90deg, var(--bg-surface), transparent);
+}
+
+.tab-bar.has-overflow-left::before,
+.tab-bar.has-overflow-right::after {
+  opacity: 1;
 }
 
 /* -----------------------------------------------------------------------

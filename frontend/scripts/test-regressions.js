@@ -145,6 +145,61 @@ assertContains(
   "tab bar must use the shared sidebar header height",
 );
 assertContains(
+  "frontend/src/js/tabs.js",
+  "this._setupScrolling();",
+  "tab bar must enable horizontal scroll handling for overflowed tabs",
+);
+assertContains(
+  "frontend/src/js/tabs.js",
+  "this._setupTooltip();",
+  "tab bar must show rich hover hints for truncated tabs",
+);
+assertContains(
+  "frontend/src/js/tabs.js",
+  "removeTab(sessionId) {\n      this._hideTabTooltip();",
+  "removing a tab must clear any visible tab tooltip",
+);
+assertContains(
+  "frontend/src/js/tabs.js",
+  "async closeTab(sessionId) {\n      this._hideTabTooltip();",
+  "closing a tab must clear any visible or pending tab tooltip",
+);
+assertContains(
+  "frontend/src/js/tabs.js",
+  "!tab?.isConnected",
+  "tab tooltip timers must not show hints for removed tab elements",
+);
+assertContains(
+  "frontend/src/js/tabs.js",
+  "_clearTabTooltipTimer",
+  "tab tooltip cleanup must cancel pending hover timers",
+);
+assertContains(
+  "frontend/src/js/tabs.js",
+  "session.protocol !== \"leviathan\"",
+  "Leviathan tabs must close without connected-session confirmation",
+);
+assertContains(
+  "frontend/src/js/tabs.js",
+  "Connected since:",
+  "connection tab hover hints must include the connected-since timestamp",
+);
+assertContains(
+  "frontend/src/js/tabs.js",
+  "tab.appendChild(closeBtn);\n\n      // Protocol badge",
+  "tab close button must render on the left side of each tab",
+);
+assertContains(
+  "frontend/src/css/layout.css",
+  "scrollbar-gutter: stable;",
+  "overflowing tab lists must expose a stable horizontal scrollbar",
+);
+assertContains(
+  "frontend/src/css/tabs.css",
+  ".tab-tooltip",
+  "tab hover hints must have dedicated tooltip styling",
+);
+assertContains(
   "frontend/src/js/leviathan.js",
   "Hex Editor",
   "Leviathan mode must put Hex Editor in the tool list",
