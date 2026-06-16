@@ -14,27 +14,27 @@ const frontendDir = path.resolve(__dirname, "..");
 // Mapping: source (relative to node_modules) → destination (relative to frontend/)
 const assets = [
   {
-    src: "xterm/css/xterm.css",
+    src: "@xterm/xterm/css/xterm.css",
     dest: "src/css/lib/xterm.css",
   },
   {
-    src: "xterm/lib/xterm.js",
+    src: "@xterm/xterm/lib/xterm.js",
     dest: "src/js/lib/xterm.min.js",
   },
   {
-    src: "xterm-addon-fit/lib/xterm-addon-fit.js",
+    src: "@xterm/addon-fit/lib/addon-fit.js",
     dest: "src/js/lib/xterm-addon-fit.min.js",
   },
   {
-    src: "xterm-addon-search/lib/xterm-addon-search.js",
+    src: "@xterm/addon-search/lib/addon-search.js",
     dest: "src/js/lib/xterm-addon-search.min.js",
   },
   {
-    src: "xterm-addon-unicode11/lib/xterm-addon-unicode11.js",
+    src: "@xterm/addon-unicode11/lib/addon-unicode11.js",
     dest: "src/js/lib/xterm-addon-unicode11.min.js",
   },
   {
-    src: "xterm-addon-web-links/lib/xterm-addon-web-links.js",
+    src: "@xterm/addon-web-links/lib/addon-web-links.js",
     dest: "src/js/lib/xterm-addon-web-links.min.js",
   },
 ];

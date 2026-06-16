@@ -130,6 +130,21 @@ assertContains(
   "Leviathan mode label must sit on the right side of the sidebar header",
 );
 assertContains(
+  "frontend/src/css/tokens.css",
+  "--tab-bar-height: 44px;",
+  "tab bar row must match the sidebar header height",
+);
+assertContains(
+  "frontend/src/css/sidebar.css",
+  "height: var(--tab-bar-height);",
+  "sidebar header must use the shared tab bar height",
+);
+assertContains(
+  "frontend/src/css/layout.css",
+  "height: var(--tab-bar-height);",
+  "tab bar must use the shared sidebar header height",
+);
+assertContains(
   "frontend/src/js/leviathan.js",
   "Hex Editor",
   "Leviathan mode must put Hex Editor in the tool list",
@@ -138,6 +153,21 @@ assertContains(
   "frontend/src/js/leviathan.js",
   "LeviathanSetByte",
   "Leviathan hex view must support byte editing",
+);
+assertContains(
+  "frontend/src/js/leviathan.js",
+  "_handleHexByteInput",
+  "Leviathan hex byte edits must update while typing",
+);
+assertContains(
+  "frontend/src/js/leviathan.js",
+  "_updateHexAsciiCell",
+  "Leviathan hex byte edits must update the ASCII preview immediately",
+);
+assertContains(
+  "frontend/src/js/leviathan.js",
+  "_focusHexByte(cell, 1)",
+  "Leviathan hex byte edits must advance to the next byte after entry",
 );
 assertContains(
   "frontend/src/js/leviathan.js",
@@ -213,6 +243,46 @@ assertContains(
   "frontend/src/js/wails-service.js",
   "window.go?.api?.Service",
   "Wails service bridge must use the normal named Wails API",
+);
+assertContains(
+  "frontend/package.json",
+  '"@xterm/xterm":',
+  "frontend dependencies must use the maintained scoped xterm package",
+);
+assertContains(
+  "frontend/package.json",
+  '"@xterm/addon-fit":',
+  "frontend dependencies must use the maintained scoped xterm addons",
+);
+assertContains(
+  "frontend/scripts/copy-assets.js",
+  "@xterm/xterm/lib/xterm.js",
+  "xterm browser assets must be copied from the maintained scoped package",
+);
+assertContains(
+  "frontend/scripts/copy-assets.js",
+  "@xterm/addon-fit/lib/addon-fit.js",
+  "xterm addon browser assets must be copied from the maintained scoped packages",
+);
+assertNotContains(
+  "frontend/package.json",
+  '"xterm":',
+  "deprecated unscoped xterm dependency must not be restored",
+);
+assertNotContains(
+  "frontend/package.json",
+  '"xterm-addon-',
+  "deprecated unscoped xterm addon dependencies must not be restored",
+);
+assertNotContains(
+  "frontend/package-lock.json",
+  '"node_modules/xterm"',
+  "package lock must not contain the deprecated unscoped xterm package",
+);
+assertNotContains(
+  "frontend/package-lock.json",
+  '"node_modules/xterm-addon-',
+  "package lock must not contain deprecated unscoped xterm addon packages",
 );
 assertContains(
   "frontend/scripts/build.js",

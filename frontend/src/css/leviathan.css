@@ -686,6 +686,14 @@
   background: var(--bg-input);
 }
 
+.leviathan-byte.is-editing {
+  border-color: var(--warning);
+}
+
+.leviathan-byte.is-saving {
+  color: var(--accent);
+}
+
 .leviathan-byte.is-search-hit {
   border-color: var(--warning);
   color: var(--text-inverse);

@@ -44,6 +44,7 @@
   border-bottom: 1px solid var(--border-subtle);
   display: flex;
   align-items: center;
+  height: var(--tab-bar-height);
   min-height: var(--tab-bar-height);
   overflow: hidden;
 }

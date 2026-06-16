@@ -572,32 +572,203 @@
         line.appendChild(createElement("span", "leviathan-offset", { textContent: this._hexOffset(row.offset) }));
         const bytes = createElement("span", "leviathan-byte-cells");
         const cells = row.bytes || String(row.hex || "").split(/\s+/).filter(Boolean);
+        const ascii = createElement("span", "leviathan-ascii", { textContent: row.ascii || "" });
         cells.forEach((value, idx) => {
           const cellOffset = (row.offset || 0) + idx;
+          const hexValue = this._normaliseHexByte(value) || "00";
           const cell = createElement("input", "leviathan-byte", {
-            value,
+            value: hexValue,
             maxlength: "2",
+            inputmode: "text",
+            autocomplete: "off",
+            spellcheck: "false",
             "aria-label": `Byte ${this._hexOffset(cellOffset)}`,
+            dataset: {
+              offset: String(cellOffset),
+              committedHex: hexValue,
+            },
           });
           if (activeHit && cellOffset >= activeHit.offset && cellOffset < activeHit.offset + activeHit.length) {
             cell.classList.add("is-search-hit");
           }
-          cell.addEventListener("change", async () => {
-            try {
-              await window.NexusTerminal.wailsService.LeviathanSetByte(cellOffset, cell.value);
-              cell.value = cell.value.trim().padStart(2, "0").slice(-2).toLowerCase();
-              status.textContent = "Edited " + this._hexOffset(cellOffset);
-            } catch (err) {
-              status.textContent = String(err);
-              cell.value = value;
-            }
-          });
+          this._wireHexByteCell(cell, bytes, ascii, idx, status);
           bytes.appendChild(cell);
         });
         line.appendChild(bytes);
-        line.appendChild(createElement("span", "leviathan-ascii", { textContent: row.ascii || "" }));
+        line.appendChild(ascii);
         grid.appendChild(line);
       }
+    }
+
+    _wireHexByteCell(cell, rowCells, ascii, asciiIndex, status) {
+      cell.addEventListener("focus", () => {
+        cell.select();
+      });
+      cell.addEventListener("keydown", (event) => {
+        if (event.key === "ArrowRight") {
+          event.preventDefault();
+          this._focusHexByte(cell, 1);
+        } else if (event.key === "ArrowLeft") {
+          event.preventDefault();
+          this._focusHexByte(cell, -1);
+        } else if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          this._finaliseHexByte(cell, rowCells, ascii, asciiIndex, status, { advance: 1 });
+        } else if (event.key === "Backspace" && cell.value.length === 0) {
+          event.preventDefault();
+          this._focusHexByte(cell, -1);
+        }
+      });
+      cell.addEventListener("input", () => {
+        this._handleHexByteInput(cell, rowCells, ascii, asciiIndex, status);
+      });
+      cell.addEventListener("paste", (event) => {
+        this._pasteHexBytes(event, cell, rowCells, ascii, asciiIndex, status);
+      });
+      cell.addEventListener("blur", () => {
+        this._finaliseHexByte(cell, rowCells, ascii, asciiIndex, status, { advance: 0 });
+      });
+    }
+
+    _handleHexByteInput(cell, rowCells, ascii, asciiIndex, status) {
+      const clean = this._normaliseHexByte(cell.value);
+      if (cell.value !== clean) cell.value = clean;
+      cell.classList.toggle("is-editing", clean.length === 1);
+      if (clean.length === 0) {
+        this._updateHexAsciiCell(ascii, asciiIndex, cell.dataset.committedHex || "00");
+        rowCells.classList.toggle("is-editing", Boolean(rowCells.querySelector(".leviathan-byte.is-editing")));
+        return;
+      }
+      if (clean.length === 2) {
+        this._updateHexAsciiCell(ascii, asciiIndex, clean);
+        this._commitHexByte(cell, ascii, asciiIndex, status);
+        this._focusHexByte(cell, 1);
+      }
+      rowCells.classList.toggle("is-editing", Boolean(rowCells.querySelector(".leviathan-byte.is-editing")));
+    }
+
+    _finaliseHexByte(cell, rowCells, ascii, asciiIndex, status, options = {}) {
+      let clean = this._normaliseHexByte(cell.value);
+      if (clean.length === 0) {
+        clean = cell.dataset.committedHex || "00";
+      } else if (clean.length === 1) {
+        clean = clean.padStart(2, "0");
+      }
+      cell.value = clean;
+      cell.classList.remove("is-editing");
+      rowCells.classList.toggle("is-editing", Boolean(rowCells.querySelector(".leviathan-byte.is-editing")));
+      this._updateHexAsciiCell(ascii, asciiIndex, clean);
+      this._commitHexByte(cell, ascii, asciiIndex, status);
+      if (options.advance) this._focusHexByte(cell, options.advance);
+    }
+
+    _pasteHexBytes(event, cell, rowCells, ascii, asciiIndex, status) {
+      const text = event.clipboardData?.getData("text/plain") || "";
+      const pasted = this._hexByteList(text);
+      if (!pasted.length) return;
+      event.preventDefault();
+      const scope = cell.closest(".leviathan-hex-grid") || rowCells;
+      const cells = Array.from(scope.querySelectorAll(".leviathan-byte"));
+      const startIndex = cells.indexOf(cell);
+      if (startIndex < 0) return;
+      pasted.forEach((hex, idx) => {
+        const target = cells[startIndex + idx];
+        if (!target) return;
+        const context = this._hexCellContext(target);
+        if (!context) return;
+        target.value = hex;
+        target.classList.remove("is-editing");
+        this._updateHexAsciiCell(context.ascii, context.index, hex);
+        this._commitHexByte(target, context.ascii, context.index, status);
+      });
+      const next = cells[Math.min(startIndex + pasted.length, cells.length - 1)];
+      if (next) {
+        next.focus();
+        next.select();
+      }
+    }
+
+    _commitHexByte(cell, ascii, asciiIndex, status) {
+      const hex = this._normaliseHexByte(cell.value);
+      if (hex.length !== 2) return;
+      if (hex === cell.dataset.committedHex || hex === cell.dataset.pendingHex) return;
+      const previous = cell.dataset.committedHex || "00";
+      const offset = Number(cell.dataset.offset || 0);
+      cell.dataset.pendingHex = hex;
+      cell.classList.add("is-saving");
+      window.NexusTerminal.wailsService
+        .LeviathanSetByte(offset, hex)
+        .then((payload) => {
+          if (cell.dataset.pendingHex === hex) {
+            delete cell.dataset.pendingHex;
+            cell.dataset.committedHex = hex;
+            cell.classList.remove("is-saving");
+            status.textContent = "Edited " + this._hexOffset(offset);
+            this.applyState(payload);
+          }
+        })
+        .catch((err) => {
+          if (cell.dataset.pendingHex === hex) {
+            delete cell.dataset.pendingHex;
+            cell.classList.remove("is-saving");
+            cell.value = previous;
+            this._updateHexAsciiCell(ascii, asciiIndex, previous);
+            status.textContent = String(err);
+          }
+        });
+    }
+
+    _focusHexByte(cell, direction) {
+      const scope = cell.closest(".leviathan-hex-grid") || cell.closest(".leviathan-byte-cells");
+      if (!scope) return;
+      const cells = Array.from(scope.querySelectorAll(".leviathan-byte"));
+      const index = cells.indexOf(cell);
+      const next = cells[index + direction];
+      if (!next) return;
+      next.focus();
+      next.select();
+    }
+
+    _hexCellContext(cell) {
+      const row = cell.closest(".leviathan-hex-row");
+      if (!row) return null;
+      const ascii = row.querySelector(".leviathan-ascii");
+      const rowCells = Array.from(row.querySelectorAll(".leviathan-byte"));
+      const index = rowCells.indexOf(cell);
+      if (!ascii || index < 0) return null;
+      return { ascii, index };
+    }
+
+    _updateHexAsciiCell(ascii, index, hex) {
+      const chars = Array.from(ascii.textContent || "");
+      while (chars.length <= index) chars.push(" ");
+      chars[index] = this._hexByteToAscii(hex);
+      ascii.textContent = chars.join("");
+    }
+
+    _hexByteToAscii(hex) {
+      const value = Number.parseInt(hex, 16);
+      if (!Number.isFinite(value)) return ".";
+      return value >= 32 && value < 127 ? String.fromCharCode(value) : ".";
+    }
+
+    _normaliseHexByte(value) {
+      return String(value || "")
+        .replace(/[^0-9a-f]/gi, "")
+        .slice(0, 2)
+        .toLowerCase();
+    }
+
+    _hexByteList(value) {
+      const clean = String(value || "")
+        .replace(/0x/gi, "")
+        .replace(/[^0-9a-f]/gi, "")
+        .toLowerCase();
+      const bytes = [];
+      for (let i = 0; i + 1 < clean.length; i += 2) {
+        bytes.push(clean.slice(i, i + 2));
+      }
+      return bytes;
     }
 
     _renderParams(toolId, container) {
