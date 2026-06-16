@@ -437,10 +437,10 @@
 
     _loadSSHKeyOptions() {
       if (this._sshKeyOptionsLoading || this._sshKeyOptionsLoaded) return;
-      if (!window.go || !window.go.api || !window.go.api.Service) return;
+      if (!window.NexusTerminal?.wailsService) return;
 
       this._sshKeyOptionsLoading = true;
-      window.go.api.Service.ListSSHKeys()
+      window.NexusTerminal.wailsService.ListSSHKeys()
         .then((keys) => {
           this._sshKeyOptions = Array.isArray(keys) ? keys : [];
           this._sshKeyOptionsLoaded = true;
@@ -1215,7 +1215,7 @@
         const profileId = profile.id;
         if (profileId) {
           try {
-            const code = await window.go.api.Service.GetTOTPCode(profileId);
+            const code = await window.NexusTerminal.wailsService.GetTOTPCode(profileId);
             testBtn.textContent = code;
             setTimeout(() => {
               testBtn.textContent = "Test";
@@ -1254,7 +1254,7 @@
         if (!secret) {
           // Delete existing secret
           try {
-            await window.go.api.Service.DeleteTOTPSecret(profileId);
+            await window.NexusTerminal.wailsService.DeleteTOTPSecret(profileId);
             NexusTerminal.Notifications.show("TOTP secret removed.", "info");
           } catch (err) {
             NexusTerminal.Notifications.show(
@@ -1265,7 +1265,7 @@
           return;
         }
         try {
-          await window.go.api.Service.SetTOTPSecret(profileId, secret);
+          await window.NexusTerminal.wailsService.SetTOTPSecret(profileId, secret);
           NexusTerminal.Notifications.show(
             "TOTP secret saved securely.",
             "success",
@@ -1295,7 +1295,7 @@
         const profileId = profile.id;
         if (!profileId) return;
         try {
-          await window.go.api.Service.DeleteTOTPSecret(profileId);
+          await window.NexusTerminal.wailsService.DeleteTOTPSecret(profileId);
           NexusTerminal.Notifications.show("TOTP secret removed.", "info");
           secretInput.placeholder =
             "Base32-encoded secret (e.g. from authenticator app setup)";
@@ -1319,7 +1319,7 @@
       if (profile.id) {
         (async () => {
           try {
-            const has = await window.go.api.Service.HasTOTPSecret(profile.id);
+            const has = await window.NexusTerminal.wailsService.HasTOTPSecret(profile.id);
             if (has) {
               secretInput.placeholder = "••••••••• (secret saved)";
             }
@@ -1763,8 +1763,8 @@
       });
       browseBtn.addEventListener("mousedown", (e) => e.preventDefault());
       browseBtn.addEventListener("click", () => {
-        if (!window.go || !window.go.api || !window.go.api.Service) return;
-        window.go.api.Service.SelectFile("Select SSH Private Key", "*")
+        if (!window.NexusTerminal?.wailsService) return;
+        window.NexusTerminal.wailsService.SelectFile("Select SSH Private Key", "*")
           .then((path) => {
             if (path) input.value = path;
           })
@@ -1831,8 +1831,8 @@
 
         browseBtn.addEventListener("mousedown", (e) => e.preventDefault());
         browseBtn.addEventListener("click", () => {
-          if (!window.go || !window.go.api || !window.go.api.Service) return;
-          window.go.api.Service.SelectFile("Select SSH Private Key", "*")
+          if (!window.NexusTerminal?.wailsService) return;
+          window.NexusTerminal.wailsService.SelectFile("Select SSH Private Key", "*")
             .then((path) => {
               if (path) keyInput.value = path;
               this._validateKeyPath(keyInput, error);
@@ -1908,10 +1908,10 @@
         }
         return;
       }
-      if (!window.go || !window.go.api || !window.go.api.Service) {
+      if (!window.NexusTerminal?.wailsService) {
         return;
       }
-      window.go.api.Service.FileExists(value)
+      window.NexusTerminal.wailsService.FileExists(value)
         .then((exists) => {
           if (!exists) {
             errorEl.textContent = "Key file not found.";
@@ -1922,7 +1922,7 @@
             }
             return;
           }
-          return window.go.api.Service.FileIsPrivateKey(value).then((isKey) => {
+          return window.NexusTerminal.wailsService.FileIsPrivateKey(value).then((isKey) => {
             if (!isKey) {
               errorEl.textContent = "File is not a recognised private key.";
               errorEl.style.display = "block";
@@ -2328,11 +2328,11 @@
       try {
         let saved;
         if (this._isNew) {
-          saved = await window.go.api.Service.CreateProfile(this._profile);
+          saved = await window.NexusTerminal.wailsService.CreateProfile(this._profile);
           this.app.state.addProfile(saved);
           this.app.notifications.success("Profile created");
         } else {
-          saved = await window.go.api.Service.UpdateProfile(this._profile);
+          saved = await window.NexusTerminal.wailsService.UpdateProfile(this._profile);
           this.app.state.updateProfile(saved);
           this.app.notifications.success("Profile updated");
         }
@@ -2353,7 +2353,7 @@
       if (!ok) return;
 
       try {
-        await window.go.api.Service.DeleteProfile(this._profile.id);
+        await window.NexusTerminal.wailsService.DeleteProfile(this._profile.id);
         this.app.state.removeProfile(this._profile.id);
         this.app.sidebar.render();
         this.app.notifications.success("Profile deleted");
@@ -2377,7 +2377,7 @@
       this.app.notifications.info(`Testing connection to ${host}:${port}…`);
 
       try {
-        const result = await window.go.api.Service.TestConnection(host, port);
+        const result = await window.NexusTerminal.wailsService.TestConnection(host, port);
         this.app.notifications.success(
           `Reachable — ${result.latencyMs}ms latency`,
         );

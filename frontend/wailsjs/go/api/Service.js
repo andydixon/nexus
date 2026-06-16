@@ -186,6 +186,10 @@ export function LeviathanExportJSON(arg1, arg2) {
   return window['go']['api']['Service']['LeviathanExportJSON'](arg1, arg2);
 }
 
+export function LeviathanExportRange(arg1, arg2, arg3) {
+  return window['go']['api']['Service']['LeviathanExportRange'](arg1, arg2, arg3);
+}
+
 export function LeviathanLoadFile(arg1, arg2) {
   return window['go']['api']['Service']['LeviathanLoadFile'](arg1, arg2);
 }

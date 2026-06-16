@@ -58,7 +58,6 @@
     "patch-plan": { source: "set 0x00 90 90" },
     "patch-apply": { source: "set 0x00 90 90" },
     transform: { pipeline: "hex.encode", start: 0, length: 1024 },
-    binsnoop: { maxBytes: 67108864 },
     "spectrogram-view": { fftSize: 2048, height: 1024, maxWidth: 1400, aspectRatio: 1, minHz: 0, maxHz: 0, brightness: 1, contrast: 1 },
     hex: { start: 0, bytes: 2048, width: 16 },
   };
@@ -68,6 +67,8 @@
       this.app = app;
       this.state = null;
       this.lastResults = new Map();
+      this.autoRunners = new Map();
+      this.hexSearches = new Map();
     }
 
     renderSidebar() {
@@ -115,7 +116,7 @@
 
     async loadFile() {
       try {
-        const payload = await window.go.api.Service.LeviathanOpenFile();
+        const payload = await window.NexusTerminal.wailsService.LeviathanOpenFile();
         this.applyState(payload);
         this.refreshOpenHexTabs();
       } catch (err) {
@@ -126,9 +127,9 @@
 
     async saveFile() {
       try {
-        const path = await window.go.api.Service.LeviathanSaveWorking();
+        const path = await window.NexusTerminal.wailsService.LeviathanSaveWorking();
         if (path) this.app.notifications.success("Saved working copy");
-        const state = await window.go.api.Service.LeviathanState();
+        const state = await window.NexusTerminal.wailsService.LeviathanState();
         this.applyState(state);
       } catch (err) {
         this.app.notifications.error("Save failed: " + err);
@@ -153,6 +154,7 @@
           state: "connected",
           tabName: tool.name,
           toolId: tool.id,
+          leviathanParams: options.params || null,
         };
         this.app.state.addSession(sessionInfo);
         this.app.tabs.addTab(sessionInfo);
@@ -170,9 +172,11 @@
 
       const header = createElement("div", "leviathan-panel-header");
       const titleWrap = createElement("div", "leviathan-title-wrap");
-      titleWrap.appendChild(createElement("span", "leviathan-eyebrow", { textContent: this._stateLabel() }));
-      titleWrap.appendChild(createElement("h2", "", { textContent: tool.name }));
-      titleWrap.appendChild(createElement("p", "", { textContent: tool.desc }));
+      titleWrap.appendChild(createElement("span", "leviathan-tool-mark", { textContent: tool.ico }));
+      const heading = createElement("div", "leviathan-heading");
+      heading.appendChild(createElement("h2", "", { textContent: tool.name }));
+      heading.appendChild(createElement("span", "leviathan-eyebrow", { textContent: this._stateLabel() }));
+      titleWrap.appendChild(heading);
       header.appendChild(titleWrap);
 
       const headerActions = createElement("div", "leviathan-header-actions");
@@ -193,6 +197,8 @@
 
       if (tool.id === "hex") {
         this.renderHexEditor(body, sessionId);
+      } else if (tool.id === "search") {
+        this.renderSearchTool(body, sessionId);
       } else if (tool.id === "spectrogram-encode") {
         this.renderSpectrogramEncode(body, sessionId);
       } else if (tool.id === "spectrogram-view") {
@@ -203,37 +209,113 @@
     }
 
     renderHexEditor(body, sessionId) {
+      const { controls, output } = this._createWorkbench(body, "leviathan-hex-workbench", { topBar: true });
       const toolbar = createElement("div", "leviathan-tool-toolbar");
-      const start = this._input("start", "0");
-      const bytes = this._input("bytes", "2048");
-      const refresh = createElement("button", "btn btn-sm btn-primary", { textContent: "Refresh" });
-      toolbar.append(start.row, bytes.row, refresh);
-      body.appendChild(toolbar);
+      const initial = this._sessionParams(sessionId);
+      const start = this._input("start", String(initial.start ?? 0));
+      const bytes = this._input("bytes", String(initial.bytes ?? initial.length ?? 2048));
+      const width = this._selectInput("row", [
+        ["16", "16 bytes"],
+        ["32", "32 bytes"],
+      ], String(initial.width || 16));
+      const search = createElement("button", "btn btn-sm", { type: "button", textContent: "Search" });
+      const prev = createElement("button", "btn btn-sm", { type: "button", textContent: "Prev" });
+      const next = createElement("button", "btn btn-sm", { type: "button", textContent: "Next" });
+      toolbar.append(start.row, bytes.row, width.row, search, prev, next);
 
       const status = createElement("div", "leviathan-status", { textContent: this._stateLabel() });
       const grid = createElement("div", "leviathan-hex-grid");
-      body.append(status, grid);
+      controls.append(toolbar, status);
+      output.appendChild(grid);
 
       const load = async () => {
         try {
           status.textContent = "Loading hex...";
-          const result = await window.go.api.Service.LeviathanRunTool("hex", {
+          const result = await window.NexusTerminal.wailsService.LeviathanRunTool("hex", {
             start: Number(start.input.value || 0),
             bytes: Number(bytes.input.value || 2048),
-            width: 16,
+            width: Number(width.input.value || 16),
           });
           this.lastResults.set(sessionId, result);
-          this._renderHexRows(grid, result.rows || [], status);
+          this._renderHexRows(grid, result.rows || [], status, Number(width.input.value || 16), this._currentHexSearchHit(sessionId));
           status.textContent = this._stateLabel();
         } catch (err) {
           status.textContent = String(err);
         }
       };
-      refresh.addEventListener("click", load);
+      [start.input, bytes.input, width.input].forEach((input) => {
+        input.addEventListener("change", load);
+      });
+      search.addEventListener("click", () => this._showHexSearchModal(sessionId, start.input, width.input, load));
+      prev.addEventListener("click", () => this._gotoHexSearchHit(sessionId, -1, start.input, width.input, load));
+      next.addEventListener("click", () => this._gotoHexSearchHit(sessionId, 1, start.input, width.input, load));
       load();
     }
 
+    renderSearchTool(body, sessionId) {
+      const { controls, output } = this._createWorkbench(body, "leviathan-compact-workbench", { topBar: true });
+      const params = createElement("div", "leviathan-params");
+      const mode = this._selectInput("mode", [
+        ["text", "String"],
+        ["hex", "Hex"],
+        ["regex", "Regex"],
+      ], "text");
+      const query = this._input("query", "MZ");
+      const start = this._input("start", "0");
+      const length = this._input("length", "-1");
+      const max = this._input("max", "1000");
+      params.append(mode.row, query.row, start.row, length.row, max.row);
+
+      const toolbar = createElement("div", "leviathan-tool-toolbar");
+      const search = createElement("button", "btn btn-sm btn-primary", { type: "button", textContent: "Search" });
+      const exportBtn = createElement("button", "btn btn-sm", { type: "button", textContent: "Export JSON" });
+      toolbar.append(search, exportBtn);
+      controls.append(params, toolbar);
+
+      const summary = createElement("div", "leviathan-summary");
+      const results = createElement("div", "leviathan-results");
+      output.append(summary, results);
+      results.appendChild(createElement("div", "leviathan-empty", { textContent: "Search results will appear here." }));
+
+      const runSearch = async () => {
+        try {
+          results.innerHTML = "";
+          results.appendChild(createElement("div", "leviathan-empty", { textContent: "Searching..." }));
+          const payload = {
+            mode: mode.input.value,
+            query: query.input.value,
+            start: Number(start.input.value || 0),
+            length: Number(length.input.value || -1),
+            max: Number(max.input.value || 1000),
+          };
+          const out = await window.NexusTerminal.wailsService.LeviathanRunTool("search", payload);
+          this.lastResults.set(sessionId, out);
+          this._renderResult(summary, results, out, "search");
+        } catch (err) {
+          results.innerHTML = "";
+          this._renderToolError(results, "search", err);
+        }
+      };
+      search.addEventListener("click", runSearch);
+      query.input.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") runSearch();
+      });
+      exportBtn.addEventListener("click", async () => {
+        const out = this.lastResults.get(sessionId);
+        if (!out) return;
+        try {
+          await window.NexusTerminal.wailsService.LeviathanExportJSON("search.json", out);
+          this.app.notifications.success("Exported JSON");
+        } catch (err) {
+          this.app.notifications.error("Export failed: " + err);
+        }
+      });
+      this.autoRunners.set(sessionId, runSearch);
+      requestAnimationFrame(runSearch);
+    }
+
     renderSpectrogramEncode(body, sessionId) {
+      const { controls, output } = this._createWorkbench(body);
       const params = createElement("div", "leviathan-params");
       const fields = [
         this._paramInput(params, "durationSec", "Duration (s)", 5, { type: "number", min: "0.25", max: "60", step: "0.25" }),
@@ -248,18 +330,16 @@
         this._paramInput(params, "preserveAspectRatio", "Preserve aspect", true, { type: "checkbox" }),
         this._paramInput(params, "invert", "Invert image", true, { type: "checkbox" }),
       ];
-      body.appendChild(params);
 
       const imagePicker = createElement("div", "leviathan-file-picker");
       const chooseImage = createElement("button", "btn btn-sm", { type: "button", textContent: "Select Image" });
       const imagePath = createElement("span", "leviathan-file-path", { textContent: "No insertion image selected" });
       imagePicker.append(chooseImage, imagePath);
-      body.appendChild(imagePicker);
 
       let selectedImagePath = "";
       chooseImage.addEventListener("click", async () => {
         try {
-          const path = await window.go.api.Service.SelectFile("Select Image to Insert", "");
+          const path = await window.NexusTerminal.wailsService.SelectFile("Select Image to Insert", "");
           if (!path) return;
           selectedImagePath = path;
           imagePath.textContent = path;
@@ -272,11 +352,11 @@
       const encode = createElement("button", "btn btn-sm btn-primary", { type: "button", textContent: "Encode Loaded Image" });
       const insert = createElement("button", "btn btn-sm", { type: "button", textContent: "Insert Into Loaded Audio" });
       toolbar.append(encode, insert);
-      body.appendChild(toolbar);
+      controls.append(params, imagePicker, toolbar);
 
       const summary = createElement("div", "leviathan-summary");
       const results = createElement("div", "leviathan-results");
-      body.append(summary, results);
+      output.append(summary, results);
       results.appendChild(createElement("div", "leviathan-empty", { textContent: "Load an image to encode, or load WAV/MP3 audio and select an image to insert." }));
 
       const run = async (toolId) => {
@@ -289,7 +369,7 @@
             if (!selectedImagePath) throw new Error("Select an image to insert first.");
             payload.imagePath = selectedImagePath;
           }
-          const out = await window.go.api.Service.LeviathanRunTool(toolId, payload);
+          const out = await window.NexusTerminal.wailsService.LeviathanRunTool(toolId, payload);
           this.lastResults.set(sessionId, out);
           summary.innerHTML = "";
           results.innerHTML = "";
@@ -298,7 +378,7 @@
           if (out?.path) this.app.notifications.success("Saved " + out.path);
         } catch (err) {
           results.innerHTML = "";
-          results.appendChild(createElement("pre", "leviathan-json", { textContent: String(err) }));
+          this._renderToolError(results, toolId, err);
         }
       };
       encode.addEventListener("click", () => run("spectrogram-encode"));
@@ -306,6 +386,7 @@
     }
 
     renderSpectrogramView(body, sessionId) {
+      const { controls, output } = this._createWorkbench(body);
       const params = createElement("div", "leviathan-params");
       const fields = [
         this._paramInput(params, "fftSize", "FFT size", 2048, { type: "number", min: "256", max: "8192", step: "256" }),
@@ -317,26 +398,25 @@
         this._paramInput(params, "brightness", "Brightness", 1, { type: "number", min: "0.1", max: "4", step: "0.1" }),
         this._paramInput(params, "contrast", "Contrast", 1, { type: "number", min: "0.1", max: "4", step: "0.1" }),
       ];
-      body.appendChild(params);
 
       const toolbar = createElement("div", "leviathan-tool-toolbar");
       const run = createElement("button", "btn btn-sm btn-primary", { type: "button", textContent: "Render Spectrogram" });
       const exportBtn = createElement("button", "btn btn-sm", { type: "button", textContent: "Export JSON" });
       toolbar.append(run, exportBtn);
-      body.appendChild(toolbar);
+      controls.append(params, toolbar);
 
       const summary = createElement("div", "leviathan-summary");
       const results = createElement("div", "leviathan-results");
-      body.append(summary, results);
+      output.append(summary, results);
       results.appendChild(createElement("div", "leviathan-empty", { textContent: "Load a WAV or MP3 file, then render its spectrogram." }));
 
-      run.addEventListener("click", async () => {
+      const render = async () => {
         try {
           results.innerHTML = "";
           results.appendChild(createElement("div", "leviathan-empty", { textContent: "Rendering spectrogram..." }));
           const payload = {};
           for (const field of fields) payload[field.key] = this._fieldValue(field);
-          const out = await window.go.api.Service.LeviathanRunTool("spectrogram-view", payload);
+          const out = await window.NexusTerminal.wailsService.LeviathanRunTool("spectrogram-view", payload);
           this.lastResults.set(sessionId, out);
           summary.innerHTML = "";
           results.innerHTML = "";
@@ -354,38 +434,53 @@
           }
         } catch (err) {
           results.innerHTML = "";
-          results.appendChild(createElement("pre", "leviathan-json", { textContent: String(err) }));
+          this._renderToolError(results, "spectrogram-view", err);
         }
-      });
+      };
+      run.addEventListener("click", render);
       exportBtn.addEventListener("click", async () => {
         const out = this.lastResults.get(sessionId);
         if (!out) return;
         try {
-          await window.go.api.Service.LeviathanExportJSON("spectrogram-view.json", out);
+          await window.NexusTerminal.wailsService.LeviathanExportJSON("spectrogram-view.json", out);
           this.app.notifications.success("Exported JSON");
         } catch (err) {
           this.app.notifications.error("Export failed: " + err);
         }
       });
+      this.autoRunners.set(sessionId, render);
+      requestAnimationFrame(render);
     }
 
     renderToolRunner(body, sessionId, tool) {
       const toolbar = createElement("div", "leviathan-tool-toolbar");
       const params = createElement("div", "leviathan-params");
       const fields = this._renderParams(tool.id, params);
-      const run = createElement("button", "btn btn-sm btn-primary", { textContent: "Run" });
+      const autoRun = this._shouldAutoRunTool(tool.id, fields);
+      const topBar = fields.length === 0 || this._shouldUseTopBar(fields);
+      const { controls, output } = this._createWorkbench(
+        body,
+        topBar ? "leviathan-compact-workbench" : "",
+        { topBar },
+      );
+      const run = createElement("button", "btn btn-sm btn-primary", { textContent: this._toolActionLabel(tool.id) });
       const exportBtn = createElement("button", "btn btn-sm", { textContent: "Export JSON" });
-      toolbar.append(run, exportBtn);
-      body.append(params, toolbar);
+      if (!autoRun || fields.length) toolbar.append(run);
+      toolbar.append(exportBtn);
+      if (fields.length) controls.append(params);
+      controls.append(toolbar);
 
       const summary = createElement("div", "leviathan-summary");
       const results = createElement("div", "leviathan-results");
-      body.append(summary, results);
+      output.append(summary, results);
 
-      run.addEventListener("click", async () => {
+      let running = false;
+      const runTool = async () => {
+        if (running) return;
+        running = true;
         try {
           if (tool.id === "diff" && !this.state?.compare) {
-            const compare = await window.go.api.Service.LeviathanOpenCompare();
+            const compare = await window.NexusTerminal.wailsService.LeviathanOpenCompare();
             this.applyState(compare);
           }
           results.innerHTML = "";
@@ -394,30 +489,49 @@
           for (const field of fields) {
             payload[field.key] = this._fieldValue(field);
           }
-          const out = await window.go.api.Service.LeviathanRunTool(tool.id, payload);
+          const out = await window.NexusTerminal.wailsService.LeviathanRunTool(tool.id, payload);
           this.lastResults.set(sessionId, out);
-          this._renderResult(summary, results, out);
+          this._renderResult(summary, results, out, tool.id);
           if (out && out.state) this.applyState(out.state);
         } catch (err) {
           results.innerHTML = "";
-          results.appendChild(createElement("pre", "leviathan-json", { textContent: String(err) }));
+          this._renderToolError(results, tool.id, err);
+        } finally {
+          running = false;
         }
-      });
+      };
+      if (!autoRun || fields.length) run.addEventListener("click", runTool);
       exportBtn.addEventListener("click", async () => {
         const out = this.lastResults.get(sessionId);
         if (!out) return;
         try {
-          await window.go.api.Service.LeviathanExportJSON(`${tool.id}.json`, out);
+          await window.NexusTerminal.wailsService.LeviathanExportJSON(`${tool.id}.json`, out);
           this.app.notifications.success("Exported JSON");
         } catch (err) {
           this.app.notifications.error("Export failed: " + err);
         }
       });
-      results.appendChild(
-        createElement("div", "leviathan-empty", {
-          textContent: "Run the tool to populate this tab.",
-        }),
-      );
+      if (autoRun) {
+        this.autoRunners.set(sessionId, runTool);
+        requestAnimationFrame(runTool);
+      } else {
+        this.autoRunners.delete(sessionId);
+        results.appendChild(
+          createElement("div", "leviathan-empty", {
+            textContent: "Ready.",
+          }),
+        );
+      }
+    }
+
+    _createWorkbench(body, extraClass = "", options = {}) {
+      body.classList.add("leviathan-workbench");
+      body.classList.toggle("leviathan-top-workbench", Boolean(options.topBar));
+      if (extraClass) body.classList.add(extraClass);
+      const controls = createElement("section", "leviathan-control-plane");
+      const output = createElement("section", "leviathan-output-plane");
+      body.append(controls, output);
+      return { controls, output };
     }
 
     applyState(payload) {
@@ -427,6 +541,15 @@
 
     destroyPanel(sessionId) {
       this.lastResults.delete(sessionId);
+      this.autoRunners.delete(sessionId);
+    }
+
+    handleTabFocus(sessionId) {
+      const session = this.app.state.getSession(sessionId);
+      if (session?.protocol !== "leviathan") return;
+      this._highlightActiveTool(session.toolId);
+      const runner = this.autoRunners.get(sessionId);
+      if (runner) runner();
     }
 
     refreshOpenHexTabs() {
@@ -437,8 +560,9 @@
       }
     }
 
-    _renderHexRows(grid, rows, status) {
+    _renderHexRows(grid, rows, status, rowWidth = 16, activeHit = null) {
       grid.innerHTML = "";
+      grid.style.setProperty("--leviathan-hex-width", String(rowWidth));
       if (!rows.length) {
         grid.appendChild(createElement("div", "leviathan-empty", { textContent: "Load a file to inspect bytes." }));
         return;
@@ -449,16 +573,20 @@
         const bytes = createElement("span", "leviathan-byte-cells");
         const cells = row.bytes || String(row.hex || "").split(/\s+/).filter(Boolean);
         cells.forEach((value, idx) => {
+          const cellOffset = (row.offset || 0) + idx;
           const cell = createElement("input", "leviathan-byte", {
             value,
             maxlength: "2",
-            "aria-label": `Byte ${this._hexOffset((row.offset || 0) + idx)}`,
+            "aria-label": `Byte ${this._hexOffset(cellOffset)}`,
           });
+          if (activeHit && cellOffset >= activeHit.offset && cellOffset < activeHit.offset + activeHit.length) {
+            cell.classList.add("is-search-hit");
+          }
           cell.addEventListener("change", async () => {
             try {
-              await window.go.api.Service.LeviathanSetByte((row.offset || 0) + idx, cell.value);
+              await window.NexusTerminal.wailsService.LeviathanSetByte(cellOffset, cell.value);
               cell.value = cell.value.trim().padStart(2, "0").slice(-2).toLowerCase();
-              status.textContent = "Edited " + this._hexOffset((row.offset || 0) + idx);
+              status.textContent = "Edited " + this._hexOffset(cellOffset);
             } catch (err) {
               status.textContent = String(err);
               cell.value = value;
@@ -500,10 +628,54 @@
       });
     }
 
-    _renderResult(summary, results, out) {
+    _shouldUseTopBar(fields) {
+      return fields.length <= 3 && !fields.some((field) => field.input.tagName === "TEXTAREA");
+    }
+
+    _shouldAutoRunTool(toolId, fields) {
+      const autoRunTools = new Set([
+        "overview",
+        "hashes",
+        "entropy",
+        "strings",
+        "iocs",
+        "search",
+        "multi-search",
+        "parse",
+        "disasm",
+        "pdf",
+        "squashfs",
+        "carve",
+        "keys",
+        "timestamps",
+        "stego",
+        "metadata",
+        "binsnoop",
+        "rules",
+        "patch-plan",
+        "transform",
+        "spectrogram-view",
+      ]);
+      return autoRunTools.has(toolId);
+    }
+
+    _toolActionLabel(toolId) {
+      if (toolId === "case") return "Export Case";
+      if (toolId === "diff") return this.state?.compare ? "Compare" : "Load Compare";
+      return "Run";
+    }
+
+    _renderResult(summary, results, out, toolId = "") {
       summary.innerHTML = "";
       results.innerHTML = "";
       this._renderSummaryPills(summary, this._flatSummary(out));
+      if (toolId === "overview") return this._renderOverview(results, out);
+      if (toolId === "hashes") return this._renderHashes(results, out);
+      if (toolId === "entropy") return this._renderEntropy(summary, results, out);
+      if (toolId === "search") return this._renderSearchResults(summary, results, out);
+      if (toolId === "strings") return this._renderStrings(results, out.items || []);
+      if (toolId === "binsnoop") return this._renderBinsnoop(summary, results, out);
+      if (toolId === "carve") return this._renderCarve(summary, results, out);
       if (out?.tree) {
         this._renderTree(results, out.tree);
         return;
@@ -516,15 +688,186 @@
       results.appendChild(createElement("pre", "leviathan-json", { textContent: JSON.stringify(out, null, 2) }));
     }
 
-    _renderTable(container, rows) {
-      rows = rows.slice(0, 1000);
+    _renderOverview(container, out) {
+      const dashboard = createElement("div", "leviathan-dashboard");
+      dashboard.appendChild(this._metricCard("File", out?.name || this.state?.name || "No file"));
+      dashboard.appendChild(this._metricCard("Size", formatBytes(out?.size || 0)));
+      dashboard.appendChild(this._metricCard("Entropy mean", this._formatNumber(out?.entropy?.mean, 2)));
+      dashboard.appendChild(this._metricCard("Strings", out?.strings?.total ?? 0));
+      dashboard.appendChild(this._metricCard("Carve hits", out?.carve?.total ?? 0));
+      dashboard.appendChild(this._metricCard("Valid carve", out?.carve?.valid ?? 0));
+      container.appendChild(dashboard);
+
+      const sections = createElement("div", "leviathan-sections");
+      sections.appendChild(this._kvSection("Hashes", out?.hashes || {}, ["crc32", "md5", "sha1", "sha256", "sha512"]));
+      sections.appendChild(this._kvSection("IOC totals", out?.iocs || {}, Object.keys(out?.iocs || {}).sort()));
+      sections.appendChild(this._kvSection("Scan limits", out?.limits || {}, Object.keys(out?.limits || {}), true));
+      container.appendChild(sections);
+    }
+
+    _renderHashes(container, out) {
+      const rows = ["crc32", "md5", "sha1", "sha256", "sha512"]
+        .filter((key) => out?.[key])
+        .map((key) => ({ algorithm: key.toUpperCase(), digest: out[key] }));
+      this._renderTable(container, rows, ["algorithm", "digest"]);
+    }
+
+    _renderEntropy(summary, container, out) {
+      summary.innerHTML = "";
+      this._renderSummaryPills(summary, {
+        samples: Array.isArray(out?.samples) ? out.samples.length : 0,
+        mean: this._formatNumber(out?.mean, 3),
+        min: this._formatNumber(out?.min, 3),
+        max: this._formatNumber(out?.max, 3),
+        high: out?.highCount ?? 0,
+      });
+
+      const frame = createElement("div", "leviathan-entropy-frame");
+      const canvas = createElement("canvas", "leviathan-entropy-canvas", {
+        width: "1200",
+        height: "260",
+      });
+      frame.appendChild(canvas);
+      container.appendChild(frame);
+
+      const samples = (out?.samples || []).map((v) => Number(v) || 0);
+      const offsets = (out?.offsets || []).map((v) => Number(v) || 0);
+      const step = Number(out?.step || out?.windowSize || 4096);
+      let dragStart = null;
+      let dragEnd = null;
+
+      const pointerIndex = (event) => {
+        const rect = canvas.getBoundingClientRect();
+        const ratio = Math.min(1, Math.max(0, (event.clientX - rect.left) / Math.max(rect.width, 1)));
+        return Math.min(samples.length - 1, Math.max(0, Math.round(ratio * (samples.length - 1))));
+      };
+      const draw = () => this._drawEntropyCanvas(canvas, samples, dragStart, dragEnd);
+
+      canvas.addEventListener("mousedown", (event) => {
+        if (!samples.length) return;
+        dragStart = pointerIndex(event);
+        dragEnd = dragStart;
+        draw();
+      });
+      canvas.addEventListener("mousemove", (event) => {
+        if (dragStart == null) return;
+        dragEnd = pointerIndex(event);
+        draw();
+      });
+      canvas.addEventListener("mouseup", () => {
+        if (dragStart == null || dragEnd == null || !offsets.length) {
+          dragStart = null;
+          dragEnd = null;
+          draw();
+          return;
+        }
+        const lo = Math.min(dragStart, dragEnd);
+        const hi = Math.max(dragStart, dragEnd);
+        const start = offsets[lo] || 0;
+        const end = (offsets[hi] || start) + step;
+        dragStart = null;
+        dragEnd = null;
+        draw();
+        if (end > start) this.openHexRange(start, end - start);
+      });
+      canvas.addEventListener("mouseleave", () => {
+        if (dragStart == null) return;
+        dragStart = null;
+        dragEnd = null;
+        draw();
+      });
+      requestAnimationFrame(draw);
+    }
+
+    _renderSearchResults(summary, container, out) {
+      const hits = out?.hits || [];
+      summary.innerHTML = "";
+      this._renderSummaryPills(summary, { hits: hits.length });
+      this._renderTable(container, hits, ["offset", "length", "sample"]);
+    }
+
+    _renderStrings(container, rows) {
+      this._renderTable(container, rows, ["offset", "length", "encoding", "value"]);
+    }
+
+    _renderCarve(summary, container, out) {
+      const rows = out?.items || [];
+      summary.innerHTML = "";
+      this._renderSummaryPills(summary, {
+        hits: rows.length,
+        exportable: rows.filter((row) => this._rowRange(row).length > 0).length,
+      });
+      this._renderTable(container, rows, ["offset", "length", "kind", "extension", "confidence", "status"], {
+        exportRows: true,
+        exportName: (row) => this._foundFileName(row, "carve"),
+      });
+    }
+
+    _renderBinsnoop(summary, container, out) {
+      const results = out?.results || {};
+      const rows = results.file_map || results.fileMap || [];
+      summary.innerHTML = "";
+      this._renderSummaryPills(summary, {
+        hits: rows.length,
+        scanned: formatBytes(results.scanned_bytes || results.document_bytes || this.state?.size || 0),
+        mode: results.whole_file ? "whole file" : "range",
+        window: results.windowed ? formatBytes(results.window_bytes || 0) : "full",
+      });
+      this._renderTable(container, rows, ["offset", "size", "name", "description", "confidence"], {
+        exportRows: true,
+        exportName: (row) => this._foundFileName(row, "binsnoop"),
+      });
+    }
+
+    _drawEntropyCanvas(canvas, samples, dragStart, dragEnd) {
+      const ctx = canvas.getContext("2d");
+      const width = canvas.width;
+      const height = canvas.height;
+      ctx.clearRect(0, 0, width, height);
+      ctx.fillStyle = "#101010";
+      ctx.fillRect(0, 0, width, height);
+      ctx.strokeStyle = "rgba(255,255,255,0.08)";
+      ctx.lineWidth = 1;
+      for (let i = 1; i < 8; i++) {
+        const y = height - (i / 8) * height;
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(width, y);
+        ctx.stroke();
+      }
+      if (dragStart != null && dragEnd != null) {
+        const lo = Math.min(dragStart, dragEnd);
+        const hi = Math.max(dragStart, dragEnd);
+        const x1 = (lo / Math.max(samples.length - 1, 1)) * width;
+        const x2 = (hi / Math.max(samples.length - 1, 1)) * width;
+        ctx.fillStyle = "rgba(78, 205, 196, 0.18)";
+        ctx.fillRect(x1, 0, Math.max(2, x2 - x1), height);
+      }
+      if (!samples.length) return;
+      ctx.strokeStyle = "#4ecdc4";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      samples.forEach((sample, index) => {
+        const x = (index / Math.max(samples.length - 1, 1)) * width;
+        const y = height - (Math.max(0, Math.min(8, sample)) / 8) * height;
+        if (index === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+      ctx.stroke();
+    }
+
+    _renderTable(container, rows, preferredColumns = null, options = {}) {
+      const sourceRows = rows || [];
+      const maxRows = options.maxRows || (options.exportRows ? sourceRows.length : 1000);
+      rows = sourceRows.slice(0, maxRows);
       if (!rows.length) {
         container.appendChild(createElement("div", "leviathan-empty", { textContent: "No rows." }));
         return;
       }
-      const preferred = ["offset", "length", "kind", "name", "category", "value", "sample", "summary", "iso", "type"];
+      const preferred = preferredColumns || ["offset", "length", "size", "kind", "name", "category", "value", "sample", "summary", "description", "iso", "type"];
       const all = Array.from(new Set(rows.flatMap((row) => Object.keys(row || {}))));
       const cols = [...preferred.filter((c) => all.includes(c)), ...all.filter((c) => !preferred.includes(c))].slice(0, 8);
+      if (options.exportRows) cols.push("export");
       const table = createElement("table", "leviathan-table");
       const thead = createElement("thead");
       const headRow = createElement("tr");
@@ -533,11 +876,104 @@
       const tbody = createElement("tbody");
       rows.forEach((row) => {
         const tr = createElement("tr");
-        cols.forEach((c) => tr.appendChild(createElement("td", "", { textContent: this._formatCell(row[c]) })));
+        cols.forEach((c) => {
+          const td = createElement("td");
+          if (c === "export") {
+            const range = this._rowRange(row);
+            if (range.length > 0) {
+              const btn = createElement("button", "btn btn-xs leviathan-export-found", {
+                type: "button",
+                textContent: "Export",
+              });
+              btn.addEventListener("click", () => this._exportFoundRange(row, options.exportName));
+              td.appendChild(btn);
+            } else {
+              td.appendChild(createElement("span", "leviathan-muted", { textContent: "No length" }));
+            }
+          } else if (c === "offset" && row[c] != null) {
+            const offset = Number(row[c]);
+            const length = Number(row.length || row.size || 256);
+            const btn = createElement("button", "leviathan-offset-link", {
+              type: "button",
+              textContent: this._hexOffset(offset),
+            });
+            btn.addEventListener("click", () => this.openHexRange(offset, Math.max(256, length || 256)));
+            td.appendChild(btn);
+          } else {
+            td.textContent = this._formatCell(row[c]);
+          }
+          tr.appendChild(td);
+        });
         tbody.appendChild(tr);
       });
       table.append(thead, tbody);
       container.appendChild(table);
+      if (sourceRows.length > rows.length) {
+        container.appendChild(createElement("div", "leviathan-table-note", {
+          textContent: `Showing ${rows.length} of ${sourceRows.length} rows.`,
+        }));
+      }
+    }
+
+    _rowRange(row) {
+      const offset = Number(row?.offset);
+      if (!Number.isFinite(offset) || offset < 0) return { offset: 0, length: 0 };
+      let length = Number(row.length ?? row.size ?? 0);
+      if ((!Number.isFinite(length) || length <= 0) && Number.isFinite(Number(row.end))) {
+        length = Number(row.end) - offset;
+      }
+      if ((!Number.isFinite(length) || length <= 0) && this.state?.size > offset) {
+        length = Number(this.state.size) - offset;
+      }
+      return {
+        offset,
+        length: Number.isFinite(length) ? Math.max(0, Math.floor(length)) : 0,
+      };
+    }
+
+    _foundFileName(row, prefix) {
+      const range = this._rowRange(row);
+      const label = String(row.kind || row.name || row.id || prefix || "found")
+        .toLowerCase()
+        .replace(/[^a-z0-9._-]+/g, "-")
+        .replace(/^-+|-+$/g, "")
+        .slice(0, 48) || "found";
+      const ext = String(row.extension || row.ext || "bin")
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "")
+        .slice(0, 12) || "bin";
+      return `${prefix || "found"}-${label}-${this._hexOffset(range.offset)}.${ext}`;
+    }
+
+    async _exportFoundRange(row, nameBuilder) {
+      const range = this._rowRange(row);
+      if (range.length <= 0) {
+        this.app.notifications.error("Export failed: finding has no readable range");
+        return;
+      }
+      const name = typeof nameBuilder === "function" ? nameBuilder(row) : this._foundFileName(row, "found");
+      try {
+        const path = await window.NexusTerminal.wailsService.LeviathanExportRange(name, range.offset, range.length);
+        if (path) this.app.notifications.success("Exported " + path);
+      } catch (err) {
+        this.app.notifications.error("Export failed: " + err);
+      }
+    }
+
+    _renderToolError(container, toolId, err) {
+      const message = String(err || "The tool could not complete.");
+      const isSquashMagic = toolId === "squashfs" && /magic|superblock|squash/i.test(message);
+      const state = createElement("div", isSquashMagic ? "leviathan-error-state leviathan-error-state-warning" : "leviathan-error-state");
+      const icon = createElement("div", "leviathan-error-icon", { "aria-hidden": "true" });
+      icon.appendChild(createElement("span", "", { textContent: "!" }));
+      const title = isSquashMagic ? "Not a SquashFS image" : "Tool could not run";
+      const body = isSquashMagic
+        ? "The loaded file does not start with a valid SquashFS superblock. Try another file, or inspect this one in the Hex Editor."
+        : message;
+      state.appendChild(icon);
+      state.appendChild(createElement("strong", "", { textContent: title }));
+      state.appendChild(createElement("p", "", { textContent: body }));
+      container.appendChild(state);
     }
 
     _renderTree(container, root) {
@@ -556,7 +992,7 @@
     }
 
     _stateAction(method, sessionId) {
-      return window.go.api.Service[method]()
+      return window.NexusTerminal.wailsService[method]()
         .then((state) => {
           this.applyState(state);
           const session = this.app.state.getSession(sessionId);
@@ -572,6 +1008,16 @@
       const row = createElement("label", "leviathan-param-inline");
       row.appendChild(createElement("span", "", { textContent: label }));
       const input = createElement("input", "form-input", { value });
+      row.appendChild(input);
+      return { row, input };
+    }
+
+    _selectInput(label, options, value) {
+      const row = createElement("label", "leviathan-param-inline");
+      row.appendChild(createElement("span", "", { textContent: label }));
+      const input = createElement("select", "form-input");
+      options.forEach(([optionValue, text]) => input.add(new Option(text, optionValue)));
+      input.value = value;
       row.appendChild(input);
       return { row, input };
     }
@@ -604,6 +1050,148 @@
       return raw !== "" && Number.isFinite(numeric) && !stringKeys.includes(field.key)
         ? numeric
         : raw;
+    }
+
+    openHexRange(start, length = 2048) {
+      const safeStart = Math.max(0, Math.floor(Number(start) || 0));
+      const safeLength = Math.max(256, Math.min(8192, Math.floor(Number(length) || 2048)));
+      this.openTool("hex", {
+        params: { start: safeStart, bytes: safeLength, width: 16 },
+      });
+    }
+
+    _sessionParams(sessionId) {
+      return this.app.state.getSession(sessionId)?.leviathanParams || {};
+    }
+
+    _currentHexSearchHit(sessionId) {
+      const state = this.hexSearches.get(sessionId);
+      if (!state || state.index < 0 || !state.hits?.length) return null;
+      const hit = state.hits[state.index];
+      return {
+        offset: Number(hit.offset || 0),
+        length: Number(hit.length || 1),
+      };
+    }
+
+    _gotoHexSearchHit(sessionId, direction, startInput, widthInput, load) {
+      const state = this.hexSearches.get(sessionId);
+      if (!state || !state.hits?.length) {
+        this._showHexSearchModal(sessionId, startInput, widthInput, load);
+        return;
+      }
+      state.index = (state.index + direction + state.hits.length) % state.hits.length;
+      const hit = state.hits[state.index];
+      const rowWidth = Number(widthInput.value || 16);
+      const offset = Number(hit.offset || 0);
+      startInput.value = String(Math.max(0, offset - (offset % rowWidth)));
+      load();
+    }
+
+    _showHexSearchModal(sessionId, startInput, widthInput, load) {
+      const backdrop = createElement("div", "modal-backdrop");
+      const modal = createElement("div", "modal modal-sm leviathan-search-modal");
+      const header = createElement("div", "modal-header");
+      header.appendChild(createElement("h3", "modal-title", { textContent: "Hex Search" }));
+      const closeBtn = createElement("button", "btn btn-icon btn-xs modal-close", {
+        type: "button",
+        textContent: "x",
+      });
+      header.appendChild(closeBtn);
+
+      const body = createElement("div", "modal-body");
+      const fields = createElement("div", "leviathan-modal-fields");
+      const mode = this._selectInput("mode", [
+        ["text", "String"],
+        ["hex", "Hex"],
+        ["regex", "Regex"],
+      ], "text");
+      const query = this._input("query", "");
+      fields.append(mode.row, query.row);
+      const status = createElement("div", "leviathan-status", { textContent: "" });
+      body.append(fields, status);
+
+      const footer = createElement("div", "modal-footer");
+      const cancel = createElement("button", "btn btn-sm", { type: "button", textContent: "Cancel" });
+      const run = createElement("button", "btn btn-sm btn-primary", { type: "button", textContent: "Search" });
+      footer.append(cancel, run);
+      modal.append(header, body, footer);
+      backdrop.appendChild(modal);
+      document.body.appendChild(backdrop);
+
+      const close = () => {
+        backdrop.classList.remove("is-visible");
+        modal.classList.remove("is-visible");
+        setTimeout(() => backdrop.remove(), 200);
+      };
+      const search = async () => {
+        try {
+          status.textContent = "Searching...";
+          const out = await window.NexusTerminal.wailsService.LeviathanRunTool("search", {
+            mode: mode.input.value,
+            query: query.input.value,
+            start: 0,
+            length: -1,
+            max: 5000,
+          });
+          const hits = (out.hits || []).map((hit) => ({
+            offset: Number(hit.offset || 0),
+            length: Number(hit.length || 1),
+            sample: hit.sample || "",
+          }));
+          this.hexSearches.set(sessionId, {
+            mode: mode.input.value,
+            query: query.input.value,
+            hits,
+            index: -1,
+          });
+          close();
+          if (hits.length) this._gotoHexSearchHit(sessionId, 1, startInput, widthInput, load);
+        } catch (err) {
+          status.textContent = String(err);
+        }
+      };
+
+      closeBtn.addEventListener("click", close);
+      cancel.addEventListener("click", close);
+      run.addEventListener("click", search);
+      query.input.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") search();
+      });
+      requestAnimationFrame(() => {
+        backdrop.classList.add("is-visible");
+        modal.classList.add("is-visible");
+        query.input.focus();
+      });
+    }
+
+    _metricCard(label, value) {
+      const item = createElement("div", "leviathan-metric");
+      item.appendChild(createElement("span", "", { textContent: label }));
+      item.appendChild(createElement("strong", "", { textContent: this._formatCell(value) }));
+      return item;
+    }
+
+    _kvSection(title, values, keys, bytes = false) {
+      const section = createElement("section", "leviathan-section");
+      section.appendChild(createElement("h3", "", { textContent: title }));
+      const list = createElement("div", "leviathan-kv-list");
+      keys.forEach((key) => {
+        if (values?.[key] == null) return;
+        const row = createElement("div", "leviathan-kv-row");
+        row.appendChild(createElement("span", "", { textContent: key }));
+        row.appendChild(createElement("strong", "", {
+          textContent: bytes ? formatBytes(Number(values[key]) || 0) : this._formatCell(values[key]),
+        }));
+        list.appendChild(row);
+      });
+      section.appendChild(list);
+      return section;
+    }
+
+    _formatNumber(value, digits = 2) {
+      const n = Number(value);
+      return Number.isFinite(n) ? n.toFixed(digits) : "0";
     }
 
     _renderSummaryPills(container, values) {

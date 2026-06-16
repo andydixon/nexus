@@ -172,7 +172,7 @@
           section: "Security",
           action: async () => {
             try {
-              await window.go.api.Service.LockSecretStore();
+              await window.NexusTerminal.wailsService.LockSecretStore();
               this.app.state.setSecretStoreState(false);
               this.app.notifications.info("Secret store locked");
             } catch (err) {
@@ -189,7 +189,7 @@
             try {
               const pw =
                 await this.app.secretPrompt.promptMasterPassword(false);
-              await window.go.api.Service.UnlockSecretStore(pw);
+              await window.NexusTerminal.wailsService.UnlockSecretStore(pw);
               this.app.state.setSecretStoreState(true);
               this.app.notifications.success("Secret store unlocked");
             } catch (err) {

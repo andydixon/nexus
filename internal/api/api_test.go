@@ -200,6 +200,24 @@ func TestWriteLeviathanDocumentFileWritesPatchedBytes(t *testing.T) {
 	}
 }
 
+func TestWriteLeviathanDocumentRangeFileWritesSelectedPatchedBytes(t *testing.T) {
+	doc := document.New("patched.bin", []byte("abcdef"))
+	if _, err := doc.Set(3, 'Z'); err != nil {
+		t.Fatalf("Set() failed: %v", err)
+	}
+	path := filepath.Join(t.TempDir(), "range.bin")
+	if err := writeLeviathanDocumentRangeFile(path, doc, 2, 3); err != nil {
+		t.Fatalf("writeLeviathanDocumentRangeFile() failed: %v", err)
+	}
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile() failed: %v", err)
+	}
+	if string(got) != "cZe" {
+		t.Fatalf("written bytes = %q, want %q", string(got), "cZe")
+	}
+}
+
 func TestReadLeviathanSmallFileRejectsOversizedFile(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "big.img")
 	if err := os.WriteFile(path, []byte("abcd"), 0600); err != nil {

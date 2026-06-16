@@ -41,7 +41,7 @@ class RecordingManager {
             const cols = entry ? entry.term.cols : 80;
             const rows = entry ? entry.term.rows : 24;
 
-            await window.go.api.Service.StartRecording(sessionId, cols, rows);
+            await window.NexusTerminal.wailsService.StartRecording(sessionId, cols, rows);
             this.activeSessions.add(sessionId);
             this._updateRecordingIndicator(sessionId, true);
             this.app.notifications.success('Recording started');
@@ -56,7 +56,7 @@ class RecordingManager {
      */
     async stop(sessionId) {
         try {
-            await window.go.api.Service.StopRecording(sessionId);
+            await window.NexusTerminal.wailsService.StopRecording(sessionId);
             this.activeSessions.delete(sessionId);
             this._updateRecordingIndicator(sessionId, false);
             this.app.notifications.success('Recording saved');
@@ -71,8 +71,8 @@ class RecordingManager {
     async openBrowser() {
         try {
             const [recordings, storageInfo] = await Promise.all([
-                window.go.api.Service.ListRecordings(),
-                window.go.api.Service.GetRecordingStorageInfo(),
+                window.NexusTerminal.wailsService.ListRecordings(),
+                window.NexusTerminal.wailsService.GetRecordingStorageInfo(),
             ]);
             this._showBrowserModal(recordings || [], storageInfo || {});
         } catch (err) {
@@ -86,7 +86,7 @@ class RecordingManager {
      */
     async playback(id) {
         try {
-            const data = await window.go.api.Service.GetRecording(id);
+            const data = await window.NexusTerminal.wailsService.GetRecording(id);
             this._showPlaybackModal(data);
         } catch (err) {
             this.app.notifications.error('Failed to load recording: ' + err);
@@ -99,7 +99,7 @@ class RecordingManager {
      */
     async deleteRecording(id) {
         try {
-            await window.go.api.Service.DeleteRecording(id);
+            await window.NexusTerminal.wailsService.DeleteRecording(id);
             this.app.notifications.success('Recording deleted');
         } catch (err) {
             this.app.notifications.error('Failed to delete recording: ' + err);
@@ -225,11 +225,11 @@ class RecordingManager {
             status.textContent = '';
             btn.disabled = true;
             try {
-                const result = await window.go.api.Service.CleanupRecordings(ageDays, maxBytes);
+                const result = await window.NexusTerminal.wailsService.CleanupRecordings(ageDays, maxBytes);
                 status.textContent = `Deleted ${result.deleted || 0}; freed ${_formatBytes(result.freedBytes || 0)}.`;
-                const fresh = await window.go.api.Service.ListRecordings();
+                const fresh = await window.NexusTerminal.wailsService.ListRecordings();
                 close();
-                this._showBrowserModal(fresh || [], await window.go.api.Service.GetRecordingStorageInfo());
+                this._showBrowserModal(fresh || [], await window.NexusTerminal.wailsService.GetRecordingStorageInfo());
             } catch (err) {
                 status.textContent = 'Cleanup failed: ' + err;
             } finally {
@@ -556,7 +556,7 @@ class ExportImportUI {
             }
 
             try {
-                const path = await window.go.api.Service.ExportProfilesEncrypted(selectedIds, password);
+                const path = await window.NexusTerminal.wailsService.ExportProfilesEncrypted(selectedIds, password);
                 this.app.notifications.success(`Exported ${selectedIds.length} profile(s) to ${path}`);
                 close();
             } catch (err) {
@@ -628,7 +628,7 @@ class ExportImportUI {
             try {
                 confirmBtn.disabled = true;
                 confirmBtn.textContent = 'Importing...';
-                const count = await window.go.api.Service.ImportProfilesEncrypted(password, strategy);
+                const count = await window.NexusTerminal.wailsService.ImportProfilesEncrypted(password, strategy);
                 this.app.notifications.success(`Imported ${count} profile(s)`);
                 await this.app.loadProfiles();
                 close();

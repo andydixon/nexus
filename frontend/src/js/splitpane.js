@@ -434,7 +434,7 @@ class SplitPaneManager {
         if (placeholder) placeholder.remove();
 
         // Connect via backend
-        window.go.api.Service.ConnectSession(profile.id).then(function(sessionInfo) {
+        window.NexusTerminal.wailsService.ConnectSession(profile.id).then(function(sessionInfo) {
             self.app.state.addSession(sessionInfo);
 
             // Create a terminal container inside this pane

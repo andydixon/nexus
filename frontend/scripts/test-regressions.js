@@ -23,6 +23,27 @@ function assertNotContains(file, needle, message) {
   }
 }
 
+function assertTreeNotContains(relDir, needle, message) {
+  const dir = path.join(repo, relDir);
+  const offenders = [];
+  const walk = (current) => {
+    for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
+      const full = path.join(current, entry.name);
+      if (entry.isDirectory()) {
+        walk(full);
+        continue;
+      }
+      if (!entry.isFile() || !entry.name.endsWith(".js")) continue;
+      const rel = path.relative(repo, full);
+      if (read(rel).includes(needle)) offenders.push(rel);
+    }
+  };
+  walk(dir);
+  if (offenders.length) {
+    throw new Error(`${message}\nUnexpected ${JSON.stringify(needle)} in ${offenders.join(", ")}`);
+  }
+}
+
 assertContains(
   "frontend/src/js/terminal.js",
   "escapeHtml(title)",
@@ -162,6 +183,106 @@ assertContains(
   "internal/leviathan/spectrogram/spectrogram.go",
   "github.com/hajimehoshi/go-mp3",
   "Leviathan spectrogram visualiser must support MP3 decoding",
+);
+assertNotContains(
+  "wails.json",
+  "\"obfuscated\": true",
+  "Wails obfuscation must stay disabled because this app embeds frontend/src and uses normal Wails globals",
+);
+assertNotContains(
+  "wails.json",
+  "\"garbleargs\"",
+  "garble arguments must not be configured when Wails obfuscation is disabled",
+);
+assertContains(
+  "frontend/index.html",
+  "wails-service.js",
+  "frontend must load the Wails service bridge before app code",
+);
+assertNotContains(
+  "frontend/index.html",
+  'type="module" src="/src/js/wails-service.js"',
+  "Wails bridge must load as a synchronous classic script before app code",
+);
+assertContains(
+  "frontend/src/js/wails-service.js",
+  'prop === "then"',
+  "Wails service proxy must not masquerade as a Promise thenable",
+);
+assertContains(
+  "frontend/src/js/wails-service.js",
+  "window.go?.api?.Service",
+  "Wails service bridge must use the normal named Wails API",
+);
+assertContains(
+  "frontend/scripts/build.js",
+  "sourceMappingURL",
+  "frontend production build must remove source-map references",
+);
+assertContains(
+  "frontend/scripts/build.js",
+  "bundle-novnc.js",
+  "frontend production build must regenerate the noVNC bundle",
+);
+assertContains(
+  "frontend/scripts/novnc-entry.js",
+  "initLogging(\"error\")",
+  "bundled noVNC logging must default to errors only",
+);
+assertNotContains(
+  "frontend/src/js/app.js",
+  "console.debug(\"[session:debug]\"",
+  "release UI must not print telnet negotiation debug events",
+);
+assertNotContains(
+  "frontend/src/js/app.js",
+  "console.log(\"Backend is ready\")",
+  "release UI must not print backend-ready lifecycle events",
+);
+assertContains(
+  "build.sh",
+  "NEXUS_COMPRESS",
+  "local builds must expose an explicit compression switch",
+);
+assertContains(
+  "scripts/build-common.sh",
+  "nexus_use_upx_for_target",
+  "build scripts must share one UPX target-selection helper",
+);
+assertContains(
+  "build.sh",
+  "Skipping UPX compression on macOS",
+  "local compressed builds must avoid unsupported macOS UPX by default",
+);
+assertContains(
+  "build.sh",
+  "-trimpath",
+  "local production builds should trim file paths from binaries",
+);
+assertContains(
+  "scripts/build-common.sh",
+  "-buildid=",
+  "production builds must strip the Go build ID",
+);
+assertContains(
+  "scripts/build-common.sh",
+  "-O2 -g0",
+  "production builds must remove cgo debug output by default",
+);
+assertContains(
+  "Makefile",
+  "build-compressed",
+  "Makefile must expose an explicit compressed build target",
+);
+assertContains(
+  "Makefile",
+  "NEXUS_FORCE_MACOS_UPX",
+  "Makefile compressed builds must make macOS UPX opt-in",
+);
+assertTreeNotContains(
+  "frontend/src/js",
+  "window.go.api.Service",
+  "app code must not call named Wails backend methods directly",
 );
 
 console.log("frontend regression checks passed");

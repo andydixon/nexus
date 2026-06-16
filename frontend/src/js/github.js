@@ -425,7 +425,7 @@
       this._statusEl.textContent = `Downloading ${repo.fullName}...`;
 
       try {
-        await window.go.api.Service.DownloadGitHubRepoArchive(
+        await window.NexusTerminal.wailsService.DownloadGitHubRepoArchive(
           this.sessionID,
           repo.fullName,
           ref,
@@ -441,7 +441,7 @@
       if (!this._statusEl) return;
       this._statusEl.textContent = "Refreshing…";
       try {
-        await window.go.api.Service.RefreshGitHubRepos(this.sessionID);
+        await window.NexusTerminal.wailsService.RefreshGitHubRepos(this.sessionID);
       } catch (err) {
         this.showError(err.message || "Refresh failed");
       }

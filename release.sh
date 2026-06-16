@@ -65,6 +65,7 @@ release_targets() {
 
 check_deps() {
     command -v go >/dev/null 2>&1 || { err "Go is not installed"; exit 1; }
+    export PATH="$PATH:$(go env GOPATH)/bin"
     command -v node >/dev/null 2>&1 || { err "Node.js is not installed"; exit 1; }
     command -v npm >/dev/null 2>&1 || { err "npm is not installed"; exit 1; }
     command -v zip >/dev/null 2>&1 || { err "zip is not installed"; exit 1; }
@@ -83,6 +84,8 @@ check_deps() {
             export PATH="$PATH:$(go env GOPATH)/bin"
         fi
     fi
+
+    ensure_upx
 }
 
 install_deps() {
@@ -103,6 +106,30 @@ build_version() {
 
 build_ldflags() {
     nexus_build_ldflags "$1"
+}
+
+ensure_upx() {
+    if ! nexus_bool_enabled "${NEXUS_COMPRESS:-0}"; then
+        return
+    fi
+    local requires_upx=0
+    local target
+    while IFS= read -r target; do
+        [ -n "$target" ] || continue
+        local target_os="${target%%/*}"
+        if nexus_use_upx_for_target "$target_os"; then
+            requires_upx=1
+            break
+        fi
+    done < <(release_targets)
+    if [ "$requires_upx" -eq 0 ]; then
+        return
+    fi
+    if command -v upx >/dev/null 2>&1; then
+        return
+    fi
+    err "NEXUS_COMPRESS=1 requires UPX. Install it first, for example: brew install upx"
+    exit 1
 }
 
 pick_cc() {
@@ -175,10 +202,24 @@ build_target() {
     fi
 
     log "Building ${platform}..."
+    nexus_configure_release_cgo
     local ldflags
     ldflags="$(build_ldflags "$version")"
     local tags
     tags="$(build_tags)"
+    local build_args=("-platform" "$platform" "-trimpath")
+    if nexus_use_upx_for_target "$target_os"; then
+        build_args+=("-upx")
+        if [ -n "${NEXUS_UPX_FLAGS:-}" ]; then
+            build_args+=("-upxflags" "$NEXUS_UPX_FLAGS")
+        fi
+    elif nexus_skips_upx_for_target "$target_os"; then
+        warn "Skipping UPX compression for ${platform}; distribute the zipped .app instead, or set NEXUS_FORCE_MACOS_UPX=1 with suitable NEXUS_UPX_FLAGS."
+    fi
+    if [ -n "$tags" ]; then
+        build_args+=("-tags" "$tags")
+    fi
+    build_args+=("-ldflags" "$ldflags" "-o" "$output_path")
     if [ -n "$cc" ]; then
         local cc_cmd="$cc"
         if [ -n "$zig_target" ]; then
@@ -188,22 +229,12 @@ build_target() {
                 cc_cmd="zig cc -target ${zig_target}-windows-gnu"
             fi
         fi
-        if [ -n "$tags" ]; then
-            if ! CC="$cc_cmd" CGO_ENABLED=1 wails build -platform "$platform" -tags "$tags" -ldflags "$ldflags" -o "$output_path"; then
-                warn "Build failed for ${platform}"
-                return 1
-            fi
-        elif ! CC="$cc_cmd" CGO_ENABLED=1 wails build -platform "$platform" -ldflags "$ldflags" -o "$output_path"; then
+        if ! CC="$cc_cmd" CGO_ENABLED=1 wails build "${build_args[@]}"; then
             warn "Build failed for ${platform}"
             return 1
         fi
     else
-        if [ -n "$tags" ]; then
-            if ! CGO_ENABLED=1 wails build -platform "$platform" -tags "$tags" -ldflags "$ldflags" -o "$output_path"; then
-                warn "Build failed for ${platform}"
-                return 1
-            fi
-        elif ! CGO_ENABLED=1 wails build -platform "$platform" -ldflags "$ldflags" -o "$output_path"; then
+        if ! CGO_ENABLED=1 wails build "${build_args[@]}"; then
             warn "Build failed for ${platform}"
             return 1
         fi

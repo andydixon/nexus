@@ -7,6 +7,10 @@ function Write-Info($Message) { Write-Host "[nexus] $Message" -ForegroundColor G
 function Write-Warn($Message) { Write-Host "[nexus] $Message" -ForegroundColor Yellow }
 function Write-Err($Message)  { Write-Host "[nexus] $Message" -ForegroundColor Red }
 
+function Test-BoolEnabled([string]$Value) {
+    return $Value -match '^(1|true|TRUE|yes|YES|on|ON)$'
+}
+
 function Get-WailsPath {
     $wails = Get-Command wails -ErrorAction SilentlyContinue
     if ($wails) { return $wails.Source }
@@ -67,7 +71,7 @@ function Get-BuildVersion {
 }
 
 function Get-Ldflags([string]$Version) {
-    $flags = "-s -w -X github.com/andydixon/nexus/internal/api.appVersion=$Version"
+    $flags = "-s -w -buildid= -X github.com/andydixon/nexus/internal/api.appVersion=$Version"
     if ($env:NEXUS_UPDATE_URL) {
         $flags += " -X github.com/andydixon/nexus/internal/api.appUpdateURL=$($env:NEXUS_UPDATE_URL)"
     }
@@ -88,8 +92,23 @@ function Build {
     $ldflags = Get-Ldflags $version
 
     $env:CGO_ENABLED = '1'
+    if (-not $env:CGO_CFLAGS) { $env:CGO_CFLAGS = '-O2 -g0' }
+    if (-not $env:CGO_CXXFLAGS) { $env:CGO_CXXFLAGS = '-O2 -g0' }
+
+    $buildArgs = @('build', '-trimpath')
+    if (Test-BoolEnabled $env:NEXUS_COMPRESS) {
+        if (-not (Get-Command upx -ErrorAction SilentlyContinue)) {
+            throw 'NEXUS_COMPRESS=1 requires UPX. Install it first.'
+        }
+        $buildArgs += '-upx'
+        if ($env:NEXUS_UPX_FLAGS) {
+            $buildArgs += @('-upxflags', $env:NEXUS_UPX_FLAGS)
+        }
+    }
+    $buildArgs += @('-ldflags', $ldflags)
+
     Write-Info 'Building production binary (CGO_ENABLED=1)...'
-    & $wailsPath build -ldflags $ldflags
+    & $wailsPath @buildArgs
     Write-Info 'Build complete: build\bin\'
 }
 

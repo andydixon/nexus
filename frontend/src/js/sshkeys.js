@@ -81,7 +81,7 @@
       list.innerHTML = '<div class="sshkey-loading">Loading keys…</div>';
 
       try {
-        const keys = await window.go.api.Service.ListSSHKeyPairs();
+        const keys = await window.NexusTerminal.wailsService.ListSSHKeyPairs();
         if (keys.length === 0) {
           list.innerHTML =
             '<div class="sshkey-empty">No SSH keys found in ~/.ssh/</div>';
@@ -133,7 +133,7 @@
 
     async _copyPublicKey(key) {
       try {
-        const pubKey = await window.go.api.Service.GetSSHPublicKey(key.name);
+        const pubKey = await window.NexusTerminal.wailsService.GetSSHPublicKey(key.name);
         if (window.runtime && window.runtime.ClipboardSetText) {
           window.runtime.ClipboardSetText(pubKey);
         } else {
@@ -158,7 +158,7 @@
 
     async _deleteKey(key) {
       try {
-        await window.go.api.Service.DeleteSSHKey(key.name);
+        await window.NexusTerminal.wailsService.DeleteSSHKey(key.name);
         this.app.notifications.success(`Key "${key.name}" deleted`);
         this._loadKeys();
       } catch (err) {
@@ -237,7 +237,7 @@
           }
 
           try {
-            await window.go.api.Service.GenerateSSHKey(
+            await window.NexusTerminal.wailsService.GenerateSSHKey(
               name,
               keyType,
               bits,

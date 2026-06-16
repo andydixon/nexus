@@ -6,6 +6,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
+source "$SCRIPT_DIR/scripts/build-common.sh"
 
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -29,6 +30,7 @@ fi
 export GOCACHE="${GOCACHE:-$SCRIPT_DIR/.cache/go-build}"
 export GOPATH="${GOPATH:-$SCRIPT_DIR/.cache/go}"
 mkdir -p "$GOCACHE" "$GOPATH"
+export PATH="$GOPATH/bin:$PATH"
 
 version_at_least() {
     local have="${1#go}"
@@ -91,6 +93,16 @@ wails_cmd() {
     fi
 }
 
+ensure_upx() {
+    if ! nexus_bool_enabled "${NEXUS_COMPRESS:-0}"; then
+        return
+    fi
+    if command -v upx >/dev/null 2>&1; then
+        return
+    fi
+    warn "UPX is not installed; compressed targets will be skipped unless the target does not use UPX."
+}
+
 linux_deps_ok() {
     command -v pkg-config >/dev/null 2>&1 || return 1
     pkg-config --exists gtk+-3.0 || return 1
@@ -132,6 +144,7 @@ check_deps() {
     command -v node >/dev/null 2>&1 || { err "Node.js is not installed"; exit 1; }
     command -v npm >/dev/null 2>&1 || { err "npm is not installed"; exit 1; }
     resolve_wails
+    ensure_upx
 
     log "Go:    $(go version)"
     log "Node:  $(node --version)"
@@ -197,12 +210,31 @@ build_target() {
     local host="$3"
     local host_arch_value="$4"
     local version="$5"
+    local platform="${target_os}/${target_arch}"
+    nexus_configure_release_cgo
     local ldflags
     ldflags="$(build_ldflags "${version}")"
     local tags
     tags="$(build_tags)"
+    local build_args=("-platform" "$target_os/$target_arch" "-trimpath")
+    if nexus_use_upx_for_target "$target_os"; then
+        if ! command -v upx >/dev/null 2>&1; then
+            warn "Skipping ${platform} (NEXUS_COMPRESS=1 requires UPX)"
+            ((SKIPPED_TARGETS += 1))
+            return 0
+        fi
+        build_args+=("-upx")
+        if [ -n "${NEXUS_UPX_FLAGS:-}" ]; then
+            build_args+=("-upxflags" "$NEXUS_UPX_FLAGS")
+        fi
+    elif nexus_skips_upx_for_target "$target_os"; then
+        warn "Skipping UPX compression for ${platform}; distribute the zipped .app instead, or set NEXUS_FORCE_MACOS_UPX=1 with suitable NEXUS_UPX_FLAGS."
+    fi
+    if [ -n "$tags" ]; then
+        build_args+=("-tags" "$tags")
+    fi
+    build_args+=("-ldflags" "$ldflags")
 
-    local platform="${target_os}/${target_arch}"
     local cc=""
 
     if [ "$target_os" = "linux" ] && ! linux_deps_ok; then
@@ -222,17 +254,9 @@ build_target() {
 
     log "Building ${platform}…"
     if [ -n "$cc" ]; then
-        if [ -n "$tags" ]; then
-            CC="$cc" CGO_ENABLED=1 wails_cmd build -platform "$platform" -tags "$tags" -ldflags "$ldflags"
-        else
-            CC="$cc" CGO_ENABLED=1 wails_cmd build -platform "$platform" -ldflags "$ldflags"
-        fi
+        CC="$cc" CGO_ENABLED=1 wails_cmd build "${build_args[@]}"
     else
-        if [ -n "$tags" ]; then
-            CGO_ENABLED=1 wails_cmd build -platform "$platform" -tags "$tags" -ldflags "$ldflags"
-        else
-            CGO_ENABLED=1 wails_cmd build -platform "$platform" -ldflags "$ldflags"
-        fi
+        CGO_ENABLED=1 wails_cmd build "${build_args[@]}"
     fi
     ((BUILT_TARGETS += 1))
 }

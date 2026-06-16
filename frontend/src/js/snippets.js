@@ -92,7 +92,7 @@
     _sendCommand(sessionId, command) {
       try {
         const b64 = window.NexusTerminal.utf8ToBase64(command + "\n");
-        window.go.api.Service.WriteSession(sessionId, b64);
+        window.NexusTerminal.wailsService.WriteSession(sessionId, b64);
         this.app.notifications.info("Snippet sent");
       } catch (err) {
         this.app.notifications.error("Failed to send snippet: " + err);
@@ -171,7 +171,7 @@
     /** @private */
     async _loadSnippets() {
       try {
-        this.snippets = (await window.go.api.Service.ListSnippets()) || [];
+        this.snippets = (await window.NexusTerminal.wailsService.ListSnippets()) || [];
       } catch (err) {
         this.snippets = [];
         console.error("Failed to load snippets:", err);
@@ -334,7 +334,7 @@
       });
       deleteBtn.addEventListener("click", async () => {
         try {
-          await window.go.api.Service.DeleteSnippet(snippet.id);
+          await window.NexusTerminal.wailsService.DeleteSnippet(snippet.id);
           this.snippets = this.snippets.filter((s) => s.id !== snippet.id);
           this._renderList(modal, closeFn);
           detailPanel.innerHTML =
@@ -418,10 +418,10 @@
 
             let saved;
             if (isNew) {
-              saved = await window.go.api.Service.CreateSnippet(data);
+              saved = await window.NexusTerminal.wailsService.CreateSnippet(data);
               this.snippets.push(saved);
             } else {
-              saved = await window.go.api.Service.UpdateSnippet(data);
+              saved = await window.NexusTerminal.wailsService.UpdateSnippet(data);
               const idx = this.snippets.findIndex((s) => s.id === saved.id);
               if (idx !== -1) this.snippets[idx] = saved;
             }

@@ -119,6 +119,7 @@
       if (session) {
         this.app.sidebar.highlightActive(session.profileId);
       }
+      this.app.leviathan?.handleTabFocus?.(sessionId);
 
       // Fit and refresh the terminal for the newly active session.
       // Double-RAF ensures the panel has layout dimensions before fitting.
@@ -169,7 +170,7 @@
       }
 
       try {
-        await window.go.api.Service.DisconnectSession(sessionId);
+        await window.NexusTerminal.wailsService.DisconnectSession(sessionId);
       } catch (_) {
         // Session may already be closed — carry on
       }

@@ -48,13 +48,13 @@
       this._activeTab = tabKey || this._activeTab || "general";
 
       try {
-        this._knownHosts = (await window.go.api.Service.ListKnownHosts()) || [];
+        this._knownHosts = (await window.NexusTerminal.wailsService.ListKnownHosts()) || [];
       } catch (_) {
         this._knownHosts = [];
       }
 
       try {
-        this._defaultShell = await window.go.api.Service.GetDefaultShell();
+        this._defaultShell = await window.NexusTerminal.wailsService.GetDefaultShell();
       } catch (_) {
         this._defaultShell = "";
       }
@@ -88,7 +88,7 @@
       this._collectValues();
 
       try {
-        await window.go.api.Service.SavePreferences(this._prefs);
+        await window.NexusTerminal.wailsService.SavePreferences(this._prefs);
         this.app.state.setPreferences(this._prefs);
 
         // Apply terminal colour theme change immediately.
@@ -312,7 +312,7 @@
       });
       browseBtn.addEventListener("click", async () => {
         try {
-          const path = await window.go.api.Service.BrowseForShell();
+          const path = await window.NexusTerminal.wailsService.BrowseForShell();
           if (path) {
             shellInput.value = path;
           }
@@ -429,7 +429,7 @@
         initBtn.addEventListener("click", async () => {
           try {
             const pw = await this.app.secretPrompt.promptMasterPassword(true);
-            await window.go.api.Service.InitialiseSecretStore(pw);
+            await window.NexusTerminal.wailsService.InitialiseSecretStore(pw);
             this.app.state.setSecretStoreInitialised(true);
             this.app.state.setSecretStoreState(true);
             this.app.notifications.success("Secret store created");
@@ -448,7 +448,7 @@
         unlockBtn.addEventListener("click", async () => {
           try {
             const pw = await this.app.secretPrompt.promptMasterPassword(false);
-            await window.go.api.Service.UnlockSecretStore(pw);
+            await window.NexusTerminal.wailsService.UnlockSecretStore(pw);
             this.app.state.setSecretStoreState(true);
             this.app.notifications.success("Secret store unlocked");
             this._renderTabContent(body);
@@ -465,7 +465,7 @@
         });
         lockBtn.addEventListener("click", async () => {
           try {
-            await window.go.api.Service.LockSecretStore();
+            await window.NexusTerminal.wailsService.LockSecretStore();
             this.app.state.setSecretStoreState(false);
             this.app.notifications.info("Secret store locked");
             this._renderTabContent(body);
@@ -522,7 +522,7 @@
         });
         deleteBtn.addEventListener("click", async () => {
           try {
-            await window.go.api.Service.DeleteKnownHost(kh.id);
+            await window.NexusTerminal.wailsService.DeleteKnownHost(kh.id);
             this._knownHosts = this._knownHosts.filter((h) => h.id !== kh.id);
             this._renderTabContent(body);
             this.app.notifications.success("Known host removed");
@@ -911,8 +911,8 @@
 
       const versionEl = body.querySelector("[data-role='app-version']");
       if (versionEl) {
-        if (window.go && window.go.api && window.go.api.Service) {
-          window.go.api.Service.GetAppInfo()
+        if (window.NexusTerminal?.wailsService) {
+          window.NexusTerminal.wailsService.GetAppInfo()
             .then((info) => {
               const version = (info && info.version) || "dev";
               versionEl.textContent = `Version ${version}`;
@@ -931,7 +931,7 @@
           updateBtn.disabled = true;
           updateBtn.textContent = "Checking…";
           try {
-            const info = await window.go.api.Service.CheckForUpdates();
+            const info = await window.NexusTerminal.wailsService.CheckForUpdates();
             const resultEl = body.querySelector("#settings-update-result");
             if (this.app && typeof this.app.setUpdateInfo === "function") {
               this.app.setUpdateInfo(info);
@@ -979,7 +979,7 @@
           importBtn.disabled = true;
           importBtn.textContent = "Importing…";
           try {
-            const count = await window.go.api.Service.ImportSSHConfig(
+            const count = await window.NexusTerminal.wailsService.ImportSSHConfig(
               "",
               "SSH Config",
             );

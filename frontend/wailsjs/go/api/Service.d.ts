@@ -96,6 +96,8 @@ export function IsSecretStoreUnlocked():Promise<boolean>;
 
 export function LeviathanExportJSON(arg1:string,arg2:Record<string, any>):Promise<string>;
 
+export function LeviathanExportRange(arg1:string,arg2:number,arg3:number):Promise<string>;
+
 export function LeviathanLoadFile(arg1:string,arg2:boolean):Promise<Record<string, any>>;
 
 export function LeviathanOpenCompare():Promise<Record<string, any>>;

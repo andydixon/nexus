@@ -28,6 +28,7 @@ const requiredFiles = [
   'dist/src/js/lib/xterm-addon-fit.min.js',
   'dist/src/js/lib/xterm-addon-search.min.js',
   'dist/src/js/lib/xterm-addon-web-links.min.js',
+  'dist/src/js/wails-service.js',
 ];
 
 /**
@@ -47,11 +48,66 @@ function copyDirSync(src, dest) {
 }
 
 /**
+ * Copies one file and creates the parent directory if needed.
+ */
+function copyFileSync(src, dest) {
+  fs.mkdirSync(path.dirname(dest), { recursive: true });
+  fs.copyFileSync(src, dest);
+}
+
+/**
  * Removes a directory tree if it exists.
  */
 function cleanDir(dir) {
   if (fs.existsSync(dir)) {
     fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+function copyWailsRuntimeBindings(srcRoot, destRoot) {
+  const runtimeFiles = [
+    'go/api/Service.js',
+    'runtime/runtime.js',
+  ];
+
+  for (const relPath of runtimeFiles) {
+    const src = path.join(srcRoot, relPath);
+    if (fs.existsSync(src)) {
+      copyFileSync(src, path.join(destRoot, relPath));
+    }
+  }
+}
+
+function walkFiles(dir, predicate, files = []) {
+  if (!fs.existsSync(dir)) return files;
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      walkFiles(full, predicate, files);
+    } else if (entry.isFile() && predicate(full)) {
+      files.push(full);
+    }
+  }
+  return files;
+}
+
+function cleanupDistAssets() {
+  console.log('[build] Cleaning production frontend assets...');
+  const sourceMapFiles = walkFiles(distDir, (file) => file.endsWith('.js') || file.endsWith('.css'));
+  let mapCommentCount = 0;
+  for (const file of sourceMapFiles) {
+    const input = fs.readFileSync(file, 'utf8');
+    const output = input
+      .replace(/(?:\r?\n)?\/\/# sourceMappingURL=.*?(?=\r?\n|$)/g, '')
+      .replace(/(?:\r?\n)?\/\*# sourceMappingURL=.*?\*\/(?=\r?\n|$)/g, '');
+    if (output !== input) {
+      fs.writeFileSync(file, output);
+      mapCommentCount += 1;
+    }
+  }
+
+  if (mapCommentCount > 0) {
+    console.log(`[build] Removed ${mapCommentCount} source-map reference(s).`);
   }
 }
 
@@ -65,6 +121,10 @@ function copyAssets() {
     cwd:   frontendDir,
     stdio: 'inherit',
   });
+  execSync('node scripts/bundle-novnc.js', {
+    cwd:   frontendDir,
+    stdio: 'inherit',
+  });
 }
 
 /**
@@ -72,6 +132,7 @@ function copyAssets() {
  *   dist/index.html
  *   dist/src/css/  (application + lib stylesheets)
  *   dist/src/js/   (application + lib scripts)
+ *   dist/wailsjs/  (generated backend bindings, if present)
  *   dist/src/components/  (if present)
  *   dist/src/assets/      (if present)
  */
@@ -92,6 +153,13 @@ function buildDist() {
   const srcDir = path.join(frontendDir, 'src');
   if (fs.existsSync(srcDir)) {
     copyDirSync(srcDir, path.join(distDir, 'src'));
+  }
+
+  // Copy only runtime Wails bindings so embedded production assets do not
+  // carry TypeScript declarations and model files.
+  const wailsjsDir = path.join(frontendDir, 'wailsjs');
+  if (fs.existsSync(wailsjsDir)) {
+    copyWailsRuntimeBindings(wailsjsDir, path.join(distDir, 'wailsjs'));
   }
 
   console.log('[build] dist/ assembled.');
@@ -151,6 +219,7 @@ try {
 }
 
 buildDist();
+cleanupDistAssets();
 
 if (!validate()) {
   console.error('[build] Validation failed — some required files are missing.');

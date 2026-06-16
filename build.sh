@@ -29,6 +29,7 @@ fi
 export GOCACHE="${GOCACHE:-$SCRIPT_DIR/.cache/go-build}"
 export GOPATH="${GOPATH:-$SCRIPT_DIR/.cache/go}"
 mkdir -p "$GOCACHE" "$GOPATH"
+export PATH="$GOPATH/bin:$PATH"
 
 version_at_least() {
     local have="${1#go}"
@@ -91,6 +92,20 @@ wails_cmd() {
     fi
 }
 
+ensure_upx() {
+    if ! nexus_bool_enabled "${NEXUS_COMPRESS:-0}"; then
+        return
+    fi
+    if nexus_skips_upx_for_target "$(host_os)"; then
+        return
+    fi
+    if command -v upx >/dev/null 2>&1; then
+        return
+    fi
+    err "NEXUS_COMPRESS=1 requires UPX. Install it first, for example: brew install upx"
+    exit 1
+}
+
 check_linux_deps() {
     if [ "$(uname -s)" != "Linux" ]; then
         return
@@ -122,6 +137,14 @@ build_tags() {
     nexus_build_tags
 }
 
+host_os() {
+    case "$(uname -s)" in
+        Darwin) echo "darwin" ;;
+        Linux) echo "linux" ;;
+        *) echo "unknown" ;;
+    esac
+}
+
 build_version() {
     nexus_build_version
 }
@@ -137,6 +160,7 @@ check_deps() {
     command -v npm >/dev/null 2>&1 || { err "npm is not installed"; exit 1; }
     check_linux_deps
     resolve_wails
+    ensure_upx
 
     log "All prerequisites found"
     log "Go:    $(go version)"
@@ -176,11 +200,24 @@ build() {
     version="$(build_version)"
     local tags
     tags="$(build_tags)"
+    nexus_configure_release_cgo
+    local build_args=("-trimpath")
+    if nexus_bool_enabled "${NEXUS_COMPRESS:-0}"; then
+        if nexus_skips_upx_for_target "$(host_os)"; then
+            warn "Skipping UPX compression on macOS; distribute the zipped .app instead, or set NEXUS_FORCE_MACOS_UPX=1 with suitable NEXUS_UPX_FLAGS."
+        else
+            log "Using UPX compression"
+            build_args+=("-upx")
+            if [ -n "${NEXUS_UPX_FLAGS:-}" ]; then
+                build_args+=("-upxflags" "$NEXUS_UPX_FLAGS")
+            fi
+        fi
+    fi
     if [ -n "$tags" ]; then
         log "Using Wails build tags: ${tags}"
-        wails_cmd build -tags "$tags" -ldflags "$(build_ldflags "${version}")"
+        wails_cmd build "${build_args[@]}" -tags "$tags" -ldflags "$(build_ldflags "${version}")"
     else
-        wails_cmd build -ldflags "$(build_ldflags "${version}")"
+        wails_cmd build "${build_args[@]}" -ldflags "$(build_ldflags "${version}")"
     fi
 
     # Replace Wails-generated icon with custom app icon on macOS.

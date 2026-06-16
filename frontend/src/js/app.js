@@ -73,10 +73,9 @@
     }
 
     /**
-     * Polls for `window.go` and `window.runtime` to become available.
-     * Wails injects these into the webview; on fast machines they are
-     * present before DOMContentLoaded, but on slower starts there may
-     * be a brief delay.
+     * Polls for the Wails runtime and generated binding bridge.
+     * Application code uses wailsService as a small compatibility layer over
+     * the normal Wails backend global.
      * @returns {Promise<void>}
      * @private
      */
@@ -85,7 +84,11 @@
         const maxWait = 5000;
         const start = Date.now();
         const check = () => {
-          if (window.go && window.runtime) {
+          const hasBridge =
+            typeof window.NexusTerminal?.hasWailsService === "function"
+              ? window.NexusTerminal.hasWailsService()
+              : Boolean(window.NexusTerminal?.wailsService && window.runtime);
+          if (window.NexusTerminal?.wailsService && hasBridge) {
             resolve();
           } else if (Date.now() - start < maxWait) {
             setTimeout(check, 50);
@@ -98,7 +101,9 @@
             resolve();
           }
         };
-        check();
+        Promise.resolve(window.NexusTerminal?.wailsServiceReady)
+          .catch(() => null)
+          .finally(check);
       });
     }
 
@@ -109,7 +114,7 @@
      */
     async loadProfiles() {
       try {
-        const profiles = await window.go.api.Service.ListProfiles();
+        const profiles = await window.NexusTerminal.wailsService.ListProfiles();
         this.state.setProfiles(profiles || []);
         this.sidebar.render();
       } catch (err) {
@@ -122,7 +127,7 @@
      */
     async loadPreferences() {
       try {
-        const prefs = await window.go.api.Service.GetPreferences();
+        const prefs = await window.NexusTerminal.wailsService.GetPreferences();
         this.state.setPreferences(prefs || {});
         this._applyPreferences();
       } catch (err) {
@@ -137,10 +142,10 @@
     async checkSecretStore() {
       try {
         const initialised =
-          await window.go.api.Service.IsSecretStoreInitialised();
+          await window.NexusTerminal.wailsService.IsSecretStoreInitialised();
         this.state.setSecretStoreInitialised(!!initialised);
         if (initialised) {
-          const unlocked = await window.go.api.Service.IsSecretStoreUnlocked();
+          const unlocked = await window.NexusTerminal.wailsService.IsSecretStoreUnlocked();
           this.state.setSecretStoreState(!!unlocked);
         } else {
           this.state.setSecretStoreState(false);
@@ -218,7 +223,7 @@
           if (entry) {
             const { cols, rows } = entry.term;
             try {
-              window.go.api.Service.ResizeSession(
+              window.NexusTerminal.wailsService.ResizeSession(
                 payload.sessionID,
                 cols,
                 rows,
@@ -316,14 +321,12 @@
         this.recordings._updateRecordingIndicator(payload.sessionID, false);
       });
 
-      // Telnet negotiation debug messages
-      window.runtime.EventsOn("session:debug", (payload) => {
-        console.debug("[session:debug]", payload);
-      });
+      // Telnet negotiation debug messages are intentionally ignored in release UI.
+      window.runtime.EventsOn("session:debug", () => {});
 
       // Backend ready event (emitted from DomReady)
       window.runtime.EventsOn("backend:ready", () => {
-        console.log("Backend is ready");
+        // Lifecycle signal only.
       });
 
       // Host key verification requests
@@ -380,7 +383,7 @@
      */
     async closeSessionImmediate(sessionId) {
       try {
-        await window.go.api.Service.DisconnectSession(sessionId);
+        await window.NexusTerminal.wailsService.DisconnectSession(sessionId);
       } catch (_) {
         // Ignore failures; we still want to clean up locally.
       }
@@ -816,7 +819,7 @@
 
       try {
         const sessionInfo =
-          await window.go.api.Service.ConnectSession(profileId);
+          await window.NexusTerminal.wailsService.ConnectSession(profileId);
         this.state.addSession(sessionInfo);
         this.tabs.addTab(sessionInfo);
 
@@ -859,7 +862,7 @@
      */
     async connectLocal() {
       try {
-        const sessionInfo = await window.go.api.Service.ConnectLocal();
+        const sessionInfo = await window.NexusTerminal.wailsService.ConnectLocal();
         this.state.addSession(sessionInfo);
         this.tabs.addTab(sessionInfo);
 
@@ -986,7 +989,7 @@
           displayName: result.host,
           tags: [],
         };
-        const sessionInfo = await window.go.api.Service.ConnectQuick(profile);
+        const sessionInfo = await window.NexusTerminal.wailsService.ConnectQuick(profile);
         this.state.addSession(sessionInfo);
         this.tabs.addTab(sessionInfo);
 
@@ -1229,9 +1232,9 @@
       this._latencySessionID = sessionID;
 
       const doPing = async () => {
-        if (!window.go || !window.go.api || !window.go.api.Service) return;
+        if (!window.NexusTerminal?.wailsService) return;
         try {
-          const ms = await window.go.api.Service.PingSession(sessionID);
+          const ms = await window.NexusTerminal.wailsService.PingSession(sessionID);
           const el = document.getElementById("status-latency");
           if (el && this._latencySessionID === sessionID) {
             el.textContent = ms + " ms";
@@ -1266,12 +1269,12 @@
     }
 
     async checkForUpdates(silent) {
-      if (!window.go || !window.go.api || !window.go.api.Service) {
+      if (!window.NexusTerminal?.wailsService) {
         return;
       }
 
       try {
-        const info = await window.go.api.Service.CheckForUpdates();
+        const info = await window.NexusTerminal.wailsService.CheckForUpdates();
         this.setUpdateInfo(info);
         if (!silent && info && info.available) {
           this.notifications.info(

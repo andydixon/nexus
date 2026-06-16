@@ -155,7 +155,7 @@
             const data = seq.repeat(lines);
             const b64 = utf8ToBase64(data);
             try {
-              window.go.api.Service.WriteSession(sessionId, b64);
+              window.NexusTerminal.wailsService.WriteSession(sessionId, b64);
             } catch (_) {
               /* non-critical */
             }
@@ -251,7 +251,7 @@
       term.onData((data) => {
         try {
           const b64 = utf8ToBase64(data);
-          window.go.api.Service.WriteSession(sessionId, b64);
+          window.NexusTerminal.wailsService.WriteSession(sessionId, b64);
 
           // Broadcast to other connected sessions if enabled
           if (this.app.state.broadcastMode) {
@@ -263,7 +263,7 @@
               const otherSession = this.app.state.getSession(otherId);
               if (otherSession && otherSession.state === "connected") {
                 try {
-                  window.go.api.Service.WriteSession(otherId, b64);
+                  window.NexusTerminal.wailsService.WriteSession(otherId, b64);
                 } catch (_) {
                   /* non-critical */
                 }
@@ -331,7 +331,7 @@
       // Notify backend when terminal dimensions change
       term.onResize(({ cols, rows }) => {
         try {
-          window.go.api.Service.ResizeSession(sessionId, cols, rows);
+          window.NexusTerminal.wailsService.ResizeSession(sessionId, cols, rows);
         } catch (err) {
           console.error("ResizeSession error:", err);
         }
@@ -895,7 +895,7 @@
       const totalBytes = typeof file.size === "number" ? file.size : 0;
       let uploadId = "";
       try {
-        uploadId = await window.go.api.Service.SFTPUploadStart(
+        uploadId = await window.NexusTerminal.wailsService.SFTPUploadStart(
           sessionId,
           remoteDir,
           file.name,
@@ -906,14 +906,14 @@
           const end = Math.min(offset + UPLOAD_CHUNK_BYTES, totalBytes);
           const buffer = await this._readFileSlice(file, offset, end);
           const base64Data = this._arrayBufferToBase64(buffer);
-          await window.go.api.Service.SFTPUploadChunk(uploadId, base64Data);
+          await window.NexusTerminal.wailsService.SFTPUploadChunk(uploadId, base64Data);
         }
 
-        await window.go.api.Service.SFTPUploadFinish(uploadId);
+        await window.NexusTerminal.wailsService.SFTPUploadFinish(uploadId);
       } catch (err) {
         if (uploadId) {
           try {
-            await window.go.api.Service.SFTPUploadCancel(uploadId);
+            await window.NexusTerminal.wailsService.SFTPUploadCancel(uploadId);
           } catch (_) {
             /* noop */
           }
@@ -1167,12 +1167,12 @@
           renderLoading();
           try {
             const targetPath =
-              path || (await window.go.api.Service.SFTPPwd(sessionId));
-            const files = await window.go.api.Service.SFTPList(
+              path || (await window.NexusTerminal.wailsService.SFTPPwd(sessionId));
+            const files = await window.NexusTerminal.wailsService.SFTPList(
               sessionId,
               targetPath,
             );
-            const stat = await window.go.api.Service.SFTPStat(
+            const stat = await window.NexusTerminal.wailsService.SFTPStat(
               sessionId,
               targetPath,
             );
@@ -1446,7 +1446,7 @@
       const renderForwards = async () => {
         try {
           const forwards =
-            (await window.go.api.Service.ListPortForwards(sessionId)) || [];
+            (await window.NexusTerminal.wailsService.ListPortForwards(sessionId)) || [];
           listEl.innerHTML = "";
           if (forwards.length === 0) {
             listEl.innerHTML =
@@ -1472,7 +1472,7 @@
             });
             stopBtn.addEventListener("click", async () => {
               try {
-                await window.go.api.Service.StopPortForward(sessionId, fwd.id);
+                await window.NexusTerminal.wailsService.StopPortForward(sessionId, fwd.id);
                 self.app.notifications.info("Forward stopped");
                 renderForwards();
               } catch (err) {
@@ -1517,7 +1517,7 @@
         }
 
         try {
-          await window.go.api.Service.StartPortForward(sessionId, {
+          await window.NexusTerminal.wailsService.StartPortForward(sessionId, {
             id: "",
             direction: direction,
             bindHost: bindHost,

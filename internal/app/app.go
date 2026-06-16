@@ -110,8 +110,6 @@ func (a *App) Startup(ctx context.Context) {
 	// Wire the API service with all backing stores now that they exist.
 	*a.Service = *api.NewService(store, a.SecretStore, a.KeychainStore, a.SessionManager, a.AuditLog, a.Prefs)
 	a.Service.SetContext(ctx)
-
-	log.Printf("Nexus Terminal initialised – data directory: %s", cfg.DataDir)
 }
 
 // Shutdown is called by Wails when the application is closing. It ensures all
@@ -134,8 +132,6 @@ func (a *App) Shutdown(ctx context.Context) {
 	if a.SecretStore != nil {
 		a.SecretStore.Lock()
 	}
-
-	log.Println("Nexus Terminal shut down cleanly")
 }
 
 // DomReady is called by Wails once the frontend DOM is fully loaded. It emits
@@ -144,7 +140,6 @@ func (a *App) DomReady(ctx context.Context) {
 	runtime.EventsEmit(ctx, "backend:ready", map[string]interface{}{
 		"message": "Backend is ready",
 	})
-	log.Println("DOM ready – backend:ready event emitted")
 }
 
 // EmitOpenAbout tells the frontend to open the About tab.

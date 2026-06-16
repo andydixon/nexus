@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -236,6 +237,44 @@ func (s *Service) LeviathanExportJSON(name string, value map[string]any) (string
 	return path, os.WriteFile(path, b, 0600)
 }
 
+// LeviathanExportRange prompts for a destination and streams a document range to disk.
+func (s *Service) LeviathanExportRange(name string, start, length int64) (string, error) {
+	engine := s.leviathanEngine()
+	engine.mu.Lock()
+	if engine.doc == nil {
+		engine.mu.Unlock()
+		return "", errors.New("open a file first")
+	}
+	doc := engine.doc
+	engine.mu.Unlock()
+
+	if s.ctx == nil {
+		return "", fmt.Errorf("application context not set")
+	}
+	if start < 0 {
+		return "", errors.New("export start must be non-negative")
+	}
+	if length <= 0 {
+		return "", errors.New("this finding does not have a known exportable length")
+	}
+	size := doc.Size()
+	if start >= size {
+		return "", errors.New("export start is outside the document")
+	}
+	if length > size-start {
+		length = size - start
+	}
+	defaultName := fmt.Sprintf("leviathan-%08x.bin", uint64(start))
+	path, err := wailsRuntime.SaveFileDialog(s.ctx, wailsRuntime.SaveDialogOptions{
+		Title:           "Export Found File",
+		DefaultFilename: safeExportName(name, defaultName),
+	})
+	if err != nil || path == "" {
+		return "", err
+	}
+	return path, writeLeviathanDocumentRangeFile(path, doc, start, length)
+}
+
 func (l *leviathanState) stateLocked() leviathanDocState {
 	state := leviathanDocState{}
 	if l.doc != nil {
@@ -323,12 +362,8 @@ func (l *leviathanState) runToolLocked(tool string, params map[string]any) (map[
 		entries, err := fs.Walk()
 		return map[string]any{"superblock": fs.Superblock(), "compression": fs.CompressionName(), "entries": entries}, err
 	case "binsnoop":
-		buf, err := l.rangeBytes(0, min64(l.doc.Size(), int64Param(params, "maxBytes", 64<<20)))
-		if err != nil {
-			return nil, err
-		}
-		scanner := binsnoop.New()
-		return map[string]any{"results": scanner.AnalyzeBytes(buf, l.doc.Name(), false), "signatures": binsnoop.ListSignatures()}, nil
+		results, err := leviathanBinsnoopDocument(l.doc, intParam(params, "max", 10000))
+		return map[string]any{"results": results, "signatures": binsnoop.ListSignatures()}, err
 	case "rules":
 		rules, err := analysis.ParseRules(stringParam(params, "source", ""))
 		if err != nil {
@@ -565,12 +600,16 @@ func (s *Service) leviathanSpectrogramInsert(doc *document.Document, params map[
 }
 
 func writeLeviathanDocumentFile(path string, doc *document.Document) error {
+	return writeLeviathanDocumentRangeFile(path, doc, 0, doc.Size())
+}
+
+func writeLeviathanDocumentRangeFile(path string, doc *document.Document, start, length int64) error {
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
 	if err != nil {
 		return err
 	}
 	defer f.Close()
-	if err := doc.ForEachChunk(0, doc.Size(), func(_ int64, chunk []byte) error {
+	if err := doc.ForEachChunk(start, length, func(_ int64, chunk []byte) error {
 		_, err := f.Write(chunk)
 		return err
 	}); err != nil {
@@ -854,6 +893,78 @@ func boolParam(m map[string]any, key string, def bool) bool {
 		}
 	}
 	return def
+}
+
+func leviathanBinsnoopDocument(d *document.Document, maxResults int) (map[string]any, error) {
+	if maxResults <= 0 {
+		maxResults = 10000
+	}
+	const windowSize int64 = 32 << 20
+	const overlapSize int64 = 1 << 20
+
+	scanner := binsnoop.New()
+	size := d.Size()
+	seen := make(map[string]bool)
+	fileMap := make([]binsnoop.SignatureResult, 0, 128)
+	truncated := false
+
+	maxInt := int64(^uint(0) >> 1)
+	for off := int64(0); off < size; {
+		readLen := windowSize + overlapSize
+		if off+readLen > size {
+			readLen = size - off
+		}
+		buf, err := d.Range(off, readLen)
+		if err != nil {
+			return nil, err
+		}
+		for _, hit := range scanner.Scan(buf) {
+			abs := off + int64(hit.Offset)
+			if abs < 0 || abs > maxInt || abs >= size {
+				continue
+			}
+			if hit.Size < 0 || int64(hit.Size) > size-abs {
+				continue
+			}
+			hit.Offset = int(abs)
+			key := fmt.Sprintf("%d:%s", hit.Offset, hit.Name)
+			if seen[key] {
+				continue
+			}
+			seen[key] = true
+			fileMap = append(fileMap, hit)
+			if len(fileMap) >= maxResults {
+				truncated = true
+				break
+			}
+		}
+		if truncated || off+windowSize >= size {
+			break
+		}
+		off += windowSize
+	}
+
+	sort.Slice(fileMap, func(i, j int) bool {
+		if fileMap[i].Offset == fileMap[j].Offset {
+			return fileMap[i].Confidence > fileMap[j].Confidence
+		}
+		return fileMap[i].Offset < fileMap[j].Offset
+	})
+
+	return map[string]any{
+		"file_path":      d.Name(),
+		"file_map":       fileMap,
+		"scanned_bytes":  size,
+		"window_bytes":   windowSize,
+		"overlap_bytes":  overlapSize,
+		"whole_file":     true,
+		"windowed":       true,
+		"truncated":      truncated,
+		"max_results":    maxResults,
+		"extractions":    map[string]any{},
+		"result_count":   len(fileMap),
+		"document_bytes": size,
+	}, nil
 }
 
 func leviathanSpectrogramEncodeOptions(params map[string]any) spectrogram.EncodeOptions {

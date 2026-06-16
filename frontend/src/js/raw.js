@@ -214,7 +214,7 @@
           return `[${ts}] [${dir}] ${e.data}`;
         });
         const content = lines.join("\n");
-        await window.go.api.Service.SaveSessionCapture(sessionId, content);
+        await window.NexusTerminal.wailsService.SaveSessionCapture(sessionId, content);
         this.app.notifications.success("Capture saved");
       } catch (err) {
         this.app.notifications.error("Save failed: " + err);
@@ -257,7 +257,7 @@
           format === "hex" || format === "escaped"
             ? btoa(dataToSend)
             : window.NexusTerminal.utf8ToBase64(dataToSend);
-        await window.go.api.Service.WriteSession(sessionId, b64);
+        await window.NexusTerminal.wailsService.WriteSession(sessionId, b64);
         input.value = "";
 
         // Also show in viewer as sent data
