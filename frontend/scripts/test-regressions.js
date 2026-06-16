@@ -325,6 +325,21 @@ assertContains(
   "Wails service bridge must use the normal named Wails API",
 );
 assertContains(
+  "frontend/src/js/sshkeys.js",
+  "textContent: \"Failed to load keys: \" + String(err)",
+  "SSH key manager errors must be rendered as text rather than injected HTML",
+);
+assertContains(
+  "frontend/src/js/sshkeys.js",
+  "textContent: message",
+  "SSH key delete confirmation messages must be rendered as text",
+);
+assertNotContains(
+  "frontend/src/js/sshkeys.js",
+  "Failed to load keys: ${err}",
+  "SSH key manager must not interpolate backend errors into innerHTML",
+);
+assertContains(
   "frontend/package.json",
   '"@xterm/xterm":',
   "frontend dependencies must use the maintained scoped xterm package",

@@ -22,16 +22,22 @@ import (
 	"github.com/google/uuid"
 )
 
+const (
+	maxConfigFileBytes = 5 * 1024 * 1024
+	maxConfigLineBytes = 256 * 1024
+	maxHostBlocks      = 5000
+)
+
 // HostBlock represents a parsed SSH config Host section.
 type HostBlock struct {
-	Aliases       []string
-	HostName      string
-	Port          int
-	User          string
-	IdentityFile  string
-	ProxyJump     string
-	ForwardAgent  bool
-	Compression   bool
+	Aliases      []string
+	HostName     string
+	Port         int
+	User         string
+	IdentityFile string
+	ProxyJump    string
+	ForwardAgent bool
+	Compression  bool
 }
 
 // ParseFile reads and parses an OpenSSH config file.
@@ -41,11 +47,33 @@ func ParseFile(path string) ([]HostBlock, error) {
 		return nil, fmt.Errorf("sshconfig: failed to open %s: %w", path, err)
 	}
 	defer f.Close()
+	info, err := f.Stat()
+	if err != nil {
+		return nil, fmt.Errorf("sshconfig: failed to stat %s: %w", path, err)
+	}
+	if info.IsDir() {
+		return nil, fmt.Errorf("sshconfig: %s is a directory", path)
+	}
+	if info.Size() > maxConfigFileBytes {
+		return nil, fmt.Errorf("sshconfig: config file is too large: %d bytes exceeds %d bytes", info.Size(), maxConfigFileBytes)
+	}
 
 	var blocks []HostBlock
 	var current *HostBlock
+	commitCurrent := func() error {
+		if current == nil {
+			return nil
+		}
+		if len(blocks) >= maxHostBlocks {
+			return fmt.Errorf("sshconfig: too many Host blocks (max %d)", maxHostBlocks)
+		}
+		blocks = append(blocks, *current)
+		current = nil
+		return nil
+	}
 
 	scanner := bufio.NewScanner(f)
+	scanner.Buffer(make([]byte, 0, 64*1024), maxConfigLineBytes)
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 
@@ -61,8 +89,8 @@ func ParseFile(path string) ([]HostBlock, error) {
 		switch key {
 		case "host":
 			// Commit previous block.
-			if current != nil {
-				blocks = append(blocks, *current)
+			if err := commitCurrent(); err != nil {
+				return nil, err
 			}
 			aliases := strings.Fields(value)
 			// Skip wildcard-only hosts (e.g. "Host *").
@@ -83,8 +111,8 @@ func ParseFile(path string) ([]HostBlock, error) {
 
 		case "match":
 			// Commit previous block and skip Match blocks.
-			if current != nil {
-				blocks = append(blocks, *current)
+			if err := commitCurrent(); err != nil {
+				return nil, err
 			}
 			current = nil
 
@@ -122,8 +150,8 @@ func ParseFile(path string) ([]HostBlock, error) {
 	}
 
 	// Commit final block.
-	if current != nil {
-		blocks = append(blocks, *current)
+	if err := commitCurrent(); err != nil {
+		return nil, err
 	}
 
 	if err := scanner.Err(); err != nil {
@@ -161,13 +189,13 @@ func ToProfiles(blocks []HostBlock, folder string) []models.Profile {
 		username := b.User
 
 		sshConf := &models.SSHConfig{
-			AuthMethods:   []string{"publickey", "password"},
-			SecretMode:    models.SecretModeAskEveryTime,
-			HostKeyPolicy: models.HostKeyAsk,
-			TerminalType:  "xterm-256color",
-			AgentAuth:     b.ForwardAgent,
+			AuthMethods:     []string{"publickey", "password"},
+			SecretMode:      models.SecretModeAskEveryTime,
+			HostKeyPolicy:   models.HostKeyAsk,
+			TerminalType:    "xterm-256color",
+			AgentAuth:       b.ForwardAgent,
 			AgentForwarding: b.ForwardAgent,
-			Compression:   b.Compression,
+			Compression:     b.Compression,
 		}
 
 		if b.IdentityFile != "" {

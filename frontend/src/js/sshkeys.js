@@ -92,7 +92,12 @@
           list.appendChild(this._renderKeyRow(key));
         }
       } catch (err) {
-        list.innerHTML = `<div class="sshkey-error">Failed to load keys: ${err}</div>`;
+        list.innerHTML = "";
+        list.appendChild(
+          createElement("div", "sshkey-error", {
+            textContent: "Failed to load keys: " + String(err),
+          }),
+        );
       }
     }
 
@@ -263,19 +268,41 @@
       return new Promise((resolve) => {
         const backdrop = createElement("div", "modal-backdrop");
         const modal = createElement("div", "modal modal-sm");
-        modal.innerHTML = `
-          <div class="modal-header">
-            <h3 class="modal-title">${title}</h3>
-            <button class="btn btn-icon btn-xs modal-close">&times;</button>
-          </div>
-          <div class="modal-body">
-            <p style="font-size:var(--text-sm);color:var(--text-secondary)">${message}</p>
-          </div>
-          <div class="modal-footer">
-            <button class="btn btn-sm confirm-cancel">Cancel</button>
-            <button class="btn btn-sm btn-danger confirm-ok">${confirmLabel}</button>
-          </div>
-        `;
+        const header = createElement("div", "modal-header");
+        header.appendChild(
+          createElement("h3", "modal-title", { textContent: title }),
+        );
+        header.appendChild(
+          createElement("button", "btn btn-icon btn-xs modal-close", {
+            textContent: "x",
+            type: "button",
+            "aria-label": "Close",
+          }),
+        );
+
+        const body = createElement("div", "modal-body");
+        const messageEl = createElement("p", "", { textContent: message });
+        messageEl.style.fontSize = "var(--text-sm)";
+        messageEl.style.color = "var(--text-secondary)";
+        body.appendChild(messageEl);
+
+        const footer = createElement("div", "modal-footer");
+        footer.appendChild(
+          createElement("button", "btn btn-sm confirm-cancel", {
+            textContent: "Cancel",
+            type: "button",
+          }),
+        );
+        footer.appendChild(
+          createElement("button", "btn btn-sm btn-danger confirm-ok", {
+            textContent: confirmLabel,
+            type: "button",
+          }),
+        );
+
+        modal.appendChild(header);
+        modal.appendChild(body);
+        modal.appendChild(footer);
         backdrop.appendChild(modal);
         document.body.appendChild(backdrop);
         requestAnimationFrame(() => {

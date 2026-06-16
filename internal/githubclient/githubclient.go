@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"sort"
 	"strings"
@@ -22,6 +23,7 @@ import (
 const (
 	maxGitHubJSONBodyBytes  = 4 << 20
 	maxGitHubErrorBodyBytes = 64 << 10
+	maxGitHubArchiveBytes   = int64(2 << 30)
 )
 
 // Client wraps the GitHub REST API for repository listing.
@@ -190,9 +192,16 @@ func (c *Client) fetchRepos(ctx context.Context, progress func(done int, total i
 
 // FetchLatestCommit returns the committer name and commit time for a repo/ref.
 func (c *Client) FetchLatestCommit(ctx context.Context, fullName string, ref string) (string, string, error) {
-	url := fmt.Sprintf("%s/repos/%s/commits/%s", c.baseURL, fullName, ref)
 	if ref == "" {
-		url = fmt.Sprintf("%s/repos/%s/commits/HEAD", c.baseURL, fullName)
+		ref = "HEAD"
+	}
+	owner, repo, err := splitRepoFullName(fullName)
+	if err != nil {
+		return "", "", err
+	}
+	url, err := c.endpointURL("repos", owner, repo, "commits", ref)
+	if err != nil {
+		return "", "", err
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -252,12 +261,17 @@ func (c *Client) FetchLatestCommit(ctx context.Context, fullName string, ref str
 
 // DownloadRepoArchive downloads a repository zip archive to the given path.
 func (c *Client) DownloadRepoArchive(ctx context.Context, fullName string, ref string, destPath string) error {
-	if fullName == "" {
-		return fmt.Errorf("repository name cannot be empty")
+	owner, repo, err := splitRepoFullName(fullName)
+	if err != nil {
+		return err
 	}
-	url := fmt.Sprintf("%s/repos/%s/zipball", c.baseURL, fullName)
+	segments := []string{"repos", owner, repo, "zipball"}
 	if ref != "" {
-		url = url + "/" + ref
+		segments = append(segments, ref)
+	}
+	url, err := c.endpointURL(segments...)
+	if err != nil {
+		return err
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -280,6 +294,9 @@ func (c *Client) DownloadRepoArchive(ctx context.Context, fullName string, ref s
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("GitHub API returned HTTP %d: %s", resp.StatusCode, readGitHubErrorBody(resp.Body))
 	}
+	if resp.ContentLength > maxGitHubArchiveBytes {
+		return fmt.Errorf("archive is too large: %d bytes exceeds %d bytes", resp.ContentLength, maxGitHubArchiveBytes)
+	}
 
 	file, err := os.Create(destPath)
 	if err != nil {
@@ -287,7 +304,7 @@ func (c *Client) DownloadRepoArchive(ctx context.Context, fullName string, ref s
 	}
 	defer file.Close()
 
-	if _, err := io.Copy(file, resp.Body); err != nil {
+	if _, err := copyLimitedArchive(file, resp.Body, maxGitHubArchiveBytes); err != nil {
 		return fmt.Errorf("writing archive: %w", err)
 	}
 	return nil
@@ -344,4 +361,48 @@ func readGitHubErrorBody(r io.Reader) string {
 		return "<response body unavailable: " + err.Error() + ">"
 	}
 	return strings.TrimSpace(string(body))
+}
+
+func splitRepoFullName(fullName string) (string, string, error) {
+	parts := strings.Split(strings.TrimSpace(fullName), "/")
+	if len(parts) != 2 {
+		return "", "", fmt.Errorf("repository name must be in owner/repo format")
+	}
+	owner := strings.TrimSpace(parts[0])
+	repo := strings.TrimSpace(parts[1])
+	if owner == "" || repo == "" {
+		return "", "", fmt.Errorf("repository name must be in owner/repo format")
+	}
+	return owner, repo, nil
+}
+
+func (c *Client) endpointURL(segments ...string) (string, error) {
+	u, err := url.Parse(c.baseURL)
+	if err != nil {
+		return "", fmt.Errorf("invalid GitHub base URL: %w", err)
+	}
+	plainPath := strings.TrimRight(u.Path, "/")
+	escapedPath := strings.TrimRight(u.EscapedPath(), "/")
+	for _, segment := range segments {
+		if segment == "" {
+			return "", fmt.Errorf("empty GitHub API path segment")
+		}
+		plainPath += "/" + segment
+		escapedPath += "/" + url.PathEscape(segment)
+	}
+	u.Path = plainPath
+	u.RawPath = escapedPath
+	return u.String(), nil
+}
+
+func copyLimitedArchive(dst io.Writer, src io.Reader, maxBytes int64) (int64, error) {
+	limited := &io.LimitedReader{R: src, N: maxBytes + 1}
+	n, err := io.Copy(dst, limited)
+	if err != nil {
+		return n, err
+	}
+	if n > maxBytes {
+		return n, fmt.Errorf("archive exceeds %d bytes", maxBytes)
+	}
+	return n, nil
 }

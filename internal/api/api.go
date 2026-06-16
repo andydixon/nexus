@@ -49,6 +49,7 @@ const (
 	maxSFTPUploadChunkBytes    = 1024 * 1024
 	maxStreamingSFTPUploadSize = int64(2 * 1024 * 1024 * 1024)
 	maxSSHPublicKeyBytes       = 64 * 1024
+	sshKeygenTimeout           = 30 * time.Second
 )
 
 // Service is the main API surface exposed to the frontend via Wails bindings.
@@ -1809,6 +1810,10 @@ func (s *Service) GenerateSSHKey(name string, keyType string, bits int, passphra
 	if err != nil {
 		return err
 	}
+	keyType, bits, err = validateSSHKeyGenerationOptions(keyType, bits)
+	if err != nil {
+		return err
+	}
 	sshDir := filepath.Dir(keyPath)
 
 	// Ensure .ssh directory exists
@@ -1819,10 +1824,6 @@ func (s *Service) GenerateSSHKey(name string, keyType string, bits int, passphra
 	// Check if key already exists
 	if _, err := os.Stat(keyPath); err == nil {
 		return fmt.Errorf("key %q already exists", name)
-	}
-
-	if keyType == "" {
-		keyType = "ed25519"
 	}
 
 	// Build ssh-keygen arguments
@@ -1837,10 +1838,15 @@ func (s *Service) GenerateSSHKey(name string, keyType string, bits int, passphra
 	}
 
 	// #nosec G204 — arguments are sanitised above
-	cmd := exec.Command("ssh-keygen", args...)
+	ctx, cancel := context.WithTimeout(context.Background(), sshKeygenTimeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "ssh-keygen", args...)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			return fmt.Errorf("ssh-keygen timed out after %s", sshKeygenTimeout)
+		}
 		return fmt.Errorf("ssh-keygen failed: %s", stderr.String())
 	}
 
@@ -1929,10 +1935,33 @@ func safeSFTPUploadName(fileName string) (string, error) {
 	}
 	name = strings.ReplaceAll(name, "\\", "/")
 	safeName := path.Base(name)
-	if safeName == "" || safeName == "." || safeName == "/" || strings.ContainsRune(safeName, 0) {
+	if safeName == "" || safeName == "." || safeName == ".." || safeName == "/" || strings.ContainsRune(safeName, 0) {
 		return "", fmt.Errorf("invalid file name")
 	}
 	return safeName, nil
+}
+
+func validateSSHKeyGenerationOptions(keyType string, bits int) (string, int, error) {
+	keyType = strings.ToLower(strings.TrimSpace(keyType))
+	if keyType == "" {
+		keyType = "ed25519"
+	}
+	switch keyType {
+	case "ed25519", "ecdsa":
+		return keyType, bits, nil
+	case "rsa":
+		if bits == 0 {
+			bits = 4096
+		}
+		switch bits {
+		case 2048, 3072, 4096:
+			return keyType, bits, nil
+		default:
+			return "", 0, fmt.Errorf("unsupported RSA key size %d (use 2048, 3072, or 4096)", bits)
+		}
+	default:
+		return "", 0, fmt.Errorf("unsupported SSH key type %q", keyType)
+	}
 }
 
 func (s *Service) lookupSFTPUpload(uploadID string) (*sftpUpload, error) {

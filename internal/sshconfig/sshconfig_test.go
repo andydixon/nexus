@@ -3,6 +3,8 @@ package sshconfig
 import (
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"testing"
 )
 
@@ -86,6 +88,50 @@ func TestParseFile(t *testing.T) {
 	}
 	if sb.Port != 22 {
 		t.Errorf("expected default port 22, got %d", sb.Port)
+	}
+}
+
+func TestParseFileRejectsOversizedFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config")
+	f, err := os.Create(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Truncate(maxConfigFileBytes + 1); err != nil {
+		f.Close()
+		t.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = ParseFile(path)
+	if err == nil {
+		t.Fatal("expected oversized config file to be rejected")
+	}
+	if !strings.Contains(err.Error(), "too large") {
+		t.Fatalf("error = %q, want too large", err.Error())
+	}
+}
+
+func TestParseFileRejectsTooManyHostBlocks(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config")
+	var b strings.Builder
+	for i := 0; i < maxHostBlocks+1; i++ {
+		b.WriteString("Host host")
+		b.WriteString(strconv.Itoa(i))
+		b.WriteString("\n    HostName example.com\n")
+	}
+	if err := os.WriteFile(path, []byte(b.String()), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := ParseFile(path)
+	if err == nil {
+		t.Fatal("expected excessive Host blocks to be rejected")
+	}
+	if !strings.Contains(err.Error(), "too many Host blocks") {
+		t.Fatalf("error = %q, want too many Host blocks", err.Error())
 	}
 }
 

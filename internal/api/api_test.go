@@ -138,6 +138,44 @@ func TestSafeSFTPUploadNamePreservesHTMLCharacters(t *testing.T) {
 	}
 }
 
+func TestSafeSFTPUploadNameRejectsParentDirectory(t *testing.T) {
+	for _, name := range []string{"..", "folder/..", `folder\..`} {
+		t.Run(name, func(t *testing.T) {
+			if _, err := safeSFTPUploadName(name); err == nil {
+				t.Fatal("expected parent directory upload name to be rejected")
+			}
+		})
+	}
+}
+
+func TestValidateSSHKeyGenerationOptions(t *testing.T) {
+	keyType, bits, err := validateSSHKeyGenerationOptions("", 0)
+	if err != nil {
+		t.Fatalf("default options error = %v", err)
+	}
+	if keyType != "ed25519" {
+		t.Fatalf("default key type = %q, want ed25519", keyType)
+	}
+	if bits != 0 {
+		t.Fatalf("default bits = %d, want 0", bits)
+	}
+
+	keyType, bits, err = validateSSHKeyGenerationOptions("rsa", 0)
+	if err != nil {
+		t.Fatalf("rsa default options error = %v", err)
+	}
+	if keyType != "rsa" || bits != 4096 {
+		t.Fatalf("rsa defaults = %q/%d, want rsa/4096", keyType, bits)
+	}
+
+	if _, _, err := validateSSHKeyGenerationOptions("rsa", 999999); err == nil {
+		t.Fatal("expected oversized RSA key size to be rejected")
+	}
+	if _, _, err := validateSSHKeyGenerationOptions("dsa", 0); err == nil {
+		t.Fatal("expected unsupported key type to be rejected")
+	}
+}
+
 func TestImportProfilesNormalizesSparseRAWProfile(t *testing.T) {
 	svc := newTestService(t)
 	data := `[

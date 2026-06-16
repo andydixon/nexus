@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/url"
+	"strings"
 	"sync"
 	"time"
 
@@ -53,10 +55,12 @@ type Config struct {
 }
 
 var upgrader = websocket.Upgrader{
-	CheckOrigin:     func(r *http.Request) bool { return true },
+	CheckOrigin:     allowProxyOrigin,
 	ReadBufferSize:  65536,
 	WriteBufferSize: 65536,
 }
+
+const maxWebSocketMessageBytes = 8 << 20
 
 // NewClient creates a new VNC proxy client.
 func NewClient(cfg Config) *Client {
@@ -186,6 +190,7 @@ func (c *Client) startProxy(vncConn net.Conn) (string, error) {
 			return
 		}
 		defer ws.Close()
+		ws.SetReadLimit(maxWebSocketMessageBytes)
 
 		// Bridge WebSocket ↔ VNC TCP in both directions
 		done := make(chan struct{}, 2)
@@ -250,6 +255,34 @@ func (c *Client) startProxy(vncConn net.Conn) (string, error) {
 	}()
 
 	return wsURL, nil
+}
+
+func allowProxyOrigin(r *http.Request) bool {
+	origin := r.Header.Get("Origin")
+	if origin == "" {
+		return true
+	}
+	u, err := url.Parse(origin)
+	if err != nil {
+		return false
+	}
+	switch strings.ToLower(u.Scheme) {
+	case "wails":
+		return true
+	case "http", "https":
+		return isLoopbackHost(u.Hostname())
+	default:
+		return false
+	}
+}
+
+func isLoopbackHost(host string) bool {
+	h := strings.ToLower(strings.TrimSpace(host))
+	if h == "localhost" {
+		return true
+	}
+	ip := net.ParseIP(h)
+	return ip != nil && ip.IsLoopback()
 }
 
 func newProxyToken() (string, error) {
