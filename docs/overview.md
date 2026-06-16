@@ -1,10 +1,10 @@
 # Nexus Terminal Overview
 
-Nexus Terminal is a desktop connection workspace for people who manage servers, network services, remote desktops, and repositories every day. It brings SSH, Telnet, RAW TCP, VNC, GitHub, and local shell workflows into one focused app with secure credential handling, multi-session organisation, file transfer, automation, and recording built in.
+Nexus Terminal is a desktop connection and analysis workspace for people who manage servers, network services, remote desktops, repositories, and binary artefacts every day. It brings SSH, Telnet, RAW TCP, VNC, GitHub, local shell, and Leviathan binary-analysis workflows into one focused app with secure credential handling, multi-session organisation, file transfer, automation, recording, and inspection tooling built in.
 
 ## Product positioning
 
-Nexus is more than an SSH client. It is a single command centre for remote access, terminal operations, file movement, raw socket inspection, GitHub repository visibility, and repeatable operational workflows.
+Nexus is more than an SSH client. It is a single command centre for remote access, terminal operations, file movement, raw socket inspection, GitHub repository visibility, binary triage, and repeatable operational workflows.
 
 Use Nexus when you need to:
 
@@ -13,7 +13,7 @@ Use Nexus when you need to:
 - Move files over SSH without leaving the terminal workspace.
 - Work safely with host key verification, encrypted secrets, TOTP support, and audit logging.
 - Reuse commands, automate login flows, record sessions, and react to terminal output.
-- Support mixed estates that include SSH servers, Telnet devices, raw TCP services, VNC desktops, GitHub repositories, and local shells.
+- Support mixed estates that include SSH servers, Telnet devices, raw TCP services, VNC desktops, GitHub repositories, local shells, firmware images, binaries, archives, and other artefacts.
 
 ## Main feature groups
 
@@ -25,6 +25,7 @@ Use Nexus when you need to:
 - **VNC** for remote desktop access.
 - **GitHub** for repository browsing and download workflows.
 - **Local terminal** for opening a shell on the local machine.
+- **Leviathan** for binary inspection, editing, carving, transforms, and spectrogram workflows.
 - **Quick connect** for one-off sessions without saving a profile.
 - **Saved profiles** for repeat connections.
 
@@ -45,6 +46,7 @@ Use Nexus when you need to:
 - Pin tabs to keep important systems visible.
 - Rename sessions.
 - Reorder tabs.
+- Scroll overflowing tabs and hover them to see full names and connection start times.
 - Close one session or all sessions.
 - Split panes vertically or horizontally.
 - Resize split panes.
@@ -169,6 +171,47 @@ Use Nexus when you need to:
 - Open repositories in the browser.
 - Download repository ZIP archives.
 
+### Leviathan binary workbench
+
+- Switch from **Nexus Terminal** to **Leviathan** from the sidebar header.
+- Load a local file into a working document, inspect it with multiple tools, then save the patched working copy.
+- Tools open as normal tabs beside connection sessions.
+- Leviathan tabs close immediately without connection-disconnect confirmation.
+- Shared undo, redo, and revert actions for byte-level edits.
+- File-backed document model for large local files, with chunked save/export where supported.
+- Clear limits for tools that require bounded in-memory buffers, such as image/audio spectrogram conversion and some parsers.
+
+### Leviathan editor and triage tools
+
+- **Hex Editor** with editable byte cells, live ASCII preview, 16-byte and 32-byte rows, byte search, string/hex search, previous/next match navigation, and range opening from analysis views.
+- **Overview** for first-pass summary across hashes, entropy, strings, indicators, and carve candidates.
+- **Hashes** for CRC32, MD5, SHA-1, SHA-256, and SHA-512.
+- **Entropy** graph over the whole file, with selectable ranges that can open a new hex editor tab.
+- **Strings** extraction for ASCII and UTF-16 text.
+- **IOCs** for URLs, domains, paths, hashes, and other indicators.
+- **Search** and **Multi-search** for text, hex, and regular-expression matching.
+- Exportable results from tools that find files, ranges, or structured artefacts.
+
+### Leviathan structure, recovery, and transform tools
+
+- **Structures** parser for common binary formats such as PE, ELF, Mach-O, ZIP, images, RIFF, ASN.1, and certificates.
+- **Disasm** heuristic disassembly for common CPU families, with raw byte fallback for unsupported architectures.
+- **PDF** object, stream, xref, and suspicious-surface inspection.
+- **SquashFS** superblock and filesystem metadata inspection with human-readable bad-magic errors.
+- **Carve**, **Keys**, **Timestamps**, **Stego**, and **Metadata** tools for embedded artefacts and recovery workflows.
+- **BinSnoop** deep signature scanning across the whole file, with export for discovered files and ranges.
+- **Rules** for YARA-like rule scans.
+- **Patch Plan** and **Patch Apply** for validating and applying patch scripts.
+- **Transforms** for hex, Base64, URL, XOR, inflate, and cipher pipelines.
+- **Case Export** for bundling useful artefacts from a working investigation.
+
+### Leviathan spectrogram tools
+
+- Convert an image into WAV audio so the image appears in a spectrogram.
+- Insert an encoded image into an existing WAV or MP3 carrier.
+- Visualise WAV or MP3 audio as a spectrogram image.
+- Control FFT size, height, maximum width, aspect ratio, frequency range, brightness, and contrast.
+
 ### Automation and reusable workflows
 
 - Snippet library for saved commands.
@@ -228,25 +271,26 @@ Use Nexus when you need to:
 
 ### Suggested headline
 
-Nexus Terminal: one desktop workspace for SSH, files, sockets, remote desktops, and repositories.
+Nexus Terminal: one desktop workspace for SSH, files, sockets, remote desktops, repositories, and binary artefacts.
 
 ### Suggested subheadline
 
-Manage SSH, Telnet, RAW TCP, VNC, GitHub, and local shell sessions from a fast tabbed interface with secure credentials, SFTP file transfer, split panes, snippets, recordings, and automation built in.
+Manage SSH, Telnet, RAW TCP, VNC, GitHub, local shell, and Leviathan binary-analysis sessions from a fast tabbed interface with secure credentials, SFTP file transfer, split panes, snippets, recordings, automation, and artefact-inspection tools built in.
 
 ### Short product description
 
-Nexus Terminal helps developers, operators, support engineers, and homelab users manage many connections without juggling separate tools. Save profiles, organise them with groups and tags, connect in tabs or split panes, move files over SFTP, inspect raw TCP traffic, open VNC desktops, browse GitHub repositories, and keep credentials protected with keychain and encrypted-vault storage.
+Nexus Terminal helps developers, operators, support engineers, reverse engineers, firmware analysts, and homelab users manage many connections and artefacts without juggling separate tools. Save profiles, organise them with groups and tags, connect in tabs or split panes, move files over SFTP, inspect raw TCP traffic, open VNC desktops, browse GitHub repositories, triage binaries with Leviathan, and keep credentials protected with keychain and encrypted-vault storage.
 
 ### Product page feature bullets
 
-- All-in-one connection workspace for SSH, Telnet, RAW TCP, VNC, GitHub, and local shells.
+- All-in-one connection and analysis workspace for SSH, Telnet, RAW TCP, VNC, GitHub, local shells, and Leviathan tools.
 - Fast multi-session interface with tabs, pinned sessions, split panes, reconnect, and broadcast input.
 - Rich SSH support including agent auth, TOTP, jump hosts, proxies, port forwarding, startup commands, login scripts, and host key policies.
 - Built-in SFTP browser with upload, download, rename, delete, folders, bookmarks, drag-and-drop upload, and permission-aware directory picking.
 - RAW TCP tooling with text, hex, split views, payload presets, captures, timestamps, and byte-level sending.
 - VNC viewer with scale-to-fit, view-only mode, quality controls, shared sessions, and optional SSH tunnelling.
 - GitHub repository browser with organisation grouping, filtering, activity sorting, metadata, ZIP downloads, and GitHub Enterprise support.
+- Leviathan binary workbench with hex editing, hashes, entropy, strings, IOCs, carving, BinSnoop, structures, PDF/SquashFS inspection, transforms, rules, patching, case export, and spectrogram image/audio tools.
 - Secure credential model using OS keychain first, encrypted vault fallback, per-profile secret modes, known hosts, encrypted exports, and audit logging.
 - Productivity tools including command palette, snippets, trigger rules, session recording, terminal search, scrollback export, and local terminal.
 
@@ -257,6 +301,7 @@ Nexus Terminal helps developers, operators, support engineers, and homelab users
 - Support teams who troubleshoot customer systems, network appliances, and legacy Telnet devices.
 - Network and hardware engineers who need RAW TCP and Telnet tools beside normal SSH workflows.
 - Homelab users who want SSH, VNC, file transfer, and repo access in one desktop app.
+- Reverse engineers, firmware analysts, and security researchers who want binary triage beside their live operational sessions.
 
 ## Learn more
 

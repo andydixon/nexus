@@ -1,6 +1,6 @@
 # Nexus Terminal Quick Start
 
-Nexus Terminal is a desktop client for SSH, Telnet, RAW TCP, and GitHub sessions. This page is a shareable quick start for everyday use.
+Nexus Terminal is a desktop client for SSH, Telnet, RAW TCP, VNC, GitHub, local terminal sessions, and Leviathan binary analysis. This page is a shareable quick start for everyday use.
 
 ## Get connected in minutes
 
@@ -14,10 +14,19 @@ One-off session? Use **Cmd+Shift+Q** / **Ctrl+Shift+Q** for quick connect.
 ## Daily workflow
 
 - **Tabs and splits**: Drag tabs to reorder, and split the workspace to view multiple sessions at once.
+- **Scrollable tabs**: Use the tab bar scrollbar or mouse wheel/trackpad over the tab strip when many tabs are open. Hover a tab to see its full name and connection start time.
 - **Broadcast input**: Toggle with **Cmd+Shift+B** (macOS) or **Ctrl+Shift+B** (Windows/Linux) to send the same command to all connected sessions.
 - **Snippets**: Save common commands and run them with one click.
 - **Search**: Press **Cmd+F** (macOS) or **Ctrl+F** (Windows/Linux) to search within the active terminal.
 - **Reconnect quickly**: If a session drops, click **Reconnect** on the disconnected overlay.
+
+## VNC remote desktops
+
+Create a **VNC** profile for remote desktop sessions. Use SSH tunnelling when possible, especially outside trusted networks. Direct VNC is available for isolated or trusted networks, but classic VNC traffic may not be encrypted.
+
+## Leviathan binary tools
+
+Click **Leviathan** beside **Nexus Terminal** in the sidebar header to switch from connection profiles to binary-analysis tools. Use **Load** to choose a file, then open tools such as Hex Editor, Overview, Hashes, Entropy, Strings, Carve, BinSnoop, Structures, PDF, SquashFS, Transforms, and Spectrogram tools. Tools open in normal tabs and can be closed without a disconnect confirmation.
 
 ## File transfers on SSH
 

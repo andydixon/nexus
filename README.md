@@ -1,14 +1,15 @@
 # Nexus Terminal
 
-**A desktop client for SSH, Telnet, RAW TCP, and GitHub — with secure credential handling and a focused, multi-session workflow.**
+**A desktop client for SSH, Telnet, RAW TCP, VNC, GitHub, local terminals, and Leviathan binary analysis — with secure credential handling and a focused, multi-session workflow.**
 
 Nexus Terminal helps you manage many connections at once, keep terminal work organised, and move files with confidence.
 
 ## Highlights
 
-- SSH, Telnet, RAW TCP, and GitHub sessions in one app
+- SSH, Telnet, RAW TCP, VNC, GitHub, and local terminal sessions in one app
 - Tabbed sessions with split panes, pinning, and reordering
 - SFTP browser with drag-and-drop uploads and a directory picker
+- Leviathan binary workbench with hex editing, entropy, carving, BinSnoop, structure parsers, transforms, and spectrogram tools
 - Disconnected overlay with one-click reconnect
 - Broadcast input, snippets, and terminal search
 - Session recording and playback

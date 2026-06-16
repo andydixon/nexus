@@ -205,6 +205,31 @@ assertContains(
   "Leviathan mode must put Hex Editor in the tool list",
 );
 assertContains(
+  "frontend/src/js/settings.js",
+  "Leviathan Binary Tools",
+  "in-app help must document the integrated Leviathan workbench",
+);
+assertContains(
+  "frontend/src/js/settings.js",
+  "VNC Connections",
+  "in-app help must document VNC connection profiles",
+);
+assertContains(
+  "docs/user-manual.md",
+  "## 11. Leviathan binary workbench",
+  "user manual must include a full Leviathan section",
+);
+assertContains(
+  "docs/user-manual.md",
+  "### VNC",
+  "user manual must include VNC connection guidance",
+);
+assertContains(
+  "docs/overview.md",
+  "### Leviathan binary workbench",
+  "product overview must include Leviathan as a first-class feature group",
+);
+assertContains(
   "frontend/src/js/leviathan.js",
   "LeviathanSetByte",
   "Leviathan hex view must support byte editing",

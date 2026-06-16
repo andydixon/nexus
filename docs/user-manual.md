@@ -12,9 +12,10 @@
 8. SFTP file browser
 9. Drag-and-drop uploads and paste
 10. Session recordings
-11. Security and credentials
-12. Settings
-13. Troubleshooting
+11. Leviathan binary workbench
+12. Security and credentials
+13. Settings
+14. Troubleshooting
 
 ---
 
@@ -50,7 +51,7 @@ Tip: You can drag the divider between split panes to rebalance space.
 ### Create a new profile
 
 1. Click **New** in the sidebar.
-2. Choose the protocol (SSH, Telnet, RAW, GitHub).
+2. Choose the protocol (SSH, Telnet, RAW, VNC, or GitHub).
 3. Fill in the required fields and optional settings.
 4. Save and connect.
 
@@ -86,6 +87,15 @@ Tip: Use the search box to filter profiles by name, host, or tag.
 - Text, hex, and split views for binary-safe data.
 - Payload presets and configurable encoding and line endings.
 
+### VNC
+
+- Remote desktop viewer embedded in the Nexus workspace.
+- Password prompt and saved-password modes.
+- View-only mode, scale-to-fit, shared sessions, and quality controls.
+- Optional SSH tunnel for safer VNC transport.
+
+Use SSH tunnelling for VNC whenever possible. Direct VNC is useful on trusted or isolated networks, but many classic VNC deployments do not provide strong transport encryption.
+
 ### GitHub
 
 - Browse repositories by organisation.
@@ -97,6 +107,9 @@ Tip: Use the search box to filter profiles by name, host, or tag.
 
 - **Reorder** tabs by dragging them.
 - **Pin** important sessions to keep them at the front.
+- **Scroll** the tab bar with the scrollbar or mouse wheel/trackpad when many tabs are open.
+- **Hover** a tab to see the full name and, for connected sessions, the connection start time.
+- **Close** tabs with the close button on the left side of each tab. Leviathan tool tabs close without a disconnect confirmation.
 - **Split** the workspace vertically or horizontally to view multiple sessions at once.
 - **Broadcast** input to multiple connected sessions when needed.
 
@@ -190,7 +203,69 @@ Screenshot: Recordings list with playback controls.
 
 ---
 
-## 11. Security and credentials
+## 11. Leviathan binary workbench
+
+Leviathan is the integrated binary-analysis and editing workspace inside Nexus Terminal. It is useful for firmware images, unknown binaries, archives, captures, embedded files, suspicious documents, and audio spectrogram experiments.
+
+### Switching to Leviathan
+
+Click **Leviathan** in the top-left sidebar header. The normal connection list changes into a tool list. Click **Nexus Terminal** to return to saved servers and groups.
+
+Use **Load** to select a local file. The selected file becomes the current Leviathan working document. Use **Save** to write the patched working copy to a chosen destination.
+
+Leviathan tools open as regular tabs. You can open multiple tool tabs at once, switch between them, and close them without a connection-disconnect confirmation.
+
+### Hex Editor
+
+The Hex Editor is the primary byte-level view.
+
+- Choose 16 or 32 bytes per row.
+- Edit byte cells directly; typing two hex digits advances to the next byte.
+- The ASCII preview updates as bytes are edited.
+- Paste hex runs such as `de ad be ef` or `deadbeef` into consecutive cells.
+- Use Search to find strings or hex values, then move through matches with previous/next.
+- Undo, redo, or revert edits from the Leviathan panel header.
+
+### Triage tools
+
+- **Overview**: first-pass summary across hashes, entropy, strings, indicators, and carve candidates.
+- **Hashes**: CRC32, MD5, SHA-1, SHA-256, and SHA-512.
+- **Entropy**: graph entropy across the whole file; select a region to open that range in a new Hex Editor tab.
+- **Strings**: ASCII and UTF-16 string extraction.
+- **IOCs**: URLs, domains, paths, hashes, and other indicators.
+- **Search** and **Multi-search**: text, hex, and regular-expression matching.
+
+### Structure and recovery tools
+
+- **Structures** parses common formats such as PE, ELF, Mach-O, ZIP, images, RIFF, ASN.1, and certificates.
+- **Disasm** provides heuristic disassembly for common CPU families and raw byte fallback where decoding is not implemented.
+- **PDF** inspects objects, streams, xrefs, and suspicious surfaces.
+- **SquashFS** inspects filesystem superblocks and metadata; non-SquashFS input shows a human-readable bad-magic error.
+- **Carve** and **BinSnoop** scan for embedded files and signatures and can export discovered files or ranges.
+- **Keys**, **Timestamps**, **Stego**, and **Metadata** help recover common artefacts from binaries and containers.
+
+### Editing, transforms, and cases
+
+- **Patch Plan** validates patch scripts without modifying the working copy.
+- **Patch Apply** applies validated patch scripts.
+- **Transforms** runs pipelines such as hex, Base64, URL, XOR, inflate, and cipher transforms over selected data.
+- **Rules** runs YARA-like scans over the current document.
+- **Case Export** packages investigation artefacts from the working document.
+
+### Spectrogram tools
+
+- **Spectrogram Encode** converts an image into WAV audio so the image appears in a spectrogram.
+- It can also insert an encoded image into an existing WAV or MP3 carrier.
+- **Spectrogram View** renders WAV or MP3 audio as a spectrogram image.
+- Controls include FFT size, height, maximum width, aspect ratio, frequency range, brightness, and contrast.
+
+### Large file behaviour
+
+Leviathan keeps loaded files file-backed where possible and writes patched working copies in chunks. Some tools still need bounded in-memory buffers because the underlying parser or decoder works on complete byte slices; those tools reject oversized inputs with a clear message rather than trying to allocate unbounded memory.
+
+---
+
+## 12. Security and credentials
 
 Nexus Terminal stores credentials securely:
 
@@ -214,7 +289,7 @@ Screenshot: TOTP configuration in the profile editor.
 
 ---
 
-## 12. Settings
+## 13. Settings
 
 Open settings with **Cmd+,** (macOS) or **Ctrl+,** (Windows/Linux) and configure:
 
@@ -227,7 +302,7 @@ Screenshot: Settings panel with appearance and security options.
 
 ---
 
-## 13. Troubleshooting
+## 14. Troubleshooting
 
 ### Session shows as disconnected
 
@@ -238,6 +313,19 @@ Screenshot: Settings panel with appearance and security options.
 
 - Check the folder is writable; **READ ONLY** indicates no write permission.
 - Confirm the SSH session is connected.
+
+### VNC will not connect
+
+- Confirm the VNC host and port are correct. The common VNC port is `5900` plus the display number.
+- If using a password, check whether the profile is set to saved, session-only, or ask-every-time mode.
+- If using an SSH tunnel, verify the tunnel host, username, authentication method, and SSH host key policy.
+- If direct VNC is enabled, test from a trusted network first and prefer an SSH tunnel for untrusted networks.
+
+### Leviathan cannot load or save a file
+
+- Check that the file still exists and that your user account can read it.
+- When saving, choose a writable destination and avoid overwriting a file that another process has locked.
+- Some tools enforce explicit size limits for safety. If a tool rejects an oversized input, try selecting a smaller range or using a tool that works on the file-backed document.
 
 ### Cannot read a folder
 

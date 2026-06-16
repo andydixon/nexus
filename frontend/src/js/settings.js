@@ -549,15 +549,17 @@
           id: "getting-started",
           title: "Getting Started",
           content: `
-                <p>Welcome to <strong>Nexus Terminal</strong> — a desktop application for connecting to remote servers via SSH, Telnet, and RAW TCP, as well as browsing your GitHub repositories.</p>
+                <p>Welcome to <strong>Nexus Terminal</strong> — a desktop application for SSH, Telnet, RAW TCP, VNC, GitHub, local terminal, and Leviathan binary-analysis workflows.</p>
                 <h4>Creating Your First Connection</h4>
                 <ol>
                     <li>Click the <strong>+</strong> button at the top of the sidebar, or press <kbd>⌘N</kbd> (Mac) / <kbd>Ctrl+N</kbd> (Windows/Linux).</li>
-                    <li>Choose a protocol (SSH, Telnet, RAW, or GitHub).</li>
+                    <li>Choose a protocol (SSH, Telnet, RAW, VNC, or GitHub).</li>
                     <li>Fill in the hostname, port, and any credentials required.</li>
                     <li>Optionally assign the connection to a <strong>group</strong> to keep your sidebar organised.</li>
                     <li>Click <strong>Save</strong>, then double-click the entry in the sidebar to connect.</li>
                 </ol>
+                <h4>Leviathan Tools</h4>
+                <p>Click <strong>Leviathan</strong> beside <strong>Nexus Terminal</strong> in the sidebar header to switch from connection profiles to binary-analysis tools. Use <strong>Load</strong> to choose a local file, then open tools such as Hex Editor, Overview, Entropy, Carve, BinSnoop, Structures, and Spectrogram View.</p>
                 <h4>Quick Connect</h4>
                 <p>Need to connect quickly without saving a profile? Press <kbd>⌘⇧Q</kbd> / <kbd>Ctrl+Shift+Q</kbd> to open the quick connect dialog. Choose SSH, Telnet, or RAW, enter the host and port, and you're connected immediately.</p>
                 <h4>Managing Connections</h4>
@@ -632,6 +634,22 @@
             `,
         },
         {
+          id: "vnc",
+          title: "VNC Connections",
+          content: `
+                <p>VNC profiles open a remote desktop viewer inside the Nexus workspace.</p>
+                <ul>
+                    <li><strong>Password handling</strong> — ask each time, use the session only, or save the password in the encrypted secret store.</li>
+                    <li><strong>View-only mode</strong> — observe a desktop without sending mouse or keyboard input.</li>
+                    <li><strong>Scale-to-fit</strong> — resize the remote desktop to fit the available workspace.</li>
+                    <li><strong>Shared session</strong> — request a shared VNC session where the server supports it.</li>
+                    <li><strong>Quality</strong> — tune image quality for slower links.</li>
+                    <li><strong>SSH tunnel</strong> — carry VNC traffic through an SSH connection using password, public key, or SSH agent authentication.</li>
+                </ul>
+                <p>Prefer <strong>SSH tunnel</strong> for VNC outside trusted networks. Direct VNC is supported for isolated or trusted networks, but many classic VNC deployments do not provide strong transport encryption.</p>
+            `,
+        },
+        {
           id: "github",
           title: "GitHub Connections",
           content: `
@@ -647,6 +665,35 @@
             `,
         },
         {
+          id: "leviathan",
+          title: "Leviathan Binary Tools",
+          content: `
+                <p>Leviathan is the built-in binary-analysis and editing workbench. It is useful for firmware images, unknown binaries, archives, captures, embedded files, documents, and audio spectrogram experiments.</p>
+                <h4>Opening and Saving Files</h4>
+                <p>Switch to <strong>Leviathan</strong> in the sidebar header, click <strong>Load</strong>, and select a local file. The file becomes the active working document. Use <strong>Save</strong> to write the patched working copy to a destination you choose.</p>
+                <p>Leviathan tools open in normal tabs beside terminal and VNC sessions. They close immediately without a disconnect confirmation.</p>
+                <h4>Hex Editor</h4>
+                <ul>
+                    <li>Edit byte cells directly; two hex digits commit the byte and move to the next cell.</li>
+                    <li>The ASCII preview updates while editing.</li>
+                    <li>Switch between 16-byte and 32-byte rows.</li>
+                    <li>Search for strings or hex values and move through matches with previous/next.</li>
+                    <li>Paste runs such as <code>de ad be ef</code> or <code>deadbeef</code> into consecutive cells.</li>
+                    <li>Use Undo, Redo, and Revert from the Leviathan panel header.</li>
+                </ul>
+                <h4>Triage Tools</h4>
+                <p><strong>Overview</strong>, <strong>Hashes</strong>, <strong>Entropy</strong>, <strong>Strings</strong>, <strong>IOCs</strong>, <strong>Search</strong>, and <strong>Multi-search</strong> provide a first pass over the current document. The Entropy tool renders the whole-file graph and lets you open selected ranges in the Hex Editor.</p>
+                <h4>Structure and Recovery Tools</h4>
+                <p><strong>Structures</strong>, <strong>Disasm</strong>, <strong>PDF</strong>, <strong>SquashFS</strong>, <strong>Carve</strong>, <strong>Keys</strong>, <strong>Timestamps</strong>, <strong>Stego</strong>, <strong>Metadata</strong>, <strong>BinSnoop</strong>, and <strong>Rules</strong> help identify embedded formats, files, signatures, strings, keys, and suspicious structures. Carve and BinSnoop can export discovered files or ranges.</p>
+                <h4>Edit, Transform, and Case Tools</h4>
+                <p><strong>Patch Plan</strong> validates patch scripts, <strong>Patch Apply</strong> applies them, <strong>Transforms</strong> runs hex/Base64/URL/XOR/inflate/cipher pipelines, and <strong>Case Export</strong> packages investigation artefacts.</p>
+                <h4>Spectrogram Tools</h4>
+                <p><strong>Spectrogram Encode</strong> turns an image into WAV audio or inserts an encoded image into an existing WAV/MP3 carrier. <strong>Spectrogram View</strong> visualises WAV or MP3 audio as a spectrogram image with controls for FFT size, height, aspect ratio, frequency range, brightness, and contrast.</p>
+                <h4>Large Files</h4>
+                <p>Leviathan keeps loaded files file-backed where possible and saves patched working copies in chunks. Tools that require complete image, audio, PDF, or other parser buffers enforce explicit size limits and show a clear message if an input is too large.</p>
+            `,
+        },
+        {
           id: "sessions",
           title: "Sessions & Tabs",
           content: `
@@ -655,7 +702,9 @@
                     <li><strong>Rename</strong> — right-click a tab and choose "Rename".</li>
                     <li><strong>Reorder</strong> — drag tabs left or right to rearrange.</li>
                     <li><strong>Pin</strong> — right-click and pin a tab so it stays at the left of the bar.</li>
-                    <li><strong>Close</strong> — click the <strong>×</strong> on a tab, or press <kbd>⌘W</kbd> / <kbd>Ctrl+W</kbd>.</li>
+                    <li><strong>Scroll</strong> — use the tab bar scrollbar or mouse wheel/trackpad over the tab strip when many tabs are open.</li>
+                    <li><strong>Hover hints</strong> — hover a tab to see its full name and connected-since time where available.</li>
+                    <li><strong>Close</strong> — click the <strong>×</strong> on the left side of a tab, or press <kbd>⌘W</kbd> / <kbd>Ctrl+W</kbd>. Leviathan tabs close without a disconnect confirmation.</li>
                 </ul>
                 <h4>Split Panes</h4>
                 <p>You can split the terminal into multiple panes:</p>
@@ -797,11 +846,25 @@
                     <li>If the server is genuinely unreachable, attempts will exhaust after the configured maximum (default 5).</li>
                     <li>Check the reconnection settings in the profile's Advanced section.</li>
                 </ul>
+                <h4>VNC will not connect</h4>
+                <ul>
+                    <li>Check the VNC host and port. The common port is <code>5900</code> plus the display number.</li>
+                    <li>If a password is required, check whether the profile is set to saved, session-only, or ask-every-time mode.</li>
+                    <li>If using an SSH tunnel, verify the tunnel host, username, authentication method, private key, and host-key policy.</li>
+                    <li>If using direct VNC, test from a trusted network and prefer SSH tunnelling on untrusted networks.</li>
+                </ul>
                 <h4>The terminal looks garbled or the wrong size</h4>
                 <ul>
                     <li>Try resizing the window — the terminal should re-fit automatically.</li>
                     <li>If you're using split panes, drag the divider to give the terminal more space.</li>
                     <li>Some older servers may not support modern terminal features. Try a different terminal theme in <strong>Settings → Terminal</strong>.</li>
+                </ul>
+                <h4>Leviathan cannot load, save, or run a tool</h4>
+                <ul>
+                    <li>Check that the selected file still exists and that your account can read it.</li>
+                    <li>When saving, choose a writable destination and avoid files that are locked by another process.</li>
+                    <li>Some tools have explicit size limits because their parsers or decoders need a complete buffer. Use a smaller file or selected range when available.</li>
+                    <li>If SquashFS reports bad magic, the file is probably not a SquashFS image; inspect the header in Hex Editor or try Overview/BinSnoop first.</li>
                 </ul>
                 <h4>"Host key verification failed"</h4>
                 <p>This means the server's fingerprint has changed since your last connection. This can happen if the server was reinstalled, but it could also indicate a security threat. If you're certain it's safe, go to <strong>Settings → Known Hosts</strong>, find the entry, and remove it. You'll be prompted to accept the new key on your next connection.</p>
