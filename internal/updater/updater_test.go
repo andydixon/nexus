@@ -37,9 +37,9 @@ func TestIsNewer(t *testing.T) {
 		{"1.0.1", "1.0.0", true},
 		{"1.0.0", "1.0.0", false},
 		{"0.9.0", "1.0.0", false},
-		{"1.0.0", "dev", false},    // dev builds ignored
-		{"1.0.0", "", false},       // empty current ignored
-		{"1.2", "1.1.0", true},     // fewer parts
+		{"1.0.0", "dev", false}, // dev builds ignored
+		{"1.0.0", "", false},    // empty current ignored
+		{"1.2", "1.1.0", true},  // fewer parts
 		{"1.0.0", "1.0.0.1", false},
 	}
 	for _, tt := range tests {
@@ -102,5 +102,22 @@ func TestURLCheckerPlainText(t *testing.T) {
 	}
 	if !info.Available {
 		t.Fatalf("expected update to be available")
+	}
+}
+
+func TestURLCheckerRejectsOversizedManifest(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain")
+		_, _ = w.Write([]byte(strings.Repeat("x", maxUpdateResponseBytes+1)))
+	}))
+	defer server.Close()
+
+	checker := NewURLChecker(server.URL, "1.9.0")
+	_, err := checker.Check(context.Background())
+	if err == nil {
+		t.Fatal("expected oversized manifest to be rejected")
+	}
+	if !strings.Contains(err.Error(), "response exceeds") {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }

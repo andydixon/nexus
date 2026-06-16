@@ -10,6 +10,8 @@ export function CancelReconnect(arg1:string):Promise<void>;
 
 export function CheckForUpdates():Promise<Record<string, any>>;
 
+export function CleanupRecordings(arg1:number,arg2:number):Promise<Record<string, any>>;
+
 export function ClearSessionHistory(arg1:string):Promise<void>;
 
 export function CloseAllSessions():Promise<void>;
@@ -64,6 +66,8 @@ export function GetProfile(arg1:string):Promise<models.Profile>;
 
 export function GetRecording(arg1:string):Promise<Record<string, any>>;
 
+export function GetRecordingStorageInfo():Promise<Record<string, any>>;
+
 export function GetSSHPublicKey(arg1:string):Promise<string>;
 
 export function GetSessionCwd(arg1:string):Promise<string>;
@@ -89,6 +93,28 @@ export function IsRecording(arg1:string):Promise<boolean>;
 export function IsSecretStoreInitialised():Promise<boolean>;
 
 export function IsSecretStoreUnlocked():Promise<boolean>;
+
+export function LeviathanExportJSON(arg1:string,arg2:Record<string, any>):Promise<string>;
+
+export function LeviathanLoadFile(arg1:string,arg2:boolean):Promise<Record<string, any>>;
+
+export function LeviathanOpenCompare():Promise<Record<string, any>>;
+
+export function LeviathanOpenFile():Promise<Record<string, any>>;
+
+export function LeviathanRedo():Promise<api.leviathanDocState>;
+
+export function LeviathanRevert():Promise<api.leviathanDocState>;
+
+export function LeviathanRunTool(arg1:string,arg2:Record<string, any>):Promise<Record<string, any>>;
+
+export function LeviathanSaveWorking():Promise<string>;
+
+export function LeviathanSetByte(arg1:number,arg2:string):Promise<Record<string, any>>;
+
+export function LeviathanState():Promise<api.leviathanDocState>;
+
+export function LeviathanUndo():Promise<api.leviathanDocState>;
 
 export function ListAuditEntries(arg1:number):Promise<Array<models.AuditEntry>>;
 
@@ -150,7 +176,15 @@ export function SFTPStat(arg1:string,arg2:string):Promise<Record<string, any>>;
 
 export function SFTPUpload(arg1:string,arg2:string):Promise<void>;
 
+export function SFTPUploadCancel(arg1:string):Promise<void>;
+
+export function SFTPUploadChunk(arg1:string,arg2:string):Promise<void>;
+
 export function SFTPUploadData(arg1:string,arg2:string,arg3:string,arg4:string):Promise<void>;
+
+export function SFTPUploadFinish(arg1:string):Promise<void>;
+
+export function SFTPUploadStart(arg1:string,arg2:string,arg3:string,arg4:number):Promise<string>;
 
 export function SaveFile(arg1:string,arg2:string):Promise<string>;
 

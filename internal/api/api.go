@@ -48,6 +48,7 @@ const (
 	maxInlineSFTPUploadBytes   = 25 * 1024 * 1024
 	maxSFTPUploadChunkBytes    = 1024 * 1024
 	maxStreamingSFTPUploadSize = int64(2 * 1024 * 1024 * 1024)
+	maxSSHPublicKeyBytes       = 64 * 1024
 )
 
 // Service is the main API surface exposed to the frontend via Wails bindings.
@@ -66,6 +67,8 @@ type Service struct {
 
 	uploadMu sync.Mutex
 	uploads  map[string]*sftpUpload
+
+	leviathan *leviathanState
 }
 
 type sftpUpload struct {
@@ -93,6 +96,7 @@ func NewService(
 		auditLog:      auditLog,
 		prefs:         prefs,
 		uploads:       make(map[string]*sftpUpload),
+		leviathan:     &leviathanState{},
 	}
 }
 
@@ -1763,7 +1767,7 @@ func (s *Service) ListSSHKeyPairs() ([]SSHKeyInfo, error) {
 		seen[baseName] = true
 
 		// Read public key content
-		pubBytes, err := os.ReadFile(filepath.Join(sshDir, name))
+		pubBytes, err := readSSHPublicKeyFile(filepath.Join(sshDir, name))
 		if err != nil {
 			continue
 		}
@@ -1849,7 +1853,7 @@ func (s *Service) GetSSHPublicKey(name string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	data, err := os.ReadFile(pubPath)
+	data, err := readSSHPublicKeyFile(pubPath)
 	if err != nil {
 		return "", fmt.Errorf("unable to read public key: %w", err)
 	}
@@ -1889,6 +1893,20 @@ func sshKeyPairPaths(name string) (string, string, error) {
 	privPath := filepath.Join(sshDir, keyName)
 	pubPath := privPath + ".pub"
 	return privPath, pubPath, nil
+}
+
+func readSSHPublicKeyFile(path string) ([]byte, error) {
+	info, err := os.Stat(path)
+	if err != nil {
+		return nil, err
+	}
+	if info.IsDir() {
+		return nil, fmt.Errorf("public key path is a directory")
+	}
+	if info.Size() > maxSSHPublicKeyBytes {
+		return nil, fmt.Errorf("public key file is too large: %d bytes exceeds %d bytes", info.Size(), maxSSHPublicKeyBytes)
+	}
+	return os.ReadFile(path)
 }
 
 func validateSSHKeyName(name string) (string, error) {

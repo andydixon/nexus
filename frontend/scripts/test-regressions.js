@@ -38,6 +38,26 @@ assertContains(
   "SFTPUploadChunk",
   "drag-drop upload must send bounded chunks",
 );
+assertContains(
+  "frontend/src/js/terminal.js",
+  "scheduleFit",
+  "terminal resize handling must be throttled through scheduled fits",
+);
+assertContains(
+  "frontend/src/js/terminal.js",
+  "dimensionsChanged",
+  "terminal resize handling must skip unchanged container dimensions",
+);
+assertContains(
+  "frontend/src/js/terminal.js",
+  "cancelScheduledFit",
+  "terminal teardown must cancel pending fit work",
+);
+assertNotContains(
+  "frontend/src/js/terminal.js",
+  "new ResizeObserver(() => {\n        try {\n          fitAddon.fit();",
+  "ResizeObserver must not call fitAddon.fit() directly",
+);
 assertNotContains(
   "frontend/src/js/terminal.js",
   "Use SFTP Upload for files over 25 MB",
@@ -67,6 +87,81 @@ assertContains(
   "internal/api/api_test.go",
   "TestCreateProfileRejectsUnsafeGitHubBaseURL",
   "GitHub HTTP/HTTPS URL validation must stay covered",
+);
+assertContains(
+  "frontend/index.html",
+  "mode-leviathan",
+  "Leviathan mode toggle must be present beside Nexus Terminal",
+);
+assertContains(
+  "frontend/src/css/sidebar.css",
+  "user-select: none",
+  "sidebar title and mode switcher text must not be selectable",
+);
+assertContains(
+  "frontend/src/css/sidebar.css",
+  "#mode-leviathan",
+  "Leviathan mode label must have its own right-alignment rule",
+);
+assertContains(
+  "frontend/src/css/sidebar.css",
+  "margin-left: auto;",
+  "Leviathan mode label must sit on the right side of the sidebar header",
+);
+assertContains(
+  "frontend/src/js/leviathan.js",
+  "Hex Editor",
+  "Leviathan mode must put Hex Editor in the tool list",
+);
+assertContains(
+  "frontend/src/js/leviathan.js",
+  "LeviathanSetByte",
+  "Leviathan hex view must support byte editing",
+);
+assertContains(
+  "frontend/src/js/leviathan.js",
+  "spectrogram-encode",
+  "Leviathan must expose an image-to-audio spectrogram encoder",
+);
+assertContains(
+  "frontend/src/js/leviathan.js",
+  "spectrogram-view",
+  "Leviathan must expose an audio spectrogram visualiser",
+);
+assertContains(
+  "frontend/src/js/leviathan.js",
+  "preserveAspectRatio",
+  "Leviathan spectrogram encoding must expose aspect-ratio preservation",
+);
+assertContains(
+  "frontend/src/js/leviathan.js",
+  "aspectRatio",
+  "Leviathan spectrogram visualiser must expose display aspect-ratio control",
+);
+assertContains(
+  "frontend/src/js/leviathan.js",
+  "spectrogram-insert",
+  "Leviathan spectrogram encoder must support inserting images into carrier audio",
+);
+assertContains(
+  "frontend/src/js/app.js",
+  "setMode(\"leviathan\")",
+  "App mode switch must route to Leviathan",
+);
+assertContains(
+  "internal/api/leviathan.go",
+  "LeviathanRunTool",
+  "Nexus API must expose the imported Leviathan engine",
+);
+assertNotContains(
+  "internal/api/leviathan.go",
+  "Pattern: \"*\"",
+  "Leviathan open dialogs must not use wildcard filters that grey out files on macOS",
+);
+assertContains(
+  "internal/leviathan/spectrogram/spectrogram.go",
+  "github.com/hajimehoshi/go-mp3",
+  "Leviathan spectrogram visualiser must support MP3 decoding",
 );
 
 console.log("frontend regression checks passed");

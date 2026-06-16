@@ -6,9 +6,12 @@ require (
 	github.com/creack/pty v1.1.24
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.3
+	github.com/hajimehoshi/go-mp3 v0.3.4
+	github.com/klauspost/compress v1.17.11
 	github.com/mattn/go-sqlite3 v1.14.44
 	github.com/pkg/sftp v1.13.10
 	github.com/pquerna/otp v1.5.0
+	github.com/ulikunitz/xz v0.5.15
 	github.com/wailsapp/wails/v2 v2.12.0
 	github.com/zalando/go-keyring v0.2.8
 	golang.org/x/crypto v0.52.0

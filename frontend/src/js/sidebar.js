@@ -59,6 +59,10 @@
      */
     render() {
       if (!this.el) return;
+      if (this.app.mode === "leviathan") {
+        this.app.leviathan.renderSidebar();
+        return;
+      }
       this.el.innerHTML = "";
 
       const profiles = this._filteredProfiles();

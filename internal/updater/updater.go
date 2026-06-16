@@ -25,6 +25,10 @@ const (
 
 	// requestTimeout limits the HTTP request duration.
 	requestTimeout = 10 * time.Second
+
+	// maxUpdateResponseBytes bounds release and manifest responses before
+	// parsing them into memory.
+	maxUpdateResponseBytes = 1 << 20
 )
 
 // Release describes a GitHub release with the fields we care about.
@@ -135,8 +139,13 @@ func (c *Checker) Check(ctx context.Context) (*UpdateInfo, error) {
 		return nil, fmt.Errorf("updater: GitHub API returned %d", resp.StatusCode)
 	}
 
+	body, err := readLimitedUpdateBody(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("updater: failed to read response: %w", err)
+	}
+
 	var release Release
-	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
+	if err := json.Unmarshal(body, &release); err != nil {
 		return nil, fmt.Errorf("updater: failed to decode response: %w", err)
 	}
 
@@ -186,7 +195,7 @@ func (c *URLChecker) Check(ctx context.Context) (*UpdateInfo, error) {
 		return nil, fmt.Errorf("updater: update server returned %d", resp.StatusCode)
 	}
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := readLimitedUpdateBody(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("updater: failed to read response: %w", err)
 	}
@@ -213,6 +222,17 @@ func normaliseVersion(v string) string {
 	v = strings.TrimSpace(v)
 	v = strings.TrimPrefix(v, "v")
 	return v
+}
+
+func readLimitedUpdateBody(r io.Reader) ([]byte, error) {
+	body, err := io.ReadAll(io.LimitReader(r, maxUpdateResponseBytes+1))
+	if err != nil {
+		return nil, err
+	}
+	if len(body) > maxUpdateResponseBytes {
+		return nil, fmt.Errorf("response exceeds %d bytes", maxUpdateResponseBytes)
+	}
+	return body, nil
 }
 
 func parseManifest(body []byte, current string) (*UpdateInfo, bool) {

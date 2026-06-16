@@ -20,6 +20,8 @@ import (
 	"golang.org/x/net/proxy"
 )
 
+const maxSSHPrivateKeyBytes = 1 << 20
+
 // Client manages a single SSH session lifecycle.
 // It handles connection establishment, authentication, PTY allocation,
 // terminal resize propagation, port forwarding, and clean shutdown.
@@ -664,6 +666,16 @@ func jumpHostClientConfig(jump models.JumpHost, auth []ssh.AuthMethod, finalConf
 // parsePrivateKey loads and parses an SSH private key file. If the key is
 // encrypted and getPassphrase is provided, it will attempt decryption.
 func (c *Client) parsePrivateKey(path string, getPassphrase func() (string, error)) (ssh.Signer, error) {
+	info, err := os.Stat(path)
+	if err != nil {
+		return nil, fmt.Errorf("unable to stat key file: %w", err)
+	}
+	if info.IsDir() {
+		return nil, fmt.Errorf("key path is a directory")
+	}
+	if info.Size() > maxSSHPrivateKeyBytes {
+		return nil, fmt.Errorf("key file is too large: %d bytes exceeds %d bytes", info.Size(), maxSSHPrivateKeyBytes)
+	}
 	keyData, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("unable to read key file: %w", err)

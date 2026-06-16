@@ -1,7 +1,9 @@
 package secrets
 
 import (
+	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -264,6 +266,30 @@ func TestVaultPath(t *testing.T) {
 	// The file should exist at the expected path.
 	if !store.IsInitialised() {
 		t.Fatalf("expected vault file at %s", want)
+	}
+}
+
+func TestSecretStoreLoadRejectsOversizedVault(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, vaultFileName)
+	file, err := os.Create(path)
+	if err != nil {
+		t.Fatalf("Create() failed: %v", err)
+	}
+	if err := file.Truncate(maxVaultFileBytes + 1); err != nil {
+		t.Fatalf("Truncate() failed: %v", err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatalf("Close() failed: %v", err)
+	}
+
+	store := NewSecretStore(dir)
+	_, err = store.load()
+	if err == nil {
+		t.Fatal("expected oversized vault to be rejected")
+	}
+	if !strings.Contains(err.Error(), "vault file is too large") {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 

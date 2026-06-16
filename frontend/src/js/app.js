@@ -22,6 +22,7 @@
     SnippetLibrary,
     SSHKeyManager,
     TriggerEngine,
+    LeviathanWorkbench,
     stateLabel,
   } = window.NexusTerminal;
 
@@ -44,7 +45,9 @@
       this.snippets = new SnippetLibrary(this);
       this.sshKeys = new SSHKeyManager(this);
       this.triggers = new TriggerEngine(this);
+      this.leviathan = new LeviathanWorkbench(this);
       this.updateInfo = null;
+      this.mode = "nexus";
     }
 
     /**
@@ -542,6 +545,8 @@
       this._bindClick("btn-recordings", () => this.recordings.openBrowser());
       this._bindClick("btn-new-tab", () => this.profileEditor.openNew());
       this._bindClick("btn-broadcast", () => this.toggleBroadcast());
+      this._bindClick("mode-nexus", () => this.setMode("nexus"));
+      this._bindClick("mode-leviathan", () => this.setMode("leviathan"));
 
       // Wire the "Local Machine" sidebar button
       this.sidebar.onConnectLocal = () => this.connectLocal();
@@ -587,6 +592,33 @@
           this._focusVisibleTerminal();
         });
       });
+    }
+
+    // ── App mode switching ─────────────────────────────────────────
+
+    /**
+     * Switches the sidebar between Nexus profiles and Leviathan tools.
+     * @param {"nexus"|"leviathan"} mode
+     */
+    setMode(mode) {
+      this.mode = mode === "leviathan" ? "leviathan" : "nexus";
+      const root = document.getElementById("app");
+      if (root) {
+        root.classList.toggle("mode-leviathan", this.mode === "leviathan");
+      }
+      document
+        .getElementById("mode-nexus")
+        ?.classList.toggle("is-active", this.mode === "nexus");
+      document
+        .getElementById("mode-leviathan")
+        ?.classList.toggle("is-active", this.mode === "leviathan");
+
+      if (this.mode === "leviathan") {
+        this.leviathan.renderSidebar();
+        this.leviathan.openTool("hex", { reuseExisting: true });
+      } else {
+        this.sidebar.render();
+      }
     }
 
     // ── Split pane ─────────────────────────────────────────────────

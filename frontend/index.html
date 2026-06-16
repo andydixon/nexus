@@ -23,6 +23,7 @@
     <link rel="stylesheet" href="/src/css/modals.css" />
     <link rel="stylesheet" href="/src/css/github.css" />
     <link rel="stylesheet" href="/src/css/vnc.css" />
+    <link rel="stylesheet" href="/src/css/leviathan.css" />
   </head>
   <body>
     <div id="app" class="app">
@@ -47,7 +48,22 @@
               <polyline points="4 17 10 11 4 5"></polyline>
               <line x1="12" y1="19" x2="20" y2="19"></line>
             </svg>
-            <span class="sidebar-title">Nexus Terminal</span>
+            <span class="sidebar-product-switch" aria-label="Application mode">
+              <button
+                class="sidebar-title sidebar-mode-toggle is-active"
+                id="mode-nexus"
+                type="button"
+              >
+                Nexus Terminal
+              </button>
+              <button
+                class="sidebar-title sidebar-mode-toggle"
+                id="mode-leviathan"
+                type="button"
+              >
+                Leviathan
+              </button>
+            </span>
           </div>
         </div>
 
@@ -324,6 +340,7 @@
     <script src="/src/js/snippets.js"></script>
     <script src="/src/js/sshkeys.js"></script>
     <script src="/src/js/triggers.js"></script>
+    <script src="/src/js/leviathan.js"></script>
     <script src="/src/js/app.js"></script>
   </body>
 </html>

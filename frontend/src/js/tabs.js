@@ -177,6 +177,7 @@
       this.app.terminals.destroyTerminal(sessionId);
       this.app.rawViewer.destroyViewer(sessionId);
       window.NexusTerminal.GitHubViewer.destroyViewer(sessionId);
+      this.app.leviathan?.destroyPanel(sessionId);
       this.removeTab(sessionId);
       this.app.state.removeSession(sessionId);
     }

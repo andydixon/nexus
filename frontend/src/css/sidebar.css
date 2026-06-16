@@ -19,6 +19,8 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  width: 100%;
+  min-width: 0;
 }
 
 .sidebar-logo svg {
@@ -33,6 +35,51 @@
   font-weight: var(--weight-semibold);
   color: var(--text-primary);
   letter-spacing: 0.02em;
+}
+
+.sidebar-product-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 1;
+  min-width: 0;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.sidebar-mode-toggle {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  height: auto;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  white-space: nowrap;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+#mode-leviathan {
+  margin-left: auto;
+  text-align: right;
+}
+
+.sidebar-mode-toggle.is-active {
+  color: var(--text-primary);
+}
+
+.sidebar-mode-toggle:hover {
+  color: var(--text-secondary);
+}
+
+.sidebar-mode-toggle.is-active:hover {
+  color: var(--text-primary);
+}
+
+.mode-leviathan .sidebar-search,
+.mode-leviathan .sidebar-footer {
+  display: none;
 }
 
 /* -----------------------------------------------------------------------

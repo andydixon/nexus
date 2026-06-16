@@ -28,6 +28,8 @@ const (
 	argonKeyLen  = 32
 
 	saltLen = 32
+
+	maxVaultFileBytes = 10 * 1024 * 1024
 )
 
 // SecretStore manages encrypted credential storage.
@@ -331,6 +333,16 @@ func (s *SecretStore) save() error {
 
 // load reads and unmarshals the vault from disc.
 func (s *SecretStore) load() (*secretVault, error) {
+	info, err := os.Stat(s.vaultPath())
+	if err != nil {
+		return nil, fmt.Errorf("failed to stat vault file: %w", err)
+	}
+	if info.IsDir() {
+		return nil, errors.New("vault path is a directory")
+	}
+	if info.Size() > maxVaultFileBytes {
+		return nil, fmt.Errorf("vault file is too large: %d bytes exceeds %d bytes", info.Size(), maxVaultFileBytes)
+	}
 	data, err := os.ReadFile(s.vaultPath())
 	if err != nil {
 		return nil, fmt.Errorf("failed to read vault file: %w", err)

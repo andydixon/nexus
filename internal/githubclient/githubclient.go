@@ -19,6 +19,11 @@ import (
 	"github.com/andydixon/nexus/internal/models"
 )
 
+const (
+	maxGitHubJSONBodyBytes  = 4 << 20
+	maxGitHubErrorBodyBytes = 64 << 10
+)
+
 // Client wraps the GitHub REST API for repository listing.
 type Client struct {
 	baseURL    string
@@ -41,19 +46,19 @@ func New(baseURL, token string) *Client {
 
 // apiRepo is the subset of the GitHub API response we care about.
 type apiRepo struct {
-	FullName    string    `json:"full_name"`
-	Name        string    `json:"name"`
-	Description string    `json:"description"`
-	HTMLURL     string    `json:"html_url"`
-	DefaultBranch string  `json:"default_branch"`
-	Private     bool      `json:"private"`
-	Fork        bool      `json:"fork"`
-	Archived    bool      `json:"archived"`
-	Language    string    `json:"language"`
-	Stars       int       `json:"stargazers_count"`
-	PushedAt    time.Time `json:"pushed_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
-	Owner       struct {
+	FullName      string    `json:"full_name"`
+	Name          string    `json:"name"`
+	Description   string    `json:"description"`
+	HTMLURL       string    `json:"html_url"`
+	DefaultBranch string    `json:"default_branch"`
+	Private       bool      `json:"private"`
+	Fork          bool      `json:"fork"`
+	Archived      bool      `json:"archived"`
+	Language      string    `json:"language"`
+	Stars         int       `json:"stargazers_count"`
+	PushedAt      time.Time `json:"pushed_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
+	Owner         struct {
 		Login string `json:"login"`
 	} `json:"owner"`
 }
@@ -90,7 +95,7 @@ func (c *Client) fetchRepos(ctx context.Context, progress func(done int, total i
 			return nil, fmt.Errorf("fetching repos page %d: %w", page, err)
 		}
 
-		body, readErr := io.ReadAll(resp.Body)
+		body, readErr := readLimitedGitHubBody(resp.Body, maxGitHubJSONBodyBytes)
 		resp.Body.Close()
 		if readErr != nil {
 			return nil, fmt.Errorf("reading response body: %w", readErr)
@@ -128,19 +133,19 @@ func (c *Client) fetchRepos(ctx context.Context, progress func(done int, total i
 	result := make([]models.GitHubRepo, len(all))
 	for i, r := range all {
 		result[i] = models.GitHubRepo{
-			FullName:    r.FullName,
-			Name:        r.Name,
-			Owner:       r.Owner.Login,
-			Description: r.Description,
-			HTMLURL:     r.HTMLURL,
+			FullName:      r.FullName,
+			Name:          r.Name,
+			Owner:         r.Owner.Login,
+			Description:   r.Description,
+			HTMLURL:       r.HTMLURL,
 			DefaultBranch: r.DefaultBranch,
-			Private:     r.Private,
-			Fork:        r.Fork,
-			Archived:    r.Archived,
-			Language:    r.Language,
-			Stars:       r.Stars,
-			PushedAt:    r.PushedAt.Format(time.RFC3339),
-			UpdatedAt:   r.UpdatedAt.Format(time.RFC3339),
+			Private:       r.Private,
+			Fork:          r.Fork,
+			Archived:      r.Archived,
+			Language:      r.Language,
+			Stars:         r.Stars,
+			PushedAt:      r.PushedAt.Format(time.RFC3339),
+			UpdatedAt:     r.UpdatedAt.Format(time.RFC3339),
 		}
 	}
 
@@ -208,8 +213,7 @@ func (c *Client) FetchLatestCommit(ctx context.Context, fullName string, ref str
 		return "", "", fmt.Errorf("authentication failed (HTTP %d)", resp.StatusCode)
 	}
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return "", "", fmt.Errorf("GitHub API returned HTTP %d: %s", resp.StatusCode, string(body))
+		return "", "", fmt.Errorf("GitHub API returned HTTP %d: %s", resp.StatusCode, readGitHubErrorBody(resp.Body))
 	}
 
 	var payload struct {
@@ -225,7 +229,11 @@ func (c *Client) FetchLatestCommit(ctx context.Context, fullName string, ref str
 		} `json:"commit"`
 	}
 
-	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+	body, err := readLimitedGitHubBody(resp.Body, maxGitHubJSONBodyBytes)
+	if err != nil {
+		return "", "", fmt.Errorf("reading commit response: %w", err)
+	}
+	if err := json.Unmarshal(body, &payload); err != nil {
 		return "", "", fmt.Errorf("decoding commit: %w", err)
 	}
 
@@ -270,8 +278,7 @@ func (c *Client) DownloadRepoArchive(ctx context.Context, fullName string, ref s
 		return fmt.Errorf("authentication failed (HTTP %d) — check your access token", resp.StatusCode)
 	}
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("GitHub API returned HTTP %d: %s", resp.StatusCode, string(body))
+		return fmt.Errorf("GitHub API returned HTTP %d: %s", resp.StatusCode, readGitHubErrorBody(resp.Body))
 	}
 
 	file, err := os.Create(destPath)
@@ -310,8 +317,31 @@ func (c *Client) ValidateToken(ctx context.Context) (string, error) {
 	var user struct {
 		Login string `json:"login"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&user); err != nil {
+	body, err := readLimitedGitHubBody(resp.Body, maxGitHubJSONBodyBytes)
+	if err != nil {
+		return "", fmt.Errorf("reading user response: %w", err)
+	}
+	if err := json.Unmarshal(body, &user); err != nil {
 		return "", fmt.Errorf("decoding user: %w", err)
 	}
 	return user.Login, nil
+}
+
+func readLimitedGitHubBody(r io.Reader, maxBytes int64) ([]byte, error) {
+	body, err := io.ReadAll(io.LimitReader(r, maxBytes+1))
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(body)) > maxBytes {
+		return nil, fmt.Errorf("response body exceeds %d bytes", maxBytes)
+	}
+	return body, nil
+}
+
+func readGitHubErrorBody(r io.Reader) string {
+	body, err := readLimitedGitHubBody(r, maxGitHubErrorBodyBytes)
+	if err != nil {
+		return "<response body unavailable: " + err.Error() + ">"
+	}
+	return strings.TrimSpace(string(body))
 }

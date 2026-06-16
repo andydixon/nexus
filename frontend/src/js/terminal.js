@@ -182,21 +182,70 @@
         this._handleFileDrop(sessionId, term, files);
       });
 
+      let fitRaf = 0;
+      let forceNextFit = false;
+      let lastFitWidth = 0;
+      let lastFitHeight = 0;
+
+      const cancelScheduledFit = () => {
+        if (!fitRaf) return;
+        cancelAnimationFrame(fitRaf);
+        fitRaf = 0;
+      };
+
+      const scheduleFit = (force = false) => {
+        forceNextFit = forceNextFit || force;
+        if (fitRaf) return;
+
+        fitRaf = requestAnimationFrame(() => {
+          fitRaf = 0;
+
+          if (!container.isConnected) {
+            forceNextFit = false;
+            return;
+          }
+
+          const rect = container.getBoundingClientRect();
+          const width = Math.round(rect.width);
+          const height = Math.round(rect.height);
+          if (width <= 0 || height <= 0) {
+            return;
+          }
+
+          const dimensionsChanged =
+            width !== lastFitWidth || height !== lastFitHeight;
+          if (!forceNextFit && !dimensionsChanged) {
+            return;
+          }
+
+          lastFitWidth = width;
+          lastFitHeight = height;
+          forceNextFit = false;
+
+          try {
+            fitAddon.fit();
+          } catch (_) {
+            /* noop */
+          }
+        });
+      };
+
       // Force a synchronous layout reflow so the container reports its
       // true dimensions, then fit the terminal to fill the space.
       // eslint-disable-next-line no-unused-expressions
       container.offsetHeight;
-      const doFit = () => {
+      scheduleFit(true);
+      // Belt-and-braces: retry once after a paint in case the initial
+      // reflow dimensions were still stale.
+      requestAnimationFrame(() => scheduleFit(true));
+
+      const refreshTerminal = () => {
         try {
-          fitAddon.fit();
+          term.refresh(0, term.rows - 1);
         } catch (_) {
           /* noop */
         }
       };
-      doFit();
-      // Belt-and-braces: retry once after a paint in case the initial
-      // reflow dimensions were still stale.
-      requestAnimationFrame(doFit);
 
       // Forward user keystrokes to the backend
       term.onData((data) => {
@@ -288,13 +337,11 @@
         }
       });
 
-      // Re-fit when the container itself resizes
+      // Re-fit when the container itself resizes. ResizeObserver can fire
+      // repeatedly while xterm mutates its DOM, so schedule at most one fit
+      // per frame and skip work when the container dimensions are unchanged.
       const observer = new ResizeObserver(() => {
-        try {
-          fitAddon.fit();
-        } catch (_) {
-          // Ignore transient errors during layout shifts
-        }
+        scheduleFit();
       });
       observer.observe(container);
 
@@ -304,6 +351,9 @@
         searchAddon,
         webLinksAddon,
         observer,
+        scheduleFit,
+        cancelScheduledFit,
+        refreshTerminal,
         decoder:
           typeof TextDecoder !== "undefined" ? new TextDecoder("utf-8") : null,
       });
@@ -346,6 +396,7 @@
       if (!entry) return;
 
       entry.observer.disconnect();
+      entry.cancelScheduledFit();
       entry.term.dispose();
       this.terminals.delete(sessionId);
     }
@@ -365,13 +416,7 @@
       // Re-fit the newly visible terminal
       const entry = this.terminals.get(sessionId);
       if (entry) {
-        requestAnimationFrame(() => {
-          try {
-            entry.fitAddon.fit();
-          } catch (_) {
-            /* noop */
-          }
-        });
+        entry.scheduleFit(true);
       }
     }
 
@@ -390,13 +435,7 @@
     fitSession(sessionId) {
       const entry = this.terminals.get(sessionId);
       if (entry) {
-        requestAnimationFrame(() => {
-          try {
-            entry.fitAddon.fit();
-          } catch (_) {
-            /* noop */
-          }
-        });
+        entry.scheduleFit(true);
       }
     }
 

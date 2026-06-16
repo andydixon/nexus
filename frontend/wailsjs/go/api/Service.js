@@ -14,6 +14,10 @@ export function CheckForUpdates() {
   return window['go']['api']['Service']['CheckForUpdates']();
 }
 
+export function CleanupRecordings(arg1, arg2) {
+  return window['go']['api']['Service']['CleanupRecordings'](arg1, arg2);
+}
+
 export function ClearSessionHistory(arg1) {
   return window['go']['api']['Service']['ClearSessionHistory'](arg1);
 }
@@ -122,6 +126,10 @@ export function GetRecording(arg1) {
   return window['go']['api']['Service']['GetRecording'](arg1);
 }
 
+export function GetRecordingStorageInfo() {
+  return window['go']['api']['Service']['GetRecordingStorageInfo']();
+}
+
 export function GetSSHPublicKey(arg1) {
   return window['go']['api']['Service']['GetSSHPublicKey'](arg1);
 }
@@ -172,6 +180,50 @@ export function IsSecretStoreInitialised() {
 
 export function IsSecretStoreUnlocked() {
   return window['go']['api']['Service']['IsSecretStoreUnlocked']();
+}
+
+export function LeviathanExportJSON(arg1, arg2) {
+  return window['go']['api']['Service']['LeviathanExportJSON'](arg1, arg2);
+}
+
+export function LeviathanLoadFile(arg1, arg2) {
+  return window['go']['api']['Service']['LeviathanLoadFile'](arg1, arg2);
+}
+
+export function LeviathanOpenCompare() {
+  return window['go']['api']['Service']['LeviathanOpenCompare']();
+}
+
+export function LeviathanOpenFile() {
+  return window['go']['api']['Service']['LeviathanOpenFile']();
+}
+
+export function LeviathanRedo() {
+  return window['go']['api']['Service']['LeviathanRedo']();
+}
+
+export function LeviathanRevert() {
+  return window['go']['api']['Service']['LeviathanRevert']();
+}
+
+export function LeviathanRunTool(arg1, arg2) {
+  return window['go']['api']['Service']['LeviathanRunTool'](arg1, arg2);
+}
+
+export function LeviathanSaveWorking() {
+  return window['go']['api']['Service']['LeviathanSaveWorking']();
+}
+
+export function LeviathanSetByte(arg1, arg2) {
+  return window['go']['api']['Service']['LeviathanSetByte'](arg1, arg2);
+}
+
+export function LeviathanState() {
+  return window['go']['api']['Service']['LeviathanState']();
+}
+
+export function LeviathanUndo() {
+  return window['go']['api']['Service']['LeviathanUndo']();
 }
 
 export function ListAuditEntries(arg1) {
@@ -294,8 +346,24 @@ export function SFTPUpload(arg1, arg2) {
   return window['go']['api']['Service']['SFTPUpload'](arg1, arg2);
 }
 
+export function SFTPUploadCancel(arg1) {
+  return window['go']['api']['Service']['SFTPUploadCancel'](arg1);
+}
+
+export function SFTPUploadChunk(arg1, arg2) {
+  return window['go']['api']['Service']['SFTPUploadChunk'](arg1, arg2);
+}
+
 export function SFTPUploadData(arg1, arg2, arg3, arg4) {
   return window['go']['api']['Service']['SFTPUploadData'](arg1, arg2, arg3, arg4);
+}
+
+export function SFTPUploadFinish(arg1) {
+  return window['go']['api']['Service']['SFTPUploadFinish'](arg1);
+}
+
+export function SFTPUploadStart(arg1, arg2, arg3, arg4) {
+  return window['go']['api']['Service']['SFTPUploadStart'](arg1, arg2, arg3, arg4);
 }
 
 export function SaveFile(arg1, arg2) {

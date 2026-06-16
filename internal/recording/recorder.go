@@ -9,6 +9,7 @@
 package recording
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"fmt"
@@ -33,6 +34,9 @@ const (
 	MaxRecordingBytes = int64(250 * 1024 * 1024)
 	// MaxPlaybackBytes bounds the file size loaded for playback.
 	MaxPlaybackBytes = int64(100 * 1024 * 1024)
+	// MaxPlaybackLineBytes bounds one asciicast line during streaming playback
+	// parsing. Terminal events should stay well below this in normal use.
+	MaxPlaybackLineBytes = 8 * 1024 * 1024
 )
 
 // Header is the asciicast v2 file header (first line).
@@ -298,26 +302,30 @@ func (s *Store) getWithLimit(id string, maxBytes int64) (*Header, []Event, error
 	if maxBytes > 0 && info.Size() > maxBytes {
 		return nil, nil, fmt.Errorf("recording: file is too large for playback (max %d bytes)", maxBytes)
 	}
-	data, err := os.ReadFile(path)
+	file, err := os.Open(path)
 	if err != nil {
-		return nil, nil, fmt.Errorf("recording: failed to read file: %w", err)
+		return nil, nil, fmt.Errorf("recording: failed to open file: %w", err)
 	}
-
-	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
-	if len(lines) < 1 {
-		return nil, nil, fmt.Errorf("recording: empty file")
-	}
+	defer file.Close()
 
 	// Parse header (first line).
+	scanner := bufio.NewScanner(file)
+	scanner.Buffer(make([]byte, 0, 64*1024), MaxPlaybackLineBytes)
+	if !scanner.Scan() {
+		if err := scanner.Err(); err != nil {
+			return nil, nil, fmt.Errorf("recording: failed to scan header: %w", err)
+		}
+		return nil, nil, fmt.Errorf("recording: empty file")
+	}
 	var hdr Header
-	if err := json.Unmarshal([]byte(lines[0]), &hdr); err != nil {
+	if err := json.Unmarshal([]byte(strings.TrimSpace(scanner.Text())), &hdr); err != nil {
 		return nil, nil, fmt.Errorf("recording: invalid header: %w", err)
 	}
 
 	// Parse events (remaining lines).
-	events := make([]Event, 0, len(lines)-1)
-	for _, line := range lines[1:] {
-		line = strings.TrimSpace(line)
+	events := make([]Event, 0)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
 		if line == "" {
 			continue
 		}
@@ -346,6 +354,9 @@ func (s *Store) getWithLimit(id string, maxBytes int64) (*Header, []Event, error
 			Type:    EventType(evtType),
 			Data:    evtData,
 		})
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, nil, fmt.Errorf("recording: failed to scan events: %w", err)
 	}
 
 	return &hdr, events, nil

@@ -2,11 +2,13 @@ package api
 
 import (
 	"encoding/base64"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/andydixon/nexus/internal/audit"
+	"github.com/andydixon/nexus/internal/leviathan/document"
 	"github.com/andydixon/nexus/internal/models"
 	"github.com/andydixon/nexus/internal/storage"
 )
@@ -166,6 +168,63 @@ func TestImportProfilesNormalizesSparseRAWProfile(t *testing.T) {
 	}
 	if profiles[0].RAW.Encoding != "utf-8" {
 		t.Fatalf("raw encoding = %q, want utf-8", profiles[0].RAW.Encoding)
+	}
+}
+
+func TestLeviathanDocumentBytesRejectsOversizedDocument(t *testing.T) {
+	doc := document.New("large.bin", []byte("abcd"))
+	_, err := leviathanDocumentBytes(doc, 3, "test")
+	if err == nil {
+		t.Fatal("expected oversized document to be rejected")
+	}
+	if !strings.Contains(err.Error(), "too large") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestWriteLeviathanDocumentFileWritesPatchedBytes(t *testing.T) {
+	doc := document.New("patched.bin", []byte("abcd"))
+	if _, err := doc.Set(1, 'Z'); err != nil {
+		t.Fatalf("Set() failed: %v", err)
+	}
+	path := filepath.Join(t.TempDir(), "out.bin")
+	if err := writeLeviathanDocumentFile(path, doc); err != nil {
+		t.Fatalf("writeLeviathanDocumentFile() failed: %v", err)
+	}
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile() failed: %v", err)
+	}
+	if string(got) != "aZcd" {
+		t.Fatalf("written bytes = %q, want %q", string(got), "aZcd")
+	}
+}
+
+func TestReadLeviathanSmallFileRejectsOversizedFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "big.img")
+	if err := os.WriteFile(path, []byte("abcd"), 0600); err != nil {
+		t.Fatalf("WriteFile() failed: %v", err)
+	}
+	_, err := readLeviathanSmallFile(path, 3, "image")
+	if err == nil {
+		t.Fatal("expected oversized file to be rejected")
+	}
+	if !strings.Contains(err.Error(), "too large") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestReadSSHPublicKeyFileRejectsOversizedFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "big.pub")
+	if err := os.WriteFile(path, []byte(strings.Repeat("x", maxSSHPublicKeyBytes+1)), 0600); err != nil {
+		t.Fatalf("WriteFile() failed: %v", err)
+	}
+	_, err := readSSHPublicKeyFile(path)
+	if err == nil {
+		t.Fatal("expected oversized public key to be rejected")
+	}
+	if !strings.Contains(err.Error(), "too large") {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 

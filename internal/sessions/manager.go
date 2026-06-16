@@ -32,6 +32,8 @@ import (
 	"github.com/andydixon/nexus/internal/vncclient"
 )
 
+const maxVNCTunnelPrivateKeyBytes = 1 << 20
+
 // Session wraps a protocol client with metadata and state.
 type Session struct {
 	Info           models.SessionInfo
@@ -1031,6 +1033,16 @@ func (m *Manager) connectVNC(sess *Session, getSecret func(prompt string) (strin
 			cfg.SSHPassword = password
 		case "publickey":
 			if vncConf.SSHPrivateKey != "" {
+				info, err := os.Stat(vncConf.SSHPrivateKey)
+				if err != nil {
+					return fmt.Errorf("reading SSH key metadata: %w", err)
+				}
+				if info.IsDir() {
+					return fmt.Errorf("SSH key path is a directory")
+				}
+				if info.Size() > maxVNCTunnelPrivateKeyBytes {
+					return fmt.Errorf("SSH key is too large: %d bytes exceeds %d bytes", info.Size(), maxVNCTunnelPrivateKeyBytes)
+				}
 				keyData, err := os.ReadFile(vncConf.SSHPrivateKey)
 				if err != nil {
 					return fmt.Errorf("reading SSH key: %w", err)
