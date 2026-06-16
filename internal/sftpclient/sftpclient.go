@@ -267,6 +267,21 @@ func (c *Client) UploadBytes(remotePath string, data []byte, onProgress func(Tra
 	return c.copyWithProgress(reader, remote, int64(len(data)), remotePath, onProgress)
 }
 
+// CreateWriter creates or truncates a remote file and returns a streaming
+// writer for callers that already manage progress and chunking.
+func (c *Client) CreateWriter(remotePath string) (io.WriteCloser, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.closed || c.sftp == nil {
+		return nil, fmt.Errorf("sftpclient: client is closed")
+	}
+	remote, err := c.sftp.Create(remotePath)
+	if err != nil {
+		return nil, fmt.Errorf("sftpclient: failed to create remote file: %w", err)
+	}
+	return remote, nil
+}
+
 // Pwd returns the current working directory on the remote host.
 func (c *Client) Pwd() (string, error) {
 	c.mu.Lock()

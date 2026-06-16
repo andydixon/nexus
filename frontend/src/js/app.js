@@ -744,7 +744,7 @@
      * Opens a new session for the given profile ID.
      * @param {string} profileId
      */
-    async connectProfile(profileId) {
+    async connectProfile(profileId, options = {}) {
       const profile = this.state.getProfile(profileId);
       if (!profile) {
         this.notifications.error("Profile not found");
@@ -772,6 +772,14 @@
           return;
         }
         if (decision !== "new") return;
+      }
+
+      if (
+        !options.skipDirectVNCWarning &&
+        this._requiresDirectVNCWarning(profile)
+      ) {
+        const ok = await this.confirmDirectVNCProfile(profile, "connect");
+        if (!ok) return;
       }
 
       try {
@@ -977,7 +985,9 @@
      */
     _confirmReuseSession(profile, session) {
       const createElement = window.NexusTerminal.createElement;
-      const label = (profile.displayName || profile.host || "Untitled").trim();
+      const label = window.NexusTerminal.escapeHtml(
+        (profile.displayName || profile.host || "Untitled").trim(),
+      );
       const stateLabel =
         session.state === "connected" ? "connected" : "connecting";
 
@@ -1030,6 +1040,74 @@
         backdrop.addEventListener("click", (e) => {
           if (e.target === backdrop) close(null);
         });
+      });
+    }
+
+    /**
+     * Reports whether a profile connects directly to VNC without SSH tunnelling.
+     * @param {Object} profile
+     * @returns {boolean}
+     * @private
+     */
+    _requiresDirectVNCWarning(profile) {
+      return !!(
+        profile &&
+        profile.protocol === "vnc" &&
+        profile.vnc &&
+        !profile.vnc.sshTunnel
+      );
+    }
+
+    /**
+     * Warns before saving or connecting direct VNC profiles.
+     * @param {Object} profile
+     * @param {"save"|"connect"} action
+     * @returns {Promise<boolean>}
+     */
+    confirmDirectVNCProfile(profile, action) {
+      const { createElement, createModalShell } = window.NexusTerminal;
+      const label = (
+        profile.displayName ||
+        profile.vnc?.vncHost ||
+        profile.host ||
+        "VNC"
+      ).trim();
+      const actionLabel = action === "connect" ? "Connect" : "Save";
+
+      return new Promise((resolve) => {
+        const shell = createModalShell("Direct VNC Connection", "modal-sm");
+        const bodyText = createElement("p", "", {
+          textContent:
+            label +
+            " is configured without an SSH tunnel. VNC traffic may be visible to the network unless the server is otherwise protected.",
+        });
+        bodyText.style.fontSize = "var(--text-sm)";
+        bodyText.style.color = "var(--text-secondary)";
+        shell.body.appendChild(bodyText);
+
+        const cancelBtn = createElement("button", "btn btn-sm", {
+          textContent: "Cancel",
+        });
+        const okBtn = createElement(
+          "button",
+          "btn btn-sm btn-warning direct-vnc-confirm",
+          { textContent: actionLabel },
+        );
+        shell.footer.appendChild(cancelBtn);
+        shell.footer.appendChild(okBtn);
+
+        const close = (value) => {
+          shell.remove();
+          resolve(value);
+        };
+
+        shell.closeButton.addEventListener("click", () => close(false));
+        cancelBtn.addEventListener("click", () => close(false));
+        okBtn.addEventListener("click", () => close(true));
+        shell.backdrop.addEventListener("click", (e) => {
+          if (e.target === shell.backdrop) close(false);
+        });
+        shell.show();
       });
     }
 

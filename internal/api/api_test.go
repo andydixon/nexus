@@ -113,6 +113,82 @@ func TestSFTPUploadDataRejectsOversizedPayloadBeforeSessionLookup(t *testing.T) 
 	}
 }
 
+func TestSFTPUploadChunkRejectsOversizedChunkBeforeUploadLookup(t *testing.T) {
+	svc := newTestService(t)
+	payload := base64.StdEncoding.EncodeToString(make([]byte, maxSFTPUploadChunkBytes+1))
+
+	err := svc.SFTPUploadChunk("missing-upload", payload)
+	if err == nil {
+		t.Fatal("expected oversized upload chunk to be rejected")
+	}
+	if !strings.Contains(err.Error(), "chunk is too large") {
+		t.Fatalf("error = %q, want chunk is too large", err.Error())
+	}
+}
+
+func TestSafeSFTPUploadNamePreservesHTMLCharacters(t *testing.T) {
+	got, err := safeSFTPUploadName(`../report <final>.txt`)
+	if err != nil {
+		t.Fatalf("safeSFTPUploadName() error = %v", err)
+	}
+	if got != "report <final>.txt" {
+		t.Fatalf("safe name = %q, want HTML characters preserved in base name", got)
+	}
+}
+
+func TestImportProfilesNormalizesSparseRAWProfile(t *testing.T) {
+	svc := newTestService(t)
+	data := `[
+		{
+			"displayName": "Raw Device",
+			"protocol": "raw",
+			"host": "device.local",
+			"raw": {}
+		}
+	]`
+
+	count, err := svc.ImportProfiles(data, "skip")
+	if err != nil {
+		t.Fatalf("ImportProfiles() error = %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("imported = %d, want 1", count)
+	}
+	profiles, err := svc.ListProfiles()
+	if err != nil {
+		t.Fatalf("ListProfiles() error = %v", err)
+	}
+	if len(profiles) != 1 {
+		t.Fatalf("profiles = %d, want 1", len(profiles))
+	}
+	if profiles[0].Port != models.DefaultRAWPort {
+		t.Fatalf("port = %d, want %d", profiles[0].Port, models.DefaultRAWPort)
+	}
+	if profiles[0].RAW.Encoding != "utf-8" {
+		t.Fatalf("raw encoding = %q, want utf-8", profiles[0].RAW.Encoding)
+	}
+}
+
+func TestCreateProfileNormalizesLegacyVNCSecretMode(t *testing.T) {
+	svc := newTestService(t)
+	profile := models.NewProfile(models.ProtocolVNC)
+	profile.DisplayName = "VNC"
+	profile.Host = "vnc.local"
+	profile.VNC.SecretMode = "prompt"
+	profile.VNC.SSHSecretMode = "prompt"
+
+	got, err := svc.CreateProfile(profile)
+	if err != nil {
+		t.Fatalf("CreateProfile() error = %v", err)
+	}
+	if got.VNC.SecretMode != models.SecretModeAskEveryTime {
+		t.Fatalf("secret mode = %q, want %q", got.VNC.SecretMode, models.SecretModeAskEveryTime)
+	}
+	if got.VNC.SSHSecretMode != models.SecretModeAskEveryTime {
+		t.Fatalf("ssh secret mode = %q, want %q", got.VNC.SSHSecretMode, models.SecretModeAskEveryTime)
+	}
+}
+
 func newTestService(t *testing.T) *Service {
 	t.Helper()
 	store, err := storage.NewStore(filepath.Join(t.TempDir(), "test.db"))

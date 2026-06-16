@@ -13,21 +13,27 @@ import (
 	"github.com/andydixon/nexus/internal/models"
 )
 
+const (
+	maxHistoryEntries = 10000
+	maxHistoryBytes   = 10 * 1024 * 1024
+)
+
 // Client manages a raw TCP connection.
 // It provides binary-safe data handling with support for text and hex views,
 // timestamps, direction markers, and payload presets.
 type Client struct {
-	mu        sync.Mutex
-	config    *models.Profile
-	conn      net.Conn
-	connected bool
-	onData    func(data []byte, direction string, timestamp time.Time)
-	onError   func(err error)
-	onClose   func()
-	ctx       context.Context
-	cancel    context.CancelFunc
-	history   []HistoryEntry
-	historyMu sync.RWMutex
+	mu           sync.Mutex
+	config       *models.Profile
+	conn         net.Conn
+	connected    bool
+	onData       func(data []byte, direction string, timestamp time.Time)
+	onError      func(err error)
+	onClose      func()
+	ctx          context.Context
+	cancel       context.CancelFunc
+	history      []HistoryEntry
+	historyBytes int
+	historyMu    sync.RWMutex
 }
 
 // HistoryEntry records a single sent or received data frame with its timestamp.
@@ -193,7 +199,10 @@ func (c *Client) GetHistory() []HistoryEntry {
 	defer c.historyMu.RUnlock()
 
 	out := make([]HistoryEntry, len(c.history))
-	copy(out, c.history)
+	for i, entry := range c.history {
+		out[i] = entry
+		out[i].Data = copyBytes(entry.Data)
+	}
 	return out
 }
 
@@ -202,6 +211,7 @@ func (c *Client) ClearHistory() {
 	c.historyMu.Lock()
 	defer c.historyMu.Unlock()
 	c.history = nil
+	c.historyBytes = 0
 }
 
 // SaveCapture writes the session history to a file in JSON format.
@@ -271,7 +281,21 @@ func (c *Client) readLoop() {
 func (c *Client) appendHistory(entry HistoryEntry) {
 	c.historyMu.Lock()
 	defer c.historyMu.Unlock()
+
+	if len(entry.Data) > maxHistoryBytes {
+		entry.Data = copyBytes(entry.Data[len(entry.Data)-maxHistoryBytes:])
+	}
 	c.history = append(c.history, entry)
+	c.historyBytes += len(entry.Data)
+	for len(c.history) > maxHistoryEntries || c.historyBytes > maxHistoryBytes {
+		if len(c.history) == 0 {
+			c.historyBytes = 0
+			return
+		}
+		c.historyBytes -= len(c.history[0].Data)
+		c.history[0].Data = nil
+		c.history = c.history[1:]
+	}
 }
 
 // applyLineEnding appends the configured line ending to text.

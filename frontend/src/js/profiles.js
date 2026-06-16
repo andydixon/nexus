@@ -2314,6 +2314,17 @@
         return;
       }
 
+      if (
+        this.app._requiresDirectVNCWarning &&
+        this.app._requiresDirectVNCWarning(this._profile)
+      ) {
+        const ok = await this.app.confirmDirectVNCProfile(
+          this._profile,
+          andConnect ? "connect" : "save",
+        );
+        if (!ok) return;
+      }
+
       try {
         let saved;
         if (this._isNew) {
@@ -2329,7 +2340,7 @@
         this.close();
 
         if (andConnect && saved && saved.id) {
-          this.app.connectProfile(saved.id);
+          this.app.connectProfile(saved.id, { skipDirectVNCWarning: true });
         }
       } catch (err) {
         this.app.notifications.error("Save failed: " + err);

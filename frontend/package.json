@@ -8,6 +8,7 @@
     "bundle:novnc": "node scripts/bundle-novnc.js",
     "build": "node scripts/build.js",
     "dev": "node scripts/build.js --watch",
+    "test": "node scripts/test-regressions.js",
     "postinstall": "npm run install:assets && npm run bundle:novnc"
   },
   "dependencies": {

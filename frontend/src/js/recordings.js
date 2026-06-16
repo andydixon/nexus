@@ -70,8 +70,11 @@ class RecordingManager {
      */
     async openBrowser() {
         try {
-            const recordings = await window.go.api.Service.ListRecordings();
-            this._showBrowserModal(recordings || []);
+            const [recordings, storageInfo] = await Promise.all([
+                window.go.api.Service.ListRecordings(),
+                window.go.api.Service.GetRecordingStorageInfo(),
+            ]);
+            this._showBrowserModal(recordings || [], storageInfo || {});
         } catch (err) {
             this.app.notifications.error('Failed to list recordings: ' + err);
         }
@@ -133,9 +136,10 @@ class RecordingManager {
     /**
      * Renders a modal listing all saved recordings.
      * @param {Array} recordings
+     * @param {Object} storageInfo
      * @private
      */
-    _showBrowserModal(recordings) {
+    _showBrowserModal(recordings, storageInfo = {}) {
         const backdrop = createElement('div', 'modal-backdrop');
         const modal = createElement('div', 'modal modal-lg');
 
@@ -164,12 +168,36 @@ class RecordingManager {
             listHTML += '</div>';
         }
 
+        const totalSize = _formatBytes(storageInfo.totalBytes || 0);
+        const count = storageInfo.count ?? recordings.length;
+
         modal.innerHTML = `
             <div class="modal-header">
                 <h3 class="modal-title">Session Recordings</h3>
                 <button class="btn btn-icon btn-xs modal-close">&times;</button>
             </div>
             <div class="modal-body" style="max-height:60vh;overflow-y:auto;">
+                <div class="recording-storage">
+                    <div class="recording-storage-summary">
+                        <span>${count} recording${count === 1 ? '' : 's'}</span>
+                        <span>${totalSize}</span>
+                    </div>
+                    <div class="recording-cleanup-controls">
+                        <select class="form-input recording-cleanup-age">
+                            <option value="30">Older than 30 days</option>
+                            <option value="7">Older than 7 days</option>
+                            <option value="90">Older than 90 days</option>
+                            <option value="0">Ignore age</option>
+                        </select>
+                        <select class="form-input recording-cleanup-size">
+                            <option value="1073741824">Keep under 1 GB</option>
+                            <option value="5368709120">Keep under 5 GB</option>
+                            <option value="0">Ignore size</option>
+                        </select>
+                        <button class="btn btn-sm recording-cleanup">Clean up</button>
+                    </div>
+                    <div class="form-help recording-cleanup-status"></div>
+                </div>
                 ${listHTML}
             </div>
             <div class="modal-footer">
@@ -188,6 +216,26 @@ class RecordingManager {
 
         modal.querySelector('.modal-close').addEventListener('click', close);
         modal.querySelector('.modal-close-btn').addEventListener('click', close);
+
+        modal.querySelector('.recording-cleanup').addEventListener('click', async () => {
+            const ageDays = parseInt(modal.querySelector('.recording-cleanup-age').value, 10) || 0;
+            const maxBytes = parseInt(modal.querySelector('.recording-cleanup-size').value, 10) || 0;
+            const status = modal.querySelector('.recording-cleanup-status');
+            const btn = modal.querySelector('.recording-cleanup');
+            status.textContent = '';
+            btn.disabled = true;
+            try {
+                const result = await window.go.api.Service.CleanupRecordings(ageDays, maxBytes);
+                status.textContent = `Deleted ${result.deleted || 0}; freed ${_formatBytes(result.freedBytes || 0)}.`;
+                const fresh = await window.go.api.Service.ListRecordings();
+                close();
+                this._showBrowserModal(fresh || [], await window.go.api.Service.GetRecordingStorageInfo());
+            } catch (err) {
+                status.textContent = 'Cleanup failed: ' + err;
+            } finally {
+                btn.disabled = false;
+            }
+        });
 
         // Play buttons
         modal.querySelectorAll('.rec-play').forEach(btn => {
@@ -545,6 +593,7 @@ class ExportImportUI {
                         <option value="duplicate">Create duplicates</option>
                     </select>
                 </div>
+                <div class="form-error import-status" aria-live="polite"></div>
             </div>
             <div class="modal-footer">
                 <button class="btn btn-sm import-cancel">Cancel</button>
@@ -567,13 +616,18 @@ class ExportImportUI {
         modal.querySelector('.import-confirm').addEventListener('click', async () => {
             const password = modal.querySelector('.import-password').value;
             const strategy = modal.querySelector('.import-strategy').value;
+            const status = modal.querySelector('.import-status');
+            const confirmBtn = modal.querySelector('.import-confirm');
+            status.textContent = '';
 
             if (!password) {
-                this.app.notifications.error('Please enter the decryption password.');
+                status.textContent = 'Please enter the decryption password.';
                 return;
             }
 
             try {
+                confirmBtn.disabled = true;
+                confirmBtn.textContent = 'Importing...';
                 const count = await window.go.api.Service.ImportProfilesEncrypted(password, strategy);
                 this.app.notifications.success(`Imported ${count} profile(s)`);
                 await this.app.loadProfiles();
@@ -582,9 +636,18 @@ class ExportImportUI {
                 if (String(err).includes('cancelled')) {
                     return;
                 }
-                this.app.notifications.error('Import failed: ' + err);
+                status.textContent = this._formatImportError(err);
+                this.app.notifications.error('Import failed');
+            } finally {
+                confirmBtn.disabled = false;
+                confirmBtn.textContent = 'Import';
             }
         });
+    }
+
+    _formatImportError(err) {
+        const msg = String(err || 'Unknown import error');
+        return msg.replace(/\s+/g, ' ').trim();
     }
 }
 

@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"strings"
@@ -1198,6 +1199,22 @@ func (m *Manager) DeleteRecording(id string) error {
 	return m.recordStore.Delete(id)
 }
 
+// RecordingStorageInfo returns aggregate recording storage usage.
+func (m *Manager) RecordingStorageInfo() (recording.StorageInfo, error) {
+	if m.recordStore == nil {
+		return recording.StorageInfo{}, fmt.Errorf("sessions: recording store not configured")
+	}
+	return m.recordStore.StorageInfo()
+}
+
+// CleanupRecordings applies age and total-size retention limits.
+func (m *Manager) CleanupRecordings(maxAgeDays int, maxTotalBytes int64) (recording.CleanupResult, error) {
+	if m.recordStore == nil {
+		return recording.CleanupResult{}, fmt.Errorf("sessions: recording store not configured")
+	}
+	return m.recordStore.Cleanup(maxAgeDays, maxTotalBytes)
+}
+
 // ---------------------------------------------------------------------------
 // SFTP file browser
 // ---------------------------------------------------------------------------
@@ -1338,6 +1355,15 @@ func (m *Manager) SFTPUploadBytes(sessionID, remotePath string, data []byte) err
 			"done":        p.Done,
 		})
 	})
+}
+
+// SFTPOpenUpload opens a remote file for a caller-managed streaming upload.
+func (m *Manager) SFTPOpenUpload(sessionID, remotePath string) (io.WriteCloser, error) {
+	sc, err := m.getSFTP(sessionID)
+	if err != nil {
+		return nil, err
+	}
+	return sc.CreateWriter(remotePath)
 }
 
 // SFTPPwd returns the current working directory on the remote host.

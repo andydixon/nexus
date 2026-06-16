@@ -53,6 +53,52 @@
   }
 
   /**
+   * Creates a standard modal skeleton without HTML string interpolation.
+   * @param {string} title
+   * @param {string} [sizeClass]
+   * @returns {{backdrop: HTMLElement, modal: HTMLElement, body: HTMLElement, footer: HTMLElement, closeButton: HTMLElement, show: Function, remove: Function}}
+   */
+  function createModalShell(title, sizeClass = "modal-sm") {
+    const backdrop = createElement("div", "modal-backdrop");
+    const modal = createElement("div", `modal ${sizeClass}`);
+    const header = createElement("div", "modal-header");
+    const titleEl = createElement("h3", "modal-title", { textContent: title });
+    const closeButton = createElement("button", "btn btn-icon btn-xs modal-close", {
+      textContent: "x",
+      "aria-label": "Close",
+    });
+    const body = createElement("div", "modal-body");
+    const footer = createElement("div", "modal-footer");
+
+    header.appendChild(titleEl);
+    header.appendChild(closeButton);
+    modal.appendChild(header);
+    modal.appendChild(body);
+    modal.appendChild(footer);
+    backdrop.appendChild(modal);
+
+    return {
+      backdrop,
+      modal,
+      body,
+      footer,
+      closeButton,
+      show() {
+        document.body.appendChild(backdrop);
+        requestAnimationFrame(() => {
+          backdrop.classList.add("is-visible");
+          modal.classList.add("is-visible");
+        });
+      },
+      remove() {
+        backdrop.classList.remove("is-visible");
+        modal.classList.remove("is-visible");
+        setTimeout(() => backdrop.remove(), 200);
+      },
+    };
+  }
+
+  /**
    * Escapes HTML special characters to prevent XSS.
    * @param {string} str - Raw string.
    * @returns {string} Escaped string safe for innerHTML.
@@ -305,6 +351,7 @@
     $,
     $$,
     createElement,
+    createModalShell,
     escapeHtml,
     formatTimestamp,
     debounce,

@@ -9,6 +9,7 @@
 package recording
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -27,6 +28,11 @@ const (
 	EventOutput EventType = "o"
 	// EventInput represents data sent from the user to the remote host.
 	EventInput EventType = "i"
+
+	// MaxRecordingBytes bounds a single active recording file.
+	MaxRecordingBytes = int64(250 * 1024 * 1024)
+	// MaxPlaybackBytes bounds the file size loaded for playback.
+	MaxPlaybackBytes = int64(100 * 1024 * 1024)
 )
 
 // Header is the asciicast v2 file header (first line).
@@ -66,18 +72,23 @@ type RecordingMeta struct {
 
 // Recorder captures terminal I/O for a single session.
 type Recorder struct {
-	mu        sync.Mutex
-	file      *os.File
-	encoder   *json.Encoder
-	startTime time.Time
-	header    Header
-	eventCount int
-	closed    bool
-	filePath  string
+	mu           sync.Mutex
+	file         *os.File
+	startTime    time.Time
+	header       Header
+	eventCount   int
+	closed       bool
+	filePath     string
+	bytesWritten int64
+	maxBytes     int64
 }
 
 // NewRecorder creates a new recording file and writes the header.
 func NewRecorder(dir, id, title string, cols, rows int) (*Recorder, error) {
+	return newRecorderWithLimit(dir, id, title, cols, rows, MaxRecordingBytes)
+}
+
+func newRecorderWithLimit(dir, id, title string, cols, rows int, maxBytes int64) (*Recorder, error) {
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return nil, fmt.Errorf("recording: failed to create directory: %w", err)
 	}
@@ -102,20 +113,26 @@ func NewRecorder(dir, id, title string, cols, rows int) (*Recorder, error) {
 		},
 	}
 
-	enc := json.NewEncoder(f)
-	enc.SetEscapeHTML(false)
-	if err := enc.Encode(hdr); err != nil {
+	headerLine, err := marshalJSONLine(hdr)
+	if err != nil {
+		f.Close()
+		os.Remove(path)
+		return nil, fmt.Errorf("recording: failed to encode header: %w", err)
+	}
+	n, err := f.Write(headerLine)
+	if err != nil {
 		f.Close()
 		os.Remove(path)
 		return nil, fmt.Errorf("recording: failed to write header: %w", err)
 	}
 
 	return &Recorder{
-		file:      f,
-		encoder:   enc,
-		startTime: now,
-		header:    hdr,
-		filePath:  path,
+		file:         f,
+		startTime:    now,
+		header:       hdr,
+		filePath:     path,
+		bytesWritten: int64(n),
+		maxBytes:     maxBytes,
 	}, nil
 }
 
@@ -145,11 +162,23 @@ func (r *Recorder) writeEvent(eventType EventType, data []byte) {
 		Data:    string(data),
 	}
 
-	// Write as a JSON array line: [elapsed, "o"/"i", "data"]
-	if err := r.encoder.Encode(evt); err != nil {
-		// Non-fatal — continue recording even if one event fails.
+	line, err := marshalJSONLine(evt)
+	if err != nil {
 		return
 	}
+	if r.maxBytes > 0 && r.bytesWritten+int64(len(line)) > r.maxBytes {
+		r.closed = true
+		_ = r.file.Sync()
+		_ = r.file.Close()
+		r.file = nil
+		return
+	}
+
+	n, err := r.file.Write(line)
+	if err != nil {
+		return
+	}
+	r.bytesWritten += int64(n)
 	r.eventCount++
 }
 
@@ -175,7 +204,9 @@ func (r *Recorder) Close() error {
 			r.file.Close()
 			return fmt.Errorf("recording: sync failed: %w", err)
 		}
-		return r.file.Close()
+		err := r.file.Close()
+		r.file = nil
+		return err
 	}
 	return nil
 }
@@ -252,7 +283,21 @@ func (s *Store) List() ([]RecordingMeta, error) {
 
 // Get reads the full recording (header + events) from a file.
 func (s *Store) Get(id string) (*Header, []Event, error) {
-	path := filepath.Join(s.dir, id+".cast")
+	return s.getWithLimit(id, MaxPlaybackBytes)
+}
+
+func (s *Store) getWithLimit(id string, maxBytes int64) (*Header, []Event, error) {
+	path, err := s.recordingPath(id)
+	if err != nil {
+		return nil, nil, err
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		return nil, nil, fmt.Errorf("recording: failed to stat file: %w", err)
+	}
+	if maxBytes > 0 && info.Size() > maxBytes {
+		return nil, nil, fmt.Errorf("recording: file is too large for playback (max %d bytes)", maxBytes)
+	}
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, nil, fmt.Errorf("recording: failed to read file: %w", err)
@@ -308,11 +353,125 @@ func (s *Store) Get(id string) (*Header, []Event, error) {
 
 // Delete removes a recording file.
 func (s *Store) Delete(id string) error {
-	path := filepath.Join(s.dir, id+".cast")
+	path, err := s.recordingPath(id)
+	if err != nil {
+		return err
+	}
 	if err := os.Remove(path); err != nil {
 		return fmt.Errorf("recording: failed to delete: %w", err)
 	}
 	return nil
+}
+
+// StorageInfo summarizes recording storage usage.
+type StorageInfo struct {
+	Count             int        `json:"count"`
+	TotalBytes        int64      `json:"totalBytes"`
+	OldestCreatedAt   *time.Time `json:"oldestCreatedAt,omitempty"`
+	NewestCreatedAt   *time.Time `json:"newestCreatedAt,omitempty"`
+	MaxRecordingBytes int64      `json:"maxRecordingBytes"`
+	MaxPlaybackBytes  int64      `json:"maxPlaybackBytes"`
+}
+
+// CleanupResult describes files removed by retention cleanup.
+type CleanupResult struct {
+	Deleted    int   `json:"deleted"`
+	FreedBytes int64 `json:"freedBytes"`
+}
+
+// StorageInfo returns aggregate metadata for recordings.
+func (s *Store) StorageInfo() (StorageInfo, error) {
+	metas, err := s.List()
+	if err != nil {
+		return StorageInfo{}, err
+	}
+	info := StorageInfo{
+		Count:             len(metas),
+		MaxRecordingBytes: MaxRecordingBytes,
+		MaxPlaybackBytes:  MaxPlaybackBytes,
+	}
+	for i := range metas {
+		meta := metas[i]
+		info.TotalBytes += meta.Size
+		if info.OldestCreatedAt == nil || meta.CreatedAt.Before(*info.OldestCreatedAt) {
+			t := meta.CreatedAt
+			info.OldestCreatedAt = &t
+		}
+		if info.NewestCreatedAt == nil || meta.CreatedAt.After(*info.NewestCreatedAt) {
+			t := meta.CreatedAt
+			info.NewestCreatedAt = &t
+		}
+	}
+	return info, nil
+}
+
+// Cleanup removes recordings older than maxAgeDays and/or enough oldest files
+// to bring total storage below maxTotalBytes. Non-positive limits are ignored.
+func (s *Store) Cleanup(maxAgeDays int, maxTotalBytes int64) (CleanupResult, error) {
+	metas, err := s.List()
+	if err != nil {
+		return CleanupResult{}, err
+	}
+
+	result := CleanupResult{}
+	deleted := map[string]bool{}
+	total := int64(0)
+	for _, meta := range metas {
+		total += meta.Size
+	}
+
+	deleteMeta := func(meta RecordingMeta) {
+		if deleted[meta.ID] {
+			return
+		}
+		if err := s.Delete(meta.ID); err == nil {
+			deleted[meta.ID] = true
+			result.Deleted++
+			result.FreedBytes += meta.Size
+			total -= meta.Size
+		}
+	}
+
+	if maxAgeDays > 0 {
+		cutoff := time.Now().Add(-time.Duration(maxAgeDays) * 24 * time.Hour)
+		for _, meta := range metas {
+			if meta.CreatedAt.Before(cutoff) {
+				deleteMeta(meta)
+			}
+		}
+	}
+
+	if maxTotalBytes > 0 && total > maxTotalBytes {
+		sort.Slice(metas, func(i, j int) bool {
+			return metas[i].CreatedAt.Before(metas[j].CreatedAt)
+		})
+		for _, meta := range metas {
+			if total <= maxTotalBytes {
+				break
+			}
+			deleteMeta(meta)
+		}
+	}
+
+	return result, nil
+}
+
+func (s *Store) recordingPath(id string) (string, error) {
+	id = strings.TrimSpace(id)
+	if id == "" || id == "." || id == ".." || strings.ContainsAny(id, `/\`) {
+		return "", fmt.Errorf("recording: invalid recording ID")
+	}
+	return filepath.Join(s.dir, id+".cast"), nil
+}
+
+func marshalJSONLine(v interface{}) ([]byte, error) {
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(v); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
 }
 
 // readMeta reads just the header from a .cast file to produce metadata.

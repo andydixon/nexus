@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"os/exec"
@@ -43,8 +44,10 @@ var appVersion = "dev"
 var appUpdateURL = ""
 
 const (
-	maxProfileImportJSONBytes = 5 * 1024 * 1024
-	maxInlineSFTPUploadBytes  = 25 * 1024 * 1024
+	maxProfileImportJSONBytes  = 5 * 1024 * 1024
+	maxInlineSFTPUploadBytes   = 25 * 1024 * 1024
+	maxSFTPUploadChunkBytes    = 1024 * 1024
+	maxStreamingSFTPUploadSize = int64(2 * 1024 * 1024 * 1024)
 )
 
 // Service is the main API surface exposed to the frontend via Wails bindings.
@@ -60,6 +63,17 @@ type Service struct {
 	// secretChans maps request IDs to channels awaiting user secret input.
 	secretMu    sync.Mutex
 	secretChans map[string]chan secretResponse
+
+	uploadMu sync.Mutex
+	uploads  map[string]*sftpUpload
+}
+
+type sftpUpload struct {
+	mu         sync.Mutex
+	writer     io.WriteCloser
+	sessionID  string
+	remotePath string
+	written    int64
 }
 
 // NewService creates a Service wired to the given backing components.
@@ -78,6 +92,7 @@ func NewService(
 		sessions:      sess,
 		auditLog:      auditLog,
 		prefs:         prefs,
+		uploads:       make(map[string]*sftpUpload),
 	}
 }
 
@@ -1088,6 +1103,39 @@ func (s *Service) DeleteRecording(id string) error {
 	return s.sessions.DeleteRecording(id)
 }
 
+// GetRecordingStorageInfo returns aggregate recording storage usage and limits.
+func (s *Service) GetRecordingStorageInfo() (map[string]interface{}, error) {
+	info, err := s.sessions.RecordingStorageInfo()
+	if err != nil {
+		return nil, err
+	}
+	result := map[string]interface{}{
+		"count":             info.Count,
+		"totalBytes":        info.TotalBytes,
+		"maxRecordingBytes": info.MaxRecordingBytes,
+		"maxPlaybackBytes":  info.MaxPlaybackBytes,
+	}
+	if info.OldestCreatedAt != nil {
+		result["oldestCreatedAt"] = info.OldestCreatedAt.Format(time.RFC3339)
+	}
+	if info.NewestCreatedAt != nil {
+		result["newestCreatedAt"] = info.NewestCreatedAt.Format(time.RFC3339)
+	}
+	return result, nil
+}
+
+// CleanupRecordings removes recordings by age and total storage limit.
+func (s *Service) CleanupRecordings(maxAgeDays int, maxTotalBytes int64) (map[string]interface{}, error) {
+	result, err := s.sessions.CleanupRecordings(maxAgeDays, maxTotalBytes)
+	if err != nil {
+		return nil, err
+	}
+	return map[string]interface{}{
+		"deleted":    result.Deleted,
+		"freedBytes": result.FreedBytes,
+	}, nil
+}
+
 // ---------------------------------------------------------------------------
 // Encrypted export / import
 // ---------------------------------------------------------------------------
@@ -1349,13 +1397,118 @@ func (s *Service) SFTPUploadData(sessionID string, remoteDir string, fileName st
 		return fmt.Errorf("upload payload is too large (max %d bytes)", maxInlineSFTPUploadBytes)
 	}
 
-	safeName := filepath.Base(fileName)
-	if safeName == "" || safeName == "." || safeName == "/" {
-		return fmt.Errorf("invalid file name")
+	safeName, err := safeSFTPUploadName(fileName)
+	if err != nil {
+		return err
 	}
 
 	destPath := path.Join(remoteDir, safeName)
 	return s.sessions.SFTPUploadBytes(sessionID, destPath, data)
+}
+
+// SFTPUploadStart opens a remote SFTP file for chunked browser uploads.
+func (s *Service) SFTPUploadStart(sessionID string, remoteDir string, fileName string, totalBytes int64) (string, error) {
+	if s.sessions == nil {
+		return "", fmt.Errorf("sessions service is not configured")
+	}
+	if totalBytes < 0 {
+		return "", fmt.Errorf("upload size must not be negative")
+	}
+	if totalBytes > maxStreamingSFTPUploadSize {
+		return "", fmt.Errorf("upload is too large (max %d bytes)", maxStreamingSFTPUploadSize)
+	}
+
+	safeName, err := safeSFTPUploadName(fileName)
+	if err != nil {
+		return "", err
+	}
+	remotePath := path.Join(remoteDir, safeName)
+	writer, err := s.sessions.SFTPOpenUpload(sessionID, remotePath)
+	if err != nil {
+		return "", err
+	}
+
+	uploadID := uuid.New().String()
+	s.uploadMu.Lock()
+	s.uploads[uploadID] = &sftpUpload{
+		writer:     writer,
+		sessionID:  sessionID,
+		remotePath: remotePath,
+	}
+	s.uploadMu.Unlock()
+	return uploadID, nil
+}
+
+// SFTPUploadChunk writes a base64-encoded chunk to an active browser upload.
+func (s *Service) SFTPUploadChunk(uploadID string, base64Chunk string) error {
+	if base64Chunk == "" {
+		return fmt.Errorf("empty upload chunk")
+	}
+	if base64.StdEncoding.DecodedLen(len(base64Chunk)) > maxSFTPUploadChunkBytes {
+		return fmt.Errorf("upload chunk is too large (max %d bytes)", maxSFTPUploadChunkBytes)
+	}
+	data, err := base64.StdEncoding.DecodeString(base64Chunk)
+	if err != nil {
+		return fmt.Errorf("failed to decode upload chunk: %w", err)
+	}
+	if len(data) > maxSFTPUploadChunkBytes {
+		return fmt.Errorf("upload chunk is too large (max %d bytes)", maxSFTPUploadChunkBytes)
+	}
+
+	upload, err := s.lookupSFTPUpload(uploadID)
+	if err != nil {
+		return err
+	}
+	upload.mu.Lock()
+	defer upload.mu.Unlock()
+	if upload.written+int64(len(data)) > maxStreamingSFTPUploadSize {
+		return fmt.Errorf("upload is too large (max %d bytes)", maxStreamingSFTPUploadSize)
+	}
+	n, err := upload.writer.Write(data)
+	upload.written += int64(n)
+	if err != nil {
+		s.removeSFTPUpload(uploadID)
+		_ = upload.writer.Close()
+		if s.sessions != nil {
+			_ = s.sessions.SFTPRemove(upload.sessionID, upload.remotePath)
+		}
+		return fmt.Errorf("failed to write upload chunk: %w", err)
+	}
+	if n != len(data) {
+		s.removeSFTPUpload(uploadID)
+		_ = upload.writer.Close()
+		if s.sessions != nil {
+			_ = s.sessions.SFTPRemove(upload.sessionID, upload.remotePath)
+		}
+		return io.ErrShortWrite
+	}
+	return nil
+}
+
+// SFTPUploadFinish closes an active browser upload.
+func (s *Service) SFTPUploadFinish(uploadID string) error {
+	upload, err := s.takeSFTPUpload(uploadID)
+	if err != nil {
+		return err
+	}
+	upload.mu.Lock()
+	defer upload.mu.Unlock()
+	return upload.writer.Close()
+}
+
+// SFTPUploadCancel closes and removes a partially uploaded remote file.
+func (s *Service) SFTPUploadCancel(uploadID string) error {
+	upload, err := s.takeSFTPUpload(uploadID)
+	if err != nil {
+		return err
+	}
+	upload.mu.Lock()
+	closeErr := upload.writer.Close()
+	upload.mu.Unlock()
+	if s.sessions != nil {
+		_ = s.sessions.SFTPRemove(upload.sessionID, upload.remotePath)
+	}
+	return closeErr
 }
 
 // SFTPPwd returns the current working directory on the remote host.
@@ -1751,6 +1904,46 @@ func validateSSHKeyName(name string) (string, error) {
 	return name, nil
 }
 
+func safeSFTPUploadName(fileName string) (string, error) {
+	name := strings.TrimSpace(fileName)
+	if name == "" {
+		return "", fmt.Errorf("invalid file name")
+	}
+	name = strings.ReplaceAll(name, "\\", "/")
+	safeName := path.Base(name)
+	if safeName == "" || safeName == "." || safeName == "/" || strings.ContainsRune(safeName, 0) {
+		return "", fmt.Errorf("invalid file name")
+	}
+	return safeName, nil
+}
+
+func (s *Service) lookupSFTPUpload(uploadID string) (*sftpUpload, error) {
+	s.uploadMu.Lock()
+	defer s.uploadMu.Unlock()
+	upload := s.uploads[uploadID]
+	if upload == nil {
+		return nil, fmt.Errorf("upload session not found")
+	}
+	return upload, nil
+}
+
+func (s *Service) takeSFTPUpload(uploadID string) (*sftpUpload, error) {
+	s.uploadMu.Lock()
+	defer s.uploadMu.Unlock()
+	upload := s.uploads[uploadID]
+	if upload == nil {
+		return nil, fmt.Errorf("upload session not found")
+	}
+	delete(s.uploads, uploadID)
+	return upload, nil
+}
+
+func (s *Service) removeSFTPUpload(uploadID string) {
+	s.uploadMu.Lock()
+	defer s.uploadMu.Unlock()
+	delete(s.uploads, uploadID)
+}
+
 func validateImportStrategy(strategy string) error {
 	switch strategy {
 	case "skip", "overwrite", "duplicate":
@@ -1774,20 +1967,7 @@ func validateImportProfiles(profiles []*models.Profile) error {
 }
 
 func normaliseProfileForSave(profile *models.Profile) {
-	if profile == nil {
-		return
-	}
-	if profile.Tags == nil {
-		profile.Tags = []string{}
-	}
-	if profile.VNC != nil {
-		if profile.VNC.SecretMode == "prompt" {
-			profile.VNC.SecretMode = models.SecretModeAskEveryTime
-		}
-		if profile.VNC.SSHSecretMode == "prompt" {
-			profile.VNC.SSHSecretMode = models.SecretModeAskEveryTime
-		}
-	}
+	models.NormalizeProfileDefaults(profile)
 }
 
 func redactProfileSecrets(profiles []*models.Profile) []*models.Profile {

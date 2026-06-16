@@ -7,7 +7,7 @@
 
   /* global Terminal, FitAddon, SearchAddon, WebLinksAddon, Unicode11Addon */
 
-  const MAX_INLINE_UPLOAD_BYTES = 25 * 1024 * 1024;
+  const UPLOAD_CHUNK_BYTES = 768 * 1024;
 
   /**
    * Encode a string as UTF-8 bytes then base64-encode them.
@@ -828,31 +828,8 @@
 
         for (let i = 0; i < files.length; i += 1) {
           const file = files[i];
-          if (typeof file.size === "number" && file.size > MAX_INLINE_UPLOAD_BYTES) {
-            this.app.notifications.error(
-              "Upload failed for " +
-                file.name +
-                ": file is too large for drag-and-drop upload. Use SFTP Upload for files over 25 MB.",
-            );
-            return;
-          }
           try {
-            const buffer = await this._readFileBuffer(file);
-            if (buffer && buffer.byteLength > MAX_INLINE_UPLOAD_BYTES) {
-              this.app.notifications.error(
-                "Upload failed for " +
-                  file.name +
-                  ": file is too large for drag-and-drop upload. Use SFTP Upload for files over 25 MB.",
-              );
-              return;
-            }
-            const base64Data = this._arrayBufferToBase64(buffer);
-            await window.go.api.Service.SFTPUploadData(
-              sessionId,
-              remoteDir,
-              file.name,
-              base64Data,
-            );
+            await this._uploadDroppedFileStream(sessionId, remoteDir, file);
           } catch (err) {
             const msg = err && err.message ? err.message : String(err);
             this.app.notifications.error(
@@ -872,6 +849,46 @@
       run().catch((err) => {
         const msg = err && err.message ? err.message : String(err);
         this.app.notifications.error("Upload failed: " + msg);
+      });
+    }
+
+    async _uploadDroppedFileStream(sessionId, remoteDir, file) {
+      const totalBytes = typeof file.size === "number" ? file.size : 0;
+      let uploadId = "";
+      try {
+        uploadId = await window.go.api.Service.SFTPUploadStart(
+          sessionId,
+          remoteDir,
+          file.name,
+          totalBytes,
+        );
+
+        for (let offset = 0; offset < totalBytes; offset += UPLOAD_CHUNK_BYTES) {
+          const end = Math.min(offset + UPLOAD_CHUNK_BYTES, totalBytes);
+          const buffer = await this._readFileSlice(file, offset, end);
+          const base64Data = this._arrayBufferToBase64(buffer);
+          await window.go.api.Service.SFTPUploadChunk(uploadId, base64Data);
+        }
+
+        await window.go.api.Service.SFTPUploadFinish(uploadId);
+      } catch (err) {
+        if (uploadId) {
+          try {
+            await window.go.api.Service.SFTPUploadCancel(uploadId);
+          } catch (_) {
+            /* noop */
+          }
+        }
+        throw err;
+      }
+    }
+
+    _readFileSlice(file, start, end) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(new Error("read failed"));
+        reader.readAsArrayBuffer(file.slice(start, end));
       });
     }
 

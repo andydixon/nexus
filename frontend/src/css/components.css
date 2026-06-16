@@ -116,6 +116,19 @@
   border-color: #e53935;
 }
 
+/* Warning */
+.btn-warning {
+  background: var(--warning);
+  color: #1a1a1e;
+  border-color: var(--warning);
+}
+.btn-warning:hover {
+  filter: brightness(1.05);
+}
+.btn-warning:active {
+  filter: brightness(0.95);
+}
+
 /* Size variants */
 .btn-sm {
   height: 26px;

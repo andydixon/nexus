@@ -5,6 +5,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
+source "$SCRIPT_DIR/scripts/build-common.sh"
 
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -13,7 +14,7 @@ NC='\033[0m'
 
 DEFAULT_UPDATE_URL="https://dixon.cx/downloads/nexus/manifest-{platform}-{arch}.json"
 DEFAULT_RELEASE_BASE_URL="https://dixon.cx/downloads/nexus"
-WAILS_VERSION="$(awk '$1 == "github.com/wailsapp/wails/v2" { print $2; exit }' go.mod)"
+WAILS_VERSION="$(nexus_wails_version go.mod)"
 
 log()  { echo -e "${GREEN}[nexus]${NC} $1"; }
 warn() { echo -e "${YELLOW}[nexus]${NC} $1"; }
@@ -36,11 +37,7 @@ host_arch() {
 }
 
 build_tags() {
-    if command -v pkg-config >/dev/null 2>&1 \
-        && pkg-config --exists webkit2gtk-4.1 \
-        && ! pkg-config --exists webkit2gtk-4.0; then
-        echo "webkit2_41"
-    fi
+    nexus_build_tags
 }
 
 default_targets() {
@@ -101,20 +98,11 @@ install_deps() {
 }
 
 build_version() {
-    local tag
-    local commit
-    tag="$(git describe --tags --abbrev=0 2>/dev/null || echo "dev")"
-    commit="$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")"
-    echo "${tag}-${commit}"
+    nexus_build_version
 }
 
 build_ldflags() {
-    local version="$1"
-    local flags="-s -w -X github.com/andydixon/nexus/internal/api.appVersion=${version}"
-    if [ -n "${NEXUS_UPDATE_URL:-}" ]; then
-        flags="${flags} -X github.com/andydixon/nexus/internal/api.appUpdateURL=${NEXUS_UPDATE_URL}"
-    fi
-    echo "${flags}"
+    nexus_build_ldflags "$1"
 }
 
 pick_cc() {

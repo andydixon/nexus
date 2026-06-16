@@ -6,6 +6,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
+source "$SCRIPT_DIR/scripts/build-common.sh"
 
 # Colours for output
 RED='\033[0;31m'
@@ -18,7 +19,7 @@ warn() { echo -e "${YELLOW}[nexus]${NC} $1"; }
 err()  { echo -e "${RED}[nexus]${NC} $1" >&2; }
 
 MIN_GO_VERSION="1.25.0"
-WAILS_VERSION="$(awk '$1 == "github.com/wailsapp/wails/v2" { print $2; exit }' go.mod)"
+WAILS_VERSION="$(nexus_wails_version go.mod)"
 WAILS_BIN=""
 WAILS_USE_GO_RUN=0
 
@@ -118,28 +119,15 @@ check_linux_deps() {
 }
 
 build_tags() {
-    if command -v pkg-config >/dev/null 2>&1 \
-        && pkg-config --exists webkit2gtk-4.1 \
-        && ! pkg-config --exists webkit2gtk-4.0; then
-        echo "webkit2_41"
-    fi
+    nexus_build_tags
 }
 
 build_version() {
-    local tag
-    local commit
-    tag="$(git describe --tags --abbrev=0 2>/dev/null || echo "dev")"
-    commit="$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")"
-    echo "${tag}-${commit}"
+    nexus_build_version
 }
 
 build_ldflags() {
-    local version="$1"
-    local flags="-s -w -X github.com/andydixon/nexus/internal/api.appVersion=${version}"
-    if [ -n "${NEXUS_UPDATE_URL:-}" ]; then
-        flags="${flags} -X github.com/andydixon/nexus/internal/api.appUpdateURL=${NEXUS_UPDATE_URL}"
-    fi
-    echo "${flags}"
+    nexus_build_ldflags "$1"
 }
 
 # Check prerequisites
@@ -213,6 +201,7 @@ run_tests() {
     check_go
     log "Running tests…"
     go test ./... -v -count=1
+    (cd frontend && npm test)
 }
 
 # Clean build artefacts
