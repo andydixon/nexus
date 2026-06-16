@@ -181,6 +181,11 @@ assertContains(
 );
 assertContains(
   "frontend/src/js/tabs.js",
+  "session.protocol !== \"github\"",
+  "GitHub tabs must close without connected-session confirmation",
+);
+assertContains(
+  "frontend/src/js/tabs.js",
   "Connected since:",
   "connection tab hover hints must include the connected-since timestamp",
 );

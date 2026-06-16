@@ -175,6 +175,7 @@
         session &&
         session.state === "connected" &&
         session.protocol !== "leviathan" &&
+        session.protocol !== "github" &&
         this.app.state.preferences.confirmOnDisconnect
       ) {
         const ok = await this._confirmClose(sessionId);
