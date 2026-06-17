@@ -926,6 +926,8 @@
           return "TELNET";
         case "raw":
           return "RAW";
+        case "irc":
+          return "IRC";
         default:
           return (protocol || "").toUpperCase() || "UNKNOWN";
       }

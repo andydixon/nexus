@@ -154,6 +154,30 @@ export function HasTOTPSecret(arg1) {
   return window['go']['api']['Service']['HasTOTPSecret'](arg1);
 }
 
+export function IRCHandleInput(arg1, arg2, arg3) {
+  return window['go']['api']['Service']['IRCHandleInput'](arg1, arg2, arg3);
+}
+
+export function IRCJoin(arg1, arg2) {
+  return window['go']['api']['Service']['IRCJoin'](arg1, arg2);
+}
+
+export function IRCListRooms(arg1) {
+  return window['go']['api']['Service']['IRCListRooms'](arg1);
+}
+
+export function IRCPart(arg1, arg2) {
+  return window['go']['api']['Service']['IRCPart'](arg1, arg2);
+}
+
+export function IRCRooms(arg1) {
+  return window['go']['api']['Service']['IRCRooms'](arg1);
+}
+
+export function IRCUsers(arg1, arg2) {
+  return window['go']['api']['Service']['IRCUsers'](arg1, arg2);
+}
+
 export function ImportProfiles(arg1, arg2) {
   return window['go']['api']['Service']['ImportProfiles'](arg1, arg2);
 }

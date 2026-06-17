@@ -181,6 +181,54 @@ export namespace models {
 	        this.updatedAt = source["updatedAt"];
 	    }
 	}
+	export class IRCConfig {
+	    nick: string;
+	    realName: string;
+	    useTLS: boolean;
+	    serverPasswordRequired: boolean;
+	    serverPasswordMode: string;
+	    nickServIdentify: boolean;
+	    nickServAccount: string;
+	    nickServMode: string;
+	    autoJoinRooms: string[];
+	    sshTunnel: boolean;
+	    sshHost: string;
+	    sshPort: number;
+	    sshUsername: string;
+	    sshAuthMethod: string;
+	    sshSecretMode: string;
+	    sshPrivateKeyPath: string;
+	    sshAgentAuth: boolean;
+	    autoReconnect: boolean;
+	    maxReconnectTries: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new IRCConfig(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.nick = source["nick"];
+	        this.realName = source["realName"];
+	        this.useTLS = source["useTLS"];
+	        this.serverPasswordRequired = source["serverPasswordRequired"];
+	        this.serverPasswordMode = source["serverPasswordMode"];
+	        this.nickServIdentify = source["nickServIdentify"];
+	        this.nickServAccount = source["nickServAccount"];
+	        this.nickServMode = source["nickServMode"];
+	        this.autoJoinRooms = source["autoJoinRooms"];
+	        this.sshTunnel = source["sshTunnel"];
+	        this.sshHost = source["sshHost"];
+	        this.sshPort = source["sshPort"];
+	        this.sshUsername = source["sshUsername"];
+	        this.sshAuthMethod = source["sshAuthMethod"];
+	        this.sshSecretMode = source["sshSecretMode"];
+	        this.sshPrivateKeyPath = source["sshPrivateKeyPath"];
+	        this.sshAgentAuth = source["sshAgentAuth"];
+	        this.autoReconnect = source["autoReconnect"];
+	        this.maxReconnectTries = source["maxReconnectTries"];
+	    }
+	}
 	export class JumpHost {
 	    host: string;
 	    port: number;
@@ -520,6 +568,7 @@ export namespace models {
 	    raw?: RAWConfig;
 	    github?: GitHubConfig;
 	    vnc?: VNCConfig;
+	    irc?: IRCConfig;
 	
 	    static createFrom(source: any = {}) {
 	        return new Profile(source);
@@ -553,6 +602,7 @@ export namespace models {
 	        this.raw = this.convertValues(source["raw"], RAWConfig);
 	        this.github = this.convertValues(source["github"], GitHubConfig);
 	        this.vnc = this.convertValues(source["vnc"], VNCConfig);
+	        this.irc = this.convertValues(source["irc"], IRCConfig);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

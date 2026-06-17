@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/andydixon/nexus/internal/models"
+	"github.com/lrstanley/girc"
 )
 
 // ValidationError describes a single field-level validation failure.
@@ -107,6 +108,15 @@ func ValidateProfile(p *models.Profile) error {
 		if p.VNC == nil {
 			errs.Add("vnc", "VNC configuration is required for VNC protocol")
 		} else if err := ValidateVNCConfig(p.Host, p.VNC); err != nil {
+			if ve, ok := err.(*ValidationErrors); ok {
+				errs.Errors = append(errs.Errors, ve.Errors...)
+			}
+		}
+	case models.ProtocolIRC:
+		validateProfileHostPort(errs, p.Host, p.Port)
+		if p.IRC == nil {
+			errs.Add("irc", "IRC configuration is required for IRC protocol")
+		} else if err := ValidateIRCConfig(p.IRC); err != nil {
 			if ve, ok := err.(*ValidationErrors); ok {
 				errs.Errors = append(errs.Errors, ve.Errors...)
 			}
@@ -401,6 +411,101 @@ func ValidateVNCConfig(profileHost string, cfg *models.VNCConfig) error {
 		return errs
 	}
 	return nil
+}
+
+// ValidateIRCConfig validates IRC connection settings.
+func ValidateIRCConfig(cfg *models.IRCConfig) error {
+	errs := &ValidationErrors{}
+
+	if cfg == nil {
+		return &ValidationError{Field: "irc", Message: "IRC configuration must not be nil"}
+	}
+
+	nick := strings.TrimSpace(cfg.Nick)
+	if nick == "" {
+		errs.Add("irc.nick", "nickname is required")
+	} else if !girc.IsValidNick(nick) {
+		errs.Add("irc.nick", "nickname is not valid for IRC")
+	}
+
+	if strings.ContainsAny(cfg.RealName, "\r\n\x00") {
+		errs.Add("irc.realName", "real name must not contain control characters")
+	}
+
+	if !isValidSecretMode(cfg.ServerPasswordMode) {
+		errs.Add("irc.serverPasswordMode", fmt.Sprintf("unsupported secret mode %q", cfg.ServerPasswordMode))
+	}
+	if !isValidSecretMode(cfg.NickServMode) {
+		errs.Add("irc.nickServMode", fmt.Sprintf("unsupported secret mode %q", cfg.NickServMode))
+	}
+	if cfg.NickServIdentify && !isValidNickServAccount(cfg.NickServAccount) {
+		errs.Add("irc.nickServAccount", "NickServ account must not contain control characters")
+	}
+
+	seenRooms := map[string]bool{}
+	for i, room := range cfg.AutoJoinRooms {
+		field := fmt.Sprintf("irc.autoJoinRooms[%d]", i)
+		name := strings.TrimSpace(room)
+		if name == "" {
+			errs.Add(field, "room name must not be empty")
+			continue
+		}
+		if !girc.IsValidChannel(name) {
+			errs.Add(field, "room name must start with a valid IRC channel prefix")
+		}
+		key := strings.ToLower(name)
+		if seenRooms[key] {
+			errs.Add(field, "room is listed more than once")
+		}
+		seenRooms[key] = true
+	}
+
+	if cfg.SSHTunnel {
+		if err := ValidateHost(cfg.SSHHost); err != nil {
+			errs.Add("irc.sshHost", err.(*ValidationError).Message)
+		}
+		if err := ValidatePort(cfg.SSHPort); err != nil {
+			errs.Add("irc.sshPort", err.(*ValidationError).Message)
+		}
+		if strings.TrimSpace(cfg.SSHUsername) == "" {
+			errs.Add("irc.sshUsername", "SSH username is required when tunnelling")
+		} else if err := ValidateUsername(cfg.SSHUsername); err != nil {
+			errs.Add("irc.sshUsername", err.(*ValidationError).Message)
+		}
+		if cfg.SSHAuthMethod != "password" && cfg.SSHAuthMethod != "publickey" {
+			errs.Add("irc.sshAuthMethod", fmt.Sprintf("unsupported SSH auth method %q", cfg.SSHAuthMethod))
+		}
+		if !isValidSecretMode(cfg.SSHSecretMode) {
+			errs.Add("irc.sshSecretMode", fmt.Sprintf("unsupported secret mode %q", cfg.SSHSecretMode))
+		}
+	}
+
+	if cfg.MaxReconnectTries < 0 {
+		errs.Add("irc.maxReconnectTries", "max reconnect attempts must not be negative")
+	}
+
+	if errs.HasErrors() {
+		return errs
+	}
+	return nil
+}
+
+func isValidSecretMode(mode models.SecretMode) bool {
+	switch mode {
+	case models.SecretModeSaved, models.SecretModeSessionOnly, models.SecretModeAskEveryTime:
+		return true
+	default:
+		return false
+	}
+}
+
+func isValidNickServAccount(account string) bool {
+	for _, r := range account {
+		if r < 0x20 || r == 0x7f {
+			return false
+		}
+	}
+	return true
 }
 
 func isLoopbackHost(host string) bool {

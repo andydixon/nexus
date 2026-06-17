@@ -80,6 +80,18 @@ export function GetVNCWebSocketURL(arg1:string):Promise<string>;
 
 export function HasTOTPSecret(arg1:string):Promise<boolean>;
 
+export function IRCHandleInput(arg1:string,arg2:string,arg3:string):Promise<void>;
+
+export function IRCJoin(arg1:string,arg2:string):Promise<void>;
+
+export function IRCListRooms(arg1:string):Promise<void>;
+
+export function IRCPart(arg1:string,arg2:string):Promise<void>;
+
+export function IRCRooms(arg1:string):Promise<Array<Record<string, any>>>;
+
+export function IRCUsers(arg1:string,arg2:string):Promise<Array<string>>;
+
 export function ImportProfiles(arg1:string,arg2:string):Promise<number>;
 
 export function ImportProfilesEncrypted(arg1:string,arg2:string):Promise<number>;

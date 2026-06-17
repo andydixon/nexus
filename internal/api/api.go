@@ -393,6 +393,7 @@ func (s *Service) ConnectQuick(profile models.Profile) (models.SessionInfo, erro
 	if profile.ID == "" {
 		profile.ID = uuid.New().String()
 	}
+	normaliseProfileForSave(&profile)
 	sessionID, err := s.sessions.Connect(&profile, s.promptSecret)
 	if err != nil {
 		return models.SessionInfo{}, err
@@ -525,6 +526,52 @@ func (s *Service) SaveSessionCapture(sessionID string, path string) error {
 // SendBreak transmits a Telnet BRK command to a session.
 func (s *Service) SendBreak(sessionID string) error {
 	return s.sessions.SendBreak(sessionID)
+}
+
+// ---------------------------------------------------------------------------
+// IRC-specific
+// ---------------------------------------------------------------------------
+
+// IRCHandleInput sends an IRC composer line, including slash commands.
+func (s *Service) IRCHandleInput(sessionID string, target string, input string) error {
+	return s.sessions.IRCHandleInput(sessionID, target, input)
+}
+
+// IRCJoin joins an IRC room.
+func (s *Service) IRCJoin(sessionID string, room string) error {
+	return s.sessions.IRCJoin(sessionID, room)
+}
+
+// IRCPart leaves an IRC room.
+func (s *Service) IRCPart(sessionID string, room string) error {
+	return s.sessions.IRCPart(sessionID, room)
+}
+
+// IRCListRooms requests the server room list. Results are emitted as events.
+func (s *Service) IRCListRooms(sessionID string) error {
+	return s.sessions.IRCListRooms(sessionID)
+}
+
+// IRCRooms returns currently joined IRC rooms.
+func (s *Service) IRCRooms(sessionID string) ([]map[string]interface{}, error) {
+	rooms, err := s.sessions.IRCRooms(sessionID)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]map[string]interface{}, len(rooms))
+	for i, room := range rooms {
+		result[i] = map[string]interface{}{
+			"name":  room.Name,
+			"topic": room.Topic,
+			"users": room.Users,
+		}
+	}
+	return result, nil
+}
+
+// IRCUsers returns the known users in a joined IRC room.
+func (s *Service) IRCUsers(sessionID string, room string) ([]string, error) {
+	return s.sessions.IRCUsers(sessionID, room)
 }
 
 // ---------------------------------------------------------------------------

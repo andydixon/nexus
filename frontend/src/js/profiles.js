@@ -86,6 +86,31 @@
         sshAgentAuth: false,
       },
     },
+    irc: {
+      port: 6667,
+      protocol: "irc",
+      irc: {
+        nick: "nexus",
+        realName: "Nexus Terminal",
+        useTLS: false,
+        serverPasswordRequired: false,
+        serverPasswordMode: "ask-every-time",
+        nickServIdentify: false,
+        nickServAccount: "",
+        nickServMode: "saved",
+        autoJoinRooms: [],
+        sshTunnel: false,
+        sshHost: "",
+        sshPort: 22,
+        sshUsername: "",
+        sshAuthMethod: "publickey",
+        sshSecretMode: "saved",
+        sshPrivateKey: "",
+        sshAgentAuth: false,
+        autoReconnect: true,
+        maxReconnectTries: 5,
+      },
+    },
   };
 
   class ProfileEditor {
@@ -162,10 +187,11 @@
       drawer.appendChild(header);
 
       // ── Protocol selector tabs ──────────────────────────────
-      const protocols = ["ssh", "telnet", "raw", "github", "vnc"];
+      const protocols = ["ssh", "telnet", "raw", "github", "vnc", "irc"];
       const tabBar = createElement("div", "drawer-protocol-tabs");
       for (const proto of protocols) {
-        const label = proto === "github" ? "GitHub" : proto.toUpperCase();
+        const label =
+          proto === "github" ? "GitHub" : proto === "irc" ? "IRC" : proto.toUpperCase();
         const btn = createElement(
           "button",
           `drawer-proto-tab ${profile.protocol === proto ? "active" : ""}`,
@@ -207,6 +233,10 @@
           break;
         case "vnc":
           this._renderVNCSections(profile).forEach((s) => body.appendChild(s));
+          break;
+        case "irc":
+          this._renderIRCSections(profile).forEach((s) => body.appendChild(s));
+          body.appendChild(sshKeyDatalist);
           break;
       }
 
@@ -1068,6 +1098,185 @@
                 { value: "prompt", label: "Ask every time" },
               ],
             },
+          ),
+        ]),
+      );
+
+      return sections;
+    }
+
+    /** @private */
+    _renderIRCSections(profile) {
+      const sections = [];
+      const irc = profile.irc || DEFAULTS.irc.irc;
+
+      sections.push(
+        this._renderSection("IRC", [
+          this._field("text", "irc.nick", "Nick", irc.nick, {
+            placeholder: "yourNick",
+          }),
+          this._field("text", "irc.realName", "Real Name", irc.realName, {
+            placeholder: "Shown in WHOIS",
+          }),
+          this._field("toggle", "irc.useTLS", "Use TLS", irc.useTLS, {
+            help: "Use port 6697 for most TLS IRC networks.",
+          }),
+          this._field(
+            "toggle",
+            "irc.serverPasswordRequired",
+            "Server Password",
+            irc.serverPasswordRequired,
+            {
+              help: "Prompt for an IRC PASS secret before registration.",
+            },
+          ),
+          this._field(
+            "select",
+            "irc.serverPasswordMode",
+            "Server Password Storage",
+            irc.serverPasswordMode,
+            {
+              options: [
+                { value: "saved", label: "Save to keychain" },
+                { value: "session-only", label: "Remember for session" },
+                { value: "ask-every-time", label: "Ask every time" },
+              ],
+            },
+          ),
+        ]),
+      );
+
+      sections.push(
+        this._renderSection("NickServ", [
+          this._field(
+            "toggle",
+            "irc.nickServIdentify",
+            "Identify on Connect",
+            irc.nickServIdentify,
+          ),
+          this._field(
+            "text",
+            "irc.nickServAccount",
+            "Account",
+            irc.nickServAccount,
+            {
+              placeholder: "Optional if it matches your nick",
+            },
+          ),
+          this._field(
+            "select",
+            "irc.nickServMode",
+            "Password Storage",
+            irc.nickServMode,
+            {
+              options: [
+                { value: "saved", label: "Save to keychain" },
+                { value: "session-only", label: "Remember for session" },
+                { value: "ask-every-time", label: "Ask every time" },
+              ],
+            },
+          ),
+        ]),
+      );
+
+      sections.push(
+        this._renderSection("Rooms", [
+          this._field(
+            "textarea",
+            "irc.autoJoinRoomsText",
+            "Auto-Join Rooms",
+            this._roomsToText(irc.autoJoinRooms),
+            {
+              placeholder: "#general\n#ops",
+              rows: 4,
+              help: "One room per line or comma-separated.",
+            },
+          ),
+        ]),
+      );
+
+      sections.push(
+        this._renderSection("SSH Tunnel", [
+          this._field(
+            "toggle",
+            "irc.sshTunnel",
+            "Enable SSH Tunnel",
+            irc.sshTunnel,
+          ),
+          this._field("text", "irc.sshHost", "SSH Host", irc.sshHost, {
+            placeholder: "jump.example.com",
+          }),
+          this._field("number", "irc.sshPort", "SSH Port", irc.sshPort, {
+            min: 1,
+            max: 65535,
+          }),
+          this._field(
+            "text",
+            "irc.sshUsername",
+            "SSH Username",
+            irc.sshUsername,
+            {
+              placeholder: "admin",
+            },
+          ),
+          this._field(
+            "select",
+            "irc.sshAuthMethod",
+            "SSH Auth Method",
+            irc.sshAuthMethod,
+            {
+              options: [
+                { value: "publickey", label: "Public Key" },
+                { value: "password", label: "Password" },
+              ],
+            },
+          ),
+          this._field(
+            "text",
+            "irc.sshPrivateKey",
+            "SSH Private Key Path",
+            irc.sshPrivateKey,
+            {
+              placeholder: "~/.ssh/id_ed25519",
+              datalistId: "ssh-key-path-options",
+            },
+          ),
+          this._field(
+            "toggle",
+            "irc.sshAgentAuth",
+            "Use SSH Agent",
+            irc.sshAgentAuth,
+          ),
+          this._field(
+            "select",
+            "irc.sshSecretMode",
+            "SSH Secret Storage",
+            irc.sshSecretMode,
+            {
+              options: [
+                { value: "saved", label: "Save to keychain" },
+                { value: "session-only", label: "Remember for session" },
+                { value: "ask-every-time", label: "Ask every time" },
+              ],
+            },
+          ),
+        ]),
+      );
+
+      sections.push(
+        this._renderSection("Reconnection", [
+          this._field(
+            "toggle",
+            "irc.autoReconnect",
+            "Auto-Reconnect",
+            irc.autoReconnect,
+          ),
+          this._field(
+            "number",
+            "irc.maxReconnectTries",
+            "Max Reconnect Attempts",
+            irc.maxReconnectTries || 5,
+            { min: 1, max: 20 },
           ),
         ]),
       );
@@ -2275,6 +2484,34 @@
         p.vnc.sshAgentAuth = val("vnc.sshAgentAuth") || false;
         p.vnc.sshSecretMode = val("vnc.sshSecretMode") || "saved";
       }
+
+      // IRC-specific
+      if (p.protocol === "irc") {
+        if (!p.irc) p.irc = {};
+        p.irc.nick = val("irc.nick") || "nexus";
+        p.irc.realName = val("irc.realName") || "Nexus Terminal";
+        p.irc.useTLS = val("irc.useTLS") || false;
+        p.irc.serverPasswordRequired =
+          val("irc.serverPasswordRequired") || false;
+        p.irc.serverPasswordMode =
+          val("irc.serverPasswordMode") || "ask-every-time";
+        p.irc.nickServIdentify = val("irc.nickServIdentify") || false;
+        p.irc.nickServAccount = val("irc.nickServAccount") || "";
+        p.irc.nickServMode = val("irc.nickServMode") || "saved";
+        p.irc.autoJoinRooms = this._parseRoomList(
+          val("irc.autoJoinRoomsText") || "",
+        );
+        p.irc.sshTunnel = val("irc.sshTunnel") || false;
+        p.irc.sshHost = val("irc.sshHost") || "";
+        p.irc.sshPort = val("irc.sshPort") || 22;
+        p.irc.sshUsername = val("irc.sshUsername") || "";
+        p.irc.sshAuthMethod = val("irc.sshAuthMethod") || "publickey";
+        p.irc.sshPrivateKey = val("irc.sshPrivateKey") || "";
+        p.irc.sshAgentAuth = val("irc.sshAgentAuth") || false;
+        p.irc.sshSecretMode = val("irc.sshSecretMode") || "saved";
+        p.irc.autoReconnect = val("irc.autoReconnect") !== false;
+        p.irc.maxReconnectTries = val("irc.maxReconnectTries") || 5;
+      }
     }
 
     // ── Validation ───────────────────────────────────────────────────
@@ -2299,6 +2536,25 @@
       }
       if (!profile.port || profile.port < 1 || profile.port > 65535) {
         errors.push("Port must be between 1 and 65535.");
+      }
+      if (profile.protocol === "irc") {
+        const nick = profile.irc?.nick || "";
+        if (!nick.trim()) {
+          errors.push("IRC nick is required.");
+        }
+        for (const room of profile.irc?.autoJoinRooms || []) {
+          if (!/^[#&+!][^\s,]+$/.test(room)) {
+            errors.push(`Invalid IRC room "${room}".`);
+          }
+        }
+        if (profile.irc?.sshTunnel) {
+          if (!profile.irc.sshHost?.trim()) {
+            errors.push("SSH Host is required when tunnelling IRC.");
+          }
+          if (!profile.irc.sshUsername?.trim()) {
+            errors.push("SSH Username is required when tunnelling IRC.");
+          }
+        }
       }
       return errors;
     }
@@ -2476,6 +2732,7 @@
         raw: null,
         github: null,
         vnc: null,
+        irc: null,
       };
 
       const defaults = DEFAULTS[protocol] || {};
@@ -2493,6 +2750,17 @@
       return Object.entries(envVars)
         .map(([k, v]) => `${k}=${v}`)
         .join("\n");
+    }
+
+    _roomsToText(rooms) {
+      return Array.isArray(rooms) ? rooms.join("\n") : "";
+    }
+
+    _parseRoomList(value) {
+      return String(value || "")
+        .split(/[\n,]/)
+        .map((room) => room.trim())
+        .filter(Boolean);
     }
   }
 
