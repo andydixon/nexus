@@ -1,10 +1,8 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-  <path d="M5.5 4.2h8.7l4.3 4.3v11.3H5.5V4.2Z"/>
-  <path d="M14.2 4.2v4.3h4.3"/>
-  <path d="M8.4 8.2h2.2"/>
-  <path d="M8.4 11.4h4.9"/>
-  <path d="M8.4 14.6h2.9"/>
-  <path d="m15.1 14.3 1.5 1.5"/>
-  <circle cx="13.9" cy="13.1" r="2.1"/>
-  <path d="M8.4 17.8h6.8"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M13.4 3.5H5a1.5 1.5 0 0 0-1.5 1.5v14A1.5 1.5 0 0 0 5 20.5h5.2"/>
+  <path d="M6.6 7.3h7"/>
+  <path d="M6.6 10.4h4.4"/>
+  <path d="M6.6 13.5h2.2"/>
+  <circle cx="15.3" cy="14.1" r="3.7"/>
+  <path d="m18 16.8 2.8 2.8"/>
 </svg>

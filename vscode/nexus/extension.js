@@ -22,6 +22,10 @@ class Bridge {
     if (!fs.existsSync(bridgePath)) {
       throw new Error(`Bridge executable not found: ${bridgePath}. Run vscode/build.sh first.`);
     }
+    // VSIX extraction does not always preserve the executable bit, so ensure it.
+    if (process.platform !== 'win32') {
+      try { fs.chmodSync(bridgePath, 0o755); } catch (_) { /* best effort */ }
+    }
 
     this.proc = cp.spawn(bridgePath, ['-listen', '127.0.0.1:0'], {
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -508,8 +512,6 @@ class TerminalPanel {
         await this.bridge.rpc('WriteSession', [this.session.id, msg.data]);
       } else if (msg.type === 'resize') {
         await this.bridge.rpc('ResizeSession', [this.session.id, msg.cols, msg.rows]);
-      } else if (msg.type === 'sftp') {
-        new SFTPPanel(this.context, this.bridge, this.session);
       }
     } catch (err) {
       this.panel.webview.postMessage({ type: 'status', text: err.message });
@@ -536,94 +538,191 @@ class TerminalPanel {
     const fitJs = webview.asWebviewUri(vscode.Uri.joinPath(mediaRoot, 'xterm-addon-fit.min.js'));
     const xtermCss = webview.asWebviewUri(vscode.Uri.joinPath(mediaRoot, 'xterm.css'));
     const nonce = String(Date.now());
-    const sftpStyle = String(this.profile.protocol || this.session.protocol || '').toLowerCase() === 'ssh' ? '' : 'display:none';
-    const terminalFontFamily = JSON.stringify(this.profile.terminalFontFamily || 'Menlo, Monaco, Consolas, "Courier New", monospace');
+    const terminalFontFamily = JSON.stringify(this.profile.terminalFontFamily || '');
     const terminalFontSize = Number(this.profile.terminalFontSize || 13);
     const terminalScrollback = Number(this.profile.terminalScrollback || 10000);
+    const terminalCursorStyle = JSON.stringify(this.profile.terminalCursorStyle || 'block');
     return `<!doctype html>
 <html>
 <head>
   <meta charset="utf-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource}; script-src ${webview.cspSource} 'nonce-${nonce}';">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src ${webview.cspSource} 'nonce-${nonce}'; font-src ${webview.cspSource};">
   <link rel="stylesheet" href="${xtermCss}">
   <style>
+    :root { color-scheme: light dark; }
     html, body {
       width: 100%;
       height: 100%;
       margin: 0;
+      padding: 0;
       overflow: hidden;
-      background: #0f1720;
-      font-family: Menlo, Monaco, Consolas, "Courier New", monospace;
+      background: var(--vscode-terminal-background, var(--vscode-panel-background, var(--vscode-editor-background)));
     }
+    /* Full-bleed terminal: occupies 100% of the tab, no chrome stealing space. */
     #terminal {
-      position: fixed;
+      position: absolute;
       inset: 0;
-      width: 100vw;
-      height: 100vh;
-      background: #0f1720;
-      font-family: Menlo, Monaco, Consolas, "Courier New", monospace;
+      padding: 4px 6px;
+      box-sizing: border-box;
     }
-    .xterm, .xterm-viewport, .xterm-screen {
-      width: 100% !important;
-      height: 100% !important;
-      font-family: Menlo, Monaco, Consolas, "Courier New", monospace !important;
+    .xterm { height: 100%; }
+    .xterm-viewport::-webkit-scrollbar { width: 10px; }
+    .xterm-viewport::-webkit-scrollbar-thumb {
+      background: var(--vscode-scrollbarSlider-background, rgba(121, 121, 121, .4));
     }
+    .xterm-viewport::-webkit-scrollbar-thumb:hover {
+      background: var(--vscode-scrollbarSlider-hoverBackground, rgba(100, 100, 100, .7));
+    }
+    /* Floating, auto-hiding status pill following VSCode badge styling. */
     #status {
-      position: fixed;
-      right: 10px;
-      top: 8px;
-      z-index: 2;
-      color: #a7f3d0;
-      font: 12px Menlo, Monaco, Consolas, "Courier New", monospace;
+      position: absolute;
+      right: 12px;
+      top: 10px;
+      z-index: 3;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 2px 9px;
+      border-radius: 11px;
+      font: 11px/1.6 var(--vscode-font-family);
+      color: var(--vscode-badge-foreground);
+      background: var(--vscode-badge-background);
+      box-shadow: 0 1px 4px rgba(0, 0, 0, .35);
       pointer-events: none;
-      opacity: .9;
+      opacity: 0;
+      transition: opacity .25s ease;
     }
-    #sftp {
-      position: fixed;
-      left: 10px;
-      top: 8px;
-      z-index: 2;
-      border: 1px solid rgba(148, 163, 184, .35);
-      background: rgba(15, 23, 32, .82);
-      color: #dbeafe;
-      padding: 4px 9px;
-      font: 12px Menlo, Monaco, Consolas, "Courier New", monospace;
-      cursor: pointer;
+    #status.show { opacity: 1; }
+    #status .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--vscode-charts-yellow, #e2c08d);
     }
-    #sftp:hover { background: rgba(30, 41, 59, .95); }
+    #status.ok .dot { background: var(--vscode-charts-green, #89d185); }
+    #status.bad { color: var(--vscode-statusBarItem-errorForeground, #fff); background: var(--vscode-statusBarItem-errorBackground, #c72e2e); }
+    #status.bad .dot { background: currentColor; }
   </style>
 </head>
 <body>
-  <div id="status">connecting</div>
-  <button id="sftp" style="${sftpStyle}">SFTP</button>
+  <div id="status" class="show"><span class="dot"></span><span id="statusText">Connecting…</span></div>
   <div id="terminal"></div>
   <script nonce="${nonce}" src="${xtermJs}"></script>
   <script nonce="${nonce}" src="${fitJs}"></script>
   <script nonce="${nonce}">
     const vscode = acquireVsCodeApi();
+
+    // Resolve a VSCode theme colour from the CSS variables injected into the webview.
+    const rootStyle = getComputedStyle(document.documentElement);
+    function cssVar(name, fallback) {
+      const value = rootStyle.getPropertyValue(name);
+      return value && value.trim() ? value.trim() : fallback;
+    }
+
+    const background = cssVar('--vscode-terminal-background', cssVar('--vscode-editor-background', '#1e1e1e'));
+    const foreground = cssVar('--vscode-terminal-foreground', cssVar('--vscode-editor-foreground', '#d4d4d4'));
+    // Build the xterm palette straight from the active VSCode colour theme.
+    const theme = {
+      background,
+      foreground,
+      cursor: cssVar('--vscode-terminalCursor-foreground', foreground),
+      cursorAccent: cssVar('--vscode-terminalCursor-background', background),
+      selectionBackground: cssVar('--vscode-terminal-selectionBackground', 'rgba(128,128,128,0.35)'),
+      black: cssVar('--vscode-terminal-ansiBlack', '#000000'),
+      red: cssVar('--vscode-terminal-ansiRed', '#cd3131'),
+      green: cssVar('--vscode-terminal-ansiGreen', '#0dbc79'),
+      yellow: cssVar('--vscode-terminal-ansiYellow', '#e5e510'),
+      blue: cssVar('--vscode-terminal-ansiBlue', '#2472c8'),
+      magenta: cssVar('--vscode-terminal-ansiMagenta', '#bc3fbc'),
+      cyan: cssVar('--vscode-terminal-ansiCyan', '#11a8cd'),
+      white: cssVar('--vscode-terminal-ansiWhite', '#e5e5e5'),
+      brightBlack: cssVar('--vscode-terminal-ansiBrightBlack', '#666666'),
+      brightRed: cssVar('--vscode-terminal-ansiBrightRed', '#f14c4c'),
+      brightGreen: cssVar('--vscode-terminal-ansiBrightGreen', '#23d18b'),
+      brightYellow: cssVar('--vscode-terminal-ansiBrightYellow', '#f5f543'),
+      brightBlue: cssVar('--vscode-terminal-ansiBrightBlue', '#3b8eea'),
+      brightMagenta: cssVar('--vscode-terminal-ansiBrightMagenta', '#d670d6'),
+      brightCyan: cssVar('--vscode-terminal-ansiBrightCyan', '#29b8db'),
+      brightWhite: cssVar('--vscode-terminal-ansiBrightWhite', '#e5e5e5')
+    };
+    document.body.style.background = background;
+
+    // Prefer a profile override, otherwise inherit VSCode's terminal/editor monospace font.
+    const fontFamily = ${terminalFontFamily}
+      || cssVar('--vscode-terminal-font-family', '')
+      || cssVar('--vscode-editor-font-family', 'Menlo, Monaco, "Cascadia Code", "Courier New", monospace');
+
     const term = new Terminal({
       cursorBlink: true,
+      cursorStyle: ${terminalCursorStyle},
       scrollback: ${terminalScrollback},
-      fontFamily: ${terminalFontFamily},
+      fontFamily,
       fontSize: ${terminalFontSize},
-      theme: { background: '#0f1720' }
+      lineHeight: 1.1,
+      letterSpacing: 0,
+      allowProposedApi: true,
+      theme
     });
     const fit = new FitAddon.FitAddon();
     term.loadAddon(fit);
-    term.open(document.getElementById('terminal'));
-    fit.fit();
-    term.onData(data => vscode.postMessage({ type: 'input', data: btoa(unescape(encodeURIComponent(data))) }));
-    document.getElementById('sftp').onclick = () => vscode.postMessage({ type: 'sftp' });
-    function resize() {
-      fit.fit();
-      vscode.postMessage({ type: 'resize', cols: term.cols, rows: term.rows });
+    const container = document.getElementById('terminal');
+    term.open(container);
+
+    let lastCols = 0;
+    let lastRows = 0;
+    // Push the current terminal geometry to the backend PTY. Pass force=true to
+    // re-send even when the dimensions are unchanged (needed right after the
+    // connection completes, since the remote PTY is created at a default size).
+    function resize(force) {
+      try { fit.fit(); } catch (_) { return; }
+      if (force || term.cols !== lastCols || term.rows !== lastRows) {
+        lastCols = term.cols;
+        lastRows = term.rows;
+        vscode.postMessage({ type: 'resize', cols: term.cols, rows: term.rows });
+      }
     }
-    window.addEventListener('resize', resize);
-    setTimeout(resize, 50);
+
+    // Refit whenever the tab/container changes size — handles splits, panel drags
+    // and the editor being shown after retainContextWhenHidden.
+    if (window.ResizeObserver) {
+      new ResizeObserver(() => resize()).observe(container);
+    }
+    window.addEventListener('resize', () => resize());
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) resize(); });
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => resize());
+    requestAnimationFrame(() => resize());
+    setTimeout(() => resize(), 60);
+
+    term.focus();
+    term.onData(data => vscode.postMessage({ type: 'input', data: btoa(unescape(encodeURIComponent(data))) }));
+
+    const statusEl = document.getElementById('status');
+    const statusText = document.getElementById('statusText');
+    let hideTimer = null;
+    function setStatus(text) {
+      const value = String(text || '').trim();
+      if (!value) return;
+      const lower = value.toLowerCase();
+      const connected = /connect(ed)?$|ready|open|online/.test(lower) && !/dis|fail|error|refus|lost|closed/.test(lower);
+      const failed = /dis|fail|error|refus|lost|closed|timeout/.test(lower);
+      statusText.textContent = value.charAt(0).toUpperCase() + value.slice(1);
+      statusEl.classList.toggle('ok', connected && !failed);
+      statusEl.classList.toggle('bad', failed);
+      statusEl.classList.add('show');
+      clearTimeout(hideTimer);
+      // Healthy states fade out so they don't sit on top of the terminal; problems stay visible.
+      if (connected && !failed) hideTimer = setTimeout(() => statusEl.classList.remove('show'), 1600);
+      return connected && !failed;
+    }
+
     window.addEventListener('message', event => {
       const msg = event.data || {};
       if (msg.type === 'data') term.write(Uint8Array.from(atob(msg.data), c => c.charCodeAt(0)));
-      if (msg.type === 'status') document.getElementById('status').textContent = msg.text || '';
+      if (msg.type === 'status') {
+        // The remote PTY is allocated at a default size before our first resize
+        // can land, so re-send the real geometry once the session is connected.
+        if (setStatus(msg.text)) { resize(true); setTimeout(() => resize(true), 250); }
+      }
     });
   </script>
 </body>
@@ -699,13 +798,18 @@ class RawPanel {
     .send { color: var(--vscode-terminal-ansiGreen); }
     .recv { color: var(--vscode-terminal-ansiCyan); }
     .hex { color: var(--vscode-descriptionForeground); }
+    button { border: 1px solid var(--vscode-button-border, transparent); background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); cursor: pointer; }
+    button:hover { background: var(--vscode-button-secondaryHoverBackground, var(--vscode-button-secondaryBackground)); }
+    button.primary { background: var(--vscode-button-background); color: var(--vscode-button-foreground); }
+    button.primary:hover { background: var(--vscode-button-hoverBackground, var(--vscode-button-background)); }
+    input:focus, select:focus, textarea:focus { outline: none; border-color: var(--vscode-focusBorder); }
   </style>
 </head>
 <body>
   <header>
     <select id="format"><option value="text">Text</option><option value="hex">Hex</option><option value="escaped">Escaped</option></select>
     <input id="input" autocomplete="off" spellcheck="false">
-    <button id="send">Send</button>
+    <button id="send" class="primary">Send</button>
     <button id="clear">Clear</button>
     <button id="save">Save</button>
     <span id="status">connecting</span>
@@ -858,6 +962,12 @@ class GitHubPanel {
     .repo { border: 1px solid var(--vscode-panel-border); padding: 8px; }
     .repo h3 { margin: 0 0 4px; font-size: 14px; }
     .meta { color: var(--vscode-descriptionForeground); font-size: 12px; }
+    button { border: 1px solid var(--vscode-button-border, transparent); background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); cursor: pointer; }
+    button:hover { background: var(--vscode-button-secondaryHoverBackground, var(--vscode-button-secondaryBackground)); }
+    button.primary { background: var(--vscode-button-background); color: var(--vscode-button-foreground); }
+    button.primary:hover { background: var(--vscode-button-hoverBackground, var(--vscode-button-background)); }
+    input:focus, select:focus { outline: none; border-color: var(--vscode-focusBorder); }
+    .repo p { display: flex; gap: 6px; margin: 8px 0 0; }
   </style>
 </head>
 <body>
@@ -951,13 +1061,18 @@ class IRCPanel {
     #target { width: 140px; }
     #message { flex: 1; }
     #log { height: calc(100vh - 92px); overflow: auto; padding: 8px; font-family: var(--vscode-editor-font-family), monospace; white-space: pre-wrap; }
-    .status { color: var(--vscode-descriptionForeground); }
+    .status { color: var(--vscode-descriptionForeground); align-self: center; }
+    button { border: 1px solid var(--vscode-button-border, transparent); background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); padding: 5px 10px; cursor: pointer; }
+    button:hover { background: var(--vscode-button-secondaryHoverBackground, var(--vscode-button-secondaryBackground)); }
+    button.primary { background: var(--vscode-button-background); color: var(--vscode-button-foreground); }
+    button.primary:hover { background: var(--vscode-button-hoverBackground, var(--vscode-button-background)); }
+    input:focus { outline: none; border-color: var(--vscode-focusBorder); }
   </style>
 </head>
 <body>
   <header><input id="room" placeholder="#room"><button id="join">Join</button><button id="part">Part</button><button id="list">List</button><span id="status" class="status">connecting</span></header>
   <main id="log"></main>
-  <footer><input id="target" value="server"><input id="message" autocomplete="off" spellcheck="false"><button id="send">Send</button></footer>
+  <footer><input id="target" value="server"><input id="message" autocomplete="off" spellcheck="false"><button id="send" class="primary">Send</button></footer>
   <script nonce="${nonce}">
     const vscode = acquireVsCodeApi();
     const log = document.getElementById('log');
@@ -1041,7 +1156,8 @@ class VNCPanel {
     html, body { margin: 0; width: 100%; height: 100%; color: var(--vscode-foreground); background: #111; font: var(--vscode-font-size) var(--vscode-font-family); }
     #toolbar { display: flex; gap: 8px; align-items: center; height: 36px; padding: 0 8px; box-sizing: border-box; background: var(--vscode-sideBar-background); }
     #screen { height: calc(100% - 36px); overflow: auto; display: flex; align-items: center; justify-content: center; }
-    button { padding: 4px 10px; }
+    button { padding: 4px 10px; border: 1px solid var(--vscode-button-border, transparent); background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); cursor: pointer; }
+    button:hover { background: var(--vscode-button-secondaryHoverBackground, var(--vscode-button-secondaryBackground)); }
     #status { margin-right: auto; color: var(--vscode-descriptionForeground); }
   </style>
 </head>
@@ -1161,8 +1277,12 @@ class ProfileEditorPanel {
     .grid { display: grid; grid-template-columns: repeat(2, minmax(220px, 1fr)); gap: 10px; }
     label { display: grid; gap: 4px; }
     input, select, textarea { color: var(--vscode-input-foreground); background: var(--vscode-input-background); border: 1px solid var(--vscode-input-border); padding: 5px 7px; box-sizing: border-box; }
+    input:focus, select:focus, textarea:focus { outline: none; border-color: var(--vscode-focusBorder); }
     textarea { width: 100%; min-height: 240px; font-family: var(--vscode-editor-font-family), monospace; }
-    button { padding: 5px 12px; }
+    button { padding: 5px 12px; border: 1px solid var(--vscode-button-border, transparent); background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); cursor: pointer; }
+    button:hover { background: var(--vscode-button-secondaryHoverBackground, var(--vscode-button-secondaryBackground)); }
+    button.primary { background: var(--vscode-button-background); color: var(--vscode-button-foreground); }
+    button.primary:hover { background: var(--vscode-button-hoverBackground, var(--vscode-button-background)); }
     .hint, #status { color: var(--vscode-descriptionForeground); }
     .danger { color: var(--vscode-errorForeground); }
   </style>
@@ -1171,7 +1291,7 @@ class ProfileEditorPanel {
   <header>
     <h1>${this.isNew ? 'New Connection Profile' : 'Edit Connection Profile'}</h1>
     <button id="test">Test Host</button>
-    <button id="save">Save</button>
+    <button id="save" class="primary">Save</button>
   </header>
   <main>
     <section>
@@ -1399,14 +1519,20 @@ class SettingsPanel {
     .grid { display: grid; grid-template-columns: repeat(2, minmax(220px, 1fr)); gap: 10px; }
     label { display: grid; gap: 4px; }
     input, select { color: var(--vscode-input-foreground); background: var(--vscode-input-background); border: 1px solid var(--vscode-input-border); padding: 5px 7px; }
+    input:focus, select:focus { outline: none; border-color: var(--vscode-focusBorder); }
+    button { border: 1px solid var(--vscode-button-border, transparent); background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); padding: 5px 12px; cursor: pointer; }
+    button:hover { background: var(--vscode-button-secondaryHoverBackground, var(--vscode-button-secondaryBackground)); }
+    button.primary { background: var(--vscode-button-background); color: var(--vscode-button-foreground); }
+    button.primary:hover { background: var(--vscode-button-hoverBackground, var(--vscode-button-background)); }
     table { width: 100%; border-collapse: collapse; }
     td, th { border: 1px solid var(--vscode-panel-border); padding: 5px 7px; text-align: left; }
+    td button { padding: 2px 8px; }
     .hint, #status { color: var(--vscode-descriptionForeground); }
     .danger { color: var(--vscode-errorForeground); }
   </style>
 </head>
 <body>
-  <header><h1>Nexus Settings</h1><button id="save">Save</button></header>
+  <header><h1>Nexus Settings</h1><button id="save" class="primary">Save</button></header>
   <main>
     <section>
       <h2>General</h2>
@@ -1520,12 +1646,27 @@ class SFTPPanel {
   }
 
   async init() {
-    try {
-      this.cwd = await this.bridge.rpc('SFTPPwd', [this.session.id]);
-    } catch (_) {
-      this.cwd = '/';
+    // A freshly opened SFTP session may be created before the underlying SSH
+    // connection finishes. SFTPPwd resolves realpath(".") which the server maps
+    // to the user's home directory, so retry until the session is ready and land
+    // the browser in the home folder instead of falling back to the filesystem root.
+    this.panel.webview.postMessage({ type: 'status', text: 'Connecting…' });
+    let home = '';
+    for (let attempt = 0; attempt < 30 && !home; attempt++) {
+      try {
+        const pwd = await this.bridge.rpc('SFTPPwd', [this.session.id]);
+        if (pwd && pwd.startsWith('/')) { home = pwd; break; }
+      } catch (_) {
+        // SSH session is still connecting; back off and retry.
+      }
+      await new Promise(resolve => setTimeout(resolve, 300));
     }
-    await this.list(this.cwd || '/');
+    this.cwd = home || '/';
+    try {
+      await this.list(this.cwd);
+    } catch (err) {
+      this.panel.webview.postMessage({ type: 'error', error: err.message || String(err) });
+    }
   }
 
   async list(remotePath) {
@@ -1595,6 +1736,12 @@ class SFTPPanel {
     .muted, #status { color: var(--vscode-descriptionForeground); }
     .danger { color: var(--vscode-errorForeground); }
     main { height: calc(100vh - 43px); overflow: auto; }
+    button { border: 1px solid var(--vscode-button-border, transparent); background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); cursor: pointer; }
+    button:hover { background: var(--vscode-button-secondaryHoverBackground, var(--vscode-button-secondaryBackground)); }
+    button.primary { background: var(--vscode-button-background); color: var(--vscode-button-foreground); }
+    button.primary:hover { background: var(--vscode-button-hoverBackground, var(--vscode-button-background)); }
+    td button { padding: 2px 8px; }
+    #path:focus { outline: none; border-color: var(--vscode-focusBorder); }
   </style>
 </head>
 <body>
@@ -1662,6 +1809,7 @@ class SFTPPanel {
     window.addEventListener('message', event => {
       const msg = event.data || {};
       if (msg.type === 'entries') { cwd = msg.cwd || '/'; entries = msg.entries || []; render(); }
+      if (msg.type === 'status') setStatus(msg.text);
       if (msg.type === 'error') setStatus(msg.error, true);
     });
   </script>

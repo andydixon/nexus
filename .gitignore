@@ -6,6 +6,13 @@
 build/bin/
 dist/
 
+# ── VSCode extensions: platform-specific build artifacts (never commit) ────
+# The Go bridge is compiled per-host by vscode/build.sh and staged into each
+# extension's bin/ — committing it ships a binary for the wrong OS/arch.
+vscode/bin/
+vscode/dist/
+vscode/*/bin/
+
 # ── Build platform resources (tracked — icons, plists, manifests) ─────────
 # build/darwin/, build/windows/, build/linux/ are tracked for icons & metadata
 
