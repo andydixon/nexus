@@ -69,6 +69,10 @@ class Bridge {
     if (!fs.existsSync(bridgePath)) {
       throw new Error(`Bridge executable not found: ${bridgePath}. Run vscode/build.sh first.`);
     }
+    // VSIX extraction does not always preserve the executable bit, so ensure it.
+    if (process.platform !== 'win32') {
+      try { fs.chmodSync(bridgePath, 0o755); } catch (_) { /* best effort */ }
+    }
     this.proc = cp.spawn(bridgePath, ['-listen', '127.0.0.1:0'], {
       stdio: ['ignore', 'pipe', 'pipe'],
       windowsHide: true
@@ -776,12 +780,19 @@ class ToolPanel {
     h1 { margin: 0; font-size: 15px; }
     .title-wrap { min-width: 0; }
     .file-state { color: var(--vscode-descriptionForeground); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    header button, .actions button { border: 1px solid var(--vscode-button-border, transparent); background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); }
+    header button:hover, .actions button:hover { background: var(--vscode-button-secondaryHoverBackground, var(--vscode-button-secondaryBackground)); }
     main { display: grid; grid-template-columns: minmax(260px, 360px) 1fr; height: calc(100vh - 58px); }
-    textarea { width: calc(100% - 24px); height: calc(100% - 66px); margin: 12px; resize: none; color: var(--vscode-input-foreground); background: var(--vscode-input-background); border: 1px solid var(--vscode-input-border); font-family: var(--vscode-editor-font-family); }
-    .left { border-right: 1px solid var(--vscode-panel-border); }
-    .actions { display: flex; gap: 6px; padding: 0 12px 12px; }
-    button { padding: 5px 10px; }
+    .left { border-right: 1px solid var(--vscode-panel-border); display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+    .params-head { padding: 12px 12px 6px; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--vscode-descriptionForeground); }
+    textarea { flex: 1; margin: 0 12px; resize: none; color: var(--vscode-input-foreground); background: var(--vscode-input-background); border: 1px solid var(--vscode-input-border); padding: 8px; box-sizing: border-box; font-family: var(--vscode-editor-font-family, monospace); font-size: 12px; }
+    textarea:focus { outline: none; border-color: var(--vscode-focusBorder); }
+    .actions { display: flex; gap: 6px; padding: 10px 12px; }
+    button { padding: 5px 10px; cursor: pointer; }
+    button.primary { background: var(--vscode-button-background); color: var(--vscode-button-foreground); border-color: var(--vscode-button-border, transparent); }
+    button.primary:hover { background: var(--vscode-button-hoverBackground, var(--vscode-button-background)); }
     #out { margin: 0; padding: 12px; overflow: auto; height: calc(100% - 24px); box-sizing: border-box; }
+    .out-empty { color: var(--vscode-descriptionForeground); }
     table { border-collapse: collapse; width: 100%; margin: 0 0 12px; }
     th, td { border: 1px solid var(--vscode-panel-border); padding: 4px 6px; text-align: left; vertical-align: top; font-family: var(--vscode-editor-font-family); font-size: 12px; }
     th { background: var(--vscode-editorWidget-background); position: sticky; top: 0; }
@@ -800,15 +811,20 @@ class ToolPanel {
   </header>
   <main>
     <section class="left">
+      <div class="params-head">Parameters (JSON)</div>
       <textarea id="params" spellcheck="false">${escapeHtml(JSON.stringify(JSON.parse(defaults), null, 2))}</textarea>
-      <div class="actions"><button id="run">Run</button></div>
+      <div class="actions"><button id="run" class="primary">Run</button></div>
     </section>
-    <section id="out">Run the tool to see results.</section>
+    <section id="out"><span class="out-empty">Adjust the parameters and select Run to see results.</span></section>
   </main>
   <script nonce="${nonce}">
     const vscode = acquireVsCodeApi();
     const initialFileState = ${initialFileState};
-    document.getElementById('run').onclick = () => vscode.postMessage({ type: 'run', params: document.getElementById('params').value });
+    const runTool = () => vscode.postMessage({ type: 'run', params: document.getElementById('params').value });
+    document.getElementById('run').onclick = runTool;
+    document.getElementById('params').addEventListener('keydown', event => {
+      if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') { event.preventDefault(); runTool(); }
+    });
     document.getElementById('undo').onclick = () => vscode.postMessage({ type: 'undo' });
     document.getElementById('redo').onclick = () => vscode.postMessage({ type: 'redo' });
     document.getElementById('revert').onclick = () => vscode.postMessage({ type: 'revert' });
