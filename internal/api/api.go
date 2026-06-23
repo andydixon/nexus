@@ -61,6 +61,7 @@ type Service struct {
 	auditLog      *audit.Logger
 	prefs         *preferences.Manager
 	ctx           context.Context
+	eventSink     func(string, interface{})
 
 	// secretChans maps request IDs to channels awaiting user secret input.
 	secretMu    sync.Mutex
@@ -105,6 +106,12 @@ func NewService(
 func (s *Service) SetContext(ctx context.Context) {
 	s.ctx = ctx
 	s.RegisterSecretResponseListener()
+}
+
+// SetEventSink registers an alternate UI event sink for non-Wails hosts such
+// as the VS Code bridge.
+func (s *Service) SetEventSink(sink func(string, interface{})) {
+	s.eventSink = sink
 }
 
 // ---------------------------------------------------------------------------
@@ -1026,6 +1033,26 @@ func (s *Service) DownloadGitHubRepoArchive(sessionID string, fullName string, r
 	return path, nil
 }
 
+// DownloadGitHubRepoArchiveToPath downloads a repository zip archive to an
+// explicit local destination. Non-Wails hosts provide the save path through
+// their own file picker.
+func (s *Service) DownloadGitHubRepoArchiveToPath(sessionID string, fullName string, ref string, destPath string) (string, error) {
+	if strings.TrimSpace(fullName) == "" {
+		return "", fmt.Errorf("repository name cannot be empty")
+	}
+	destPath = strings.TrimSpace(destPath)
+	if destPath == "" {
+		return "", fmt.Errorf("destination path cannot be empty")
+	}
+	if filepath.Ext(destPath) != ".zip" {
+		destPath += ".zip"
+	}
+	if err := s.sessions.DownloadGitHubArchive(sessionID, fullName, ref, destPath); err != nil {
+		return "", err
+	}
+	return destPath, nil
+}
+
 // ---------------------------------------------------------------------------
 // VNC
 // ---------------------------------------------------------------------------
@@ -1410,6 +1437,19 @@ func (s *Service) SFTPDownload(sessionID string, remotePath string) error {
 	return s.sessions.SFTPDownload(sessionID, remotePath, localPath)
 }
 
+// SFTPDownloadToPath downloads a remote file to an explicit local path. This
+// is used by non-Wails hosts, where the UI owns the save dialog.
+func (s *Service) SFTPDownloadToPath(sessionID string, remotePath string, localPath string) error {
+	if strings.TrimSpace(remotePath) == "" {
+		return fmt.Errorf("remote path cannot be empty")
+	}
+	localPath = strings.TrimSpace(localPath)
+	if localPath == "" {
+		return fmt.Errorf("local path cannot be empty")
+	}
+	return s.sessions.SFTPDownload(sessionID, remotePath, localPath)
+}
+
 // SFTPUpload uploads a local file to a remote directory. Opens a native file
 // dialog to select the local file.
 func (s *Service) SFTPUpload(sessionID string, remotePath string) error {
@@ -1428,6 +1468,29 @@ func (s *Service) SFTPUpload(sessionID string, remotePath string) error {
 	}
 
 	destPath := remotePath + "/" + filepath.Base(localPath)
+	return s.sessions.SFTPUpload(sessionID, localPath, destPath)
+}
+
+// SFTPUploadPath uploads an explicit local file path to a remote directory.
+// The remote filename is derived from the local basename and sanitised through
+// the same upload-name validation used by browser uploads.
+func (s *Service) SFTPUploadPath(sessionID string, remoteDir string, localPath string) error {
+	localPath = strings.TrimSpace(localPath)
+	if localPath == "" {
+		return fmt.Errorf("local path cannot be empty")
+	}
+	info, err := os.Stat(localPath)
+	if err != nil {
+		return fmt.Errorf("reading local file metadata: %w", err)
+	}
+	if info.IsDir() {
+		return fmt.Errorf("local path is a directory")
+	}
+	safeName, err := safeSFTPUploadName(filepath.Base(localPath))
+	if err != nil {
+		return err
+	}
+	destPath := path.Join(remoteDir, safeName)
 	return s.sessions.SFTPUpload(sessionID, localPath, destPath)
 }
 
@@ -1676,7 +1739,7 @@ func (s *Service) TestConnection(host string, port int) (map[string]interface{},
 // This bridges the synchronous Go SSH auth callback with the asynchronous
 // frontend prompt UI.
 func (s *Service) promptSecret(prompt string) (string, error) {
-	if s.ctx == nil {
+	if s.ctx == nil && s.eventSink == nil {
 		return "", fmt.Errorf("application context not available")
 	}
 
@@ -1693,7 +1756,7 @@ func (s *Service) promptSecret(prompt string) (string, error) {
 	s.secretMu.Unlock()
 
 	// Emit the prompt event to the frontend.
-	wailsRuntime.EventsEmit(s.ctx, "session:secret:prompt", map[string]interface{}{
+	s.emitEvent("session:secret:prompt", map[string]interface{}{
 		"requestID": requestID,
 		"message":   prompt,
 		"title":     "Credentials Required",
@@ -1749,6 +1812,26 @@ func (s *Service) RegisterSecretResponseListener() {
 			ch <- secretResponse{value: value, cancelled: cancelled}
 		}
 	})
+}
+
+// RespondSecret supplies a credential prompt response for non-Wails hosts.
+func (s *Service) RespondSecret(requestID string, value string, cancelled bool) {
+	s.secretMu.Lock()
+	ch, exists := s.secretChans[requestID]
+	s.secretMu.Unlock()
+
+	if exists {
+		ch <- secretResponse{value: value, cancelled: cancelled}
+	}
+}
+
+func (s *Service) emitEvent(eventName string, data interface{}) {
+	if s.eventSink != nil {
+		s.eventSink(eventName, data)
+	}
+	if s.ctx != nil {
+		wailsRuntime.EventsEmit(s.ctx, eventName, data)
+	}
 }
 
 // derefProfiles converts a slice of profile pointers to values.

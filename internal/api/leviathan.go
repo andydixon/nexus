@@ -218,6 +218,23 @@ func (s *Service) LeviathanSaveWorking() (string, error) {
 	return path, writeLeviathanDocumentFile(path, doc)
 }
 
+// LeviathanSaveWorkingToPath writes the patched bytes to an explicit path.
+// This is used by non-Wails hosts, where file picking is owned by the host UI.
+func (s *Service) LeviathanSaveWorkingToPath(path string) (string, error) {
+	engine := s.leviathanEngine()
+	engine.mu.Lock()
+	if engine.doc == nil {
+		engine.mu.Unlock()
+		return "", errors.New("open a file first")
+	}
+	doc := engine.doc
+	engine.mu.Unlock()
+	if strings.TrimSpace(path) == "" {
+		return "", errors.New("save path is required")
+	}
+	return path, writeLeviathanDocumentFile(path, doc)
+}
+
 // LeviathanExportJSON writes a tool result to disk.
 func (s *Service) LeviathanExportJSON(name string, value map[string]any) (string, error) {
 	if s.ctx == nil {

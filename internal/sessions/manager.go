@@ -70,9 +70,12 @@ type Manager struct {
 	auditLog                  *audit.Logger
 	recordStore               *recording.Store
 	ctx                       context.Context // Wails app context for event emission
+	eventSink                 func(string, interface{})
 	hostKeyMu                 sync.Mutex
 	hostKeyChans              map[string]chan bool
 	hostKeyListenerRegistered bool
+	secretMu                 sync.Mutex
+	secretChans              map[string]chan string
 }
 
 // NewManager creates a Manager wired to the given backing services.
@@ -91,6 +94,16 @@ func NewManager(store *storage.Store, secretStore *secrets.SecretStore, keychain
 func (m *Manager) SetContext(ctx context.Context) {
 	m.ctx = ctx
 	m.registerHostKeyResponseListener()
+}
+
+// SetEventSink registers an alternate UI event sink for non-Wails hosts.
+// Wails remains supported through SetContext; this hook is used by the VS Code
+// bridge so existing protocol/session code can be reused without a webview
+// runtime context.
+func (m *Manager) SetEventSink(sink func(string, interface{})) {
+	m.mu.Lock()
+	m.eventSink = sink
+	m.mu.Unlock()
 }
 
 // Connect creates a new session from a profile and connects it.
@@ -1706,7 +1719,7 @@ func (m *Manager) hostKeyCallback(sessionID string, policy models.HostKeyPolicy)
 }
 
 func (m *Manager) promptHostKey(sessionID string, host string, keyType string, fingerprint string) (bool, error) {
-	if m.ctx == nil {
+	if m.ctx == nil && m.eventSink == nil {
 		return false, fmt.Errorf("host key prompt unavailable")
 	}
 
@@ -1772,6 +1785,20 @@ func (m *Manager) handleHostKeyResponse(optionalData ...interface{}) {
 	requestID, _ := data["requestID"].(string)
 	accepted, _ := data["accepted"].(bool)
 
+	m.hostKeyMu.Lock()
+	ch, exists := m.hostKeyChans[requestID]
+	m.hostKeyMu.Unlock()
+
+	if exists {
+		select {
+		case ch <- accepted:
+		default:
+		}
+	}
+}
+
+// RespondHostKey supplies a host-key prompt response for non-Wails hosts.
+func (m *Manager) RespondHostKey(requestID string, accepted bool) {
 	m.hostKeyMu.Lock()
 	ch, exists := m.hostKeyChans[requestID]
 	m.hostKeyMu.Unlock()
@@ -2240,25 +2267,30 @@ func (m *Manager) scheduleReconnect(sess *Session, sessionID string) {
 // original callback is no longer available.
 func (m *Manager) buildInteractiveSecretCallback(sessionID string) func(prompt string) (string, error) {
 	return func(prompt string) (string, error) {
-		// Use the same event-based flow as the initial connection.
 		requestID := uuid.New().String()
 
 		ch := make(chan string, 1)
-		m.mu.Lock()
-		// Store a temporary secret channel keyed by requestID.
-		if m.ctx != nil {
-			wailsRuntime.EventsEmit(m.ctx, "session:secret:prompt", map[string]interface{}{
-				"requestID": requestID,
-				"sessionID": sessionID,
-				"title":     "Reconnection Credentials",
-				"message":   prompt,
-			})
+		m.secretMu.Lock()
+		if m.secretChans == nil {
+			m.secretChans = make(map[string]chan string)
 		}
-		m.mu.Unlock()
+		m.secretChans[requestID] = ch
+		m.secretMu.Unlock()
+		defer func() {
+			m.secretMu.Lock()
+			delete(m.secretChans, requestID)
+			m.secretMu.Unlock()
+		}()
+
+		m.emitEvent("session:secret:prompt", map[string]interface{}{
+			"requestID": requestID,
+			"sessionID": sessionID,
+			"title":     "Reconnection Credentials",
+			"message":   prompt,
+		})
 
 		// Wait for the response with a timeout.
 		var response string
-		cancel := make(chan struct{})
 
 		if m.ctx != nil {
 			wailsRuntime.EventsOn(m.ctx, "session:secret:response", func(optionalData ...interface{}) {
@@ -2282,11 +2314,25 @@ func (m *Manager) buildInteractiveSecretCallback(sessionID string) func(prompt s
 		select {
 		case response = <-ch:
 		case <-time.After(60 * time.Second):
-			close(cancel)
 			return "", fmt.Errorf("credential prompt timed out during reconnect")
 		}
 
 		return response, nil
+	}
+}
+
+// RespondSecret supplies a credential prompt response for reconnect prompts in
+// non-Wails hosts.
+func (m *Manager) RespondSecret(requestID string, value string) {
+	m.secretMu.Lock()
+	ch, exists := m.secretChans[requestID]
+	m.secretMu.Unlock()
+
+	if exists {
+		select {
+		case ch <- value:
+		default:
+		}
 	}
 }
 
@@ -2324,6 +2370,12 @@ func (m *Manager) createTabName(profile *models.Profile) string {
 
 // emitEvent sends an event to the Wails frontend via the runtime context.
 func (m *Manager) emitEvent(eventName string, data interface{}) {
+	m.mu.RLock()
+	sink := m.eventSink
+	m.mu.RUnlock()
+	if sink != nil {
+		sink(eventName, data)
+	}
 	if m.ctx == nil {
 		return
 	}
