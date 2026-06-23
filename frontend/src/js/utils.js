@@ -290,6 +290,8 @@
         return "proto-github";
       case "vnc":
         return "proto-vnc";
+      case "irc":
+        return "proto-irc";
       case "local":
         return "proto-local";
       default:

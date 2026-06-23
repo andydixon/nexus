@@ -20,6 +20,7 @@ import (
 
 	"github.com/andydixon/nexus/internal/audit"
 	"github.com/andydixon/nexus/internal/githubclient"
+	"github.com/andydixon/nexus/internal/ircclient"
 	"github.com/andydixon/nexus/internal/localshell"
 	"github.com/andydixon/nexus/internal/models"
 	"github.com/andydixon/nexus/internal/rawclient"
@@ -32,7 +33,7 @@ import (
 	"github.com/andydixon/nexus/internal/vncclient"
 )
 
-const maxVNCTunnelPrivateKeyBytes = 1 << 20
+const maxTunnelPrivateKeyBytes = 1 << 20
 
 // Session wraps a protocol client with metadata and state.
 type Session struct {
@@ -43,6 +44,7 @@ type Session struct {
 	githubClient   *githubclient.Client
 	githubCancel   context.CancelFunc // stops the auto-refresh goroutine
 	vncClient      *vncclient.Client  // VNC proxy client, nil for non-VNC sessions
+	ircClient      *ircclient.Client  // IRC client, nil for non-IRC sessions
 	localClient    *localshell.Client // local shell PTY, nil for non-local sessions
 	sftpClient     *sftpclient.Client // SFTP subsystem, nil until requested
 	profile        *models.Profile
@@ -139,6 +141,8 @@ func (m *Manager) Connect(profile *models.Profile, getSecret func(prompt string)
 			err = m.connectGitHub(sess, getSecret)
 		case models.ProtocolVNC:
 			err = m.connectVNC(sess, getSecret)
+		case models.ProtocolIRC:
+			err = m.connectIRC(sess, getSecret)
 		default:
 			err = fmt.Errorf("unsupported protocol %q", profile.Protocol)
 		}
@@ -537,6 +541,74 @@ func (m *Manager) SendBreak(sessionID string) error {
 		return fmt.Errorf("sessions: session %q is not a Telnet connection", sessionID)
 	}
 	return sess.telnetClient.SendBreak()
+}
+
+// IRCHandleInput sends a user-entered composer line to an IRC session.
+func (m *Manager) IRCHandleInput(sessionID string, target string, input string) error {
+	client, err := m.getIRC(sessionID)
+	if err != nil {
+		return err
+	}
+	return client.HandleInput(target, input)
+}
+
+// IRCJoin joins an IRC room.
+func (m *Manager) IRCJoin(sessionID string, room string) error {
+	client, err := m.getIRC(sessionID)
+	if err != nil {
+		return err
+	}
+	return client.Join(room)
+}
+
+// IRCPart leaves an IRC room.
+func (m *Manager) IRCPart(sessionID string, room string) error {
+	client, err := m.getIRC(sessionID)
+	if err != nil {
+		return err
+	}
+	return client.Part(room)
+}
+
+// IRCListRooms requests a server-side IRC room list.
+func (m *Manager) IRCListRooms(sessionID string) error {
+	client, err := m.getIRC(sessionID)
+	if err != nil {
+		return err
+	}
+	return client.ListRooms()
+}
+
+// IRCRooms returns currently joined IRC rooms.
+func (m *Manager) IRCRooms(sessionID string) ([]ircclient.RoomInfo, error) {
+	client, err := m.getIRC(sessionID)
+	if err != nil {
+		return nil, err
+	}
+	return client.Rooms(), nil
+}
+
+// IRCUsers returns known users in an IRC room.
+func (m *Manager) IRCUsers(sessionID string, room string) ([]string, error) {
+	client, err := m.getIRC(sessionID)
+	if err != nil {
+		return nil, err
+	}
+	return client.Users(room), nil
+}
+
+func (m *Manager) getIRC(sessionID string) (*ircclient.Client, error) {
+	m.mu.RLock()
+	sess, ok := m.sessions[sessionID]
+	m.mu.RUnlock()
+
+	if !ok {
+		return nil, fmt.Errorf("sessions: session %q not found", sessionID)
+	}
+	if sess.ircClient == nil {
+		return nil, fmt.Errorf("sessions: session %q is not an IRC connection", sessionID)
+	}
+	return sess.ircClient, nil
 }
 
 // WriteSessionText sends text with line ending via the RAW client.
@@ -1040,8 +1112,8 @@ func (m *Manager) connectVNC(sess *Session, getSecret func(prompt string) (strin
 				if info.IsDir() {
 					return fmt.Errorf("SSH key path is a directory")
 				}
-				if info.Size() > maxVNCTunnelPrivateKeyBytes {
-					return fmt.Errorf("SSH key is too large: %d bytes exceeds %d bytes", info.Size(), maxVNCTunnelPrivateKeyBytes)
+				if info.Size() > maxTunnelPrivateKeyBytes {
+					return fmt.Errorf("SSH key is too large: %d bytes exceeds %d bytes", info.Size(), maxTunnelPrivateKeyBytes)
 				}
 				keyData, err := os.ReadFile(vncConf.SSHPrivateKey)
 				if err != nil {
@@ -1089,6 +1161,139 @@ func (m *Manager) connectVNC(sess *Session, getSecret func(prompt string) (strin
 	})
 
 	return nil
+}
+
+// connectIRC establishes an IRC connection, optionally through an SSH tunnel,
+// and forwards typed IRC events to the frontend.
+func (m *Manager) connectIRC(sess *Session, getSecret func(prompt string) (string, error)) error {
+	profile := sess.profile
+	ircConf := profile.IRC
+	if ircConf == nil {
+		return fmt.Errorf("IRC configuration missing")
+	}
+
+	serverPass := ""
+	if ircConf.ServerPasswordRequired {
+		getPass := m.buildSecretCallback(profile.ID, "irc-server-password", ircConf.ServerPasswordMode, getSecret)
+		password, err := getPass()
+		if err != nil {
+			return fmt.Errorf("IRC server password: %w", err)
+		}
+		serverPass = password
+	}
+
+	nickServPass := ""
+	if ircConf.NickServIdentify {
+		getPass := m.buildSecretCallback(profile.ID, "irc-nickserv-password", ircConf.NickServMode, getSecret)
+		password, err := getPass()
+		if err != nil {
+			return fmt.Errorf("NickServ password: %w", err)
+		}
+		nickServPass = password
+	}
+
+	cfg := ircclient.Config{
+		Server:             profile.Host,
+		Port:               profile.Port,
+		Nick:               ircConf.Nick,
+		User:               profile.Username,
+		RealName:           ircConf.RealName,
+		UseTLS:             ircConf.UseTLS,
+		ServerPass:         serverPass,
+		AutoJoinRooms:      append([]string{}, ircConf.AutoJoinRooms...),
+		NickServIdentify:   ircConf.NickServIdentify,
+		NickServAccount:    ircConf.NickServAccount,
+		NickServPassword:   nickServPass,
+		ConnectTimeout:     time.Duration(profile.ConnectTimeout) * time.Second,
+		OnEvent:            func(event ircclient.Event) { m.emitIRCEvent(sess.Info.ID, event) },
+		OnError:            func(err error) { m.markSessionError(sess, err) },
+		OnClose:            func() { m.handleSessionClosed(sess.Info.ID) },
+		SSHTunnel:          ircConf.SSHTunnel,
+		SSHHost:            ircConf.SSHHost,
+		SSHPort:            ircConf.SSHPort,
+		SSHUsername:        ircConf.SSHUsername,
+		SSHAuthMethod:      ircConf.SSHAuthMethod,
+		SSHAgentAuth:       ircConf.SSHAgentAuth,
+		SSHHostKeyCallback: m.hostKeyCallback(sess.Info.ID, models.HostKeyAsk),
+	}
+
+	if cfg.User == "" {
+		cfg.User = ircConf.Nick
+	}
+
+	if ircConf.SSHTunnel {
+		switch ircConf.SSHAuthMethod {
+		case "password":
+			getPass := m.buildSecretCallback(profile.ID, "irc-ssh-password", ircConf.SSHSecretMode, getSecret)
+			password, err := getPass()
+			if err != nil {
+				return fmt.Errorf("IRC SSH password: %w", err)
+			}
+			cfg.SSHPassword = password
+		case "publickey":
+			if ircConf.SSHPrivateKey != "" {
+				info, err := os.Stat(ircConf.SSHPrivateKey)
+				if err != nil {
+					return fmt.Errorf("reading IRC SSH key metadata: %w", err)
+				}
+				if info.IsDir() {
+					return fmt.Errorf("IRC SSH key path is a directory")
+				}
+				if info.Size() > maxTunnelPrivateKeyBytes {
+					return fmt.Errorf("IRC SSH key is too large: %d bytes exceeds %d bytes", info.Size(), maxTunnelPrivateKeyBytes)
+				}
+				keyData, err := os.ReadFile(ircConf.SSHPrivateKey)
+				if err != nil {
+					return fmt.Errorf("reading IRC SSH key: %w", err)
+				}
+				cfg.SSHPrivateKey = keyData
+				getPassphrase := m.buildSecretCallback(profile.ID, "irc-ssh-passphrase", ircConf.SSHSecretMode, getSecret)
+				passphrase, _ := getPassphrase()
+				cfg.SSHPassphrase = passphrase
+			}
+		}
+
+		if ircConf.SSHAgentAuth {
+			socketPath := os.Getenv("SSH_AUTH_SOCK")
+			if socketPath != "" {
+				agentConn, err := net.Dial("unix", socketPath)
+				if err == nil {
+					cfg.SSHAgentConn = agentConn
+				}
+			}
+		}
+	}
+
+	client := ircclient.New(cfg)
+	if err := client.Connect(); err != nil {
+		return err
+	}
+
+	sess.ircClient = client
+	return nil
+}
+
+func (m *Manager) emitIRCEvent(sessionID string, event ircclient.Event) {
+	m.emitEvent("session:irc:event", map[string]interface{}{
+		"sessionID": sessionID,
+		"event":     event,
+	})
+}
+
+func (m *Manager) markSessionError(sess *Session, err error) {
+	if err == nil {
+		return
+	}
+	m.mu.Lock()
+	sess.Info.State = models.SessionError
+	sess.Info.Error = err.Error()
+	m.mu.Unlock()
+
+	m.emitEvent("session:state", map[string]interface{}{
+		"sessionID": sess.Info.ID,
+		"state":     string(models.SessionError),
+		"error":     err.Error(),
+	})
 }
 
 // GetVNCWebSocketURL returns the local WebSocket proxy URL for a VNC session.
@@ -1728,6 +1933,10 @@ func (m *Manager) closeSession(sess *Session) {
 		sess.vncClient.Close()
 		sess.vncClient = nil
 	}
+	if sess.ircClient != nil {
+		sess.ircClient.Close()
+		sess.ircClient = nil
+	}
 	if sess.localClient != nil {
 		sess.localClient.Close()
 		sess.localClient = nil
@@ -1879,6 +2088,10 @@ func (m *Manager) shouldAutoReconnect(sess *Session) bool {
 		if sess.profile.RAW != nil {
 			return sess.profile.RAW.AutoReconnect
 		}
+	case models.ProtocolIRC:
+		if sess.profile.IRC != nil {
+			return sess.profile.IRC.AutoReconnect
+		}
 	}
 	return false
 }
@@ -1894,6 +2107,14 @@ func (m *Manager) maxReconnectAttempts(sess *Session) int {
 	case models.ProtocolTelnet:
 		if sess.profile.Telnet != nil && sess.profile.Telnet.MaxReconnectTries > 0 {
 			maxTries = sess.profile.Telnet.MaxReconnectTries
+		}
+	case models.ProtocolRAW:
+		if sess.profile.RAW != nil {
+			maxTries = 5
+		}
+	case models.ProtocolIRC:
+		if sess.profile.IRC != nil && sess.profile.IRC.MaxReconnectTries > 0 {
+			maxTries = sess.profile.IRC.MaxReconnectTries
 		}
 	}
 	return maxTries
@@ -1959,6 +2180,7 @@ func (m *Manager) scheduleReconnect(sess *Session, sessionID string) {
 		sess.sshClient = nil
 		sess.telnetClient = nil
 		sess.rawClient = nil
+		sess.ircClient = nil
 		sess.sftpClient = nil
 		sess.Info.State = models.SessionConnecting
 		m.mu.Unlock()
@@ -1976,6 +2198,8 @@ func (m *Manager) scheduleReconnect(sess *Session, sessionID string) {
 			err = m.connectTelnet(sess)
 		case models.ProtocolRAW:
 			err = m.connectRAW(sess)
+		case models.ProtocolIRC:
+			err = m.connectIRC(sess, m.buildInteractiveSecretCallback(sessionID))
 		default:
 			err = fmt.Errorf("unsupported protocol for reconnect: %s", sess.profile.Protocol)
 		}

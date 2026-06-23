@@ -13,6 +13,7 @@ const (
 	ProtocolRAW    Protocol = "raw"
 	ProtocolGitHub Protocol = "github"
 	ProtocolVNC    Protocol = "vnc"
+	ProtocolIRC    Protocol = "irc"
 	ProtocolLocal  Protocol = "local"
 )
 
@@ -85,6 +86,9 @@ type Profile struct {
 
 	// VNC-specific configuration
 	VNC *VNCConfig `json:"vnc,omitempty"`
+
+	// IRC-specific configuration
+	IRC *IRCConfig `json:"irc,omitempty"`
 }
 
 // SSHConfig holds SSH-specific settings for a connection profile.
@@ -102,9 +106,9 @@ type SSHConfig struct {
 	AgentForwarding   bool              `json:"agentForwarding"`   // forward agent to remote host
 	AutoReconnect     bool              `json:"autoReconnect"`     // reconnect on unexpected disconnect
 	MaxReconnectTries int               `json:"maxReconnectTries"` // 0 = use default (5)
-	LoginScripts      []LoginScriptStep `json:"loginScripts"`     // expect-style auto-login sequence
-	TOTPSecret        string            `json:"totpSecret"`       // TOTP secret key for 2FA auto-fill (stored encrypted)
-	ProxyType         string            `json:"proxyType"`        // "none", "socks5", "http"
+	LoginScripts      []LoginScriptStep `json:"loginScripts"`      // expect-style auto-login sequence
+	TOTPSecret        string            `json:"totpSecret"`        // TOTP secret key for 2FA auto-fill (stored encrypted)
+	ProxyType         string            `json:"proxyType"`         // "none", "socks5", "http"
 	ProxyHost         string            `json:"proxyHost"`
 	ProxyPort         int               `json:"proxyPort"`
 	ProxyUsername     string            `json:"proxyUsername"`
@@ -144,12 +148,12 @@ const (
 type PortForward struct {
 	ID        string               `json:"id"`
 	Direction PortForwardDirection `json:"direction"`
-	BindHost  string               `json:"bindHost"`  // local address to listen on (local) or remote bind (remote)
+	BindHost  string               `json:"bindHost"` // local address to listen on (local) or remote bind (remote)
 	BindPort  int                  `json:"bindPort"`
-	DestHost  string               `json:"destHost"`  // target address to forward to
+	DestHost  string               `json:"destHost"` // target address to forward to
 	DestPort  int                  `json:"destPort"`
-	Enabled   bool                 `json:"enabled"`   // whether to activate on connect
-	Label     string               `json:"label"`     // optional descriptive label
+	Enabled   bool                 `json:"enabled"` // whether to activate on connect
+	Label     string               `json:"label"`   // optional descriptive label
 }
 
 // TelnetConfig holds Telnet-specific settings for a connection profile.
@@ -162,7 +166,7 @@ type TelnetConfig struct {
 	LineMode          bool              `json:"lineMode"`
 	AutoReconnect     bool              `json:"autoReconnect"`     // reconnect on unexpected disconnect
 	MaxReconnectTries int               `json:"maxReconnectTries"` // 0 = use default (5)
-	LoginScripts      []LoginScriptStep `json:"loginScripts"`     // expect-style auto-login sequence
+	LoginScripts      []LoginScriptStep `json:"loginScripts"`      // expect-style auto-login sequence
 }
 
 // RAWConfig holds RAW TCP-specific settings for a connection profile.
@@ -221,33 +225,71 @@ type VNCConfig struct {
 	SharedSession bool `json:"sharedSession"`
 
 	// SSH tunnel settings — if enabled, VNC traffic is tunnelled through an SSH connection.
-	SSHTunnel       bool       `json:"sshTunnel"`
-	SSHHost         string     `json:"sshHost"`
-	SSHPort         int        `json:"sshPort"`
-	SSHUsername     string     `json:"sshUsername"`
-	SSHAuthMethod   string     `json:"sshAuthMethod"`   // password, publickey
-	SSHSecretMode   SecretMode `json:"sshSecretMode"`
-	SSHPrivateKey   string     `json:"sshPrivateKeyPath"`
-	SSHAgentAuth    bool       `json:"sshAgentAuth"`
+	SSHTunnel     bool       `json:"sshTunnel"`
+	SSHHost       string     `json:"sshHost"`
+	SSHPort       int        `json:"sshPort"`
+	SSHUsername   string     `json:"sshUsername"`
+	SSHAuthMethod string     `json:"sshAuthMethod"` // password, publickey
+	SSHSecretMode SecretMode `json:"sshSecretMode"`
+	SSHPrivateKey string     `json:"sshPrivateKeyPath"`
+	SSHAgentAuth  bool       `json:"sshAgentAuth"`
+}
+
+// IRCConfig holds IRC-specific settings for a connection profile.
+type IRCConfig struct {
+	// Nick is the primary nickname used when connecting to the IRC network.
+	Nick string `json:"nick"`
+
+	// RealName is the user-facing realname/gecos sent during registration.
+	RealName string `json:"realName"`
+
+	// UseTLS enables TLS for the IRC server connection.
+	UseTLS bool `json:"useTLS"`
+
+	// ServerPasswordRequired controls whether to prompt for an IRC server PASS secret.
+	ServerPasswordRequired bool       `json:"serverPasswordRequired"`
+	ServerPasswordMode     SecretMode `json:"serverPasswordMode"`
+
+	// NickServ settings. The password is resolved through the secret store.
+	NickServIdentify bool       `json:"nickServIdentify"`
+	NickServAccount  string     `json:"nickServAccount"`
+	NickServMode     SecretMode `json:"nickServMode"`
+
+	// AutoJoinRooms are joined automatically after registration.
+	AutoJoinRooms []string `json:"autoJoinRooms"`
+
+	// SSH tunnel settings — if enabled, IRC traffic is tunnelled through SSH.
+	SSHTunnel     bool       `json:"sshTunnel"`
+	SSHHost       string     `json:"sshHost"`
+	SSHPort       int        `json:"sshPort"`
+	SSHUsername   string     `json:"sshUsername"`
+	SSHAuthMethod string     `json:"sshAuthMethod"` // password, publickey
+	SSHSecretMode SecretMode `json:"sshSecretMode"`
+	SSHPrivateKey string     `json:"sshPrivateKeyPath"`
+	SSHAgentAuth  bool       `json:"sshAgentAuth"`
+
+	// Reconnect policy for unexpected disconnects.
+	AutoReconnect     bool `json:"autoReconnect"`
+	MaxReconnectTries int  `json:"maxReconnectTries"` // 0 = use default (5)
 }
 
 // GitHubRepo is a single repository returned to the frontend for display.
 type GitHubRepo struct {
-	FullName    string `json:"fullName"`
-	Name        string `json:"name"`
-	Owner       string `json:"owner"`
-	Description string `json:"description"`
-	HTMLURL     string `json:"htmlURL"`
-	DefaultBranch string `json:"defaultBranch"`
+	FullName        string `json:"fullName"`
+	Name            string `json:"name"`
+	Owner           string `json:"owner"`
+	Description     string `json:"description"`
+	HTMLURL         string `json:"htmlURL"`
+	DefaultBranch   string `json:"defaultBranch"`
 	LatestCommitter string `json:"latestCommitter"`
 	LatestCommitAt  string `json:"latestCommitAt"`
-	Private     bool   `json:"private"`
-	Fork        bool   `json:"fork"`
-	Archived    bool   `json:"archived"`
-	Language    string `json:"language"`
-	Stars       int    `json:"stars"`
-	PushedAt    string `json:"pushedAt"` // ISO 8601
-	UpdatedAt   string `json:"updatedAt"`
+	Private         bool   `json:"private"`
+	Fork            bool   `json:"fork"`
+	Archived        bool   `json:"archived"`
+	Language        string `json:"language"`
+	Stars           int    `json:"stars"`
+	PushedAt        string `json:"pushedAt"` // ISO 8601
+	UpdatedAt       string `json:"updatedAt"`
 }
 
 // SessionState represents the lifecycle state of a connection session.

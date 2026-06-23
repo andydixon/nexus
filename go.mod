@@ -8,6 +8,7 @@ require (
 	github.com/gorilla/websocket v1.5.3
 	github.com/hajimehoshi/go-mp3 v0.3.4
 	github.com/klauspost/compress v1.17.11
+	github.com/lrstanley/girc v1.1.1
 	github.com/mattn/go-sqlite3 v1.14.44
 	github.com/pkg/sftp v1.13.10
 	github.com/pquerna/otp v1.5.0

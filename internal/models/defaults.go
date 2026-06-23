@@ -13,6 +13,8 @@ const (
 	DefaultRAWPort    = 23
 	DefaultGitHubPort = 443
 	DefaultVNCPort    = 5900
+	DefaultIRCPort    = 6667
+	DefaultIRCTLSPort = 6697
 )
 
 // Default timeout values (in seconds).
@@ -122,6 +124,19 @@ func NewProfile(protocol Protocol) Profile {
 			SSHAuthMethod: "publickey",
 			SSHSecretMode: SecretModeSaved,
 		}
+	case ProtocolIRC:
+		p.Port = DefaultIRCPort
+		p.IRC = &IRCConfig{
+			Nick:               "nexus",
+			RealName:           "Nexus Terminal",
+			ServerPasswordMode: SecretModeAskEveryTime,
+			NickServMode:       SecretModeSaved,
+			AutoJoinRooms:      []string{},
+			SSHPort:            DefaultSSHPort,
+			SSHAuthMethod:      "publickey",
+			SSHSecretMode:      SecretModeSaved,
+			AutoReconnect:      true,
+		}
 	}
 
 	return p
@@ -186,6 +201,8 @@ func NormalizeProfileDefaults(p *Profile) {
 		normalizeGitHubConfig(p, defaults.GitHub)
 	case ProtocolVNC:
 		normalizeVNCConfig(p, defaults.VNC)
+	case ProtocolIRC:
+		normalizeIRCConfig(p, defaults.IRC)
 	}
 }
 
@@ -201,6 +218,8 @@ func defaultProfileName(p *Profile) string {
 		return "GitHub"
 	case ProtocolVNC:
 		return "VNC"
+	case ProtocolIRC:
+		return "IRC"
 	case ProtocolRAW:
 		return "RAW TCP"
 	case ProtocolTelnet:
@@ -331,6 +350,34 @@ func normalizeVNCConfig(p *Profile, defaults *VNCConfig) {
 	cfg.SecretMode = normalizeSecretMode(cfg.SecretMode, defaults.SecretMode)
 	if cfg.Quality < 0 {
 		cfg.Quality = defaults.Quality
+	}
+	if cfg.SSHPort == 0 {
+		cfg.SSHPort = defaults.SSHPort
+	}
+	if cfg.SSHAuthMethod == "" {
+		cfg.SSHAuthMethod = defaults.SSHAuthMethod
+	}
+	cfg.SSHSecretMode = normalizeSecretMode(cfg.SSHSecretMode, defaults.SSHSecretMode)
+}
+
+func normalizeIRCConfig(p *Profile, defaults *IRCConfig) {
+	if p.IRC == nil {
+		cfg := *defaults
+		cfg.AutoJoinRooms = append([]string{}, defaults.AutoJoinRooms...)
+		p.IRC = &cfg
+		return
+	}
+	cfg := p.IRC
+	if cfg.Nick == "" {
+		cfg.Nick = defaults.Nick
+	}
+	if cfg.RealName == "" {
+		cfg.RealName = defaults.RealName
+	}
+	cfg.ServerPasswordMode = normalizeSecretMode(cfg.ServerPasswordMode, defaults.ServerPasswordMode)
+	cfg.NickServMode = normalizeSecretMode(cfg.NickServMode, defaults.NickServMode)
+	if cfg.AutoJoinRooms == nil {
+		cfg.AutoJoinRooms = []string{}
 	}
 	if cfg.SSHPort == 0 {
 		cfg.SSHPort = defaults.SSHPort

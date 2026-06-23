@@ -35,6 +35,7 @@
       this.terminals = new TerminalManager(this);
       this.profileEditor = new ProfileEditor(this);
       this.rawViewer = new RawViewer(this);
+      window.NexusTerminal.IRCViewer?.setApp(this);
       this.settings = new Settings(this);
       this.commandPalette = new CommandPalette(this);
       this.secretPrompt = new SecretPrompt(this);
@@ -239,6 +240,7 @@
           setTimeout(fit, 50);
           setTimeout(fit, 300);
           setTimeout(fit, 800);
+          setTimeout(() => window.NexusTerminal.IRCViewer?.fit(payload.sessionID), 50);
         }
       });
 
@@ -286,6 +288,12 @@
           payload.sessionID,
           payload.wsURL,
         );
+      });
+
+      // IRC events
+      window.runtime.EventsOn("session:irc:event", (payload) => {
+        window.NexusTerminal.IRCViewer.handleEvent(payload);
+        this.tabs.markActivity(payload.sessionID);
       });
 
       // App-wide commands from the native menu
@@ -801,7 +809,12 @@
         const decision = await this._confirmReuseSession(profile, preferred);
         if (decision === "existing") {
           this.tabs.setActive(preferred.id);
-          if (preferred.protocol !== "raw" && preferred.protocol !== "github") {
+          if (
+            preferred.protocol !== "raw" &&
+            preferred.protocol !== "github" &&
+            preferred.protocol !== "vnc" &&
+            preferred.protocol !== "irc"
+          ) {
             this.terminals.focusTerminal(preferred.id);
           }
           return;
@@ -840,6 +853,15 @@
           const container = document.getElementById(panelId);
           if (container) {
             window.NexusTerminal.VNCViewer.createViewer(
+              sessionInfo.id,
+              container,
+              profile,
+            );
+          }
+        } else if (profile.protocol === "irc") {
+          const container = document.getElementById(panelId);
+          if (container) {
+            window.NexusTerminal.IRCViewer.createViewer(
               sessionInfo.id,
               container,
               profile,
@@ -901,6 +923,7 @@
                             <option value="ssh">SSH</option>
                             <option value="telnet">Telnet</option>
                             <option value="raw">RAW TCP</option>
+                            <option value="irc">IRC</option>
                         </select>
                     </div>
                     <div class="form-group">
@@ -914,6 +937,10 @@
                     <div class="form-group qc-username-group">
                         <label class="form-label">Username</label>
                         <input class="form-input qc-username" type="text" placeholder="root" />
+                    </div>
+                    <div class="form-group qc-nick-group" style="display:none">
+                        <label class="form-label">Nick</label>
+                        <input class="form-input qc-nick" type="text" value="nexus" />
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -931,14 +958,17 @@
         const protocolSelect = modal.querySelector(".qc-protocol");
         const portInput = modal.querySelector(".qc-port");
         const usernameGroup = modal.querySelector(".qc-username-group");
+        const nickGroup = modal.querySelector(".qc-nick-group");
         const hostInput = modal.querySelector(".qc-host");
 
         // Update port default and username visibility when protocol changes
         protocolSelect.addEventListener("change", () => {
           const proto = protocolSelect.value;
-          const defaultPorts = { ssh: 22, telnet: 23, raw: 23 };
+          const defaultPorts = { ssh: 22, telnet: 23, raw: 23, irc: 6667 };
           portInput.value = defaultPorts[proto] || 22;
-          usernameGroup.style.display = proto === "ssh" ? "" : "none";
+          usernameGroup.style.display =
+            proto === "ssh" || proto === "irc" ? "" : "none";
+          nickGroup.style.display = proto === "irc" ? "" : "none";
         });
 
         const close = (value) => {
@@ -965,6 +995,7 @@
             host,
             port: parseInt(portInput.value, 10) || 22,
             username: modal.querySelector(".qc-username").value.trim(),
+            nick: modal.querySelector(".qc-nick").value.trim(),
           });
         });
         backdrop.addEventListener("click", (e) => {
@@ -989,6 +1020,13 @@
           displayName: result.host,
           tags: [],
         };
+        if (result.protocol === "irc") {
+          profile.irc = {
+            nick: result.nick || "nexus",
+            realName: "Nexus Terminal",
+            autoJoinRooms: [],
+          };
+        }
         const sessionInfo = await window.NexusTerminal.wailsService.ConnectQuick(profile);
         this.state.addSession(sessionInfo);
         this.tabs.addTab(sessionInfo);
@@ -999,6 +1037,15 @@
             protocol: "raw",
             raw: {},
           });
+        } else if (result.protocol === "irc") {
+          const container = document.getElementById(panelId);
+          if (container) {
+            window.NexusTerminal.IRCViewer.createViewer(
+              sessionInfo.id,
+              container,
+              profile,
+            );
+          }
         } else {
           this.terminals.createTerminal(sessionInfo.id, panelId, {
             protocol: result.protocol,

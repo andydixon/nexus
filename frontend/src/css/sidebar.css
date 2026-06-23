@@ -304,6 +304,9 @@
 .sidebar-item .protocol-indicator.proto-vnc::before {
   content: "⊞";
 }
+.sidebar-item .protocol-indicator.proto-irc::before {
+  content: "#";
+}
 .sidebar-item .protocol-indicator.proto-local::before {
   content: "›_";
 }
@@ -327,6 +330,10 @@
 .sidebar-item .protocol-indicator.proto-vnc {
   background: rgba(232, 93, 74, 0.18);
   color: var(--protocol-vnc);
+}
+.sidebar-item .protocol-indicator.proto-irc {
+  background: rgba(216, 178, 76, 0.18);
+  color: var(--protocol-irc);
 }
 .sidebar-item .protocol-indicator.proto-local {
   background: rgba(139, 195, 74, 0.18);
