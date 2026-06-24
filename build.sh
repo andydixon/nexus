@@ -200,7 +200,7 @@ build() {
     version="$(build_version)"
     local tags
     tags="$(build_tags)"
-    nexus_configure_release_cgo
+    nexus_configure_pure_go_build
     local build_args=("-trimpath")
     if nexus_bool_enabled "${NEXUS_COMPRESS:-0}"; then
         if nexus_skips_upx_for_target "$(host_os)"; then

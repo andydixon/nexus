@@ -179,31 +179,6 @@ host_arch() {
     esac
 }
 
-pick_cc() {
-    local target_os="$1"
-    local target_arch="$2"
-
-    if [ "$target_os" = "windows" ]; then
-        if [ "$target_arch" = "amd64" ]; then
-            echo "x86_64-w64-mingw32-gcc"
-        else
-            echo "aarch64-w64-mingw32-gcc"
-        fi
-        return
-    fi
-
-    if [ "$target_os" = "linux" ]; then
-        if [ "$target_arch" = "amd64" ]; then
-            echo "x86_64-linux-gnu-gcc"
-        else
-            echo "aarch64-linux-gnu-gcc"
-        fi
-        return
-    fi
-
-    echo ""
-}
-
 build_target() {
     local target_os="$1"
     local target_arch="$2"
@@ -211,7 +186,7 @@ build_target() {
     local host_arch_value="$4"
     local version="$5"
     local platform="${target_os}/${target_arch}"
-    nexus_configure_release_cgo
+    nexus_configure_pure_go_build
     local ldflags
     ldflags="$(build_ldflags "${version}")"
     local tags
@@ -235,29 +210,14 @@ build_target() {
     fi
     build_args+=("-ldflags" "$ldflags")
 
-    local cc=""
-
     if [ "$target_os" = "linux" ] && ! linux_deps_ok; then
         warn "Skipping ${platform} (missing Linux GTK/WebKit build dependencies)"
         ((SKIPPED_TARGETS += 1))
         return 0
     fi
 
-    if [ "$target_os" != "$host" ] || [ "$target_arch" != "$host_arch_value" ]; then
-        cc="$(pick_cc "$target_os" "$target_arch")"
-        if [ -n "$cc" ] && ! command -v "$cc" >/dev/null 2>&1; then
-            warn "Skipping ${platform} (missing C compiler: ${cc})"
-            ((SKIPPED_TARGETS += 1))
-            return 0
-        fi
-    fi
-
     log "Building ${platform}…"
-    if [ -n "$cc" ]; then
-        CC="$cc" CGO_ENABLED=1 wails_cmd build "${build_args[@]}"
-    else
-        CGO_ENABLED=1 wails_cmd build "${build_args[@]}"
-    fi
+    CGO_ENABLED=0 wails_cmd build "${build_args[@]}"
     ((BUILT_TARGETS += 1))
 }
 

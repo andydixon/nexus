@@ -35,10 +35,6 @@ function Check-Deps {
     Write-Info "Node:  $(& node --version)"
     Write-Info "Wails: $(& $wailsPath version | Select-Object -First 1)"
 
-    if (-not (Get-Command gcc -ErrorAction SilentlyContinue)) {
-        Write-Warn 'gcc not found. SQLite requires cgo + a C compiler (e.g. MSYS2 mingw-w64).'
-    }
-
     return $wailsPath
 }
 
@@ -91,9 +87,9 @@ function Build {
     $version = Get-BuildVersion
     $ldflags = Get-Ldflags $version
 
-    $env:CGO_ENABLED = '1'
-    if (-not $env:CGO_CFLAGS) { $env:CGO_CFLAGS = '-O2 -g0' }
-    if (-not $env:CGO_CXXFLAGS) { $env:CGO_CXXFLAGS = '-O2 -g0' }
+    $env:CGO_ENABLED = '0'
+    Remove-Item Env:CGO_CFLAGS -ErrorAction SilentlyContinue
+    Remove-Item Env:CGO_CXXFLAGS -ErrorAction SilentlyContinue
 
     $buildArgs = @('build', '-trimpath')
     if (Test-BoolEnabled $env:NEXUS_COMPRESS) {
@@ -107,7 +103,7 @@ function Build {
     }
     $buildArgs += @('-ldflags', $ldflags)
 
-    Write-Info 'Building production binary (CGO_ENABLED=1)...'
+    Write-Info 'Building production binary (CGO_ENABLED=0)...'
     & $wailsPath @buildArgs
     Write-Info 'Build complete: build\bin\'
 }

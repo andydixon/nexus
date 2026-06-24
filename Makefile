@@ -37,11 +37,11 @@ dev: deps
 
 # Production build
 build: deps
-	CGO_CFLAGS="$${CGO_CFLAGS:--O2 -g0}" CGO_CXXFLAGS="$${CGO_CXXFLAGS:--O2 -g0}" $(WAILS) build -trimpath -ldflags "-s -w -buildid= -X github.com/andydixon/nexus/internal/api.appVersion=$(VERSION) $(LD_UPDATE_URL)"
+	CGO_ENABLED=0 $(WAILS) build -trimpath -ldflags "-s -w -buildid= -X github.com/andydixon/nexus/internal/api.appVersion=$(VERSION) $(LD_UPDATE_URL)"
 
 # Production build with UPX compression
 build-compressed: deps upx-check
-	CGO_CFLAGS="$${CGO_CFLAGS:--O2 -g0}" CGO_CXXFLAGS="$${CGO_CXXFLAGS:--O2 -g0}" $(WAILS) build -trimpath -upx $(if $(UPX_FLAGS),-upxflags "$(UPX_FLAGS)",) -ldflags "-s -w -buildid= -X github.com/andydixon/nexus/internal/api.appVersion=$(VERSION) $(LD_UPDATE_URL)"
+	CGO_ENABLED=0 $(WAILS) build -trimpath -upx $(if $(UPX_FLAGS),-upxflags "$(UPX_FLAGS)",) -ldflags "-s -w -buildid= -X github.com/andydixon/nexus/internal/api.appVersion=$(VERSION) $(LD_UPDATE_URL)"
 
 # Run tests
 test:

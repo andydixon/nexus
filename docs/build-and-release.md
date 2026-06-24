@@ -53,17 +53,9 @@ Build a packaged release for the current host platform:
 
 By default, `./release.sh` now builds only the current host OS/architecture. On this Ubuntu 24.04 `amd64` host that means `linux/amd64`.
 
-## Optional cross-compilers
+## Optional cross-target builds
 
-If you want to add extra Linux/Windows targets from Ubuntu, install the relevant cross-compiler packages first:
-
-```bash
-sudo apt-get install -y \
-  gcc-aarch64-linux-gnu \
-  gcc-mingw-w64-x86-64
-```
-
-Then request explicit targets:
+The release scripts disable CGO and use a pure-Go SQLite driver, so Linux and Windows cross-targets no longer need C cross-compilers for the application backend. Request explicit targets with:
 
 ```bash
 NEXUS_RELEASE_TARGETS=linux/amd64,windows/amd64 ./release.sh
@@ -72,6 +64,5 @@ NEXUS_RELEASE_TARGETS=linux/amd64,windows/amd64 ./release.sh
 ## Platform caveats
 
 - macOS targets cannot be cross-built from Linux with Wails. Build those on macOS.
-- `windows/arm64` is not covered by the default Ubuntu toolchain here.
-- `linux/arm64` needs more than `gcc-aarch64-linux-gnu`; it also needs an `arm64` sysroot and target GTK/WebKit development libraries for CGO to link cleanly.
-- Tested on Ubuntu 24.04 `amd64`: `linux/amd64` and `windows/amd64` build successfully; `linux/arm64` does not in the default host setup above.
+- Cross-target support still depends on Wails and frontend packaging support for the requested platform.
+- Tested on Ubuntu 24.04 `amd64`: `linux/amd64` and `windows/amd64` build successfully.

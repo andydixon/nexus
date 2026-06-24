@@ -29,9 +29,10 @@ nexus_skips_upx_for_target() {
     ! nexus_bool_enabled "${NEXUS_FORCE_MACOS_UPX:-0}"
 }
 
-nexus_configure_release_cgo() {
-    export CGO_CFLAGS="${CGO_CFLAGS:--O2 -g0}"
-    export CGO_CXXFLAGS="${CGO_CXXFLAGS:--O2 -g0}"
+nexus_configure_pure_go_build() {
+    export CGO_ENABLED=0
+    unset CGO_CFLAGS
+    unset CGO_CXXFLAGS
 }
 
 nexus_build_tags() {

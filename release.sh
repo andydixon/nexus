@@ -132,39 +132,6 @@ ensure_upx() {
     exit 1
 }
 
-pick_cc() {
-    local target_os="$1"
-    local target_arch="$2"
-
-    if [ "$target_os" = "windows" ]; then
-        if command -v zig >/dev/null 2>&1; then
-            echo "zig:${target_arch}"
-            return
-        fi
-        if [ "$target_arch" = "amd64" ]; then
-            echo "x86_64-w64-mingw32-gcc"
-        else
-            echo "aarch64-w64-mingw32-gcc"
-        fi
-        return
-    fi
-
-    if [ "$target_os" = "linux" ]; then
-        if command -v zig >/dev/null 2>&1; then
-            echo "zig:${target_arch}"
-            return
-        fi
-        if [ "$target_arch" = "amd64" ]; then
-            echo "x86_64-linux-gnu-gcc"
-        else
-            echo "aarch64-linux-gnu-gcc"
-        fi
-        return
-    fi
-
-    echo ""
-}
-
 build_target() {
     local target_os="$1"
     local target_arch="$2"
@@ -172,24 +139,6 @@ build_target() {
     local out_dir="$4"
 
     local platform="${target_os}/${target_arch}"
-    local cc
-    cc="$(pick_cc "$target_os" "$target_arch")"
-
-    local zig_target=""
-    if [[ "$cc" == zig:* ]]; then
-        zig_target="${cc#zig:}"
-        if [ "$zig_target" = "amd64" ]; then
-            zig_target="x86_64"
-        elif [ "$zig_target" = "arm64" ]; then
-            zig_target="aarch64"
-        fi
-        cc="zig"
-    fi
-
-    if [ -n "$cc" ] && ! command -v "$cc" >/dev/null 2>&1; then
-        warn "Skipping ${platform} (missing C compiler: ${cc})"
-        return 0
-    fi
 
     local output_base="NexusTerminal-${target_os}-${target_arch}"
     local output_path
@@ -202,7 +151,7 @@ build_target() {
     fi
 
     log "Building ${platform}..."
-    nexus_configure_release_cgo
+    nexus_configure_pure_go_build
     local ldflags
     ldflags="$(build_ldflags "$version")"
     local tags
@@ -220,24 +169,9 @@ build_target() {
         build_args+=("-tags" "$tags")
     fi
     build_args+=("-ldflags" "$ldflags" "-o" "$output_path")
-    if [ -n "$cc" ]; then
-        local cc_cmd="$cc"
-        if [ -n "$zig_target" ]; then
-            if [ "$target_os" = "linux" ]; then
-                cc_cmd="zig cc -target ${zig_target}-linux-gnu"
-            elif [ "$target_os" = "windows" ]; then
-                cc_cmd="zig cc -target ${zig_target}-windows-gnu"
-            fi
-        fi
-        if ! CC="$cc_cmd" CGO_ENABLED=1 wails build "${build_args[@]}"; then
-            warn "Build failed for ${platform}"
-            return 1
-        fi
-    else
-        if ! CGO_ENABLED=1 wails build "${build_args[@]}"; then
-            warn "Build failed for ${platform}"
-            return 1
-        fi
+    if ! CGO_ENABLED=0 wails build "${build_args[@]}"; then
+        warn "Build failed for ${platform}"
+        return 1
     fi
 
     local expected_path=""

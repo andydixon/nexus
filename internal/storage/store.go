@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 
 	"github.com/andydixon/nexus/internal/models"
 	"github.com/andydixon/nexus/internal/storage/migrations"
@@ -25,12 +25,16 @@ type Store struct {
 // NewStore opens (or creates) the SQLite database at dbPath, applies any
 // pending migrations, and returns an initialised Store.
 func NewStore(dbPath string) (*Store, error) {
-	db, err := sql.Open("sqlite3", dbPath+"?_journal_mode=WAL&_busy_timeout=5000")
+	db, err := sql.Open("sqlite", dbPath)
 	if err != nil {
 		return nil, fmt.Errorf("storage: failed to open database: %w", err)
 	}
 	if err := db.Ping(); err != nil {
 		return nil, fmt.Errorf("storage: database not reachable: %w", err)
+	}
+	if err := configureSQLite(db); err != nil {
+		_ = db.Close()
+		return nil, err
 	}
 
 	s := &Store{db: db}
@@ -38,6 +42,18 @@ func NewStore(dbPath string) (*Store, error) {
 		return nil, fmt.Errorf("storage: migration failed: %w", err)
 	}
 	return s, nil
+}
+
+func configureSQLite(db *sql.DB) error {
+	db.SetMaxOpenConns(1)
+
+	if _, err := db.Exec("PRAGMA busy_timeout = 5000"); err != nil {
+		return fmt.Errorf("storage: failed to set SQLite busy timeout: %w", err)
+	}
+	if _, err := db.Exec("PRAGMA journal_mode = WAL"); err != nil {
+		return fmt.Errorf("storage: failed to enable SQLite WAL mode: %w", err)
+	}
+	return nil
 }
 
 // Close shuts down the database connection.
