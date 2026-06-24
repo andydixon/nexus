@@ -52,6 +52,11 @@ type Session struct {
 	reconnectCount int                 // number of reconnection attempts so far
 	cancelReconn   context.CancelFunc  // cancels an in-progress reconnect backoff
 
+	// Latest terminal geometry received before a PTY-capable client is attached.
+	// The frontend can know the correct size before SSH/Telnet/local setup finishes.
+	pendingResizeCols int
+	pendingResizeRows int
+
 	// Login script support — temporary buffer for expect-style matching.
 	loginBuf   []byte
 	loginBufMu sync.Mutex
@@ -74,8 +79,8 @@ type Manager struct {
 	hostKeyMu                 sync.Mutex
 	hostKeyChans              map[string]chan bool
 	hostKeyListenerRegistered bool
-	secretMu                 sync.Mutex
-	secretChans              map[string]chan string
+	secretMu                  sync.Mutex
+	secretChans               map[string]chan string
 }
 
 // NewManager creates a Manager wired to the given backing services.
@@ -270,7 +275,11 @@ func (m *Manager) ConnectLocal(shell string) (string, error) {
 			return
 		}
 
+		m.mu.Lock()
 		sess.localClient = client
+		cols, rows := sess.consumePendingResizeLocked()
+		m.mu.Unlock()
+		applyLocalResize(client, cols, rows)
 
 		m.mu.Lock()
 		sess.Info.State = models.SessionConnected
@@ -373,24 +382,64 @@ func (m *Manager) WriteToSession(sessionID string, data []byte) error {
 
 // ResizeSession sends a terminal resize to a session.
 func (m *Manager) ResizeSession(sessionID string, cols, rows int) error {
-	m.mu.RLock()
+	m.mu.Lock()
 	sess, ok := m.sessions[sessionID]
-	m.mu.RUnlock()
-
 	if !ok {
+		m.mu.Unlock()
 		return fmt.Errorf("sessions: session %q not found", sessionID)
 	}
 
+	sshClient := sess.sshClient
+	telnetClient := sess.telnetClient
+	localClient := sess.localClient
+	isRaw := sess.rawClient != nil || (sess.profile != nil && sess.profile.Protocol == models.ProtocolRAW)
+	if sshClient == nil && telnetClient == nil && localClient == nil && !isRaw {
+		sess.pendingResizeCols = cols
+		sess.pendingResizeRows = rows
+	}
+	m.mu.Unlock()
+
 	switch {
-	case sess.sshClient != nil:
-		return sess.sshClient.Resize(cols, rows)
-	case sess.telnetClient != nil:
-		return sess.telnetClient.Resize(cols, rows)
-	case sess.localClient != nil:
-		return sess.localClient.Resize(uint16(cols), uint16(rows))
+	case sshClient != nil:
+		return sshClient.Resize(cols, rows)
+	case telnetClient != nil:
+		return telnetClient.Resize(cols, rows)
+	case localClient != nil:
+		return localClient.Resize(uint16(cols), uint16(rows))
 	}
 	// RAW sessions have no concept of terminal size.
 	return nil
+}
+
+// consumePendingResizeLocked returns and clears the latest pre-connect geometry.
+// m.mu must be held by the caller.
+func (sess *Session) consumePendingResizeLocked() (int, int) {
+	cols := sess.pendingResizeCols
+	rows := sess.pendingResizeRows
+	sess.pendingResizeCols = 0
+	sess.pendingResizeRows = 0
+	return cols, rows
+}
+
+func applySSHResize(client *sshclient.Client, cols, rows int) {
+	if cols <= 0 || rows <= 0 {
+		return
+	}
+	_ = client.Resize(cols, rows)
+}
+
+func applyTelnetResize(client *telnetclient.Client, cols, rows int) {
+	if cols <= 0 || rows <= 0 {
+		return
+	}
+	_ = client.Resize(cols, rows)
+}
+
+func applyLocalResize(client *localshell.Client, cols, rows int) {
+	if cols <= 0 || rows <= 0 {
+		return
+	}
+	_ = client.Resize(uint16(cols), uint16(rows))
 }
 
 // GetSessionCwd returns a best-effort working directory for SSH sessions.
@@ -750,7 +799,11 @@ func (m *Manager) connectSSH(sess *Session, getSecret func(prompt string) (strin
 		return err
 	}
 
+	m.mu.Lock()
 	sess.sshClient = client
+	cols, rows := sess.consumePendingResizeLocked()
+	m.mu.Unlock()
+	applySSHResize(client, cols, rows)
 
 	// Start any port-forwarding rules configured in the profile.
 	if sshConf != nil && len(sshConf.PortForwards) > 0 {
@@ -849,7 +902,11 @@ func (m *Manager) connectTelnet(sess *Session) error {
 		return err
 	}
 
+	m.mu.Lock()
 	sess.telnetClient = client
+	cols, rows := sess.consumePendingResizeLocked()
+	m.mu.Unlock()
+	applyTelnetResize(client, cols, rows)
 
 	// Execute login scripts if configured.
 	telConf := profile.Telnet

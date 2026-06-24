@@ -29,6 +29,7 @@ done
 
 cp "$ROOT_DIR/frontend/dist/src/js/lib/xterm.min.js" "$VSCODE_DIR/nexus/media/xterm.min.js"
 cp "$ROOT_DIR/frontend/dist/src/js/lib/xterm-addon-fit.min.js" "$VSCODE_DIR/nexus/media/xterm-addon-fit.min.js"
+cp "$ROOT_DIR/frontend/dist/src/js/lib/xterm-addon-unicode11.min.js" "$VSCODE_DIR/nexus/media/xterm-addon-unicode11.min.js"
 cp "$ROOT_DIR/frontend/dist/src/css/lib/xterm.css" "$VSCODE_DIR/nexus/media/xterm.css"
 cp "$ROOT_DIR/frontend/dist/src/js/lib/novnc.min.js" "$VSCODE_DIR/nexus/media/novnc.min.js"
 

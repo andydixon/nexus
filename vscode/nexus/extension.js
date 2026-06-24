@@ -336,7 +336,7 @@ class ConnectionsProvider {
     }
     .actions {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
+      grid-template-columns: repeat(var(--action-count, 3), minmax(0, 1fr));
       border-top: 1px solid var(--vscode-panel-border);
     }
     .actions button {
@@ -355,7 +355,6 @@ class ConnectionsProvider {
       text-align: center;
       color: var(--vscode-descriptionForeground);
     }
-    .status { color: var(--vscode-descriptionForeground); font-size: 11px; min-height: 15px; }
   </style>
 </head>
 <body>
@@ -373,7 +372,6 @@ class ConnectionsProvider {
     <div id="segments" class="segments"></div>
     <div id="stats" class="stats"></div>
     <div id="list"></div>
-    <div id="status" class="status"></div>
   </div>
   <script nonce="${nonce}">
     const vscode = acquireVsCodeApi();
@@ -381,7 +379,6 @@ class ConnectionsProvider {
     let filter = 'all';
     const protocols = ['all', 'ssh', 'telnet', 'raw', 'github', 'vnc', 'irc'];
     const search = document.getElementById('search');
-    const status = document.getElementById('status');
     function esc(value) {
       return String(value == null ? '' : value).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
     }
@@ -428,10 +425,13 @@ class ConnectionsProvider {
     }
     function card(profile) {
       const tags = (profile.tags || []).slice(0, 4).map(tag => '<span class="tag">' + esc(tag) + '</span>').join('');
-      const sftp = profile.protocol === 'ssh' ? '<button data-action="sftp">SFTP</button>' : '<button data-action="duplicate">Copy</button>';
+      const isSSH = profile.protocol === 'ssh';
+      const actions = isSSH
+        ? '<div class="actions" style="--action-count: 4"><button data-action="connect" title="Open SSH terminal">SSH</button><button data-action="sftp" title="Open SFTP browser">SFTP</button><button data-action="edit" title="Edit profile">✏️</button><button data-action="delete" title="Delete profile">🗑️</button></div>'
+        : '<div class="actions"><button data-action="connect">Open</button><button data-action="edit" title="Edit profile">✏️</button><button data-action="delete" title="Delete profile">🗑️</button></div>';
       return '<article class="card" data-id="' + esc(profile.id) + '">' +
         '<div class="card-main" data-action="connect"><div class="proto">' + esc(protoLabel(profile.protocol)) + '</div><div><div class="title">' + esc(profile.displayName || profile.host || profile.id) + '</div><div class="meta">' + esc(detail(profile)) + '</div>' + (tags ? '<div class="tags">' + tags + '</div>' : '') + '</div></div>' +
-        '<div class="actions"><button data-action="connect">Open</button><button data-action="edit">Edit</button>' + sftp + '<button data-action="delete">Delete</button></div>' +
+        actions +
       '</article>';
     }
     function render() {
@@ -443,7 +443,6 @@ class ConnectionsProvider {
       if (!visible.length) {
         root.innerHTML = '<div class="empty">No matching connections<br><br><button class="primary" data-empty-new>New profile</button></div>';
         root.querySelector('[data-empty-new]').onclick = () => vscode.postMessage({ type: 'new', protocol: 'ssh' });
-        status.textContent = '';
         return;
       }
       const groups = new Map();
@@ -457,7 +456,6 @@ class ConnectionsProvider {
         '<div class="group-title"><span>' + esc(name) + '</span><span>' + items.length + '</span></div>' +
         items.sort((a, b) => String(a.displayName || a.host).localeCompare(String(b.displayName || b.host))).map(card).join('')
       ).join('');
-      status.textContent = visible.length + ' connection' + (visible.length === 1 ? '' : 's');
     }
     document.getElementById('new').onclick = () => vscode.postMessage({ type: 'new', protocol: filter === 'all' ? 'ssh' : filter });
     document.getElementById('settings').onclick = () => vscode.postMessage({ type: 'settings' });
@@ -473,7 +471,7 @@ class ConnectionsProvider {
     window.addEventListener('message', event => {
       const msg = event.data || {};
       if (msg.type === 'profiles') { profiles = msg.profiles || []; render(); }
-      if (msg.type === 'error') status.textContent = msg.error || '';
+      if (msg.type === 'error') console.error(msg.error || '');
     });
     vscode.postMessage({ type: 'refresh' });
   </script>
@@ -512,9 +510,19 @@ class TerminalPanel {
         await this.bridge.rpc('WriteSession', [this.session.id, msg.data]);
       } else if (msg.type === 'resize') {
         await this.bridge.rpc('ResizeSession', [this.session.id, msg.cols, msg.rows]);
+      } else if (msg.type === 'reconnect') {
+        const oldSessionID = this.session.id;
+        const protocol = String(this.profile.protocol || this.session.protocol || '').toLowerCase();
+        const session = protocol === 'local'
+          ? await this.bridge.rpc('ConnectLocal')
+          : await this.bridge.rpc('ConnectSession', [this.profile.id]);
+        this.session = session;
+        this.panel.title = session.tabName || session.profileName || this.panel.title;
+        this.panel.webview.postMessage({ type: 'state', text: 'connecting' });
+        this.bridge.rpc('DisconnectSession', [oldSessionID]).catch(() => {});
       }
     } catch (err) {
-      this.panel.webview.postMessage({ type: 'status', text: err.message });
+      this.panel.webview.postMessage({ type: 'state', text: err.message || String(err) });
     }
   }
 
@@ -524,10 +532,10 @@ class TerminalPanel {
       this.panel.webview.postMessage({ type: 'data', data: payload.data });
     }
     if (evt.name === 'session:state' && payload.sessionID === this.session.id) {
-      this.panel.webview.postMessage({ type: 'status', text: payload.error || payload.state });
+      this.panel.webview.postMessage({ type: 'state', text: payload.error || payload.state });
     }
     if (evt.name === 'session:closed' && payload.sessionID === this.session.id) {
-      this.panel.webview.postMessage({ type: 'status', text: 'disconnected' });
+      this.panel.webview.postMessage({ type: 'state', text: 'disconnected' });
     }
   }
 
@@ -536,6 +544,7 @@ class TerminalPanel {
     const mediaRoot = vscode.Uri.file(path.join(this.context.extensionPath, 'media'));
     const xtermJs = webview.asWebviewUri(vscode.Uri.joinPath(mediaRoot, 'xterm.min.js'));
     const fitJs = webview.asWebviewUri(vscode.Uri.joinPath(mediaRoot, 'xterm-addon-fit.min.js'));
+    const unicodeJs = webview.asWebviewUri(vscode.Uri.joinPath(mediaRoot, 'xterm-addon-unicode11.min.js'));
     const xtermCss = webview.asWebviewUri(vscode.Uri.joinPath(mediaRoot, 'xterm.css'));
     const nonce = String(Date.now());
     const terminalFontFamily = JSON.stringify(this.profile.terminalFontFamily || '');
@@ -562,10 +571,24 @@ class TerminalPanel {
     #terminal {
       position: absolute;
       inset: 0;
-      padding: 4px 6px;
+      padding: 5px;
       box-sizing: border-box;
+      width: 100%;
+      height: 100%;
+      min-height: 0;
+      overflow: hidden;
     }
-    .xterm { height: 100%; }
+    #terminal .xterm {
+      width: 100%;
+      height: 100%;
+      min-height: 0;
+    }
+    #terminal .xterm-screen {
+      height: 100% !important;
+    }
+    #terminal .xterm-viewport {
+      height: 100%;
+    }
     .xterm-viewport::-webkit-scrollbar { width: 10px; }
     .xterm-viewport::-webkit-scrollbar-thumb {
       background: var(--vscode-scrollbarSlider-background, rgba(121, 121, 121, .4));
@@ -573,42 +596,80 @@ class TerminalPanel {
     .xterm-viewport::-webkit-scrollbar-thumb:hover {
       background: var(--vscode-scrollbarSlider-hoverBackground, rgba(100, 100, 100, .7));
     }
-    /* Floating, auto-hiding status pill following VSCode badge styling. */
-    #status {
-      position: absolute;
-      right: 12px;
-      top: 10px;
-      z-index: 3;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 2px 9px;
-      border-radius: 11px;
-      font: 11px/1.6 var(--vscode-font-family);
-      color: var(--vscode-badge-foreground);
-      background: var(--vscode-badge-background);
-      box-shadow: 0 1px 4px rgba(0, 0, 0, .35);
+    body.is-disconnected #terminal {
+      filter: blur(2px);
       pointer-events: none;
+    }
+    #disconnectOverlay {
+      position: absolute;
+      inset: 0;
+      z-index: 6;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(10, 14, 18, .68);
       opacity: 0;
-      transition: opacity .25s ease;
+      visibility: hidden;
+      transition: opacity .16s ease, visibility .16s ease;
     }
-    #status.show { opacity: 1; }
-    #status .dot {
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
-      background: var(--vscode-charts-yellow, #e2c08d);
+    body.is-disconnected #disconnectOverlay {
+      opacity: 1;
+      visibility: visible;
     }
-    #status.ok .dot { background: var(--vscode-charts-green, #89d185); }
-    #status.bad { color: var(--vscode-statusBarItem-errorForeground, #fff); background: var(--vscode-statusBarItem-errorBackground, #c72e2e); }
-    #status.bad .dot { background: currentColor; }
+    .disconnect-box {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      max-width: min(360px, calc(100vw - 32px));
+      padding: 18px 24px;
+      text-align: center;
+      color: var(--vscode-foreground);
+      background: var(--vscode-editorWidget-background, var(--vscode-panel-background));
+      border: 1px solid var(--vscode-editorWidget-border, var(--vscode-panel-border));
+      box-shadow: 0 8px 24px rgba(0, 0, 0, .32);
+    }
+    .disconnect-title {
+      font: 600 15px/1.35 var(--vscode-font-family);
+      letter-spacing: .45em;
+      text-indent: .45em;
+      text-transform: uppercase;
+    }
+    #disconnectMessage {
+      color: var(--vscode-descriptionForeground);
+      font-size: 12px;
+      line-height: 1.45;
+      max-width: 320px;
+      overflow-wrap: anywhere;
+    }
+    #reconnect {
+      border: 1px solid var(--vscode-button-border, transparent);
+      padding: 5px 14px;
+      color: var(--vscode-button-foreground);
+      background: var(--vscode-button-background);
+      cursor: pointer;
+    }
+    #reconnect:hover {
+      background: var(--vscode-button-hoverBackground, var(--vscode-button-background));
+    }
+    #reconnect:disabled {
+      cursor: default;
+      opacity: .7;
+    }
   </style>
 </head>
 <body>
-  <div id="status" class="show"><span class="dot"></span><span id="statusText">Connecting…</span></div>
   <div id="terminal"></div>
+  <div id="disconnectOverlay" aria-hidden="true">
+    <div class="disconnect-box">
+      <div class="disconnect-title">Disconnected</div>
+      <div id="disconnectMessage">Connection closed.</div>
+      <button id="reconnect" type="button">Reconnect</button>
+    </div>
+  </div>
   <script nonce="${nonce}" src="${xtermJs}"></script>
   <script nonce="${nonce}" src="${fitJs}"></script>
+  <script nonce="${nonce}" src="${unicodeJs}"></script>
   <script nonce="${nonce}">
     const vscode = acquireVsCodeApi();
 
@@ -651,12 +712,14 @@ class TerminalPanel {
     const fontFamily = ${terminalFontFamily}
       || cssVar('--vscode-terminal-font-family', '')
       || cssVar('--vscode-editor-font-family', 'Menlo, Monaco, "Cascadia Code", "Courier New", monospace');
+    const unicodeFontFallbacks = '"JetBrains Mono", "Cascadia Code", "Fira Code", Menlo, Monaco, Consolas, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", "Symbols Nerd Font", "PowerlineSymbols", monospace';
+    const resolvedFontFamily = [fontFamily, unicodeFontFallbacks].filter(Boolean).join(', ');
 
     const term = new Terminal({
       cursorBlink: true,
       cursorStyle: ${terminalCursorStyle},
       scrollback: ${terminalScrollback},
-      fontFamily,
+      fontFamily: resolvedFontFamily,
       fontSize: ${terminalFontSize},
       lineHeight: 1.1,
       letterSpacing: 0,
@@ -665,21 +728,49 @@ class TerminalPanel {
     });
     const fit = new FitAddon.FitAddon();
     term.loadAddon(fit);
+    try {
+      if (window.Unicode11Addon) {
+        const unicode11 = new Unicode11Addon.Unicode11Addon();
+        term.loadAddon(unicode11);
+        term.unicode.activeVersion = '11';
+      }
+    } catch (_) {
+      // Unicode width support is optional; font fallbacks still preserve glyph rendering.
+    }
     const container = document.getElementById('terminal');
     term.open(container);
 
     let lastCols = 0;
     let lastRows = 0;
-    // Push the current terminal geometry to the backend PTY. Pass force=true to
-    // re-send even when the dimensions are unchanged (needed right after the
-    // connection completes, since the remote PTY is created at a default size).
-    function resize(force) {
-      try { fit.fit(); } catch (_) { return; }
+    let resizeRaf = 0;
+
+    function sendResize(force) {
+      if (term.cols <= 0 || term.rows <= 0) return;
       if (force || term.cols !== lastCols || term.rows !== lastRows) {
         lastCols = term.cols;
         lastRows = term.rows;
         vscode.postMessage({ type: 'resize', cols: term.cols, rows: term.rows });
       }
+    }
+
+    // Push the current terminal geometry to the backend PTY. Pass force=true to
+    // re-send even when the dimensions are unchanged (needed right after the
+    // connection completes, since the remote PTY is created at a default size).
+    function resize(force) {
+      if (resizeRaf) cancelAnimationFrame(resizeRaf);
+      resizeRaf = requestAnimationFrame(() => {
+        resizeRaf = 0;
+        const rect = container.getBoundingClientRect();
+        if (rect.width <= 0 || rect.height <= 0) return;
+        try { fit.fit(); } catch (_) { return; }
+        sendResize(force);
+      });
+    }
+
+    function resizeBurst(force) {
+      resize(force);
+      setTimeout(() => resize(force), 60);
+      setTimeout(() => resize(force), 250);
     }
 
     // Refit whenever the tab/container changes size — handles splits, panel drags
@@ -689,39 +780,55 @@ class TerminalPanel {
     }
     window.addEventListener('resize', () => resize());
     document.addEventListener('visibilitychange', () => { if (!document.hidden) resize(); });
-    if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => resize());
-    requestAnimationFrame(() => resize());
-    setTimeout(() => resize(), 60);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => resizeBurst(true));
+    resizeBurst(true);
 
     term.focus();
-    term.onData(data => vscode.postMessage({ type: 'input', data: btoa(unescape(encodeURIComponent(data))) }));
+    const encoder = new TextEncoder();
+    function utf8ToBase64(value) {
+      const bytes = encoder.encode(value);
+      let binary = '';
+      for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+      return btoa(binary);
+    }
+    term.onData(data => vscode.postMessage({ type: 'input', data: utf8ToBase64(data) }));
 
-    const statusEl = document.getElementById('status');
-    const statusText = document.getElementById('statusText');
-    let hideTimer = null;
-    function setStatus(text) {
+    const reconnectButton = document.getElementById('reconnect');
+    const disconnectMessage = document.getElementById('disconnectMessage');
+    function setConnectionState(text) {
       const value = String(text || '').trim();
-      if (!value) return;
+      if (!value) return false;
       const lower = value.toLowerCase();
       const connected = /connect(ed)?$|ready|open|online/.test(lower) && !/dis|fail|error|refus|lost|closed/.test(lower);
-      const failed = /dis|fail|error|refus|lost|closed|timeout/.test(lower);
-      statusText.textContent = value.charAt(0).toUpperCase() + value.slice(1);
-      statusEl.classList.toggle('ok', connected && !failed);
-      statusEl.classList.toggle('bad', failed);
-      statusEl.classList.add('show');
-      clearTimeout(hideTimer);
-      // Healthy states fade out so they don't sit on top of the terminal; problems stay visible.
-      if (connected && !failed) hideTimer = setTimeout(() => statusEl.classList.remove('show'), 1600);
-      return connected && !failed;
+      const disconnected = /dis|fail|error|refus|lost|closed|timeout/.test(lower);
+      if (connected) {
+        document.body.classList.remove('is-disconnected');
+        reconnectButton.disabled = false;
+        reconnectButton.textContent = 'Reconnect';
+        return true;
+      }
+      if (disconnected) {
+        disconnectMessage.textContent = value.charAt(0).toUpperCase() + value.slice(1);
+        document.body.classList.add('is-disconnected');
+        reconnectButton.disabled = false;
+        reconnectButton.textContent = 'Reconnect';
+      }
+      return false;
     }
+    reconnectButton.addEventListener('click', () => {
+      reconnectButton.disabled = true;
+      reconnectButton.textContent = 'Reconnecting...';
+      disconnectMessage.textContent = 'Reconnecting...';
+      vscode.postMessage({ type: 'reconnect' });
+    });
 
     window.addEventListener('message', event => {
       const msg = event.data || {};
       if (msg.type === 'data') term.write(Uint8Array.from(atob(msg.data), c => c.charCodeAt(0)));
-      if (msg.type === 'status') {
+      if (msg.type === 'state') {
         // The remote PTY is allocated at a default size before our first resize
         // can land, so re-send the real geometry once the session is connected.
-        if (setStatus(msg.text)) { resize(true); setTimeout(() => resize(true), 250); }
+        if (setConnectionState(msg.text)) resizeBurst(true);
       }
     });
   </script>
