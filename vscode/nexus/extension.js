@@ -2,9 +2,14 @@
 
 const vscode = require('vscode');
 const cp = require('child_process');
+const crypto = require('crypto');
 const fs = require('fs');
 const http = require('http');
 const path = require('path');
+
+function createCSPNonce() {
+  return crypto.randomBytes(16).toString('base64');
+}
 
 class Bridge {
   constructor(context) {
@@ -211,7 +216,7 @@ class ConnectionsProvider {
   }
 
   html(webview) {
-    const nonce = String(Date.now());
+    const nonce = createCSPNonce();
     return `<!doctype html>
 <html>
 <head>
@@ -546,7 +551,7 @@ class TerminalPanel {
     const fitJs = webview.asWebviewUri(vscode.Uri.joinPath(mediaRoot, 'xterm-addon-fit.min.js'));
     const unicodeJs = webview.asWebviewUri(vscode.Uri.joinPath(mediaRoot, 'xterm-addon-unicode11.min.js'));
     const xtermCss = webview.asWebviewUri(vscode.Uri.joinPath(mediaRoot, 'xterm.css'));
-    const nonce = String(Date.now());
+    const nonce = createCSPNonce();
     const terminalFontFamily = JSON.stringify(this.profile.terminalFontFamily || '');
     const terminalFontSize = Number(this.profile.terminalFontSize || 13);
     const terminalScrollback = Number(this.profile.terminalScrollback || 10000);
@@ -887,7 +892,7 @@ class RawPanel {
   }
 
   html() {
-    const nonce = String(Date.now());
+    const nonce = createCSPNonce();
     return `<!doctype html>
 <html>
 <head>
@@ -1053,7 +1058,7 @@ class GitHubPanel {
   }
 
   html() {
-    const nonce = String(Date.now());
+    const nonce = createCSPNonce();
     return `<!doctype html>
 <html>
 <head>
@@ -1154,7 +1159,7 @@ class IRCPanel {
   }
 
   html() {
-    const nonce = String(Date.now());
+    const nonce = createCSPNonce();
     return `<!doctype html>
 <html>
 <head>
@@ -1252,7 +1257,7 @@ class VNCPanel {
     const webview = this.panel.webview;
     const mediaRoot = vscode.Uri.file(path.join(this.context.extensionPath, 'media'));
     const noVncJs = webview.asWebviewUri(vscode.Uri.joinPath(mediaRoot, 'novnc.min.js'));
-    const nonce = String(Date.now());
+    const nonce = createCSPNonce();
     const vncConfig = JSON.stringify((this.profile && this.profile.vnc) || {});
     return `<!doctype html>
 <html>
@@ -1367,7 +1372,7 @@ class ProfileEditorPanel {
   }
 
   html() {
-    const nonce = String(Date.now());
+    const nonce = createCSPNonce();
     const profileJson = JSON.stringify(this.profile);
     return `<!doctype html>
 <html>
@@ -1610,7 +1615,7 @@ class SettingsPanel {
   }
 
   html() {
-    const nonce = String(Date.now());
+    const nonce = createCSPNonce();
     return `<!doctype html>
 <html>
 <head>
@@ -1824,7 +1829,7 @@ class SFTPPanel {
   }
 
   html() {
-    const nonce = String(Date.now());
+    const nonce = createCSPNonce();
     return `<!doctype html>
 <html>
 <head>

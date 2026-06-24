@@ -47,6 +47,14 @@ type runtimeEventRequest struct {
 	Payload map[string]any `json:"payload"`
 }
 
+const (
+	bridgeReadHeaderTimeout = 5 * time.Second
+	bridgeReadTimeout       = 15 * time.Second
+	bridgeIdleTimeout       = 60 * time.Second
+	bridgeMaxHeaderBytes    = 16 << 10
+	bridgeMaxJSONBodyBytes  = 1 << 20
+)
+
 type eventBroker struct {
 	mu      sync.Mutex
 	clients map[chan []byte]struct{}
@@ -115,7 +123,7 @@ func main() {
 	mux.HandleFunc("/events", bridge.auth(token, bridge.handleEvents))
 	mux.HandleFunc("/runtime/event", bridge.auth(token, bridge.handleRuntimeEvent))
 
-	server := &http.Server{Handler: mux}
+	server := newBridgeHTTPServer(mux)
 	listener, err := net.Listen("tcp", *listenAddr)
 	if err != nil {
 		log.Fatalf("listen: %v", err)
@@ -207,7 +215,7 @@ func (a *bridgeApp) handleRPC(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req rpcRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := decodeLimitedJSON(w, r, &req); err != nil {
 		writeJSON(w, rpcResponse{Error: err.Error()})
 		return
 	}
@@ -225,7 +233,7 @@ func (a *bridgeApp) handleRuntimeEvent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req runtimeEventRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := decodeLimitedJSON(w, r, &req); err != nil {
 		writeJSON(w, rpcResponse{Error: err.Error()})
 		return
 	}
@@ -323,6 +331,21 @@ func randomToken() (string, error) {
 		return "", err
 	}
 	return hex.EncodeToString(b[:]), nil
+}
+
+func newBridgeHTTPServer(handler http.Handler) *http.Server {
+	return &http.Server{
+		Handler:           handler,
+		ReadHeaderTimeout: bridgeReadHeaderTimeout,
+		ReadTimeout:       bridgeReadTimeout,
+		IdleTimeout:       bridgeIdleTimeout,
+		MaxHeaderBytes:    bridgeMaxHeaderBytes,
+	}
+}
+
+func decodeLimitedJSON(w http.ResponseWriter, r *http.Request, dst any) error {
+	r.Body = http.MaxBytesReader(w, r.Body, bridgeMaxJSONBodyBytes)
+	return json.NewDecoder(r.Body).Decode(dst)
 }
 
 func writeJSON(w http.ResponseWriter, value any) {

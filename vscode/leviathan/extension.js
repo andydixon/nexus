@@ -2,9 +2,14 @@
 
 const vscode = require('vscode');
 const cp = require('child_process');
+const crypto = require('crypto');
 const fs = require('fs');
 const http = require('http');
 const path = require('path');
+
+function createCSPNonce() {
+  return crypto.randomBytes(16).toString('base64');
+}
 
 const TOOLS = [
   ['Editor', 'hex', 'Hex Editor', 'Browse and patch bytes in the working copy.'],
@@ -181,7 +186,7 @@ class ToolsView {
   }
 
   html(webview) {
-    const nonce = String(Date.now());
+    const nonce = createCSPNonce();
     const toolsJson = JSON.stringify(TOOLS);
     return `<!doctype html>
 <html>
@@ -489,7 +494,7 @@ class ToolPanel {
   }
 
   hexHtml(meta) {
-    const nonce = String(Date.now());
+    const nonce = createCSPNonce();
     const initialFileState = JSON.stringify(this.fileState || null);
     const name = escapeHtml(meta.name);
     return `<!doctype html>
@@ -765,7 +770,7 @@ class ToolPanel {
   }
 
   html(meta) {
-    const nonce = String(Date.now());
+    const nonce = createCSPNonce();
     const defaults = JSON.stringify(DEFAULTS[this.tool] || {});
     const initialFileState = JSON.stringify(this.fileState || null);
     const name = escapeHtml(meta.name);
