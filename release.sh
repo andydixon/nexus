@@ -295,8 +295,11 @@ main() {
     log "Building release ${version}..."
     : > "${out_dir}/.release-files"
 
-    local targets
-    mapfile -t targets < <(release_targets)
+    local targets=()
+    local selected_target
+    while IFS= read -r selected_target; do
+        [ -n "$selected_target" ] && targets+=("$selected_target")
+    done < <(release_targets)
     if [ "${#targets[@]}" -eq 0 ]; then
         err "No release targets selected."
         exit 1

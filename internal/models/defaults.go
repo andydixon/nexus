@@ -54,6 +54,7 @@ func DefaultAppPreferences() AppPreferences {
 		DefaultCursorStyle:  DefaultCursorStyle,
 		UseNativePaste:      false,
 		LocalShell:          "", // empty means use system default
+		LeviathanEnabled:    false,
 	}
 }
 

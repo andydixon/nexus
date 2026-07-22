@@ -3,9 +3,16 @@ package sessions
 import (
 	"crypto/ed25519"
 	"crypto/rand"
+	"encoding/base64"
+	"os"
 	"path/filepath"
+	"runtime"
+	"strings"
+	"sync"
 	"testing"
+	"time"
 
+	"github.com/andydixon/nexus/internal/audit"
 	"github.com/andydixon/nexus/internal/models"
 	"github.com/andydixon/nexus/internal/storage"
 	"golang.org/x/crypto/ssh"
@@ -152,6 +159,103 @@ func TestCloseAllEmpty(t *testing.T) {
 	if len(mgr.ListSessions()) != 0 {
 		t.Error("expected 0 sessions after CloseAll")
 	}
+}
+
+func TestTerminalDimension(t *testing.T) {
+	if got := terminalDimension(0, 80); got != 80 {
+		t.Fatalf("terminalDimension(0, 80) = %d, want 80", got)
+	}
+	if got := terminalDimension(132, 80); got != 132 {
+		t.Fatalf("terminalDimension(132, 80) = %d, want 132", got)
+	}
+	if got := terminalDimension(100000, 80); got != ^uint16(0) {
+		t.Fatalf("terminalDimension(100000, 80) = %d, want %d", got, ^uint16(0))
+	}
+}
+
+func TestRestartLocalReusesSessionAndAppliesRequestedSize(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("local PTY test requires a Unix shell")
+	}
+	dir := t.TempDir()
+	script := filepath.Join(dir, "local-shell.sh")
+	if err := os.WriteFile(script, []byte("#!/bin/sh\nstty size\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	auditStore := &sessionAuditStore{}
+	mgr := NewManager(nil, nil, nil, audit.NewLogger(auditStore), nil)
+	var outputMu sync.Mutex
+	var output strings.Builder
+	disconnected := make(chan string, 2)
+	mgr.SetEventSink(func(name string, payload interface{}) {
+		values, ok := payload.(map[string]interface{})
+		if !ok {
+			return
+		}
+		if name == "session:data" {
+			encoded, _ := values["data"].(string)
+			decoded, _ := base64.StdEncoding.DecodeString(encoded)
+			outputMu.Lock()
+			_, _ = output.Write(decoded)
+			outputMu.Unlock()
+		}
+		if name == "session:state" && values["state"] == string(models.SessionDisconnected) {
+			disconnected <- values["sessionID"].(string)
+		}
+	})
+
+	sessionID, err := mgr.ConnectLocal(script)
+	if err != nil {
+		t.Fatalf("ConnectLocal() error = %v", err)
+	}
+	waitForDisconnectedSession(t, disconnected, sessionID)
+
+	if err := mgr.RestartLocal(sessionID, 132, 43); err != nil {
+		t.Fatalf("RestartLocal() error = %v", err)
+	}
+	waitForDisconnectedSession(t, disconnected, sessionID)
+
+	info := mgr.GetSessionInfo(sessionID)
+	if info == nil || info.ID != sessionID || info.State != models.SessionDisconnected {
+		t.Fatalf("session after restart = %#v, want same disconnected session", info)
+	}
+	outputMu.Lock()
+	got := strings.ReplaceAll(output.String(), "\r", "")
+	outputMu.Unlock()
+	if !strings.Contains(got, "43 132\n") {
+		t.Fatalf("local output %q does not contain restarted size 43 132", got)
+	}
+}
+
+func waitForDisconnectedSession(t *testing.T, states <-chan string, want string) {
+	t.Helper()
+	select {
+	case got := <-states:
+		if got != want {
+			t.Fatalf("disconnected session = %q, want %q", got, want)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatalf("timed out waiting for session %q to disconnect", want)
+	}
+}
+
+type sessionAuditStore struct {
+	mu      sync.Mutex
+	entries []*models.AuditEntry
+}
+
+func (s *sessionAuditStore) AddAuditEntry(entry *models.AuditEntry) error {
+	s.mu.Lock()
+	s.entries = append(s.entries, entry)
+	s.mu.Unlock()
+	return nil
+}
+
+func (s *sessionAuditStore) ListAuditEntries(limit int) ([]*models.AuditEntry, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append([]*models.AuditEntry(nil), s.entries...), nil
 }
 
 func TestHostKeyCallbackAcceptNewStoresHost(t *testing.T) {

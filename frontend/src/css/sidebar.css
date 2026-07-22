@@ -66,6 +66,10 @@
   text-align: right;
 }
 
+#mode-leviathan[hidden] {
+  display: none;
+}
+
 .sidebar-mode-toggle.is-active {
   color: var(--text-primary);
 }

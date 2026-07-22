@@ -385,35 +385,51 @@ class SplitPaneManager {
 
         // Build profile list
         var profiles = this.app.state.profiles || [];
-        if (profiles.length > 0) {
-            var list = document.createElement('div');
-            list.className = 'split-pane-profile-list';
+        var list = document.createElement('div');
+        list.className = 'split-pane-profile-list';
 
-            var self = this;
-            profiles.forEach(function(profile) {
-                var btn = document.createElement('button');
-                btn.className = 'split-pane-profile-btn';
+        var self = this;
+        var localBtn = document.createElement('button');
+        localBtn.className = 'split-pane-profile-btn';
 
-                var badge = document.createElement('span');
-                badge.className = 'protocol-badge';
-                badge.textContent = (profile.protocol || 'ssh').toUpperCase();
-                badge.style.color = self._protocolColor(profile.protocol);
+        var localBadge = document.createElement('span');
+        localBadge.className = 'protocol-badge';
+        localBadge.textContent = 'LOCAL';
+        localBadge.style.color = self._protocolColor('local');
 
-                var label = document.createElement('span');
-                label.textContent = profile.displayName || profile.host || profile.id;
+        var localLabel = document.createElement('span');
+        localLabel.textContent = 'Local Machine';
 
-                btn.appendChild(badge);
-                btn.appendChild(label);
+        localBtn.appendChild(localBadge);
+        localBtn.appendChild(localLabel);
+        localBtn.addEventListener('click', function() {
+            self._connectLocalInPane(paneEl, ownerSessionId);
+        });
+        list.appendChild(localBtn);
 
-                btn.addEventListener('click', function() {
-                    self._connectInPane(paneEl, profile, ownerSessionId);
-                });
+        profiles.forEach(function(profile) {
+            var btn = document.createElement('button');
+            btn.className = 'split-pane-profile-btn';
 
-                list.appendChild(btn);
+            var badge = document.createElement('span');
+            badge.className = 'protocol-badge';
+            badge.textContent = (profile.protocol || 'ssh').toUpperCase();
+            badge.style.color = self._protocolColor(profile.protocol);
+
+            var label = document.createElement('span');
+            label.textContent = profile.displayName || profile.host || profile.id;
+
+            btn.appendChild(badge);
+            btn.appendChild(label);
+
+            btn.addEventListener('click', function() {
+                self._connectInPane(paneEl, profile, ownerSessionId);
             });
 
-            placeholder.appendChild(list);
-        }
+            list.appendChild(btn);
+        });
+
+        placeholder.appendChild(list);
 
         paneEl.appendChild(placeholder);
     }
@@ -427,7 +443,6 @@ class SplitPaneManager {
      */
     _connectInPane(paneEl, profile, ownerSessionId) {
         var self = this;
-        var node = paneEl._splitNode;
 
         // Remove placeholder
         var placeholder = paneEl.querySelector('.split-pane-placeholder');
@@ -435,25 +450,7 @@ class SplitPaneManager {
 
         // Connect via backend
         window.NexusTerminal.wailsService.ConnectSession(profile.id).then(function(sessionInfo) {
-            self.app.state.addSession(sessionInfo);
-
-            // Create a terminal container inside this pane
-            var termContainer = document.createElement('div');
-            termContainer.className = 'terminal-container';
-            termContainer.id = 'split-term-' + sessionInfo.id;
-            termContainer.style.position = 'relative';
-            termContainer.style.flex = '1';
-            termContainer.style.width = '100%';
-            termContainer.style.height = '100%';
-            paneEl.appendChild(termContainer);
-
-            // Track which session is in this pane
-            if (node) {
-                node.sessionId = sessionInfo.id;
-            }
-
-            // Create terminal
-            self.app.terminals.createTerminal(sessionInfo.id, termContainer.id, profile);
+            self._attachTerminalToPane(paneEl, sessionInfo, profile);
 
             self.app.notifications.info('Connecting to ' + (profile.displayName || profile.host) + '…');
         }).catch(function(err) {
@@ -461,6 +458,59 @@ class SplitPaneManager {
             // Re-render placeholder on failure
             self._renderPlaceholder(paneEl, ownerSessionId);
         });
+    }
+
+    /**
+     * Opens a local shell in a specific pane.
+     * @param {HTMLElement} paneEl
+     * @param {string} ownerSessionId
+     * @private
+     */
+    _connectLocalInPane(paneEl, ownerSessionId) {
+        var self = this;
+        var placeholder = paneEl.querySelector('.split-pane-placeholder');
+        if (placeholder) placeholder.remove();
+
+        window.NexusTerminal.wailsService.ConnectLocal().then(function(sessionInfo) {
+            var prefs = self.app.state.preferences || {};
+            self._attachTerminalToPane(paneEl, sessionInfo, {
+                terminalFontFamily: prefs.defaultFontFamily,
+                terminalFontSize: prefs.defaultFontSize,
+                terminalScrollback: prefs.defaultScrollback,
+                terminalCursorStyle: prefs.defaultCursorStyle
+            });
+            self.app.notifications.info('Opening local terminal…');
+        }).catch(function(err) {
+            self.app.notifications.error('Local terminal failed: ' + err);
+            self._renderPlaceholder(paneEl, ownerSessionId);
+        });
+    }
+
+    /**
+     * Attaches a connected terminal session to a split pane.
+     * @param {HTMLElement} paneEl
+     * @param {Object} sessionInfo
+     * @param {Object} terminalProfile
+     * @private
+     */
+    _attachTerminalToPane(paneEl, sessionInfo, terminalProfile) {
+        this.app.state.addSession(sessionInfo);
+
+        var termContainer = document.createElement('div');
+        termContainer.className = 'terminal-container';
+        termContainer.id = 'split-term-' + sessionInfo.id;
+        termContainer.style.position = 'relative';
+        termContainer.style.flex = '1';
+        termContainer.style.width = '100%';
+        termContainer.style.height = '100%';
+        paneEl.appendChild(termContainer);
+
+        var node = paneEl._splitNode;
+        if (node) {
+            node.sessionId = sessionInfo.id;
+        }
+
+        this.app.terminals.createTerminal(sessionInfo.id, termContainer.id, terminalProfile);
     }
 
     // ── Tree traversal helpers ───────────────────────────────────────
@@ -588,7 +638,8 @@ class SplitPaneManager {
             ssh: '#4ecdc4',
             telnet: '#ffa726',
             raw: '#ab47bc',
-            github: '#7c8aff'
+            github: '#7c8aff',
+            local: '#66bb6a'
         };
         return colors[protocol] || '#4ecdc4';
     }

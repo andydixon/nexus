@@ -46,6 +46,8 @@ type Session struct {
 	vncClient      *vncclient.Client  // VNC proxy client, nil for non-VNC sessions
 	ircClient      *ircclient.Client  // IRC client, nil for non-IRC sessions
 	localClient    *localshell.Client // local shell PTY, nil for non-local sessions
+	localShell     string             // configured shell path, retained for restart
+	localCwd       string             // last known local working directory
 	sftpClient     *sftpclient.Client // SFTP subsystem, nil until requested
 	profile        *models.Profile
 	recorder       *recording.Recorder // active recording, nil if not recording
@@ -214,7 +216,8 @@ func (m *Manager) ConnectLocal(shell string) (string, error) {
 	}
 
 	sess := &Session{
-		Info: info,
+		Info:       info,
+		localShell: shell,
 	}
 
 	m.mu.Lock()
@@ -226,43 +229,76 @@ func (m *Manager) ConnectLocal(shell string) (string, error) {
 		"state":     string(models.SessionConnecting),
 	})
 
-	go func() {
-		client := localshell.NewClient(localshell.Config{
-			Shell: shell,
-			Cols:  80,
-			Rows:  24,
-			OnData: func(data []byte) {
-				m.emitEvent("session:data", map[string]interface{}{
-					"sessionID": sessionID,
-					"data":      base64.StdEncoding.EncodeToString(data),
-				})
-				// Write to active recording if present.
-				m.mu.RLock()
-				rec := sess.recorder
-				m.mu.RUnlock()
-				if rec != nil {
-					rec.WriteOutput(data)
-				}
-			},
-			OnError: func(err error) {
-				m.mu.Lock()
-				sess.Info.State = models.SessionError
-				sess.Info.Error = err.Error()
-				m.mu.Unlock()
+	go m.startLocalSession(sess, 80, 24)
 
-				m.emitEvent("session:state", map[string]interface{}{
-					"sessionID": sessionID,
-					"state":     string(models.SessionError),
-					"error":     err.Error(),
-				})
-			},
-			OnClose: func() {
-				m.handleSessionClosed(sessionID)
-			},
-		})
+	return sessionID, nil
+}
 
-		if err := client.Start(); err != nil {
+// RestartLocal starts a replacement shell inside an exited local session.
+// Keeping the session ID lets the frontend retain the tab and terminal buffer.
+func (m *Manager) RestartLocal(sessionID string, cols, rows int) error {
+	m.mu.Lock()
+	sess, ok := m.sessions[sessionID]
+	if !ok {
+		m.mu.Unlock()
+		return fmt.Errorf("sessions: session %q not found", sessionID)
+	}
+	if sess.Info.Protocol != models.ProtocolLocal {
+		m.mu.Unlock()
+		return fmt.Errorf("sessions: session %q is not local", sessionID)
+	}
+	if sess.localClient != nil || sess.Info.State == models.SessionConnecting || sess.Info.State == models.SessionConnected {
+		m.mu.Unlock()
+		return fmt.Errorf("sessions: local session %q is still running", sessionID)
+	}
+	if cols <= 0 {
+		cols = 80
+	}
+	if rows <= 0 {
+		rows = 24
+	}
+	sess.Info.State = models.SessionConnecting
+	sess.Info.Error = ""
+	m.mu.Unlock()
+
+	m.emitEvent("session:state", map[string]interface{}{
+		"sessionID": sessionID,
+		"state":     string(models.SessionConnecting),
+	})
+	go m.startLocalSession(sess, cols, rows)
+	return nil
+}
+
+func (m *Manager) startLocalSession(sess *Session, cols, rows int) {
+	m.mu.RLock()
+	sessionID := sess.Info.ID
+	shell := sess.localShell
+	startDir := sess.localCwd
+	m.mu.RUnlock()
+	var client *localshell.Client
+	client = localshell.NewClient(localshell.Config{
+		Shell:    shell,
+		StartDir: startDir,
+		Cols:     terminalDimension(cols, 80),
+		Rows:     terminalDimension(rows, 24),
+		OnData: func(data []byte) {
+			m.emitEvent("session:data", map[string]interface{}{
+				"sessionID": sessionID,
+				"data":      base64.StdEncoding.EncodeToString(data),
+			})
+			m.mu.RLock()
+			rec := sess.recorder
+			m.mu.RUnlock()
+			if rec != nil {
+				rec.WriteOutput(data)
+			}
+		},
+		OnError: func(err error) {
 			m.mu.Lock()
+			if sess.localClient != client {
+				m.mu.Unlock()
+				return
+			}
 			sess.Info.State = models.SessionError
 			sess.Info.Error = err.Error()
 			m.mu.Unlock()
@@ -272,29 +308,85 @@ func (m *Manager) ConnectLocal(shell string) (string, error) {
 				"state":     string(models.SessionError),
 				"error":     err.Error(),
 			})
-			return
+		},
+		OnClose: func() {
+			m.handleLocalSessionClosed(sessionID, client)
+		},
+	})
+
+	// Publish the client before Start so a resize arriving during process
+	// creation is retained by Client.Resize and used for the initial PTY size.
+	m.mu.Lock()
+	if sess.Info.State != models.SessionConnecting {
+		m.mu.Unlock()
+		return
+	}
+	sess.localClient = client
+	pendingCols, pendingRows := sess.consumePendingResizeLocked()
+	m.mu.Unlock()
+	applyLocalResize(client, pendingCols, pendingRows)
+
+	if err := client.Start(); err != nil {
+		m.mu.Lock()
+		emitError := false
+		if sess.localClient == client {
+			sess.localClient = nil
+			sess.Info.State = models.SessionError
+			sess.Info.Error = err.Error()
+			emitError = true
 		}
-
-		m.mu.Lock()
-		sess.localClient = client
-		cols, rows := sess.consumePendingResizeLocked()
-		m.mu.Unlock()
-		applyLocalResize(client, cols, rows)
-
-		m.mu.Lock()
-		sess.Info.State = models.SessionConnected
-		sess.Info.ConnectedAt = time.Now()
 		m.mu.Unlock()
 
-		m.emitEvent("session:state", map[string]interface{}{
-			"sessionID": sessionID,
-			"state":     string(models.SessionConnected),
-		})
+		if emitError {
+			m.emitEvent("session:state", map[string]interface{}{
+				"sessionID": sessionID,
+				"state":     string(models.SessionError),
+				"error":     err.Error(),
+			})
+		}
+		return
+	}
 
-		m.auditLog.LogConnect("", sessionID, "local", "localhost")
-	}()
+	m.mu.Lock()
+	if sess.localClient != client || sess.Info.State != models.SessionConnecting {
+		m.mu.Unlock()
+		return
+	}
+	sess.Info.State = models.SessionConnected
+	sess.Info.ConnectedAt = time.Now()
+	m.mu.Unlock()
 
-	return sessionID, nil
+	m.emitEvent("session:state", map[string]interface{}{
+		"sessionID": sessionID,
+		"state":     string(models.SessionConnected),
+	})
+	m.auditLog.LogConnect("", sessionID, "local", "localhost")
+}
+
+func (m *Manager) handleLocalSessionClosed(sessionID string, client *localshell.Client) {
+	m.mu.Lock()
+	sess, ok := m.sessions[sessionID]
+	if !ok || sess.localClient != client {
+		m.mu.Unlock()
+		return
+	}
+	sess.localClient = nil
+	if cwd := client.WorkingDirectory(); cwd != "" {
+		sess.localCwd = cwd
+	}
+	m.mu.Unlock()
+
+	m.handleSessionClosed(sessionID)
+}
+
+func terminalDimension(value int, fallback uint16) uint16 {
+	if value <= 0 {
+		return fallback
+	}
+	if value > int(^uint16(0)) {
+		return ^uint16(0)
+	}
+	return uint16(value)
 }
 
 // Disconnect closes a specific session.
@@ -353,29 +445,31 @@ func (m *Manager) Reconnect(sessionID string, getSecret func(prompt string) (str
 func (m *Manager) WriteToSession(sessionID string, data []byte) error {
 	m.mu.RLock()
 	sess, ok := m.sessions[sessionID]
-	m.mu.RUnlock()
-
 	if !ok {
+		m.mu.RUnlock()
 		return fmt.Errorf("sessions: session %q not found", sessionID)
 	}
+	rec := sess.recorder
+	sshClient := sess.sshClient
+	telnetClient := sess.telnetClient
+	rawClient := sess.rawClient
+	localClient := sess.localClient
+	m.mu.RUnlock()
 
 	// Record input if recording is active.
-	m.mu.RLock()
-	rec := sess.recorder
-	m.mu.RUnlock()
 	if rec != nil {
 		rec.WriteInput(data)
 	}
 
 	switch {
-	case sess.sshClient != nil:
-		return sess.sshClient.Write(data)
-	case sess.telnetClient != nil:
-		return sess.telnetClient.Write(data)
-	case sess.rawClient != nil:
-		return sess.rawClient.Write(data)
-	case sess.localClient != nil:
-		return sess.localClient.Write(data)
+	case sshClient != nil:
+		return sshClient.Write(data)
+	case telnetClient != nil:
+		return telnetClient.Write(data)
+	case rawClient != nil:
+		return rawClient.Write(data)
+	case localClient != nil:
+		return localClient.Write(data)
 	}
 	return fmt.Errorf("sessions: no active client for session %q", sessionID)
 }
@@ -405,7 +499,7 @@ func (m *Manager) ResizeSession(sessionID string, cols, rows int) error {
 	case telnetClient != nil:
 		return telnetClient.Resize(cols, rows)
 	case localClient != nil:
-		return localClient.Resize(uint16(cols), uint16(rows))
+		return localClient.Resize(terminalDimension(cols, 80), terminalDimension(rows, 24))
 	}
 	// RAW sessions have no concept of terminal size.
 	return nil
@@ -439,7 +533,7 @@ func applyLocalResize(client *localshell.Client, cols, rows int) {
 	if cols <= 0 || rows <= 0 {
 		return
 	}
-	_ = client.Resize(uint16(cols), uint16(rows))
+	_ = client.Resize(terminalDimension(cols, 80), terminalDimension(rows, 24))
 }
 
 // GetSessionCwd returns a best-effort working directory for SSH sessions.
@@ -2021,9 +2115,12 @@ func (m *Manager) closeSession(sess *Session) {
 		sess.ircClient.Close()
 		sess.ircClient = nil
 	}
-	if sess.localClient != nil {
-		sess.localClient.Close()
-		sess.localClient = nil
+	m.mu.Lock()
+	localClient := sess.localClient
+	sess.localClient = nil
+	m.mu.Unlock()
+	if localClient != nil {
+		localClient.Close()
 	}
 
 	m.mu.Lock()

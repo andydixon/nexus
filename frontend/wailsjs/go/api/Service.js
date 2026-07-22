@@ -82,6 +82,10 @@ export function DownloadGitHubRepoArchive(arg1, arg2, arg3) {
   return window['go']['api']['Service']['DownloadGitHubRepoArchive'](arg1, arg2, arg3);
 }
 
+export function DownloadGitHubRepoArchiveToPath(arg1, arg2, arg3, arg4) {
+  return window['go']['api']['Service']['DownloadGitHubRepoArchiveToPath'](arg1, arg2, arg3, arg4);
+}
+
 export function DuplicateProfile(arg1) {
   return window['go']['api']['Service']['DuplicateProfile'](arg1);
 }
@@ -242,6 +246,10 @@ export function LeviathanSaveWorking() {
   return window['go']['api']['Service']['LeviathanSaveWorking']();
 }
 
+export function LeviathanSaveWorkingToPath(arg1) {
+  return window['go']['api']['Service']['LeviathanSaveWorkingToPath'](arg1);
+}
+
 export function LeviathanSetByte(arg1, arg2) {
   return window['go']['api']['Service']['LeviathanSetByte'](arg1, arg2);
 }
@@ -342,8 +350,20 @@ export function ResizeSession(arg1, arg2, arg3) {
   return window['go']['api']['Service']['ResizeSession'](arg1, arg2, arg3);
 }
 
+export function RespondSecret(arg1, arg2, arg3) {
+  return window['go']['api']['Service']['RespondSecret'](arg1, arg2, arg3);
+}
+
+export function RestartLocalSession(arg1, arg2, arg3) {
+  return window['go']['api']['Service']['RestartLocalSession'](arg1, arg2, arg3);
+}
+
 export function SFTPDownload(arg1, arg2) {
   return window['go']['api']['Service']['SFTPDownload'](arg1, arg2);
+}
+
+export function SFTPDownloadToPath(arg1, arg2, arg3) {
+  return window['go']['api']['Service']['SFTPDownloadToPath'](arg1, arg2, arg3);
 }
 
 export function SFTPList(arg1, arg2) {
@@ -390,6 +410,10 @@ export function SFTPUploadFinish(arg1) {
   return window['go']['api']['Service']['SFTPUploadFinish'](arg1);
 }
 
+export function SFTPUploadPath(arg1, arg2, arg3) {
+  return window['go']['api']['Service']['SFTPUploadPath'](arg1, arg2, arg3);
+}
+
 export function SFTPUploadStart(arg1, arg2, arg3, arg4) {
   return window['go']['api']['Service']['SFTPUploadStart'](arg1, arg2, arg3, arg4);
 }
@@ -420,6 +444,10 @@ export function SendBreak(arg1) {
 
 export function SetContext(arg1) {
   return window['go']['api']['Service']['SetContext'](arg1);
+}
+
+export function SetEventSink(arg1) {
+  return window['go']['api']['Service']['SetEventSink'](arg1);
 }
 
 export function SetFavourite(arg1, arg2) {

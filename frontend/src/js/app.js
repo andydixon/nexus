@@ -191,13 +191,23 @@
         );
         this.updateStatusBar();
 
+        const session = this.state.getSession(payload.sessionID);
+        const isLocal = session?.protocol === "local";
+        const localExited =
+          isLocal && payload.state === "disconnected";
         const showDisconnectedOverlay =
-          payload.state === "disconnected" || payload.state === "error";
+          !localExited &&
+          (payload.state === "disconnected" || payload.state === "error");
         this.terminals.setDisconnectedOverlay(
           payload.sessionID,
           showDisconnectedOverlay,
           payload.error,
         );
+        if (localExited) {
+          this.terminals.setLocalExited(payload.sessionID, true);
+        } else if (isLocal && payload.state === "connected") {
+          this.terminals.setLocalExited(payload.sessionID, false);
+        }
 
         if (payload.state === "error" && payload.error) {
           this._handleSessionError(payload.sessionID, payload.error);
@@ -612,7 +622,10 @@
      * @param {"nexus"|"leviathan"} mode
      */
     setMode(mode) {
-      this.mode = mode === "leviathan" ? "leviathan" : "nexus";
+      const leviathanEnabled =
+        this.state.preferences?.leviathanEnabled === true;
+      this.mode =
+        mode === "leviathan" && leviathanEnabled ? "leviathan" : "nexus";
       const root = document.getElementById("app");
       if (root) {
         root.classList.toggle("mode-leviathan", this.mode === "leviathan");
@@ -1372,6 +1385,16 @@
       if (statusBar) {
         statusBar.style.display =
           prefs.showStatusBar === false ? "none" : "flex";
+      }
+
+      // Leviathan is an opt-in mode, revealed from the About window.
+      const leviathanEnabled = prefs.leviathanEnabled === true;
+      const leviathanButton = document.getElementById("mode-leviathan");
+      if (leviathanButton) {
+        leviathanButton.hidden = !leviathanEnabled;
+      }
+      if (!leviathanEnabled && this.mode === "leviathan") {
+        this.setMode("nexus");
       }
 
       // Refit any visible terminal after geometry changes.

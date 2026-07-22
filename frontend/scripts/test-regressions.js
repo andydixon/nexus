@@ -23,6 +23,17 @@ function assertNotContains(file, needle, message) {
   }
 }
 
+function assertBefore(file, first, second, message) {
+  const text = read(file);
+  const firstIndex = text.indexOf(first);
+  const secondIndex = text.indexOf(second);
+  if (firstIndex === -1 || secondIndex === -1 || firstIndex >= secondIndex) {
+    throw new Error(
+      `${message}\nExpected ${JSON.stringify(first)} before ${JSON.stringify(second)} in ${file}`,
+    );
+  }
+}
+
 function assertTreeNotContains(relDir, needle, message) {
   const dir = path.join(repo, relDir);
   const offenders = [];
@@ -74,6 +85,26 @@ assertContains(
   "cancelScheduledFit",
   "terminal teardown must cancel pending fit work",
 );
+assertContains(
+  "frontend/src/js/terminal.js",
+  "this._sendTerminalSize(sessionId, term);",
+  "every completed terminal fit must publish its geometry to the backend PTY",
+);
+assertContains(
+  "frontend/src/js/terminal.js",
+  "[Exited - press enter to restart]",
+  "exited local shells must show the inline restart prompt",
+);
+assertContains(
+  "frontend/src/js/terminal.js",
+  "RestartLocalSession",
+  "pressing enter after a local shell exit must restart the existing session",
+);
+assertContains(
+  "frontend/src/js/app.js",
+  "!localExited &&",
+  "local shell exits must not show the disconnected overlay",
+);
 assertNotContains(
   "frontend/src/js/terminal.js",
   "new ResizeObserver(() => {\n        try {\n          fitAddon.fit();",
@@ -113,6 +144,31 @@ assertContains(
   "frontend/index.html",
   "mode-leviathan",
   "Leviathan mode toggle must be present beside Nexus Terminal",
+);
+assertContains(
+  "frontend/index.html",
+  'id="mode-leviathan"\n                type="button"\n                hidden',
+  "Leviathan mode toggle must be hidden before preferences load",
+);
+assertContains(
+  "frontend/src/js/app.js",
+  "prefs.leviathanEnabled === true",
+  "Leviathan mode must only be exposed by an explicit persisted preference",
+);
+assertContains(
+  "frontend/src/js/settings.js",
+  "KONAMI_SEQUENCE",
+  "the About window must recognise the Konami sequence",
+);
+assertContains(
+  "frontend/src/js/settings.js",
+  "_toggleLeviathanFromKonami",
+  "the About-window Konami sequence must toggle Leviathan",
+);
+assertContains(
+  "frontend/src/js/settings.js",
+  "SavePreferences(prefs)",
+  "the Konami toggle must persist the Leviathan preference immediately",
 );
 assertContains(
   "frontend/src/css/sidebar.css",
@@ -298,6 +354,17 @@ assertContains(
   "frontend/src/js/app.js",
   "setMode(\"leviathan\")",
   "App mode switch must route to Leviathan",
+);
+assertBefore(
+  "frontend/src/js/splitpane.js",
+  "localLabel.textContent = 'Local Machine';",
+  "profiles.forEach(function(profile)",
+  "split-pane connection choices must put Local Machine before saved profiles",
+);
+assertContains(
+  "frontend/src/js/splitpane.js",
+  "wailsService.ConnectLocal()",
+  "the Local Machine split-pane choice must open a real local shell",
 );
 assertContains(
   "internal/api/leviathan.go",

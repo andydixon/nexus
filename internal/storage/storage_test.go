@@ -306,6 +306,7 @@ func TestSavePreferencesDoesNotError(t *testing.T) {
 	prefs.ConfirmOnClose = true
 	prefs.DefaultFontSize = 16
 	prefs.Theme = "custom-dark"
+	prefs.LeviathanEnabled = true
 
 	if err := store.SavePreferences(&prefs); err != nil {
 		t.Fatalf("SavePreferences() error = %v", err)
@@ -326,6 +327,9 @@ func TestSavePreferencesDoesNotError(t *testing.T) {
 	}
 	if got.Theme != "custom-dark" {
 		t.Errorf("Theme = %q, want %q", got.Theme, "custom-dark")
+	}
+	if !got.LeviathanEnabled {
+		t.Error("LeviathanEnabled = false, want true")
 	}
 }
 

@@ -81,6 +81,7 @@ export namespace models {
 	    defaultCursorStyle: string;
 	    useNativePaste: boolean;
 	    localShell: string;
+	    leviathanEnabled: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new AppPreferences(source);
@@ -101,6 +102,7 @@ export namespace models {
 	        this.defaultCursorStyle = source["defaultCursorStyle"];
 	        this.useNativePaste = source["useNativePaste"];
 	        this.localShell = source["localShell"];
+	        this.leviathanEnabled = source["leviathanEnabled"];
 	    }
 	}
 	export class AuditEntry {

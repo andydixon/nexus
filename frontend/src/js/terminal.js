@@ -224,6 +224,10 @@
 
           try {
             fitAddon.fit();
+            // Forced fits do not emit onResize when xterm's geometry is
+            // unchanged. Always publish the fitted size so a new local PTY
+            // cannot remain at its 80x24 fallback dimensions.
+            this._sendTerminalSize(sessionId, term);
           } catch (_) {
             /* noop */
           }
@@ -249,6 +253,14 @@
 
       // Forward user keystrokes to the backend
       term.onData((data) => {
+        const entry = this.terminals.get(sessionId);
+        if (entry?.localExited) {
+          if (data === "\r" || data === "\n") {
+            this._restartLocalTerminal(sessionId, entry);
+          }
+          return;
+        }
+
         try {
           const b64 = utf8ToBase64(data);
           window.NexusTerminal.wailsService.WriteSession(sessionId, b64);
@@ -330,11 +342,7 @@
 
       // Notify backend when terminal dimensions change
       term.onResize(({ cols, rows }) => {
-        try {
-          window.NexusTerminal.wailsService.ResizeSession(sessionId, cols, rows);
-        } catch (err) {
-          console.error("ResizeSession error:", err);
-        }
+        this._sendTerminalSize(sessionId, { cols, rows });
       });
 
       // Re-fit when the container itself resizes. ResizeObserver can fire
@@ -354,6 +362,8 @@
         scheduleFit,
         cancelScheduledFit,
         refreshTerminal,
+        localExited: false,
+        localRestarting: false,
         decoder:
           typeof TextDecoder !== "undefined" ? new TextDecoder("utf-8") : null,
       });
@@ -462,6 +472,24 @@
     }
 
     /**
+     * Marks a local shell as exited without obscuring its terminal buffer.
+     * Enter is intercepted by the terminal input handler and restarts it.
+     * @param {string} sessionId
+     * @param {boolean} isExited
+     */
+    setLocalExited(sessionId, isExited) {
+      const entry = this.terminals.get(sessionId);
+      if (!entry) return;
+
+      if (isExited && !entry.localExited) {
+        entry.term.write("\r\n[Exited - press enter to restart]\r\n");
+      }
+      entry.localExited = isExited;
+      entry.localRestarting = false;
+      if (isExited) entry.term.focus();
+    }
+
+    /**
      * Searches within a terminal using the search addon.
      * @param {string} sessionId
      * @param {string} query
@@ -549,6 +577,34 @@
     }
 
     // ── Private helpers ──────────────────────────────────────────────
+
+    _sendTerminalSize(sessionId, dimensions) {
+      const cols = Number(dimensions?.cols || 0);
+      const rows = Number(dimensions?.rows || 0);
+      if (cols <= 0 || rows <= 0) return;
+
+      Promise.resolve(
+        window.NexusTerminal.wailsService.ResizeSession(sessionId, cols, rows),
+      ).catch((err) => console.error("ResizeSession error:", err));
+    }
+
+    async _restartLocalTerminal(sessionId, entry) {
+      if (entry.localRestarting) return;
+      entry.localRestarting = true;
+
+      try {
+        await window.NexusTerminal.wailsService.RestartLocalSession(
+          sessionId,
+          entry.term.cols,
+          entry.term.rows,
+        );
+      } catch (err) {
+        entry.localRestarting = false;
+        entry.term.write(
+          `\r\n[Restart failed: ${String(err)} - press enter to retry]\r\n`,
+        );
+      }
+    }
 
     /**
      * Ensures the disconnect overlay exists for a session panel.

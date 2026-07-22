@@ -346,6 +346,7 @@ type AppPreferences struct {
 	DefaultCursorStyle  string `json:"defaultCursorStyle"`
 	UseNativePaste      bool   `json:"useNativePaste"`
 	LocalShell          string `json:"localShell"` // path to shell binary for local terminal
+	LeviathanEnabled    bool   `json:"leviathanEnabled"`
 }
 
 // AuditEntry records an auditable action within the application.

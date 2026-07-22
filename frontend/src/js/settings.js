@@ -18,6 +18,19 @@
     { key: "about", label: "About" },
   ];
 
+  const KONAMI_SEQUENCE = [
+    "ArrowUp",
+    "ArrowUp",
+    "ArrowDown",
+    "ArrowDown",
+    "ArrowLeft",
+    "ArrowRight",
+    "ArrowLeft",
+    "ArrowRight",
+    "b",
+    "a",
+  ];
+
   class Settings {
     /**
      * @param {App} app
@@ -36,6 +49,10 @@
 
       /** @type {Array<Object>} Cached known hosts list. */
       this._knownHosts = [];
+
+      this._aboutKonamiHandler = null;
+      this._konamiIndex = 0;
+      this._konamiTogglePending = false;
     }
 
     // ── Public API ───────────────────────────────────────────────────
@@ -75,6 +92,7 @@
      * Closes the settings modal.
      */
     close() {
+      this._detachAboutKonamiListener();
       if (this._overlay) {
         this._overlay.remove();
         this._overlay = null;
@@ -198,6 +216,7 @@
      * @private
      */
     _renderTabContent(body) {
+      this._detachAboutKonamiListener();
       body.innerHTML = "";
       body.classList.remove("help-layout");
       switch (this._activeTab) {
@@ -1058,9 +1077,73 @@
           }
         });
       }
+
+      this._attachAboutKonamiListener();
     }
 
     // ── Form helpers ─────────────────────────────────────────────────
+
+    _attachAboutKonamiListener() {
+      this._detachAboutKonamiListener();
+      this._konamiIndex = 0;
+      this._aboutKonamiHandler = (event) => {
+        if (!this._overlay || this._activeTab !== "about") return;
+        if (event.ctrlKey || event.metaKey || event.altKey) {
+          this._konamiIndex = 0;
+          return;
+        }
+
+        const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
+        if (key === KONAMI_SEQUENCE[this._konamiIndex]) {
+          event.preventDefault();
+          this._konamiIndex += 1;
+          if (this._konamiIndex === KONAMI_SEQUENCE.length) {
+            this._konamiIndex = 0;
+            void this._toggleLeviathanFromKonami();
+          }
+          return;
+        }
+
+        this._konamiIndex = key === KONAMI_SEQUENCE[0] ? 1 : 0;
+      };
+      window.addEventListener("keydown", this._aboutKonamiHandler);
+    }
+
+    _detachAboutKonamiListener() {
+      if (this._aboutKonamiHandler) {
+        window.removeEventListener("keydown", this._aboutKonamiHandler);
+        this._aboutKonamiHandler = null;
+      }
+      this._konamiIndex = 0;
+    }
+
+    async _toggleLeviathanFromKonami() {
+      if (this._konamiTogglePending) return;
+      this._konamiTogglePending = true;
+
+      const enabled =
+        this.app.state.preferences?.leviathanEnabled !== true;
+      const prefs = {
+        ...this.app.state.preferences,
+        leviathanEnabled: enabled,
+      };
+
+      try {
+        await window.NexusTerminal.wailsService.SavePreferences(prefs);
+        this._prefs.leviathanEnabled = enabled;
+        this.app.state.setPreferences(prefs);
+        this.app._applyPreferences?.();
+        this.app.notifications.success(
+          enabled ? "Leviathan enabled" : "Leviathan disabled",
+        );
+      } catch (err) {
+        this.app.notifications.error(
+          "Failed to update Leviathan setting: " + err,
+        );
+      } finally {
+        this._konamiTogglePending = false;
+      }
+    }
 
     /**
      * Renders a single settings form field.

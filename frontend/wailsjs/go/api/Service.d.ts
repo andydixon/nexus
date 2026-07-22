@@ -44,6 +44,8 @@ export function DisconnectSession(arg1:string):Promise<void>;
 
 export function DownloadGitHubRepoArchive(arg1:string,arg2:string,arg3:string):Promise<string>;
 
+export function DownloadGitHubRepoArchiveToPath(arg1:string,arg2:string,arg3:string,arg4:string):Promise<string>;
+
 export function DuplicateProfile(arg1:string):Promise<models.Profile>;
 
 export function ExportProfiles(arg1:boolean):Promise<string>;
@@ -124,6 +126,8 @@ export function LeviathanRunTool(arg1:string,arg2:Record<string, any>):Promise<R
 
 export function LeviathanSaveWorking():Promise<string>;
 
+export function LeviathanSaveWorkingToPath(arg1:string):Promise<string>;
+
 export function LeviathanSetByte(arg1:number,arg2:string):Promise<Record<string, any>>;
 
 export function LeviathanState():Promise<api.leviathanDocState>;
@@ -174,7 +178,13 @@ export function RenameSession(arg1:string,arg2:string):Promise<void>;
 
 export function ResizeSession(arg1:string,arg2:number,arg3:number):Promise<void>;
 
+export function RespondSecret(arg1:string,arg2:string,arg3:boolean):Promise<void>;
+
+export function RestartLocalSession(arg1:string,arg2:number,arg3:number):Promise<void>;
+
 export function SFTPDownload(arg1:string,arg2:string):Promise<void>;
+
+export function SFTPDownloadToPath(arg1:string,arg2:string,arg3:string):Promise<void>;
 
 export function SFTPList(arg1:string,arg2:string):Promise<Array<Record<string, any>>>;
 
@@ -198,6 +208,8 @@ export function SFTPUploadData(arg1:string,arg2:string,arg3:string,arg4:string):
 
 export function SFTPUploadFinish(arg1:string):Promise<void>;
 
+export function SFTPUploadPath(arg1:string,arg2:string,arg3:string):Promise<void>;
+
 export function SFTPUploadStart(arg1:string,arg2:string,arg3:string,arg4:number):Promise<string>;
 
 export function SaveFile(arg1:string,arg2:string):Promise<string>;
@@ -213,6 +225,8 @@ export function SelectFile(arg1:string,arg2:string):Promise<string>;
 export function SendBreak(arg1:string):Promise<void>;
 
 export function SetContext(arg1:context.Context):Promise<void>;
+
+export function SetEventSink(arg1:any):Promise<void>;
 
 export function SetFavourite(arg1:string,arg2:boolean):Promise<void>;
 

@@ -430,6 +430,12 @@ func (s *Service) ConnectLocal() (models.SessionInfo, error) {
 	return *info, nil
 }
 
+// RestartLocalSession starts a new shell in an exited local terminal while
+// preserving its tab, scrollback, terminal geometry, and best-effort cwd.
+func (s *Service) RestartLocalSession(sessionID string, cols int, rows int) error {
+	return s.sessions.RestartLocal(sessionID, cols, rows)
+}
+
 // DisconnectSession closes a session by ID.
 func (s *Service) DisconnectSession(sessionID string) error {
 	return s.sessions.Disconnect(sessionID)
