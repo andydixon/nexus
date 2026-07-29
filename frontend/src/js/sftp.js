@@ -192,6 +192,7 @@
       var state = this.panels.get(sessionId);
       if (!state) return;
 
+      if (state.cleanupResize) state.cleanupResize();
       state.el.remove();
 
       this.panels.delete(sessionId);
@@ -1196,13 +1197,19 @@
       }
 
       function onMouseUp() {
+        cleanupResize();
+        self._refitTerminal(sessionId);
+      }
+
+      function cleanupResize() {
         handle.classList.remove("is-dragging");
         document.body.style.userSelect = "";
         document.body.style.cursor = "";
         document.removeEventListener("mousemove", onMouseMove);
         document.removeEventListener("mouseup", onMouseUp);
-        self._refitTerminal(sessionId);
       }
+
+      state.cleanupResize = cleanupResize;
 
       handle.addEventListener("mousedown", function (e) {
         e.preventDefault();

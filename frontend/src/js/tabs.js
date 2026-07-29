@@ -182,19 +182,7 @@
         if (!ok) return;
       }
 
-      try {
-        await window.NexusTerminal.wailsService.DisconnectSession(sessionId);
-      } catch (_) {
-        // Session may already be closed — carry on
-      }
-
-      this.app.terminals.destroyTerminal(sessionId);
-      this.app.rawViewer.destroyViewer(sessionId);
-      window.NexusTerminal.GitHubViewer.destroyViewer(sessionId);
-      window.NexusTerminal.IRCViewer.destroyViewer(sessionId);
-      this.app.leviathan?.destroyPanel(sessionId);
-      this.removeTab(sessionId);
-      this.app.state.removeSession(sessionId);
+      await this.app.closeSessionImmediate(sessionId);
     }
 
     /**
@@ -852,13 +840,8 @@
       const session = this.app.state.getSession(sessionId);
       if (!session || !session.profileId) return;
 
-      // Close the current tab, then open a fresh connection
-      this.app.terminals.destroyTerminal(sessionId);
-      this.app.rawViewer.destroyViewer(sessionId);
-      window.NexusTerminal.GitHubViewer.destroyViewer(sessionId);
-      this.app.state.removeSession(sessionId);
-      this.removeTab(sessionId);
-
+      // Fully close the old session before opening a fresh connection.
+      await this.app.closeSessionImmediate(sessionId);
       await this.app.connectProfile(session.profileId);
     }
 

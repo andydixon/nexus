@@ -66,6 +66,16 @@ class RecordingManager {
     }
 
     /**
+     * Drops frontend recording state when a session is closed. The backend
+     * finalises the recorder as part of DisconnectSession.
+     * @param {string} sessionId
+     */
+    cleanup(sessionId) {
+        this.activeSessions.delete(sessionId);
+        this._updateRecordingIndicator(sessionId, false);
+    }
+
+    /**
      * Opens the recordings browser modal.
      */
     async openBrowser() {

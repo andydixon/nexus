@@ -542,6 +542,7 @@
     destroyPanel(sessionId) {
       this.lastResults.delete(sessionId);
       this.autoRunners.delete(sessionId);
+      this.hexSearches.delete(sessionId);
     }
 
     handleTabFocus(sessionId) {

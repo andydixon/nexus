@@ -47,6 +47,8 @@
       this.sshKeys = new SSHKeyManager(this);
       this.triggers = new TriggerEngine(this);
       this.leviathan = new LeviathanWorkbench(this);
+      /** @type {Map<string, Promise<void>>} Idempotent in-flight session closes. */
+      this._closingSessions = new Map();
       this.updateInfo = null;
       this.mode = "nexus";
     }
@@ -399,20 +401,94 @@
      * Disconnects and removes a session without confirmation prompts.
      * @param {string} sessionId
      */
-    async closeSessionImmediate(sessionId) {
+    closeSessionImmediate(sessionId, options = {}) {
+      const existing = this._closingSessions.get(sessionId);
+      if (existing) return existing;
+
+      let resolveOperation;
+      let rejectOperation;
+      const operation = new Promise((resolve, reject) => {
+        resolveOperation = resolve;
+        rejectOperation = reject;
+      });
+      this._closingSessions.set(sessionId, operation);
+
       try {
-        await window.NexusTerminal.wailsService.DisconnectSession(sessionId);
-      } catch (_) {
-        // Ignore failures; we still want to clean up locally.
+        this._closeSessionResources(sessionId, options).then(
+          resolveOperation,
+          rejectOperation,
+        );
+      } catch (err) {
+        rejectOperation(err);
       }
 
-      this.terminals.destroyTerminal(sessionId);
-      this.rawViewer.destroyViewer(sessionId);
-      window.NexusTerminal.GitHubViewer.destroyViewer(sessionId);
-      window.NexusTerminal.VNCViewer.destroyViewer(sessionId);
-      this.tabs.removeTab(sessionId);
-      this.state.removeSession(sessionId);
+      const clearClosing = () => {
+        if (this._closingSessions.get(sessionId) === operation) {
+          this._closingSessions.delete(sessionId);
+        }
+      };
+      operation.then(clearClosing, clearClosing);
+      return operation;
+    }
+
+    /**
+     * Releases every frontend and backend resource owned by a session.
+     * Local objects are dropped before awaiting the backend so a slow close
+     * cannot leave renderers, observers or viewers running invisibly.
+     * @param {string} sessionId
+     * @param {{removeTab?: boolean, cleanupSplits?: boolean}} options
+     * @private
+     */
+    async _closeSessionResources(sessionId, options = {}) {
+      const removeTab = options.removeTab !== false;
+      const cleanupSplits = options.cleanupSplits !== false;
+
+      let splitCleanup = Promise.resolve();
+      if (cleanupSplits) {
+        try {
+          splitCleanup = Promise.resolve(this.splitPanes.cleanup(sessionId));
+        } catch (_) {
+          // Continue with the rest of the idempotent local cleanup.
+        }
+      }
+
+      const localCleanups = [
+        () => this.sftp.close(sessionId),
+        () => this.triggers.cleanup(sessionId),
+        () => this.recordings.cleanup(sessionId),
+        () => this.terminals.destroyTerminal(sessionId),
+        () => this.rawViewer.destroyViewer(sessionId),
+        () => window.NexusTerminal.GitHubViewer?.destroyViewer(sessionId),
+        () => window.NexusTerminal.VNCViewer?.destroyViewer(sessionId),
+        () => window.NexusTerminal.IRCViewer?.destroyViewer(sessionId),
+        () => this.leviathan?.destroyPanel(sessionId),
+      ];
+      for (const cleanup of localCleanups) {
+        try {
+          cleanup();
+        } catch (_) {
+          // One faulty viewer must not prevent the remaining resources closing.
+        }
+      }
+
+      if (removeTab && this.tabs.order.includes(sessionId)) {
+        this.tabs.removeTab(sessionId);
+      }
+      if (this.state.getSession(sessionId)) {
+        this.state.removeSession(sessionId);
+      }
       this.updateStatusBar();
+
+      let backendCleanup = Promise.resolve();
+      try {
+        backendCleanup = Promise.resolve(
+          window.NexusTerminal.wailsService.DisconnectSession(sessionId),
+        );
+      } catch (_) {
+        // Ignore failures; all local resources have already been released.
+      }
+
+      await Promise.allSettled([splitCleanup, backendCleanup]);
     }
 
     // ── Keyboard shortcuts ───────────────────────────────────────────
@@ -1828,6 +1904,8 @@
   }
 
   // ── Bootstrap ────────────────────────────────────────────────────────
+
+  window.NexusTerminal.App = App;
 
   document.addEventListener("DOMContentLoaded", () => {
     try {

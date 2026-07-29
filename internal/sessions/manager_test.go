@@ -4,6 +4,7 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/base64"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -145,6 +146,52 @@ func TestDisconnectNotFound(t *testing.T) {
 	err := mgr.Disconnect("nonexistent-id")
 	if err == nil {
 		t.Error("expected error when disconnecting non-existent session")
+	}
+}
+
+func TestDisconnectRemovesSessionAndReleasesReferences(t *testing.T) {
+	mgr := NewManager(nil, nil, nil, nil, nil)
+	sess := &Session{
+		Info: models.SessionInfo{
+			ID:    "session-1",
+			State: models.SessionConnected,
+		},
+		profile: &models.Profile{ID: "profile-1"},
+	}
+	mgr.sessions[sess.Info.ID] = sess
+
+	if err := mgr.Disconnect(sess.Info.ID); err != nil {
+		t.Fatalf("Disconnect() error = %v", err)
+	}
+	if got := len(mgr.ListSessions()); got != 0 {
+		t.Fatalf("ListSessions() returned %d sessions after disconnect, want 0", got)
+	}
+	if !sess.closed {
+		t.Fatal("disconnected session was not marked closed")
+	}
+	if sess.profile != nil {
+		t.Fatal("disconnected session retained its profile")
+	}
+}
+
+func TestRepeatedDisconnectDoesNotRetainSessions(t *testing.T) {
+	mgr := NewManager(nil, nil, nil, nil, nil)
+
+	for i := 0; i < 1000; i++ {
+		id := fmt.Sprintf("session-%d", i)
+		mgr.sessions[id] = &Session{
+			Info: models.SessionInfo{
+				ID:    id,
+				State: models.SessionConnected,
+			},
+		}
+		if err := mgr.Disconnect(id); err != nil {
+			t.Fatalf("Disconnect(%q) error = %v", id, err)
+		}
+	}
+
+	if got := len(mgr.ListSessions()); got != 0 {
+		t.Fatalf("ListSessions() retained %d explicitly closed sessions, want 0", got)
 	}
 }
 

@@ -33,6 +33,14 @@ class SplitPaneManager {
          * @type {Map<string, Object|null>}
          */
         this.trees = new Map();
+
+        /**
+         * Connections started from placeholders but not yet attached to a pane.
+         * Closing a pane/tab marks its token cancelled so a late backend result
+         * is disconnected instead of becoming an invisible session.
+         * @type {Map<string, {ownerSessionId: string, cancelled: boolean, completed: boolean}>}
+         */
+        this.pendingConnections = new Map();
     }
 
     // ── Public API ───────────────────────────────────────────────────
@@ -55,8 +63,47 @@ class SplitPaneManager {
      * Removes all split state for a session (used on tab close).
      * @param {string} sessionId
      */
-    cleanup(sessionId) {
+    async cleanup(sessionId) {
+        var root = this.trees.get(sessionId);
         this.trees.delete(sessionId);
+
+        var childSessionIds = new Set();
+        var self = this;
+        function releaseNode(node) {
+            if (!node) return;
+            if (node.type === 'leaf') {
+                self._cancelPendingConnection(node.paneId);
+                if (node.sessionId && node.sessionId !== sessionId) {
+                    childSessionIds.add(node.sessionId);
+                }
+                if (node.el) node.el._splitNode = null;
+                node.parent = null;
+                return;
+            }
+            if (node.cancelDrag) node.cancelDrag();
+            releaseNode(node.first);
+            releaseNode(node.second);
+            if (node.el) node.el._splitNode = null;
+            node.parent = null;
+        }
+        releaseNode(root);
+
+        // A connection may still be resolving before its leaf has a session ID.
+        // Its token remains captured by the promise and will disconnect any late
+        // result after _cancelPendingConnection marks it cancelled.
+        for (var [paneId, token] of this.pendingConnections) {
+            if (token.ownerSessionId === sessionId) {
+                token.cancelled = true;
+                this.pendingConnections.delete(paneId);
+            }
+        }
+
+        await Promise.allSettled(Array.from(childSessionIds, function(childId) {
+            return self.app.closeSessionImmediate(childId, {
+                removeTab: false,
+                cleanupSplits: false
+            });
+        }));
     }
 
     /**
@@ -265,15 +312,27 @@ class SplitPaneManager {
         var branch = leaf.parent;
         var sibling = (branch.first === leaf) ? branch.second : branch.first;
 
-        // If the closing pane has a terminal session, destroy it (but not the owner session)
+        this._cancelPendingConnection(leaf.paneId);
+
+        // If the closing pane has a child session, release both its frontend
+        // renderer and backend connection. The owner pane cannot be closed
+        // independently because it provides the tab's identity.
         if (leaf.sessionId && leaf.sessionId !== ownerSessionId) {
-            this.app.terminals.destroyTerminal(leaf.sessionId);
+            this.app.closeSessionImmediate(leaf.sessionId, {
+                removeTab: false,
+                cleanupSplits: false
+            });
+            leaf.sessionId = null;
         }
+
+        if (branch.cancelDrag) branch.cancelDrag();
 
         // Replace the branch element with the sibling element in the DOM
         sibling.el.style.flex = branch.el.style.flex || '1';
         branch.el.parentNode.insertBefore(sibling.el, branch.el);
         branch.el.remove();
+        leaf.el._splitNode = null;
+        branch.el._splitNode = null;
 
         // Remove close button from sibling if it's now the only pane
         sibling.parent = branch.parent;
@@ -312,18 +371,37 @@ class SplitPaneManager {
      */
     _setupDividerDrag(divider, branch) {
         var self = this;
+        var onMouseMove = null;
+        var onMouseUp = null;
+        var bodyClass = null;
+
+        function stopDrag(refit) {
+            if (bodyClass) document.body.classList.remove(bodyClass);
+            divider.classList.remove('is-dragging');
+            if (onMouseMove) document.removeEventListener('mousemove', onMouseMove);
+            if (onMouseUp) document.removeEventListener('mouseup', onMouseUp);
+            onMouseMove = null;
+            onMouseUp = null;
+            bodyClass = null;
+            if (refit) self._refitTree(branch);
+        }
+
+        branch.cancelDrag = function() {
+            stopDrag(false);
+        };
 
         divider.addEventListener('mousedown', function(e) {
             e.preventDefault();
+            stopDrag(false);
             var isHorizontal = branch.direction === 'horizontal';
-            var bodyClass = isHorizontal ? 'split-resizing-row' : 'split-resizing';
+            bodyClass = isHorizontal ? 'split-resizing-row' : 'split-resizing';
             document.body.classList.add(bodyClass);
             divider.classList.add('is-dragging');
 
             var containerRect = branch.el.getBoundingClientRect();
             var dividerSize = isHorizontal ? 4 : 4; // divider thickness
 
-            function onMouseMove(e) {
+            onMouseMove = function(e) {
                 var totalSize, mousePos;
                 if (isHorizontal) {
                     totalSize = containerRect.height - dividerSize;
@@ -343,17 +421,11 @@ class SplitPaneManager {
 
                 // Refit terminals in this branch
                 self._refitTree(branch);
-            }
+            };
 
-            function onMouseUp() {
-                document.body.classList.remove(bodyClass);
-                divider.classList.remove('is-dragging');
-                document.removeEventListener('mousemove', onMouseMove);
-                document.removeEventListener('mouseup', onMouseUp);
-
-                // Final refit
-                self._refitTree(branch);
-            }
+            onMouseUp = function() {
+                stopDrag(true);
+            };
 
             document.addEventListener('mousemove', onMouseMove);
             document.addEventListener('mouseup', onMouseUp);
@@ -443,17 +515,29 @@ class SplitPaneManager {
      */
     _connectInPane(paneEl, profile, ownerSessionId) {
         var self = this;
+        var token = this._beginPendingConnection(paneEl, ownerSessionId);
 
         // Remove placeholder
         var placeholder = paneEl.querySelector('.split-pane-placeholder');
         if (placeholder) placeholder.remove();
 
         // Connect via backend
-        window.NexusTerminal.wailsService.ConnectSession(profile.id).then(function(sessionInfo) {
+        window.NexusTerminal.wailsService.ConnectSession(profile.id).then(async function(sessionInfo) {
+            if (!self._completePendingConnection(paneEl, ownerSessionId, token)) {
+                try {
+                    await window.NexusTerminal.wailsService.DisconnectSession(sessionInfo.id);
+                } catch (_) {
+                    // The backend may already have completed the close.
+                }
+                return;
+            }
             self._attachTerminalToPane(paneEl, sessionInfo, profile);
 
             self.app.notifications.info('Connecting to ' + (profile.displayName || profile.host) + '…');
         }).catch(function(err) {
+            if (!self._completePendingConnection(paneEl, ownerSessionId, token)) {
+                return;
+            }
             self.app.notifications.error('Connection failed: ' + err);
             // Re-render placeholder on failure
             self._renderPlaceholder(paneEl, ownerSessionId);
@@ -468,10 +552,19 @@ class SplitPaneManager {
      */
     _connectLocalInPane(paneEl, ownerSessionId) {
         var self = this;
+        var token = this._beginPendingConnection(paneEl, ownerSessionId);
         var placeholder = paneEl.querySelector('.split-pane-placeholder');
         if (placeholder) placeholder.remove();
 
-        window.NexusTerminal.wailsService.ConnectLocal().then(function(sessionInfo) {
+        window.NexusTerminal.wailsService.ConnectLocal().then(async function(sessionInfo) {
+            if (!self._completePendingConnection(paneEl, ownerSessionId, token)) {
+                try {
+                    await window.NexusTerminal.wailsService.DisconnectSession(sessionInfo.id);
+                } catch (_) {
+                    // The backend may already have completed the close.
+                }
+                return;
+            }
             var prefs = self.app.state.preferences || {};
             self._attachTerminalToPane(paneEl, sessionInfo, {
                 terminalFontFamily: prefs.defaultFontFamily,
@@ -481,6 +574,9 @@ class SplitPaneManager {
             });
             self.app.notifications.info('Opening local terminal…');
         }).catch(function(err) {
+            if (!self._completePendingConnection(paneEl, ownerSessionId, token)) {
+                return;
+            }
             self.app.notifications.error('Local terminal failed: ' + err);
             self._renderPlaceholder(paneEl, ownerSessionId);
         });
@@ -511,6 +607,53 @@ class SplitPaneManager {
         }
 
         this.app.terminals.createTerminal(sessionInfo.id, termContainer.id, terminalProfile);
+    }
+
+    /**
+     * Tracks an asynchronous connection attempt owned by a pane.
+     * @private
+     */
+    _beginPendingConnection(paneEl, ownerSessionId) {
+        var paneId = paneEl.dataset.paneId;
+        this._cancelPendingConnection(paneId);
+        var token = {
+            ownerSessionId: ownerSessionId,
+            cancelled: false,
+            completed: false
+        };
+        this.pendingConnections.set(paneId, token);
+        return token;
+    }
+
+    /**
+     * Returns true only if a connection result still belongs to a live pane.
+     * @private
+     */
+    _completePendingConnection(paneEl, ownerSessionId, token) {
+        if (token.completed) return false;
+        token.completed = true;
+        var paneId = paneEl.dataset.paneId;
+        if (this.pendingConnections.get(paneId) === token) {
+            this.pendingConnections.delete(paneId);
+        }
+        var root = this.trees.get(ownerSessionId);
+        var leaf = this._findLeafById(root, paneId);
+        return !token.cancelled &&
+            paneEl.isConnected !== false &&
+            leaf &&
+            leaf.el === paneEl;
+    }
+
+    /**
+     * Cancels a pending pane connection without waiting for the backend call.
+     * A late successful result will disconnect itself.
+     * @private
+     */
+    _cancelPendingConnection(paneId) {
+        var token = this.pendingConnections.get(paneId);
+        if (!token) return;
+        token.cancelled = true;
+        this.pendingConnections.delete(paneId);
     }
 
     // ── Tree traversal helpers ───────────────────────────────────────
@@ -594,6 +737,9 @@ class SplitPaneManager {
     _addCloseButton(paneEl, ownerSessionId) {
         // Don't add if already present
         if (paneEl.querySelector(':scope > .split-pane-close')) return;
+        // The owner session supplies the tab/panel identity. Allowing that leaf
+        // to close would leave an invisible backend session behind.
+        if (paneEl._splitNode && paneEl._splitNode.sessionId === ownerSessionId) return;
 
         var btn = document.createElement('button');
         btn.className = 'split-pane-close';

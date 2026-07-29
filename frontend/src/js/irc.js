@@ -195,6 +195,13 @@
         this.term.dispose();
         this.term = null;
       }
+      this.fitAddon = null;
+      this.searchAddon = null;
+      this.targets.clear();
+      this.users.clear();
+      this.unreadTargets.clear();
+      this.joinedRooms = [];
+      this.roomList = [];
       this.container.classList.remove("irc-viewer-panel");
       this.container.innerHTML = "";
     }

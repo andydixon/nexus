@@ -38,6 +38,7 @@ const maxTunnelPrivateKeyBytes = 1 << 20
 // Session wraps a protocol client with metadata and state.
 type Session struct {
 	Info           models.SessionInfo
+	closed         bool // explicitly removed from the manager
 	sshClient      *sshclient.Client
 	telnetClient   *telnetclient.Client
 	rawClient      *rawclient.Client
@@ -169,6 +170,11 @@ func (m *Manager) Connect(profile *models.Profile, getSecret func(prompt string)
 
 		if err != nil {
 			m.mu.Lock()
+			if current, ok := m.sessions[sessionID]; !ok || current != sess || sess.closed {
+				m.mu.Unlock()
+				m.closeSession(sess)
+				return
+			}
 			sess.Info.State = models.SessionError
 			sess.Info.Error = err.Error()
 			m.mu.Unlock()
@@ -182,6 +188,11 @@ func (m *Manager) Connect(profile *models.Profile, getSecret func(prompt string)
 		}
 
 		m.mu.Lock()
+		if current, ok := m.sessions[sessionID]; !ok || current != sess || sess.closed {
+			m.mu.Unlock()
+			m.closeSession(sess)
+			return
+		}
 		sess.Info.State = models.SessionConnected
 		sess.Info.ConnectedAt = time.Now()
 		m.mu.Unlock()
@@ -191,7 +202,9 @@ func (m *Manager) Connect(profile *models.Profile, getSecret func(prompt string)
 			"state":     string(models.SessionConnected),
 		})
 
-		m.auditLog.LogConnect(profile.ID, sessionID, string(profile.Protocol), profile.Host)
+		if m.auditLog != nil {
+			m.auditLog.LogConnect(profile.ID, sessionID, string(profile.Protocol), profile.Host)
+		}
 	}()
 
 	return sessionID, nil
@@ -317,7 +330,7 @@ func (m *Manager) startLocalSession(sess *Session, cols, rows int) {
 	// Publish the client before Start so a resize arriving during process
 	// creation is retained by Client.Resize and used for the initial PTY size.
 	m.mu.Lock()
-	if sess.Info.State != models.SessionConnecting {
+	if sess.closed || sess.Info.State != models.SessionConnecting {
 		m.mu.Unlock()
 		return
 	}
@@ -348,8 +361,9 @@ func (m *Manager) startLocalSession(sess *Session, cols, rows int) {
 	}
 
 	m.mu.Lock()
-	if sess.localClient != client || sess.Info.State != models.SessionConnecting {
+	if sess.closed || sess.localClient != client || sess.Info.State != models.SessionConnecting {
 		m.mu.Unlock()
+		client.Close()
 		return
 	}
 	sess.Info.State = models.SessionConnected
@@ -360,7 +374,9 @@ func (m *Manager) startLocalSession(sess *Session, cols, rows int) {
 		"sessionID": sessionID,
 		"state":     string(models.SessionConnected),
 	})
-	m.auditLog.LogConnect("", sessionID, "local", "localhost")
+	if m.auditLog != nil {
+		m.auditLog.LogConnect("", sessionID, "local", "localhost")
+	}
 }
 
 func (m *Manager) handleLocalSessionClosed(sessionID string, client *localshell.Client) {
@@ -397,9 +413,17 @@ func (m *Manager) Disconnect(sessionID string) error {
 		m.mu.Unlock()
 		return fmt.Errorf("sessions: session %q not found", sessionID)
 	}
+	// Explicit disconnect means the tab/session is gone, not merely offline.
+	// Detach it before closing clients so their onClose callbacks cannot start
+	// auto-reconnect work or retain the session in the manager indefinitely.
+	delete(m.sessions, sessionID)
+	sess.closed = true
 	m.mu.Unlock()
 
 	m.closeSession(sess)
+	if m.auditLog != nil {
+		m.auditLog.LogDisconnect(sessionID)
+	}
 	return nil
 }
 
@@ -622,20 +646,20 @@ func (m *Manager) PinSession(sessionID string, pinned bool) error {
 
 // CloseAll closes every active session.
 func (m *Manager) CloseAll() {
-	m.mu.RLock()
+	m.mu.Lock()
 	sessions := make([]*Session, 0, len(m.sessions))
 	for _, sess := range m.sessions {
+		sess.closed = true
 		sessions = append(sessions, sess)
 	}
-	m.mu.RUnlock()
+	// Detach all sessions before closing protocol clients. Close callbacks can
+	// otherwise schedule reconnects while the application is shutting down.
+	m.sessions = make(map[string]*Session)
+	m.mu.Unlock()
 
 	for _, sess := range sessions {
 		m.closeSession(sess)
 	}
-
-	m.mu.Lock()
-	m.sessions = make(map[string]*Session)
-	m.mu.Unlock()
 }
 
 // GetSessionHistory returns the RAW session history (RAW protocol only).
@@ -894,6 +918,11 @@ func (m *Manager) connectSSH(sess *Session, getSecret func(prompt string) (strin
 	}
 
 	m.mu.Lock()
+	if current, ok := m.sessions[sess.Info.ID]; !ok || current != sess || sess.closed {
+		m.mu.Unlock()
+		_ = client.Close()
+		return fmt.Errorf("session %q was closed while connecting", sess.Info.ID)
+	}
 	sess.sshClient = client
 	cols, rows := sess.consumePendingResizeLocked()
 	m.mu.Unlock()
@@ -997,6 +1026,11 @@ func (m *Manager) connectTelnet(sess *Session) error {
 	}
 
 	m.mu.Lock()
+	if current, ok := m.sessions[sess.Info.ID]; !ok || current != sess || sess.closed {
+		m.mu.Unlock()
+		_ = client.Close()
+		return fmt.Errorf("session %q was closed while connecting", sess.Info.ID)
+	}
 	sess.telnetClient = client
 	cols, rows := sess.consumePendingResizeLocked()
 	m.mu.Unlock()
@@ -1049,7 +1083,14 @@ func (m *Manager) connectRAW(sess *Session) error {
 		return err
 	}
 
+	m.mu.Lock()
+	if current, ok := m.sessions[sess.Info.ID]; !ok || current != sess || sess.closed {
+		m.mu.Unlock()
+		_ = client.Close()
+		return fmt.Errorf("session %q was closed while connecting", sess.Info.ID)
+	}
 	sess.rawClient = client
+	m.mu.Unlock()
 	return nil
 }
 
@@ -1095,7 +1136,13 @@ func (m *Manager) connectGitHub(sess *Session, getSecret func(prompt string) (st
 		}
 	}
 
+	m.mu.Lock()
+	if current, ok := m.sessions[sess.Info.ID]; !ok || current != sess || sess.closed {
+		m.mu.Unlock()
+		return fmt.Errorf("session %q was closed while connecting", sess.Info.ID)
+	}
 	sess.githubClient = client
+	m.mu.Unlock()
 
 	// Perform the initial fetch.
 	m.emitEvent("session:github:status", map[string]interface{}{
@@ -1129,7 +1176,14 @@ func (m *Manager) connectGitHub(sess *Session, getSecret func(prompt string) (st
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
+	m.mu.Lock()
+	if current, ok := m.sessions[sess.Info.ID]; !ok || current != sess || sess.closed {
+		m.mu.Unlock()
+		cancel()
+		return fmt.Errorf("session %q was closed while connecting", sess.Info.ID)
+	}
 	sess.githubCancel = cancel
+	m.mu.Unlock()
 
 	go func() {
 		ticker := time.NewTicker(interval)
@@ -1316,7 +1370,14 @@ func (m *Manager) connectVNC(sess *Session, getSecret func(prompt string) (strin
 		return err
 	}
 
+	m.mu.Lock()
+	if current, ok := m.sessions[sess.Info.ID]; !ok || current != sess || sess.closed {
+		m.mu.Unlock()
+		client.Close()
+		return fmt.Errorf("session %q was closed while connecting", sess.Info.ID)
+	}
 	sess.vncClient = client
+	m.mu.Unlock()
 
 	// Emit the WebSocket URL so the frontend can connect noVNC.
 	m.emitEvent("session:vnc:ready", map[string]interface{}{
@@ -1433,7 +1494,14 @@ func (m *Manager) connectIRC(sess *Session, getSecret func(prompt string) (strin
 		return err
 	}
 
+	m.mu.Lock()
+	if current, ok := m.sessions[sess.Info.ID]; !ok || current != sess || sess.closed {
+		m.mu.Unlock()
+		client.Close()
+		return fmt.Errorf("session %q was closed while connecting", sess.Info.ID)
+	}
 	sess.ircClient = client
+	m.mu.Unlock()
 	return nil
 }
 
@@ -2077,55 +2145,72 @@ func (m *Manager) isGitHubAuthError(err error) bool {
 
 // closeSession shuts down the protocol client for a session.
 func (m *Manager) closeSession(sess *Session) {
-	// Cancel any in-progress reconnect backoff.
-	if sess.cancelReconn != nil {
-		sess.cancelReconn()
-		sess.cancelReconn = nil
-	}
-
-	// Stop any active recording.
-	if sess.recorder != nil {
-		sess.recorder.Close()
-		sess.recorder = nil
-	}
-
-	// Close SFTP subsystem if open.
-	if sess.sftpClient != nil {
-		sess.sftpClient.Close()
-		sess.sftpClient = nil
-	}
-
-	if sess.sshClient != nil {
-		sess.sshClient.Close()
-	}
-	if sess.telnetClient != nil {
-		sess.telnetClient.Close()
-	}
-	if sess.rawClient != nil {
-		sess.rawClient.Close()
-	}
-	if sess.githubCancel != nil {
-		sess.githubCancel()
-	}
-	if sess.vncClient != nil {
-		sess.vncClient.Close()
-		sess.vncClient = nil
-	}
-	if sess.ircClient != nil {
-		sess.ircClient.Close()
-		sess.ircClient = nil
-	}
 	m.mu.Lock()
+	sess.closed = true
+	cancelReconn := sess.cancelReconn
+	recorder := sess.recorder
+	sftpClient := sess.sftpClient
+	sshClient := sess.sshClient
+	telnetClient := sess.telnetClient
+	rawClient := sess.rawClient
+	githubCancel := sess.githubCancel
+	vncClient := sess.vncClient
+	ircClient := sess.ircClient
 	localClient := sess.localClient
+
+	// Break all retained client/callback references while holding the lifecycle
+	// lock. This makes repeated close calls harmless and lets closed sessions be
+	// collected even if a short-lived callback still holds the Session object.
+	sess.cancelReconn = nil
+	sess.recorder = nil
+	sess.sftpClient = nil
+	sess.sshClient = nil
+	sess.telnetClient = nil
+	sess.rawClient = nil
+	sess.githubClient = nil
+	sess.githubCancel = nil
+	sess.vncClient = nil
+	sess.ircClient = nil
 	sess.localClient = nil
+	sess.profile = nil
+	sess.localShell = ""
+	sess.localCwd = ""
+	sess.reconnectCount = 0
+	sess.pendingResizeCols = 0
+	sess.pendingResizeRows = 0
+	sess.Info.State = models.SessionDisconnected
 	m.mu.Unlock()
+
+	if cancelReconn != nil {
+		cancelReconn()
+	}
+	if recorder != nil {
+		_ = recorder.Close()
+	}
+	if sftpClient != nil {
+		_ = sftpClient.Close()
+	}
+	if sshClient != nil {
+		_ = sshClient.Close()
+	}
+	if telnetClient != nil {
+		_ = telnetClient.Close()
+	}
+	if rawClient != nil {
+		_ = rawClient.Close()
+	}
+	if githubCancel != nil {
+		githubCancel()
+	}
+	if vncClient != nil {
+		vncClient.Close()
+	}
+	if ircClient != nil {
+		ircClient.Close()
+	}
 	if localClient != nil {
 		localClient.Close()
 	}
-
-	m.mu.Lock()
-	sess.Info.State = models.SessionDisconnected
-	m.mu.Unlock()
 }
 
 // ---------------------------------------------------------------------------
@@ -2229,15 +2314,19 @@ func (m *Manager) waitForOutput(sess *Session, pattern string, timeout time.Dura
 func (m *Manager) handleSessionClosed(sessionID string) {
 	m.mu.Lock()
 	sess, ok := m.sessions[sessionID]
-	if ok {
-		sess.Info.State = models.SessionDisconnected
+	if !ok || sess.closed {
+		m.mu.Unlock()
+		return
 	}
+	sess.Info.State = models.SessionDisconnected
 	m.mu.Unlock()
 
-	m.auditLog.LogDisconnect(sessionID)
+	if m.auditLog != nil {
+		m.auditLog.LogDisconnect(sessionID)
+	}
 
 	// Check whether auto-reconnect is enabled for this session.
-	if ok && m.shouldAutoReconnect(sess) {
+	if m.shouldAutoReconnect(sess) {
 		m.scheduleReconnect(sess, sessionID)
 		return
 	}
@@ -2358,6 +2447,10 @@ func (m *Manager) scheduleReconnect(sess *Session, sessionID string) {
 
 		// Clear old clients before reconnecting.
 		m.mu.Lock()
+		if current, ok := m.sessions[sessionID]; !ok || current != sess || sess.closed {
+			m.mu.Unlock()
+			return
+		}
 		sess.sshClient = nil
 		sess.telnetClient = nil
 		sess.rawClient = nil
@@ -2387,6 +2480,11 @@ func (m *Manager) scheduleReconnect(sess *Session, sessionID string) {
 
 		if err != nil {
 			m.mu.Lock()
+			if current, ok := m.sessions[sessionID]; !ok || current != sess || sess.closed {
+				m.mu.Unlock()
+				m.closeSession(sess)
+				return
+			}
 			sess.Info.State = models.SessionError
 			sess.Info.Error = err.Error()
 			m.mu.Unlock()
@@ -2404,6 +2502,11 @@ func (m *Manager) scheduleReconnect(sess *Session, sessionID string) {
 
 		// Success — reset the counter.
 		m.mu.Lock()
+		if current, ok := m.sessions[sessionID]; !ok || current != sess || sess.closed {
+			m.mu.Unlock()
+			m.closeSession(sess)
+			return
+		}
 		sess.reconnectCount = 0
 		sess.Info.State = models.SessionConnected
 		sess.Info.ConnectedAt = time.Now()

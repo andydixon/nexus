@@ -164,6 +164,9 @@
      */
     removeSession(id) {
       this.sessions.delete(id);
+      if (this.broadcastTargets) {
+        this.broadcastTargets.delete(id);
+      }
       if (this.activeSessionId === id) {
         // Activate the most recent remaining session, or null
         const remaining = [...this.sessions.keys()];

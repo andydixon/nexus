@@ -222,6 +222,46 @@ assertContains(
 );
 assertContains(
   "frontend/src/js/tabs.js",
+  "await this.app.closeSessionImmediate(sessionId);",
+  "all normal tab closes must use the complete session teardown path",
+);
+assertContains(
+  "frontend/src/js/app.js",
+  "this.splitPanes.cleanup(sessionId)",
+  "closing an owner tab must release all split-pane state and child sessions",
+);
+assertContains(
+  "frontend/src/js/app.js",
+  "window.NexusTerminal.VNCViewer?.destroyViewer(sessionId)",
+  "session teardown must disconnect and remove VNC viewers",
+);
+assertContains(
+  "frontend/src/js/app.js",
+  "window.NexusTerminal.IRCViewer?.destroyViewer(sessionId)",
+  "session teardown must dispose IRC terminals and resize observers",
+);
+assertContains(
+  "frontend/src/js/app.js",
+  "this.recordings.cleanup(sessionId)",
+  "session teardown must clear frontend recording state",
+);
+assertContains(
+  "frontend/src/js/splitpane.js",
+  "this.app.closeSessionImmediate(leaf.sessionId",
+  "closing a split child must release its backend session as well as its terminal",
+);
+assertContains(
+  "frontend/src/js/splitpane.js",
+  "await window.NexusTerminal.wailsService.DisconnectSession(sessionInfo.id)",
+  "late split-pane connection results must be disconnected after their pane closes",
+);
+assertContains(
+  "internal/sessions/manager.go",
+  "delete(m.sessions, sessionID)",
+  "explicit backend disconnect must remove the session from the manager map",
+);
+assertContains(
+  "frontend/src/js/tabs.js",
   "!tab?.isConnected",
   "tab tooltip timers must not show hints for removed tab elements",
 );

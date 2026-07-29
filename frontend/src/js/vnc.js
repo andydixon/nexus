@@ -74,6 +74,9 @@
       this.container = container;
       this.profile = profile;
       this.rfb = null;
+      this._rfbListeners = [];
+      this._credentialDialog = null;
+      this._destroyed = false;
 
       this._buildUI();
     }
@@ -132,6 +135,7 @@
      * @param {string} wsURL - WebSocket URL (ws://127.0.0.1:<port>)
      */
     connect(wsURL) {
+      if (this._destroyed) return;
       if (!window.noVNC || !window.noVNC.RFB) {
         this.statusEl.textContent = "Error: noVNC not loaded";
         this.statusEl.classList.add("vnc-status-error");
@@ -154,13 +158,13 @@
         this.rfb.compressionLevel = 2;
 
         // Event handlers
-        this.rfb.addEventListener("connect", () => {
+        this._addRFBListener("connect", () => {
           this.statusEl.textContent = "Connected";
           this.statusEl.classList.remove("vnc-status-error");
           this.statusEl.classList.add("vnc-status-connected");
         });
 
-        this.rfb.addEventListener("disconnect", (ev) => {
+        this._addRFBListener("disconnect", (ev) => {
           const clean = ev.detail.clean;
           this.statusEl.textContent = clean
             ? "Disconnected"
@@ -171,13 +175,13 @@
           }
         });
 
-        this.rfb.addEventListener("credentialsrequired", () => {
+        this._addRFBListener("credentialsrequired", () => {
           this.statusEl.textContent = "Credentials required";
           // TODO: prompt for VNC password via modal
           this._promptCredentials();
         });
 
-        this.rfb.addEventListener("desktopname", (ev) => {
+        this._addRFBListener("desktopname", (ev) => {
           this.statusEl.textContent = "Connected — " + ev.detail.name;
         });
       } catch (err) {
@@ -190,6 +194,11 @@
       if (this.rfb) {
         this.rfb.sendCtrlAltDel();
       }
+    }
+
+    _addRFBListener(name, handler) {
+      this.rfb.addEventListener(name, handler);
+      this._rfbListeners.push({ name, handler });
     }
 
     async _syncClipboard() {
@@ -213,6 +222,9 @@
     }
 
     _promptCredentials() {
+      if (this._destroyed) return;
+      this._closeCredentialDialog();
+
       // Build a simple modal for VNC password
       const backdrop = createElement("div", "modal-backdrop");
       const modal = createElement("div", "modal modal-sm");
@@ -242,13 +254,21 @@
       const input = modal.querySelector("#vnc-password-input");
       const submit = modal.querySelector("#vnc-password-submit");
       const cancel = modal.querySelector("#vnc-password-cancel");
+      const dialog = {
+        backdrop,
+        modal,
+        removeTimer: null,
+        focusTimer: null,
+      };
+      this._credentialDialog = dialog;
 
       const close = () => {
         backdrop.classList.remove("is-visible");
         modal.classList.remove("is-visible");
-        setTimeout(() => {
-          backdrop.remove();
-          modal.remove();
+        dialog.removeTimer = setTimeout(() => {
+          if (this._credentialDialog === dialog) {
+            this._closeCredentialDialog();
+          }
         }, 200);
       };
 
@@ -269,7 +289,17 @@
         if (e.key === "Escape") cancel.click();
       });
 
-      setTimeout(() => input.focus(), 50);
+      dialog.focusTimer = setTimeout(() => input.focus(), 50);
+    }
+
+    _closeCredentialDialog() {
+      const dialog = this._credentialDialog;
+      if (!dialog) return;
+      if (dialog.removeTimer) clearTimeout(dialog.removeTimer);
+      if (dialog.focusTimer) clearTimeout(dialog.focusTimer);
+      dialog.backdrop.remove();
+      dialog.modal.remove();
+      this._credentialDialog = null;
     }
 
     resize() {
@@ -281,7 +311,13 @@
     }
 
     destroy() {
+      this._destroyed = true;
+      this._closeCredentialDialog();
       if (this.rfb) {
+        for (const { name, handler } of this._rfbListeners) {
+          this.rfb.removeEventListener(name, handler);
+        }
+        this._rfbListeners = [];
         this.rfb.disconnect();
         this.rfb = null;
       }
