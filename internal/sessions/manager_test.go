@@ -1,6 +1,7 @@
 package sessions
 
 import (
+	"context"
 	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/base64"
@@ -374,6 +375,101 @@ func TestHandleHostKeyResponseIgnoresOtherRequestIDs(t *testing.T) {
 	case <-ch:
 		t.Fatal("unexpected host key response routed")
 	default:
+	}
+}
+
+func TestHandleSecretResponseRoutesByRequestID(t *testing.T) {
+	mgr := NewManager(nil, nil, nil, nil, nil)
+	ch := make(chan secretPromptResponse, 1)
+	mgr.secretChans = map[string]chan secretPromptResponse{"request-1": ch}
+
+	mgr.handleSecretResponse(map[string]interface{}{
+		"requestID": "request-1",
+		"value":     "secret",
+		"cancelled": false,
+	})
+
+	select {
+	case response := <-ch:
+		if response.value != "secret" || response.cancelled {
+			t.Fatalf("response = %#v, want non-cancelled secret", response)
+		}
+	default:
+		t.Fatal("expected secret response to be routed")
+	}
+}
+
+func TestInteractiveSecretPromptIsReleasedByReconnectCancellation(t *testing.T) {
+	mgr := NewManager(nil, nil, nil, nil, nil)
+	prompts := make(chan map[string]interface{}, 1)
+	mgr.SetEventSink(func(name string, data interface{}) {
+		if name == "session:secret:prompt" {
+			prompts <- data.(map[string]interface{})
+		}
+	})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	result := make(chan error, 1)
+	go func() {
+		_, err := mgr.buildInteractiveSecretCallback(ctx, "session-1")("Password")
+		result <- err
+	}()
+
+	select {
+	case <-prompts:
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for secret prompt")
+	}
+	cancel()
+
+	select {
+	case err := <-result:
+		if err == nil || !strings.Contains(err.Error(), "cancelled") {
+			t.Fatalf("callback error = %v, want cancellation", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("secret prompt did not stop after reconnect cancellation")
+	}
+
+	mgr.secretMu.Lock()
+	pending := len(mgr.secretChans)
+	mgr.secretMu.Unlock()
+	if pending != 0 {
+		t.Fatalf("pending secret prompts = %d, want 0", pending)
+	}
+}
+
+func TestInteractiveSecretPromptHonoursFrontendCancellation(t *testing.T) {
+	mgr := NewManager(nil, nil, nil, nil, nil)
+	prompts := make(chan map[string]interface{}, 1)
+	mgr.SetEventSink(func(name string, data interface{}) {
+		if name == "session:secret:prompt" {
+			prompts <- data.(map[string]interface{})
+		}
+	})
+
+	result := make(chan error, 1)
+	go func() {
+		_, err := mgr.buildInteractiveSecretCallback(context.Background(), "session-1")("Password")
+		result <- err
+	}()
+
+	var requestID string
+	select {
+	case prompt := <-prompts:
+		requestID, _ = prompt["requestID"].(string)
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for secret prompt")
+	}
+	mgr.RespondSecret(requestID, "", true)
+
+	select {
+	case err := <-result:
+		if err == nil || !strings.Contains(err.Error(), "cancelled") {
+			t.Fatalf("callback error = %v, want frontend cancellation", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("secret prompt did not stop after frontend cancellation")
 	}
 }
 

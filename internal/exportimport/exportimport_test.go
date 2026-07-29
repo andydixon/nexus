@@ -3,6 +3,7 @@ package exportimport
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/andydixon/nexus/internal/models"
@@ -101,6 +102,26 @@ func TestEncryptEmptyProfiles(t *testing.T) {
 	err := EncryptAndExport(nil, "password", path)
 	if err == nil {
 		t.Fatal("expected error for empty profiles, got nil")
+	}
+}
+
+func TestEncryptAndExportRestrictsExistingFilePermissions(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("POSIX permission bits are not enforced on Windows")
+	}
+	path := filepath.Join(t.TempDir(), "profiles.nexus")
+	if err := os.WriteFile(path, []byte("old"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := EncryptAndExport([]models.Profile{{ID: "1"}}, "password", path); err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := info.Mode().Perm(); got != 0600 {
+		t.Fatalf("export permissions = %04o, want 0600", got)
 	}
 }
 

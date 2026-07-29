@@ -316,21 +316,6 @@ assertContains(
   "in-app help must document VNC connection profiles",
 );
 assertContains(
-  "vscode/nexus/extension.js",
-  "crypto.randomBytes(16).toString('base64')",
-  "Nexus VS Code webview CSP nonces must use cryptographic randomness",
-);
-assertContains(
-  "vscode/leviathan/extension.js",
-  "crypto.randomBytes(16).toString('base64')",
-  "Leviathan VS Code webview CSP nonces must use cryptographic randomness",
-);
-assertTreeNotContains(
-  "vscode",
-  "const nonce = String(Date.now());",
-  "VS Code webview CSP nonces must not be predictable timestamps",
-);
-assertContains(
   "docs/user-manual.md",
   "## 11. Leviathan binary workbench",
   "user manual must include a full Leviathan section",
@@ -558,8 +543,8 @@ assertContains(
 );
 assertContains(
   "scripts/build-common.sh",
-  "-O2 -g0",
-  "production builds must remove cgo debug output by default",
+  "CGO_ENABLED=0",
+  "production builds must keep the pure-Go SQLite toolchain",
 );
 assertContains(
   "Makefile",

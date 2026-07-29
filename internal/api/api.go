@@ -16,6 +16,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -48,6 +49,7 @@ const (
 	maxInlineSFTPUploadBytes   = 25 * 1024 * 1024
 	maxSFTPUploadChunkBytes    = 1024 * 1024
 	maxStreamingSFTPUploadSize = int64(2 * 1024 * 1024 * 1024)
+	maxConcurrentSFTPUploads   = 16
 	maxSSHPublicKeyBytes       = 64 * 1024
 	sshKeygenTimeout           = 30 * time.Second
 )
@@ -64,8 +66,10 @@ type Service struct {
 	eventSink     func(string, interface{})
 
 	// secretChans maps request IDs to channels awaiting user secret input.
-	secretMu    sync.Mutex
-	secretChans map[string]chan secretResponse
+	secretMu                 sync.Mutex
+	secretChans              map[string]chan secretResponse
+	secretListenerRegistered bool
+	secretListenerCancel     func()
 
 	uploadMu sync.Mutex
 	uploads  map[string]*sftpUpload
@@ -106,6 +110,30 @@ func NewService(
 func (s *Service) SetContext(ctx context.Context) {
 	s.ctx = ctx
 	s.RegisterSecretResponseListener()
+}
+
+// Shutdown releases active uploads, prompt waiters, and app-wide Wails
+// listeners. It is safe to call when no Wails context was configured.
+func (s *Service) Shutdown() {
+	s.cancelSFTPUploads("")
+
+	s.secretMu.Lock()
+	cancel := s.secretListenerCancel
+	s.secretListenerCancel = nil
+	s.secretListenerRegistered = false
+	waiters := s.secretChans
+	s.secretChans = make(map[string]chan secretResponse)
+	s.secretMu.Unlock()
+
+	if cancel != nil {
+		cancel()
+	}
+	for _, ch := range waiters {
+		select {
+		case ch <- secretResponse{cancelled: true}:
+		default:
+		}
+	}
 }
 
 // SetEventSink registers an alternate UI event sink for non-Wails hosts such
@@ -438,11 +466,13 @@ func (s *Service) RestartLocalSession(sessionID string, cols int, rows int) erro
 
 // DisconnectSession closes a session by ID.
 func (s *Service) DisconnectSession(sessionID string) error {
+	s.cancelSFTPUploads(sessionID)
 	return s.sessions.Disconnect(sessionID)
 }
 
 // ReconnectSession closes and re-establishes a session.
 func (s *Service) ReconnectSession(sessionID string) error {
+	s.cancelSFTPUploads(sessionID)
 	return s.sessions.Reconnect(sessionID, s.promptSecret)
 }
 
@@ -482,6 +512,7 @@ func (s *Service) PinSession(sessionID string, pinned bool) error {
 
 // CloseAllSessions terminates all active sessions.
 func (s *Service) CloseAllSessions() {
+	s.cancelSFTPUploads("")
 	s.sessions.CloseAll()
 }
 
@@ -1538,6 +1569,9 @@ func (s *Service) SFTPUploadStart(sessionID string, remoteDir string, fileName s
 	if totalBytes > maxStreamingSFTPUploadSize {
 		return "", fmt.Errorf("upload is too large (max %d bytes)", maxStreamingSFTPUploadSize)
 	}
+	if err := s.checkSFTPUploadCapacity(); err != nil {
+		return "", err
+	}
 
 	safeName, err := safeSFTPUploadName(fileName)
 	if err != nil {
@@ -1551,6 +1585,14 @@ func (s *Service) SFTPUploadStart(sessionID string, remoteDir string, fileName s
 
 	uploadID := uuid.New().String()
 	s.uploadMu.Lock()
+	if len(s.uploads) >= maxConcurrentSFTPUploads {
+		s.uploadMu.Unlock()
+		_ = writer.Close()
+		if s.sessions != nil {
+			_ = s.sessions.SFTPRemove(sessionID, remotePath)
+		}
+		return "", fmt.Errorf("too many active uploads (max %d)", maxConcurrentSFTPUploads)
+	}
 	s.uploads[uploadID] = &sftpUpload{
 		writer:     writer,
 		sessionID:  sessionID,
@@ -1716,7 +1758,7 @@ func (s *Service) TestConnection(host string, port int) (map[string]interface{},
 		return nil, fmt.Errorf("port must be between 1 and 65535")
 	}
 
-	addr := fmt.Sprintf("%s:%d", host, port)
+	addr := net.JoinHostPort(host, strconv.Itoa(port))
 	start := time.Now()
 
 	conn, err := net.DialTimeout("tcp", addr, 10*time.Second)
@@ -1798,7 +1840,16 @@ func (s *Service) RegisterSecretResponseListener() {
 	if s.ctx == nil {
 		return
 	}
-	wailsRuntime.EventsOn(s.ctx, "session:secret:response", func(optionalData ...interface{}) {
+
+	s.secretMu.Lock()
+	if s.secretListenerRegistered {
+		s.secretMu.Unlock()
+		return
+	}
+	s.secretListenerRegistered = true
+	s.secretMu.Unlock()
+
+	cancel := wailsRuntime.EventsOn(s.ctx, "session:secret:response", func(optionalData ...interface{}) {
 		if len(optionalData) == 0 {
 			return
 		}
@@ -1815,9 +1866,15 @@ func (s *Service) RegisterSecretResponseListener() {
 		s.secretMu.Unlock()
 
 		if exists {
-			ch <- secretResponse{value: value, cancelled: cancelled}
+			select {
+			case ch <- secretResponse{value: value, cancelled: cancelled}:
+			default:
+			}
 		}
 	})
+	s.secretMu.Lock()
+	s.secretListenerCancel = cancel
+	s.secretMu.Unlock()
 }
 
 // RespondSecret supplies a credential prompt response for non-Wails hosts.
@@ -1827,7 +1884,10 @@ func (s *Service) RespondSecret(requestID string, value string, cancelled bool) 
 	s.secretMu.Unlock()
 
 	if exists {
-		ch <- secretResponse{value: value, cancelled: cancelled}
+		select {
+		case ch <- secretResponse{value: value, cancelled: cancelled}:
+		default:
+		}
 	}
 }
 
@@ -2125,6 +2185,39 @@ func (s *Service) removeSFTPUpload(uploadID string) {
 	s.uploadMu.Lock()
 	defer s.uploadMu.Unlock()
 	delete(s.uploads, uploadID)
+}
+
+func (s *Service) checkSFTPUploadCapacity() error {
+	s.uploadMu.Lock()
+	defer s.uploadMu.Unlock()
+	if len(s.uploads) >= maxConcurrentSFTPUploads {
+		return fmt.Errorf("too many active uploads (max %d)", maxConcurrentSFTPUploads)
+	}
+	return nil
+}
+
+// cancelSFTPUploads closes and removes active uploads. An empty session ID
+// cancels every upload; otherwise only uploads owned by that session are
+// affected.
+func (s *Service) cancelSFTPUploads(sessionID string) {
+	s.uploadMu.Lock()
+	uploads := make([]*sftpUpload, 0)
+	for uploadID, upload := range s.uploads {
+		if sessionID == "" || upload.sessionID == sessionID {
+			delete(s.uploads, uploadID)
+			uploads = append(uploads, upload)
+		}
+	}
+	s.uploadMu.Unlock()
+
+	for _, upload := range uploads {
+		upload.mu.Lock()
+		_ = upload.writer.Close()
+		upload.mu.Unlock()
+		if s.sessions != nil {
+			_ = s.sessions.SFTPRemove(upload.sessionID, upload.remotePath)
+		}
+	}
 }
 
 func validateImportStrategy(strategy string) error {

@@ -17,7 +17,7 @@ log()  { echo -e "${GREEN}[nexus]${NC} $1"; }
 warn() { echo -e "${YELLOW}[nexus]${NC} $1"; }
 err()  { echo -e "${RED}[nexus]${NC} $1" >&2; }
 
-MIN_GO_VERSION="1.25.0"
+MIN_GO_VERSION="1.25.12"
 WAILS_VERSION="$(awk '$1 == "github.com/wailsapp/wails/v2" { print $2; exit }' go.mod)"
 WAILS_BIN=""
 WAILS_USE_GO_RUN=0

@@ -82,8 +82,16 @@ type Manager struct {
 	hostKeyMu                 sync.Mutex
 	hostKeyChans              map[string]chan bool
 	hostKeyListenerRegistered bool
+	hostKeyListenerCancel     func()
 	secretMu                  sync.Mutex
-	secretChans               map[string]chan string
+	secretChans               map[string]chan secretPromptResponse
+	secretListenerRegistered  bool
+	secretListenerCancel      func()
+}
+
+type secretPromptResponse struct {
+	value     string
+	cancelled bool
 }
 
 // NewManager creates a Manager wired to the given backing services.
@@ -102,6 +110,7 @@ func NewManager(store *storage.Store, secretStore *secrets.SecretStore, keychain
 func (m *Manager) SetContext(ctx context.Context) {
 	m.ctx = ctx
 	m.registerHostKeyResponseListener()
+	m.registerSecretResponseListener()
 }
 
 // SetEventSink registers an alternate UI event sink for non-Wails hosts.
@@ -659,6 +668,46 @@ func (m *Manager) CloseAll() {
 
 	for _, sess := range sessions {
 		m.closeSession(sess)
+	}
+}
+
+// Shutdown closes all sessions, unregisters app-wide Wails listeners, and
+// releases any prompts still waiting for frontend input.
+func (m *Manager) Shutdown() {
+	m.CloseAll()
+
+	m.hostKeyMu.Lock()
+	hostKeyCancel := m.hostKeyListenerCancel
+	m.hostKeyListenerCancel = nil
+	m.hostKeyListenerRegistered = false
+	hostKeyChans := m.hostKeyChans
+	m.hostKeyChans = make(map[string]chan bool)
+	m.hostKeyMu.Unlock()
+	if hostKeyCancel != nil {
+		hostKeyCancel()
+	}
+	for _, ch := range hostKeyChans {
+		select {
+		case ch <- false:
+		default:
+		}
+	}
+
+	m.secretMu.Lock()
+	secretCancel := m.secretListenerCancel
+	m.secretListenerCancel = nil
+	m.secretListenerRegistered = false
+	secretChans := m.secretChans
+	m.secretChans = make(map[string]chan secretPromptResponse)
+	m.secretMu.Unlock()
+	if secretCancel != nil {
+		secretCancel()
+	}
+	for _, ch := range secretChans {
+		select {
+		case ch <- secretPromptResponse{cancelled: true}:
+		default:
+		}
 	}
 }
 
@@ -1990,7 +2039,10 @@ func (m *Manager) registerHostKeyResponseListener() {
 	m.hostKeyListenerRegistered = true
 	m.hostKeyMu.Unlock()
 
-	wailsRuntime.EventsOn(ctx, "session:hostkey:response", m.handleHostKeyResponse)
+	cancel := wailsRuntime.EventsOn(ctx, "session:hostkey:response", m.handleHostKeyResponse)
+	m.hostKeyMu.Lock()
+	m.hostKeyListenerCancel = cancel
+	m.hostKeyMu.Unlock()
 }
 
 func (m *Manager) handleHostKeyResponse(optionalData ...interface{}) {
@@ -2467,13 +2519,13 @@ func (m *Manager) scheduleReconnect(sess *Session, sessionID string) {
 		var err error
 		switch sess.profile.Protocol {
 		case models.ProtocolSSH:
-			err = m.connectSSH(sess, m.buildInteractiveSecretCallback(sessionID))
+			err = m.connectSSH(sess, m.buildInteractiveSecretCallback(ctx, sessionID))
 		case models.ProtocolTelnet:
 			err = m.connectTelnet(sess)
 		case models.ProtocolRAW:
 			err = m.connectRAW(sess)
 		case models.ProtocolIRC:
-			err = m.connectIRC(sess, m.buildInteractiveSecretCallback(sessionID))
+			err = m.connectIRC(sess, m.buildInteractiveSecretCallback(ctx, sessionID))
 		default:
 			err = fmt.Errorf("unsupported protocol for reconnect: %s", sess.profile.Protocol)
 		}
@@ -2522,14 +2574,14 @@ func (m *Manager) scheduleReconnect(sess *Session, sessionID string) {
 // buildInteractiveSecretCallback creates a getSecret callback that prompts
 // the user via Wails events. Used during auto-reconnect flows where the
 // original callback is no longer available.
-func (m *Manager) buildInteractiveSecretCallback(sessionID string) func(prompt string) (string, error) {
+func (m *Manager) buildInteractiveSecretCallback(ctx context.Context, sessionID string) func(prompt string) (string, error) {
 	return func(prompt string) (string, error) {
 		requestID := uuid.New().String()
 
-		ch := make(chan string, 1)
+		ch := make(chan secretPromptResponse, 1)
 		m.secretMu.Lock()
 		if m.secretChans == nil {
-			m.secretChans = make(map[string]chan string)
+			m.secretChans = make(map[string]chan secretPromptResponse)
 		}
 		m.secretChans[requestID] = ch
 		m.secretMu.Unlock()
@@ -2546,48 +2598,67 @@ func (m *Manager) buildInteractiveSecretCallback(sessionID string) func(prompt s
 			"message":   prompt,
 		})
 
-		// Wait for the response with a timeout.
-		var response string
-
-		if m.ctx != nil {
-			wailsRuntime.EventsOn(m.ctx, "session:secret:response", func(optionalData ...interface{}) {
-				if len(optionalData) == 0 {
-					return
-				}
-				data, ok := optionalData[0].(map[string]interface{})
-				if !ok {
-					return
-				}
-				if rid, _ := data["requestID"].(string); rid == requestID {
-					val, _ := data["value"].(string)
-					select {
-					case ch <- val:
-					default:
-					}
-				}
-			})
-		}
-
 		select {
-		case response = <-ch:
+		case response := <-ch:
+			if response.cancelled {
+				return "", fmt.Errorf("credential prompt cancelled during reconnect")
+			}
+			return response.value, nil
+		case <-ctx.Done():
+			return "", fmt.Errorf("credential prompt cancelled during reconnect: %w", ctx.Err())
 		case <-time.After(60 * time.Second):
 			return "", fmt.Errorf("credential prompt timed out during reconnect")
 		}
-
-		return response, nil
 	}
+}
+
+func (m *Manager) registerSecretResponseListener() {
+	ctx := m.ctx
+	if ctx == nil {
+		return
+	}
+
+	m.secretMu.Lock()
+	if m.secretChans == nil {
+		m.secretChans = make(map[string]chan secretPromptResponse)
+	}
+	if m.secretListenerRegistered {
+		m.secretMu.Unlock()
+		return
+	}
+	m.secretListenerRegistered = true
+	m.secretMu.Unlock()
+
+	cancel := wailsRuntime.EventsOn(ctx, "session:secret:response", m.handleSecretResponse)
+	m.secretMu.Lock()
+	m.secretListenerCancel = cancel
+	m.secretMu.Unlock()
+}
+
+func (m *Manager) handleSecretResponse(optionalData ...interface{}) {
+	if len(optionalData) == 0 {
+		return
+	}
+	data, ok := optionalData[0].(map[string]interface{})
+	if !ok {
+		return
+	}
+	requestID, _ := data["requestID"].(string)
+	value, _ := data["value"].(string)
+	cancelled, _ := data["cancelled"].(bool)
+	m.RespondSecret(requestID, value, cancelled)
 }
 
 // RespondSecret supplies a credential prompt response for reconnect prompts in
 // non-Wails hosts.
-func (m *Manager) RespondSecret(requestID string, value string) {
+func (m *Manager) RespondSecret(requestID string, value string, cancelled bool) {
 	m.secretMu.Lock()
 	ch, exists := m.secretChans[requestID]
 	m.secretMu.Unlock()
 
 	if exists {
 		select {
-		case ch <- value:
+		case ch <- secretPromptResponse{value: value, cancelled: cancelled}:
 		default:
 		}
 	}

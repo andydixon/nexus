@@ -134,11 +134,11 @@ func CarveResult(data []byte, result SignatureResult, outputDir string) error {
 	if result.Offset < 0 || result.Offset+result.Size > len(data) {
 		return fmt.Errorf("binsnoop: result offset/size exceeds data bounds")
 	}
-	if err := os.MkdirAll(outputDir, 0755); err != nil {
+	if err := os.MkdirAll(outputDir, 0700); err != nil {
 		return fmt.Errorf("binsnoop: mkdir: %w", err)
 	}
 	outPath := filepath.Join(outputDir, fmt.Sprintf("%x_%s.bin", result.Offset, result.Name))
-	return os.WriteFile(outPath, data[result.Offset:result.Offset+result.Size], 0644)
+	return os.WriteFile(outPath, data[result.Offset:result.Offset+result.Size], 0600)
 }
 
 // SignatureCount returns the number of loaded signatures.

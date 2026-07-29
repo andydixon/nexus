@@ -13,6 +13,19 @@ import (
 	"github.com/andydixon/nexus/internal/storage"
 )
 
+type closeTrackingWriter struct {
+	closed int
+}
+
+func (w *closeTrackingWriter) Write(p []byte) (int, error) {
+	return len(p), nil
+}
+
+func (w *closeTrackingWriter) Close() error {
+	w.closed++
+	return nil
+}
+
 func TestSSHKeyPairPathsAcceptsSafeName(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
@@ -125,6 +138,65 @@ func TestSFTPUploadChunkRejectsOversizedChunkBeforeUploadLookup(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "chunk is too large") {
 		t.Fatalf("error = %q, want chunk is too large", err.Error())
+	}
+}
+
+func TestCancelSFTPUploadsClosesOnlyMatchingSession(t *testing.T) {
+	first := &closeTrackingWriter{}
+	second := &closeTrackingWriter{}
+	svc := &Service{
+		uploads: map[string]*sftpUpload{
+			"first":  {writer: first, sessionID: "session-1", remotePath: "/first"},
+			"second": {writer: second, sessionID: "session-2", remotePath: "/second"},
+		},
+	}
+
+	svc.cancelSFTPUploads("session-1")
+
+	if first.closed != 1 {
+		t.Fatalf("matching writer closed %d times, want 1", first.closed)
+	}
+	if second.closed != 0 {
+		t.Fatalf("unrelated writer closed %d times, want 0", second.closed)
+	}
+	if len(svc.uploads) != 1 || svc.uploads["second"] == nil {
+		t.Fatalf("remaining uploads = %#v, want only session-2", svc.uploads)
+	}
+}
+
+func TestSFTPUploadCapacityIsBounded(t *testing.T) {
+	svc := &Service{uploads: make(map[string]*sftpUpload)}
+	for i := 0; i < maxConcurrentSFTPUploads; i++ {
+		svc.uploads[string(rune('a'+i))] = &sftpUpload{writer: &closeTrackingWriter{}}
+	}
+	if err := svc.checkSFTPUploadCapacity(); err == nil {
+		t.Fatal("expected active upload limit to be enforced")
+	}
+}
+
+func TestServiceShutdownReleasesUploadsAndSecretWaiters(t *testing.T) {
+	writer := &closeTrackingWriter{}
+	waiter := make(chan secretResponse, 1)
+	svc := &Service{
+		uploads:     map[string]*sftpUpload{"upload": {writer: writer}},
+		secretChans: map[string]chan secretResponse{"prompt": waiter},
+	}
+
+	svc.Shutdown()
+
+	if writer.closed != 1 {
+		t.Fatalf("writer closed %d times, want 1", writer.closed)
+	}
+	if len(svc.uploads) != 0 {
+		t.Fatalf("active uploads = %d, want 0", len(svc.uploads))
+	}
+	select {
+	case response := <-waiter:
+		if !response.cancelled {
+			t.Fatal("shutdown response was not cancelled")
+		}
+	default:
+		t.Fatal("shutdown did not release secret prompt waiter")
 	}
 }
 

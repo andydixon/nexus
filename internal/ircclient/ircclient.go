@@ -608,7 +608,7 @@ func (c *Client) newSSHDialer() (*sshDialer, error) {
 	if err != nil {
 		return nil, err
 	}
-	sshAddr := fmt.Sprintf("%s:%d", c.cfg.SSHHost, c.cfg.SSHPort)
+	sshAddr := net.JoinHostPort(c.cfg.SSHHost, strconv.Itoa(c.cfg.SSHPort))
 	sshConfig := &ssh.ClientConfig{
 		User:            c.cfg.SSHUsername,
 		Auth:            authMethods,

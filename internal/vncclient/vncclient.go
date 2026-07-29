@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -85,11 +86,11 @@ func (c *Client) Connect(cfg Config) (string, error) {
 	var vncConn net.Conn
 	var err error
 
-	vncAddr := fmt.Sprintf("%s:%d", cfg.VNCHost, cfg.VNCPort)
+	vncAddr := net.JoinHostPort(cfg.VNCHost, strconv.Itoa(cfg.VNCPort))
 
 	if cfg.SSHTunnel {
 		// Establish SSH connection first
-		sshAddr := fmt.Sprintf("%s:%d", cfg.SSHHost, cfg.SSHPort)
+		sshAddr := net.JoinHostPort(cfg.SSHHost, strconv.Itoa(cfg.SSHPort))
 		if cfg.SSHHostKeyCallback == nil {
 			return "", fmt.Errorf("SSH host key callback is required")
 		}

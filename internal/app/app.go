@@ -118,8 +118,12 @@ func (a *App) Shutdown(ctx context.Context) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
+	if a.Service != nil {
+		a.Service.Shutdown()
+	}
+
 	if a.SessionManager != nil {
-		a.SessionManager.CloseAll()
+		a.SessionManager.Shutdown()
 	}
 
 	if a.Store != nil {

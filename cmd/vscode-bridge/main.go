@@ -184,8 +184,11 @@ func newBridgeApp() (*bridgeApp, error) {
 }
 
 func (a *bridgeApp) close() {
+	if a.service != nil {
+		a.service.Shutdown()
+	}
 	if a.manager != nil {
-		a.manager.CloseAll()
+		a.manager.Shutdown()
 	}
 	if a.store != nil {
 		_ = a.store.Close()
@@ -243,7 +246,7 @@ func (a *bridgeApp) handleRuntimeEvent(w http.ResponseWriter, r *http.Request) {
 		value, _ := req.Payload["value"].(string)
 		cancelled, _ := req.Payload["cancelled"].(bool)
 		a.service.RespondSecret(requestID, value, cancelled)
-		a.manager.RespondSecret(requestID, value)
+		a.manager.RespondSecret(requestID, value, cancelled)
 	case "session:hostkey:response":
 		requestID, _ := req.Payload["requestID"].(string)
 		accepted, _ := req.Payload["accepted"].(bool)

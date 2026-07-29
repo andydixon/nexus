@@ -14,10 +14,10 @@ func Carve(outputPath string, data []byte, offset, size int) error {
 		return fmt.Errorf("carve: offset %d + size %d exceeds data length %d", offset, size, len(data))
 	}
 	dir := filepath.Dir(outputPath)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0700); err != nil {
 		return fmt.Errorf("carve: mkdir: %w", err)
 	}
-	return os.WriteFile(outputPath, data[offset:offset+size], 0644)
+	return os.WriteFile(outputPath, data[offset:offset+size], 0600)
 }
 
 // executeExternal runs an external extraction tool.
@@ -27,7 +27,7 @@ func executeExternal(ext *Extractor, carvedFilePath, outputDir string) *Extracti
 		OutputDirectory: outputDir,
 	}
 
-	if err := os.MkdirAll(outputDir, 0755); err != nil {
+	if err := os.MkdirAll(outputDir, 0700); err != nil {
 		return result
 	}
 
@@ -100,7 +100,7 @@ func ExecuteExtraction(data []byte, filePath string, sig *SignatureResult, ext *
 
 	case ExtractorTypeExternal:
 		// Carve data to a temp file for external tools
-		if err := os.MkdirAll(outputDir, 0755); err != nil {
+		if err := os.MkdirAll(outputDir, 0700); err != nil {
 			return &ExtractionResult{OutputDirectory: outputDir}
 		}
 
@@ -109,7 +109,7 @@ func ExecuteExtraction(data []byte, filePath string, sig *SignatureResult, ext *
 		if endOffset > len(data) {
 			endOffset = len(data)
 		}
-		if err := os.WriteFile(carvedFile, data[sig.Offset:endOffset], 0644); err != nil {
+		if err := os.WriteFile(carvedFile, data[sig.Offset:endOffset], 0600); err != nil {
 			return &ExtractionResult{OutputDirectory: outputDir}
 		}
 

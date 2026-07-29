@@ -68,6 +68,7 @@ func EncryptAndExport(profiles []models.Profile, password, filePath string) erro
 	if err != nil {
 		return fmt.Errorf("exportimport: failed to serialise profiles: %w", err)
 	}
+	defer clear(plaintext)
 
 	// Generate random salt and nonce.
 	salt := make([]byte, saltLength)
@@ -81,14 +82,17 @@ func EncryptAndExport(profiles []models.Profile, password, filePath string) erro
 	}
 
 	// Derive encryption key from password.
+	passwordBytes := []byte(password)
+	defer clear(passwordBytes)
 	key := argon2.IDKey(
-		[]byte(password),
+		passwordBytes,
 		salt,
 		exportArgonTime,
 		exportArgonMemory,
 		exportArgonThreads,
 		exportArgonKeyLen,
 	)
+	defer clear(key)
 
 	// Encrypt with AES-256-GCM.
 	block, err := aes.NewCipher(key)
@@ -104,11 +108,14 @@ func EncryptAndExport(profiles []models.Profile, password, filePath string) erro
 	ciphertext := gcm.Seal(nil, nonce, plaintext, nil)
 
 	// Write the file: version + salt + nonce + ciphertext.
-	f, err := os.Create(filePath)
+	f, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
 	if err != nil {
 		return fmt.Errorf("exportimport: failed to create file: %w", err)
 	}
 	defer f.Close()
+	if err := f.Chmod(0600); err != nil {
+		return fmt.Errorf("exportimport: failed to restrict file permissions: %w", err)
+	}
 
 	if _, err := f.Write([]byte{formatVersion}); err != nil {
 		return fmt.Errorf("exportimport: write version failed: %w", err)
@@ -163,14 +170,17 @@ func DecryptAndImport(filePath, password string) ([]models.Profile, error) {
 	ciphertext := data[1+saltLength+nonceLength:]
 
 	// Derive decryption key.
+	passwordBytes := []byte(password)
+	defer clear(passwordBytes)
 	key := argon2.IDKey(
-		[]byte(password),
+		passwordBytes,
 		salt,
 		exportArgonTime,
 		exportArgonMemory,
 		exportArgonThreads,
 		exportArgonKeyLen,
 	)
+	defer clear(key)
 
 	// Decrypt with AES-256-GCM.
 	block, err := aes.NewCipher(key)
@@ -187,6 +197,7 @@ func DecryptAndImport(filePath, password string) ([]models.Profile, error) {
 	if err != nil {
 		return nil, errors.New("exportimport: decryption failed — wrong password or corrupt file")
 	}
+	defer clear(plaintext)
 
 	// Parse the JSON bundle.
 	var bundle ExportBundle
