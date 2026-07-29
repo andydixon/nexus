@@ -234,6 +234,8 @@ export function SetProfileSecret(arg1:string,arg2:string,arg3:string):Promise<vo
 
 export function SetTOTPSecret(arg1:string,arg2:string):Promise<void>;
 
+export function Shutdown():Promise<void>;
+
 export function StartPortForward(arg1:string,arg2:models.PortForward):Promise<void>;
 
 export function StartRecording(arg1:string,arg2:number,arg3:number):Promise<string>;

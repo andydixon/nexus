@@ -462,6 +462,10 @@ export function SetTOTPSecret(arg1, arg2) {
   return window['go']['api']['Service']['SetTOTPSecret'](arg1, arg2);
 }
 
+export function Shutdown() {
+  return window['go']['api']['Service']['Shutdown']();
+}
+
 export function StartPortForward(arg1, arg2) {
   return window['go']['api']['Service']['StartPortForward'](arg1, arg2);
 }
