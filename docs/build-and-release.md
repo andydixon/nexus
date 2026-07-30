@@ -45,17 +45,28 @@ Build the app binary for the current host:
 ./build.sh
 ```
 
-Build a packaged release for the current host platform:
+Build packaged releases for every supported 64-bit desktop target:
 
 ```bash
 ./release.sh
 ```
 
-By default, `./release.sh` now builds only the current host OS/architecture. On this Ubuntu 24.04 `amd64` host that means `linux/amd64`.
+By default, `./release.sh` builds all six OS/architecture combinations:
 
-## Optional cross-target builds
+- macOS (`darwin`): `amd64` and `arm64`
+- Linux: `amd64` and `arm64`
+- Windows: `amd64` and `arm64`
 
-The release scripts disable CGO and use a pure-Go SQLite driver, so Linux and Windows cross-targets no longer need C cross-compilers for the application backend. Request explicit targets with:
+Go calls the x86-64 architecture `amd64` and the AArch64 architecture `arm64`.
+
+On macOS, Linux builds run in architecture-matched Podman or Docker containers
+because Wails does not cross-compile Linux applications directly from macOS.
+The reusable builder images keep their `node_modules` separate from the host
+checkout.
+
+## Optional targeted builds
+
+The release scripts disable CGO and use a pure-Go SQLite driver, so Linux and Windows cross-targets do not need C cross-compilers for the application backend. To build a smaller set, override the default targets:
 
 ```bash
 NEXUS_RELEASE_TARGETS=linux/amd64,windows/amd64 ./release.sh
@@ -63,6 +74,7 @@ NEXUS_RELEASE_TARGETS=linux/amd64,windows/amd64 ./release.sh
 
 ## Platform caveats
 
-- macOS targets cannot be cross-built from Linux with Wails. Build those on macOS.
+- To produce all six targets in one run, use macOS with Podman or Docker running.
+- macOS targets cannot be cross-built from Linux or Windows with Wails.
 - Cross-target support still depends on Wails and frontend packaging support for the requested platform.
 - Tested on Ubuntu 24.04 `amd64`: `linux/amd64` and `windows/amd64` build successfully.

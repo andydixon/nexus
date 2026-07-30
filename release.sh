@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # release.sh — Build and package release artefacts for Nexus Terminal.
-# Produces per-platform zips plus a manifest.json and version.txt.
+# Produces per-platform zips, manifests, and version files for every supported
+# 64-bit desktop OS/architecture combination.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -15,6 +16,24 @@ NC='\033[0m'
 DEFAULT_UPDATE_URL="https://dixon.cx/downloads/nexus/manifest-{platform}-{arch}.json"
 DEFAULT_RELEASE_BASE_URL="https://dixon.cx/downloads/nexus"
 WAILS_VERSION="$(nexus_wails_version go.mod)"
+GO_TOOLCHAIN_VERSION="$(
+    awk '
+        $1 == "go" { go_version = $2 }
+        $1 == "toolchain" {
+            sub(/^go/, "", $2)
+            toolchain_version = $2
+        }
+        END {
+            if (toolchain_version != "") {
+                print toolchain_version
+            } else {
+                print go_version
+            }
+        }
+    ' go.mod
+)"
+DEFAULT_LINUX_BUILD_IMAGE="docker.io/library/golang:${GO_TOOLCHAIN_VERSION:-1.26}-bookworm"
+DEFAULT_NODE_VERSION="20.19.4"
 
 log()  { echo -e "${GREEN}[nexus]${NC} $1"; }
 warn() { echo -e "${YELLOW}[nexus]${NC} $1"; }
@@ -24,14 +43,7 @@ host_os() {
     case "$(uname -s)" in
         Darwin) echo "darwin" ;;
         Linux) echo "linux" ;;
-        *) echo "unknown" ;;
-    esac
-}
-
-host_arch() {
-    case "$(uname -m)" in
-        x86_64|amd64) echo "amd64" ;;
-        arm64|aarch64) echo "arm64" ;;
+        MINGW*|MSYS*|CYGWIN*) echo "windows" ;;
         *) echo "unknown" ;;
     esac
 }
@@ -41,17 +53,13 @@ build_tags() {
 }
 
 default_targets() {
-    local os
-    local arch
-    os="$(host_os)"
-    arch="$(host_arch)"
-
-    if [ "$os" = "unknown" ] || [ "$arch" = "unknown" ]; then
-        err "Unsupported host platform: $(uname -s)/$(uname -m)"
-        exit 1
-    fi
-
-    echo "${os}/${arch}"
+    printf '%s\n' \
+        "darwin/amd64" \
+        "darwin/arm64" \
+        "linux/amd64" \
+        "linux/arm64" \
+        "windows/amd64" \
+        "windows/arm64"
 }
 
 release_targets() {
@@ -108,6 +116,18 @@ build_ldflags() {
     nexus_build_ldflags "$1"
 }
 
+container_engine() {
+    local candidate
+    for candidate in podman docker; do
+        if command -v "$candidate" >/dev/null 2>&1 \
+            && "$candidate" info >/dev/null 2>&1; then
+            echo "$candidate"
+            return 0
+        fi
+    done
+    return 1
+}
+
 ensure_upx() {
     if ! nexus_bool_enabled "${NEXUS_COMPRESS:-0}"; then
         return
@@ -130,6 +150,87 @@ ensure_upx() {
     fi
     err "NEXUS_COMPRESS=1 requires UPX. Install it first, for example: brew install upx"
     exit 1
+}
+
+build_linux_target_in_container() {
+    local target="$1"
+    local version="$2"
+    local out_dir="$3"
+    local target_os="${target%%/*}"
+    local target_arch="${target##*/}"
+
+    local engine
+    if ! engine="$(container_engine)"; then
+        warn "Linux targets require a running Podman or Docker engine on $(host_os)."
+        return 1
+    fi
+
+    local node_arch
+    case "$target_arch" in
+        amd64) node_arch="x64" ;;
+        arm64) node_arch="arm64" ;;
+        *)
+            warn "No Node.js Linux archive mapping for ${target_arch}."
+            return 1
+            ;;
+    esac
+
+    mkdir -p "$SCRIPT_DIR/build"
+    local container_release_dir
+    container_release_dir="$(mktemp -d "$SCRIPT_DIR/build/.release-linux.XXXXXX")"
+    local container_release_root="build/$(basename "$container_release_dir")"
+    local image="${NEXUS_LINUX_BUILD_IMAGE:-$DEFAULT_LINUX_BUILD_IMAGE}"
+    local node_version="${NEXUS_NODE_VERSION:-$DEFAULT_NODE_VERSION}"
+    local builder_image="nexus-linux-release:${GO_TOOLCHAIN_VERSION:-1.26}-${node_version}-${target_arch}"
+
+    log "Preparing the ${engine} Linux/${target_arch} release builder..."
+    if ! "$engine" build \
+        --platform "linux/${target_arch}" \
+        --build-arg "GO_IMAGE=${image}" \
+        --build-arg "NODE_ARCH=${node_arch}" \
+        --build-arg "NODE_VERSION=${node_version}" \
+        --build-arg "WAILS_VERSION=${WAILS_VERSION}" \
+        -t "$builder_image" \
+        -f "$SCRIPT_DIR/scripts/linux-release.Dockerfile" \
+        "$SCRIPT_DIR/scripts"; then
+        warn "Could not prepare the Linux/${target_arch} release builder."
+        rm -rf -- "$container_release_dir"
+        return 1
+    fi
+
+    log "Building ${target} in the ${engine} container..."
+    if ! "$engine" run --rm \
+        --platform "linux/${target_arch}" \
+        -v "${SCRIPT_DIR}:/src" \
+        --tmpfs /src/frontend/node_modules \
+        -w /src \
+        -e "NEXUS_RELEASE_TARGETS=${target}" \
+        -e "NEXUS_RELEASE_ROOT=${container_release_root}" \
+        -e "NEXUS_UPDATE_URL=${NEXUS_UPDATE_URL}" \
+        -e "NEXUS_RELEASE_BASE_URL=${NEXUS_RELEASE_BASE_URL}" \
+        -e "GIT_CONFIG_COUNT=1" \
+        -e "GIT_CONFIG_KEY_0=safe.directory" \
+        -e "GIT_CONFIG_VALUE_0=/src" \
+        "$builder_image" \
+        ./release.sh; then
+        warn "Container build failed for ${target}."
+        rm -rf -- "$container_release_dir"
+        return 1
+    fi
+
+    local output_base="NexusTerminal-${target_os}-${target_arch}"
+    local container_out="${container_release_dir}/${version}"
+    if [ ! -f "${container_out}/${output_base}" ] \
+        || [ ! -f "${container_out}/${output_base}.zip" ]; then
+        warn "Container did not produce the expected artefacts for ${target}."
+        rm -rf -- "$container_release_dir"
+        return 1
+    fi
+
+    cp "${container_out}/${output_base}" "${out_dir}/${output_base}"
+    cp "${container_out}/${output_base}.zip" "${out_dir}/${output_base}.zip"
+    echo "${target_os}|${target_arch}|${output_base}.zip" >> "${out_dir}/.release-files"
+    rm -rf -- "$container_release_dir"
 }
 
 build_target() {
@@ -288,7 +389,7 @@ main() {
         NEXUS_RELEASE_BASE_URL="${DEFAULT_RELEASE_BASE_URL}"
     fi
 
-    local release_root="build/releases"
+    local release_root="${NEXUS_RELEASE_ROOT:-build/releases}"
     local out_dir="${release_root}/${version}"
     mkdir -p "$out_dir"
 
@@ -306,13 +407,35 @@ main() {
     fi
 
     local errors=0
+    local host
+    host="$(host_os)"
     local target
+    local container_linux_targets=()
+    if [ "$host" != "linux" ]; then
+        for target in "${targets[@]}"; do
+            if [[ "$target" == linux/* ]]; then
+                container_linux_targets+=("$target")
+            fi
+        done
+    fi
+
+    if [ "${#container_linux_targets[@]}" -gt 0 ]; then
+        for target in "${container_linux_targets[@]}"; do
+            if ! build_linux_target_in_container "$target" "$version" "$out_dir"; then
+                errors=1
+            fi
+        done
+    fi
+
     for target in "${targets[@]}"; do
         local target_os="${target%%/*}"
         local target_arch="${target##*/}"
         if [ "$target_os" = "$target_arch" ] || [ -z "$target_os" ] || [ -z "$target_arch" ]; then
             err "Invalid release target: ${target}"
             errors=1
+            continue
+        fi
+        if [ "$target_os" = "linux" ] && [ "$host" != "linux" ]; then
             continue
         fi
         if ! build_target "$target_os" "$target_arch" "$version" "$out_dir"; then
