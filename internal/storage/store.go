@@ -215,13 +215,25 @@ func (s *Store) UpdateProfile(p *models.Profile) error {
 
 // DeleteProfile removes a profile by ID.
 func (s *Store) DeleteProfile(id string) error {
-	res, err := s.db.Exec("DELETE FROM profiles WHERE id = ?", id)
+	tx, err := s.db.Begin()
+	if err != nil {
+		return fmt.Errorf("storage: failed to begin profile deletion: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if _, err := tx.Exec("DELETE FROM irc_channel_state WHERE profile_id = ?", id); err != nil {
+		return fmt.Errorf("storage: failed to delete IRC channel state: %w", err)
+	}
+	res, err := tx.Exec("DELETE FROM profiles WHERE id = ?", id)
 	if err != nil {
 		return fmt.Errorf("storage: failed to delete profile: %w", err)
 	}
 	n, _ := res.RowsAffected()
 	if n == 0 {
 		return fmt.Errorf("storage: profile %q not found", id)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("storage: failed to commit profile deletion: %w", err)
 	}
 	return nil
 }
@@ -548,6 +560,80 @@ func (s *Store) ListAuditEntries(limit int) ([]*models.AuditEntry, error) {
 		entries = append(entries, e)
 	}
 	return entries, rows.Err()
+}
+
+// ---------------------------------------------------------------------------
+// IRC channel state
+// ---------------------------------------------------------------------------
+
+// GetIRCLastRooms returns the channels that were open the last time the given
+// saved IRC profile was connected.
+func (s *Store) GetIRCLastRooms(profileID string) ([]string, error) {
+	rows, err := s.db.Query(`SELECT room_name FROM irc_channel_state
+		WHERE profile_id = ? ORDER BY position, room_name`, profileID)
+	if err != nil {
+		return nil, fmt.Errorf("storage: failed to get IRC channel state: %w", err)
+	}
+	defer rows.Close()
+
+	rooms := make([]string, 0)
+	for rows.Next() {
+		var room string
+		if err := rows.Scan(&room); err != nil {
+			return nil, fmt.Errorf("storage: failed to scan IRC channel state: %w", err)
+		}
+		rooms = append(rooms, room)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("storage: failed to read IRC channel state: %w", err)
+	}
+	return rooms, nil
+}
+
+// SaveIRCLastRooms atomically replaces the remembered channel set for a saved
+// IRC profile. Empty names and case-insensitive duplicates are discarded.
+func (s *Store) SaveIRCLastRooms(profileID string, rooms []string) error {
+	profileID = strings.TrimSpace(profileID)
+	if profileID == "" {
+		return fmt.Errorf("storage: IRC channel state requires a profile ID")
+	}
+
+	normalized := make([]string, 0, len(rooms))
+	seen := make(map[string]struct{}, len(rooms))
+	for _, room := range rooms {
+		room = strings.TrimSpace(room)
+		if room == "" {
+			continue
+		}
+		key := strings.ToLower(room)
+		if _, exists := seen[key]; exists {
+			continue
+		}
+		seen[key] = struct{}{}
+		normalized = append(normalized, room)
+	}
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return fmt.Errorf("storage: failed to begin IRC channel state update: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if _, err := tx.Exec("DELETE FROM irc_channel_state WHERE profile_id = ?", profileID); err != nil {
+		return fmt.Errorf("storage: failed to clear IRC channel state: %w", err)
+	}
+	now := time.Now().Format(time.RFC3339)
+	for position, room := range normalized {
+		if _, err := tx.Exec(`INSERT INTO irc_channel_state
+			(profile_id, room_name, position, updated_at) VALUES (?, ?, ?, ?)`,
+			profileID, room, position, now); err != nil {
+			return fmt.Errorf("storage: failed to save IRC channel state: %w", err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("storage: failed to commit IRC channel state: %w", err)
+	}
+	return nil
 }
 
 // ---------------------------------------------------------------------------

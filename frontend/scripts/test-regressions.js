@@ -241,6 +241,16 @@ assertContains(
   "session teardown must dispose IRC terminals and resize observers",
 );
 assertContains(
+  "frontend/src/js/irc.js",
+  "wailsService.IRCRooms(this.sessionID)",
+  "IRC viewers created after connection must hydrate the already joined rooms",
+);
+assertContains(
+  "internal/sessions/manager.go",
+  "GetIRCLastRooms(profile.ID)",
+  "saved IRC profiles must restore the channels open in their last session",
+);
+assertContains(
   "frontend/src/js/app.js",
   "this.recordings.cleanup(sessionId)",
   "session teardown must clear frontend recording state",

@@ -102,6 +102,16 @@ func TestCreateTabName(t *testing.T) {
 	}
 }
 
+func TestMergeIRCRoomsPreservesConfiguredAndRememberedOrder(t *testing.T) {
+	got := mergeIRCRooms(
+		[]string{" #configured ", "#Shared"},
+		[]string{"#shared", "#last-session", "", "#CONFIGURED"},
+	)
+	if joined := strings.Join(got, ","); joined != "#configured,#Shared,#last-session" {
+		t.Fatalf("mergeIRCRooms() = %q, want configured rooms followed by new remembered rooms", joined)
+	}
+}
+
 // ---------------------------------------------------------------------------
 // RenameSession on non-existent session
 // ---------------------------------------------------------------------------

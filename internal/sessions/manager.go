@@ -1466,6 +1466,15 @@ func (m *Manager) connectIRC(sess *Session, getSecret func(prompt string) (strin
 		nickServPass = password
 	}
 
+	autoJoinRooms := append([]string{}, ircConf.AutoJoinRooms...)
+	if m.store != nil && profile.ID != "" {
+		lastRooms, err := m.store.GetIRCLastRooms(profile.ID)
+		if err != nil {
+			return fmt.Errorf("loading remembered IRC rooms: %w", err)
+		}
+		autoJoinRooms = mergeIRCRooms(autoJoinRooms, lastRooms)
+	}
+
 	cfg := ircclient.Config{
 		Server:             profile.Host,
 		Port:               profile.Port,
@@ -1474,7 +1483,7 @@ func (m *Manager) connectIRC(sess *Session, getSecret func(prompt string) (strin
 		RealName:           ircConf.RealName,
 		UseTLS:             ircConf.UseTLS,
 		ServerPass:         serverPass,
-		AutoJoinRooms:      append([]string{}, ircConf.AutoJoinRooms...),
+		AutoJoinRooms:      autoJoinRooms,
 		NickServIdentify:   ircConf.NickServIdentify,
 		NickServAccount:    ircConf.NickServAccount,
 		NickServPassword:   nickServPass,
@@ -1489,6 +1498,19 @@ func (m *Manager) connectIRC(sess *Session, getSecret func(prompt string) (strin
 		SSHAuthMethod:      ircConf.SSHAuthMethod,
 		SSHAgentAuth:       ircConf.SSHAgentAuth,
 		SSHHostKeyCallback: m.hostKeyCallback(sess.Info.ID, models.HostKeyAsk),
+	}
+	if m.store != nil && profile.ID != "" {
+		profileID := profile.ID
+		cfg.OnRoomsChanged = func(rooms []string) {
+			if err := m.store.SaveIRCLastRooms(profileID, rooms); err != nil {
+				m.emitIRCEvent(sess.Info.ID, ircclient.Event{
+					Type:      "system",
+					Target:    ircclient.ServerTarget,
+					Text:      "Could not remember open IRC rooms: " + err.Error(),
+					Timestamp: time.Now().UnixMilli(),
+				})
+			}
+		}
 	}
 
 	if cfg.User == "" {
@@ -1552,6 +1574,26 @@ func (m *Manager) connectIRC(sess *Session, getSecret func(prompt string) (strin
 	sess.ircClient = client
 	m.mu.Unlock()
 	return nil
+}
+
+func mergeIRCRooms(groups ...[]string) []string {
+	var rooms []string
+	seen := make(map[string]struct{})
+	for _, group := range groups {
+		for _, room := range group {
+			room = strings.TrimSpace(room)
+			if room == "" {
+				continue
+			}
+			key := strings.ToLower(room)
+			if _, exists := seen[key]; exists {
+				continue
+			}
+			seen[key] = struct{}{}
+			rooms = append(rooms, room)
+		}
+	}
+	return rooms
 }
 
 func (m *Manager) emitIRCEvent(sessionID string, event ircclient.Event) {

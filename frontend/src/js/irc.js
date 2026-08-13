@@ -11,6 +11,188 @@
   const SERVER_TARGET = "server";
   const MAX_LINES_PER_TARGET = 2000;
   const MAX_LISTED_ROOMS = 200;
+  const ANSI_RESET = "\x1b[0m";
+  const ANSI_DIM = "\x1b[2m";
+  const ANSI_BOLD = "\x1b[1m";
+  const ANSI_ITALIC = "\x1b[3m";
+  const ANSI_UNDERLINE = "\x1b[4m";
+  const ANSI_REVERSE = "\x1b[7m";
+  const ANSI_STRIKE = "\x1b[9m";
+  const ANSI_GREY = "\x1b[38;5;244m";
+  const ANSI_RED = "\x1b[38;5;203m";
+  const ANSI_GREEN = "\x1b[38;5;83m";
+  const ANSI_YELLOW = "\x1b[38;5;221m";
+  const ANSI_CYAN = "\x1b[38;5;81m";
+  const ANSI_MAGENTA = "\x1b[38;5;177m";
+  const NICK_COLOURS = [33, 39, 45, 69, 75, 81, 111, 141, 177, 207, 214, 220];
+
+  // IRC colours 00-98 mapped to the xterm 256-colour palette described by
+  // the modern IRC formatting specification. Colour 99 means terminal default.
+  const IRC_ANSI_COLOURS = [
+    15, 0, 4, 2, 9, 1, 5, 130, 11, 10, 6, 14, 12, 13, 8, 7,
+    52, 94, 100, 58, 22, 29, 23, 24, 17, 54, 53, 89,
+    88, 130, 142, 64, 28, 35, 30, 25, 18, 91, 90, 125,
+    124, 166, 184, 106, 34, 49, 37, 33, 19, 129, 127, 161,
+    196, 208, 226, 154, 46, 86, 51, 75, 21, 171, 201, 198,
+    203, 215, 227, 191, 83, 122, 87, 111, 63, 177, 207, 205,
+    217, 223, 229, 193, 157, 158, 159, 153, 147, 183, 219, 212,
+    16, 233, 235, 237, 239, 241, 244, 247, 250, 254, 231,
+  ];
+
+  function stripTerminalEscapes(value) {
+    return String(value || "")
+      .replace(/\x1b\][^\x07]*(?:\x07|\x1b\\)/g, "")
+      .replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, "")
+      .replace(/\x1b./g, "")
+      .replace(/[\x80-\x9f]/g, "");
+  }
+
+  function readDecimalColour(input, offset) {
+    const match = input.slice(offset).match(/^\d{1,2}/);
+    if (!match) return null;
+    return { value: Number(match[0]), length: match[0].length };
+  }
+
+  function readHexColour(input, offset) {
+    const value = input.slice(offset, offset + 6);
+    if (!/^[0-9a-f]{6}$/i.test(value)) return null;
+    return { value, length: 6 };
+  }
+
+  function indexedColour(code, background = false) {
+    if (code === 99 || code < 0 || code >= IRC_ANSI_COLOURS.length) {
+      return `\x1b[${background ? 49 : 39}m`;
+    }
+    return `\x1b[${background ? 48 : 38};5;${IRC_ANSI_COLOURS[code]}m`;
+  }
+
+  function hexColour(value, background = false) {
+    const red = parseInt(value.slice(0, 2), 16);
+    const green = parseInt(value.slice(2, 4), 16);
+    const blue = parseInt(value.slice(4, 6), 16);
+    return `\x1b[${background ? 48 : 38};2;${red};${green};${blue}m`;
+  }
+
+  function formatIRCText(value) {
+    const input = stripTerminalEscapes(value);
+    const toggles = {
+      "\x02": [ANSI_BOLD, "\x1b[22m", false],
+      "\x1d": [ANSI_ITALIC, "\x1b[23m", false],
+      "\x1e": [ANSI_STRIKE, "\x1b[29m", false],
+      "\x1f": [ANSI_UNDERLINE, "\x1b[24m", false],
+      "\x16": [ANSI_REVERSE, "\x1b[27m", false],
+    };
+    let output = "";
+
+    for (let index = 0; index < input.length; index += 1) {
+      const char = input[index];
+      if (toggles[char]) {
+        const toggle = toggles[char];
+        toggle[2] = !toggle[2];
+        output += toggle[toggle[2] ? 0 : 1];
+        continue;
+      }
+      if (char === "\x0f") {
+        output += ANSI_RESET;
+        for (const toggle of Object.values(toggles)) toggle[2] = false;
+        continue;
+      }
+      if (char === "\x03" || char === "\x04") {
+        const readColour = char === "\x03" ? readDecimalColour : readHexColour;
+        const foreground = readColour(input, index + 1);
+        if (!foreground) {
+          output += "\x1b[39;49m";
+          continue;
+        }
+        index += foreground.length;
+        output +=
+          char === "\x03"
+            ? indexedColour(foreground.value)
+            : hexColour(foreground.value);
+
+        if (input[index + 1] !== ",") continue;
+        const background = readColour(input, index + 2);
+        if (!background) {
+          output += ",";
+          index += 1;
+          continue;
+        }
+        index += background.length + 1;
+        output +=
+          char === "\x03"
+            ? indexedColour(background.value, true)
+            : hexColour(background.value, true);
+        continue;
+      }
+      // xterm is already monospace, so the IRC monospace toggle needs no SGR.
+      if (char === "\x11") continue;
+      const code = char.charCodeAt(0);
+      if (code < 0x20 || code === 0x7f) continue;
+      output += char;
+    }
+    return output;
+  }
+
+  function plainIRCText(value) {
+    return formatIRCText(value).replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, "");
+  }
+
+  function nickColour(nick) {
+    let hash = 0;
+    for (const char of String(nick || "")) {
+      hash = (hash * 31 + char.codePointAt(0)) >>> 0;
+    }
+    return `\x1b[38;5;${NICK_COLOURS[hash % NICK_COLOURS.length]}m`;
+  }
+
+  function formatIRCEvent(event, time) {
+    const from = plainIRCText(event?.from || "");
+    const text = formatIRCText(event?.text || "");
+    const subject = plainIRCText(event?.command || "");
+    const timestamp = `${ANSI_DIM}${ANSI_GREY}[${time}]${ANSI_RESET}`;
+    const styledNick = from
+      ? `${ANSI_BOLD}${nickColour(from)}${from}${ANSI_RESET}`
+      : "";
+    let body;
+
+    switch (event?.type) {
+      case "message":
+        body = `${ANSI_GREY}<${ANSI_RESET}${styledNick}${ANSI_GREY}>${ANSI_RESET} ${text}`;
+        break;
+      case "action":
+        body = `${ANSI_MAGENTA}${ANSI_ITALIC}* ${styledNick}${ANSI_MAGENTA}${ANSI_ITALIC} ${text}`;
+        break;
+      case "notice":
+        body = `${ANSI_YELLOW}-${styledNick || "notice"}${ANSI_YELLOW}-${ANSI_RESET} ${text}`;
+        break;
+      case "join":
+        body = `${ANSI_GREEN}-->${ANSI_RESET} ${styledNick || "user"} joined`;
+        break;
+      case "part":
+        body = `${ANSI_RED}<--${ANSI_RESET} ${styledNick || "user"} left${text ? ` (${text})` : ""}`;
+        break;
+      case "kick":
+        body = `${ANSI_RED}<--${ANSI_RESET} ${ANSI_BOLD}${subject || "user"}${ANSI_RESET} was kicked by ${styledNick || "server"}${text ? ` (${text})` : ""}`;
+        break;
+      case "quit":
+        body = `${ANSI_RED}<--${ANSI_RESET} ${styledNick || "user"} quit${text ? ` (${text})` : ""}`;
+        break;
+      case "nick":
+        body = `${styledNick || "user"} is now known as ${ANSI_BOLD}${plainIRCText(event?.text || "")}${ANSI_RESET}`;
+        break;
+      case "topic":
+        body = `${ANSI_CYAN}${ANSI_BOLD}topic:${ANSI_RESET} ${text}`;
+        break;
+      case "error":
+        body = `${ANSI_RED}${ANSI_BOLD}error:${ANSI_RESET} ${text}`;
+        break;
+      case "system":
+      default:
+        body = `${ANSI_CYAN}${text}`;
+        break;
+    }
+    return `${timestamp} ${body}${ANSI_RESET}`;
+  }
 
   class IRCViewer {
     constructor() {
@@ -68,6 +250,7 @@
       this.roomList = [];
       this.roomFilter = "";
       this.unreadTargets = new Set();
+      this.destroyed = false;
 
       this.tabsEl = null;
       this.termHost = null;
@@ -131,6 +314,7 @@
         text: "Connecting...",
         timestamp: Date.now(),
       });
+      void this._refreshJoinedRooms();
     }
 
     handleEvent(event) {
@@ -170,7 +354,7 @@
         this._renderTabs();
       }
 
-      if (["join", "part", "topic"].includes(event.type)) {
+      if (["join", "part", "kick", "topic"].includes(event.type)) {
         this._renderRooms();
       }
     }
@@ -187,6 +371,7 @@
     }
 
     destroy() {
+      this.destroyed = true;
       if (this.observer) {
         this.observer.disconnect();
         this.observer = null;
@@ -350,7 +535,7 @@
       for (const room of this.joinedRooms) {
         const row = createElement("button", "irc-room-row", {
           type: "button",
-          title: room.topic || room.name,
+          title: plainIRCText(room.topic || room.name),
         });
         row.classList.toggle("active", room.name === this.activeTarget);
         row.appendChild(createElement("span", "irc-room-name", { textContent: room.name }));
@@ -420,7 +605,7 @@
         const row = createElement("div", "irc-listed-room");
         const meta = createElement("button", "irc-listed-room-main", {
           type: "button",
-          title: room.topic || room.name,
+          title: plainIRCText(room.topic || room.name),
         });
         meta.appendChild(
           createElement("span", "irc-listed-room-name", {
@@ -429,7 +614,7 @@
         );
         meta.appendChild(
           createElement("span", "irc-listed-room-topic", {
-            textContent: room.topic || "",
+            textContent: plainIRCText(room.topic || ""),
           }),
         );
         meta.addEventListener("click", () => this._joinRoom(room.name));
@@ -507,6 +692,16 @@
       }
     }
 
+    async _refreshJoinedRooms() {
+      try {
+        const rooms = await window.NexusTerminal.wailsService.IRCRooms(this.sessionID);
+        if (this.destroyed) return;
+        this.handleEvent({ type: "rooms", rooms: Array.isArray(rooms) ? rooms : [] });
+      } catch (_) {
+        // The session may have closed while the viewer was being created.
+      }
+    }
+
     _completeMention() {
       if (!this.inputEl || !this._isRoom(this.activeTarget)) return false;
       const start = this.inputEl.selectionStart || 0;
@@ -560,32 +755,7 @@
     }
 
     _formatEvent(event) {
-      const time = this._time(event.timestamp);
-      const from = this._sanitize(event.from || "");
-      const text = this._sanitize(event.text || "");
-      switch (event.type) {
-        case "message":
-          return `[${time}] <${from}> ${text}`;
-        case "action":
-          return `[${time}] * ${from} ${text}`;
-        case "notice":
-          return `[${time}] -${from || "notice"}- ${text}`;
-        case "join":
-          return `[${time}] --> ${from || "user"} joined`;
-        case "part":
-          return `[${time}] <-- ${from || "user"} left${text ? ` (${text})` : ""}`;
-        case "quit":
-          return `[${time}] <-- ${from || "user"} quit${text ? ` (${text})` : ""}`;
-        case "nick":
-          return `[${time}] ${from || "user"} is now known as ${text}`;
-        case "topic":
-          return `[${time}] topic: ${text}`;
-        case "error":
-          return `[${time}] error: ${text}`;
-        case "system":
-        default:
-          return `[${time}] ${text}`;
-      }
+      return formatIRCEvent(event, this._time(event.timestamp));
     }
 
     _time(value) {
@@ -597,11 +767,7 @@
     }
 
     _sanitize(value) {
-      return String(value || "")
-        .replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, "")
-        .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, "")
-        .replace(/\x03(\d{1,2}(,\d{1,2})?)?/g, "")
-        .replace(/[\x02\x0f\x16\x1d\x1f]/g, "");
+      return plainIRCText(value);
     }
 
     _displayNick(user) {
@@ -620,5 +786,10 @@
   }
 
   window.NexusTerminal = window.NexusTerminal || {};
+  window.NexusTerminal.IRCFormatting = Object.freeze({
+    formatEvent: formatIRCEvent,
+    formatText: formatIRCText,
+    plainText: plainIRCText,
+  });
   window.NexusTerminal.IRCViewer = new IRCViewer();
 })();

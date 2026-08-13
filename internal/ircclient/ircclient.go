@@ -52,6 +52,7 @@ type Config struct {
 	OnEvent        func(Event)
 	OnError        func(error)
 	OnClose        func()
+	OnRoomsChanged func([]string)
 }
 
 // Event is a typed IRC event suitable for JSON delivery to the frontend.
@@ -85,6 +86,7 @@ type Client struct {
 	connected bool
 	closing   bool
 	listRooms []RoomInfo
+	roomNames []string
 }
 
 // New creates an IRC client wrapper.
@@ -406,10 +408,14 @@ func (c *Client) Rooms() []RoomInfo {
 	if c.client == nil {
 		return nil
 	}
-	channels := c.client.Channels()
-	rooms := make([]RoomInfo, 0, len(channels))
-	for _, ch := range channels {
+	c.mu.Lock()
+	roomNames := append([]string{}, c.roomNames...)
+	c.mu.Unlock()
+	rooms := make([]RoomInfo, 0, len(roomNames))
+	for _, roomName := range roomNames {
+		ch := c.client.LookupChannel(roomName)
 		if ch == nil {
+			rooms = append(rooms, RoomInfo{Name: roomName})
 			continue
 		}
 		rooms = append(rooms, RoomInfo{
@@ -445,6 +451,7 @@ func (c *Client) registerHandlers() {
 	c.client.Handlers.Add(girc.NOTICE, c.handleNotice)
 	c.client.Handlers.Add(girc.JOIN, c.handleJoin)
 	c.client.Handlers.Add(girc.PART, c.handlePart)
+	c.client.Handlers.Add(girc.KICK, c.handleKick)
 	c.client.Handlers.Add(girc.QUIT, c.handleQuit)
 	c.client.Handlers.Add(girc.NICK, c.handleNick)
 	c.client.Handlers.Add(girc.TOPIC, c.handleTopic)
@@ -499,6 +506,9 @@ func (c *Client) handleJoin(gc *girc.Client, e girc.Event) {
 		return
 	}
 	from := sourceName(e)
+	if strings.EqualFold(from, gc.GetNick()) {
+		c.rememberRoomMembership(room, true)
+	}
 	c.emit(Event{Type: "join", Target: room, From: from, Text: fmt.Sprintf("%s joined %s", from, room), Timestamp: eventTime(e)})
 	c.emitRooms()
 	c.emitUsers(room)
@@ -514,7 +524,31 @@ func (c *Client) handlePart(gc *girc.Client, e girc.Event) {
 	if len(e.Params) > 1 {
 		message = strings.TrimSpace(e.Last())
 	}
+	if strings.EqualFold(from, gc.GetNick()) {
+		c.rememberRoomMembership(room, false)
+	}
 	c.emit(Event{Type: "part", Target: room, From: from, Text: message, Timestamp: eventTime(e)})
+	c.emitRooms()
+	c.emitUsers(room)
+}
+
+func (c *Client) handleKick(gc *girc.Client, e girc.Event) {
+	if len(e.Params) < 2 {
+		return
+	}
+	room := e.Params[0]
+	kicked := e.Params[1]
+	if strings.EqualFold(kicked, gc.GetNick()) {
+		c.rememberRoomMembership(room, false)
+	}
+	c.emit(Event{
+		Type:      "kick",
+		Target:    room,
+		From:      sourceName(e),
+		Command:   kicked,
+		Text:      strings.TrimSpace(e.Last()),
+		Timestamp: eventTime(e),
+	})
 	c.emitRooms()
 	c.emitUsers(room)
 }
@@ -661,7 +695,39 @@ func (c *Client) sshAuthMethods() ([]ssh.AuthMethod, error) {
 }
 
 func (c *Client) emitRooms() {
-	c.emit(Event{Type: "rooms", Target: ServerTarget, Rooms: c.Rooms(), Timestamp: time.Now().UnixMilli()})
+	rooms := c.Rooms()
+	c.emit(Event{Type: "rooms", Target: ServerTarget, Rooms: rooms, Timestamp: time.Now().UnixMilli()})
+}
+
+func (c *Client) rememberRoomMembership(room string, joined bool) {
+	room = strings.TrimSpace(room)
+	if room == "" {
+		return
+	}
+
+	c.mu.Lock()
+	position := -1
+	changed := false
+	for i, existing := range c.roomNames {
+		if strings.EqualFold(existing, room) {
+			position = i
+			break
+		}
+	}
+	if joined && position == -1 {
+		c.roomNames = append(c.roomNames, room)
+		changed = true
+	}
+	if !joined && position >= 0 {
+		c.roomNames = append(c.roomNames[:position], c.roomNames[position+1:]...)
+		changed = true
+	}
+	names := append([]string{}, c.roomNames...)
+	c.mu.Unlock()
+
+	if changed && c.cfg.OnRoomsChanged != nil {
+		c.cfg.OnRoomsChanged(names)
+	}
 }
 
 func (c *Client) emitUsers(room string) {

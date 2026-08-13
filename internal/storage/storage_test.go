@@ -33,6 +33,15 @@ func makeSSHProfile(name, host string) *models.Profile {
 	return &p
 }
 
+func makeIRCProfile(name, host string) *models.Profile {
+	p := models.NewProfile(models.ProtocolIRC)
+	p.DisplayName = name
+	p.Host = host
+	p.Username = "nexus"
+	p.IRC.Nick = "nexus"
+	return &p
+}
+
 // ---------------------------------------------------------------------------
 // Profile CRUD
 // ---------------------------------------------------------------------------
@@ -101,6 +110,54 @@ func TestDeleteProfileNotFound(t *testing.T) {
 	store := setupTestStore(t)
 	if err := store.DeleteProfile("nonexistent"); err == nil {
 		t.Error("expected error when deleting non-existent profile")
+	}
+}
+
+func TestIRCLastRoomsRoundTripReplaceAndDelete(t *testing.T) {
+	store := setupTestStore(t)
+	p := makeIRCProfile("IRC Network", "irc.example.com")
+	if err := store.CreateProfile(p); err != nil {
+		t.Fatalf("CreateProfile() error = %v", err)
+	}
+
+	if err := store.SaveIRCLastRooms(p.ID, []string{" #Go-Nuts ", "#nexus", "#go-nuts", ""}); err != nil {
+		t.Fatalf("SaveIRCLastRooms() error = %v", err)
+	}
+	rooms, err := store.GetIRCLastRooms(p.ID)
+	if err != nil {
+		t.Fatalf("GetIRCLastRooms() error = %v", err)
+	}
+	if got, want := strings.Join(rooms, ","), "#Go-Nuts,#nexus"; got != want {
+		t.Fatalf("GetIRCLastRooms() = %q, want %q", got, want)
+	}
+
+	if err := store.SaveIRCLastRooms(p.ID, []string{"#new-room"}); err != nil {
+		t.Fatalf("SaveIRCLastRooms(replace) error = %v", err)
+	}
+	rooms, err = store.GetIRCLastRooms(p.ID)
+	if err != nil {
+		t.Fatalf("GetIRCLastRooms(replaced) error = %v", err)
+	}
+	if got, want := strings.Join(rooms, ","), "#new-room"; got != want {
+		t.Fatalf("GetIRCLastRooms(replaced) = %q, want %q", got, want)
+	}
+
+	if err := store.DeleteProfile(p.ID); err != nil {
+		t.Fatalf("DeleteProfile() error = %v", err)
+	}
+	rooms, err = store.GetIRCLastRooms(p.ID)
+	if err != nil {
+		t.Fatalf("GetIRCLastRooms(after delete) error = %v", err)
+	}
+	if len(rooms) != 0 {
+		t.Fatalf("GetIRCLastRooms(after delete) = %v, want empty", rooms)
+	}
+}
+
+func TestSaveIRCLastRoomsRejectsEmptyProfileID(t *testing.T) {
+	store := setupTestStore(t)
+	if err := store.SaveIRCLastRooms(" ", []string{"#room"}); err == nil {
+		t.Fatal("SaveIRCLastRooms() accepted an empty profile ID")
 	}
 }
 
