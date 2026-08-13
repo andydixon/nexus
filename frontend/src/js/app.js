@@ -49,6 +49,10 @@
       this.leviathan = new LeviathanWorkbench(this);
       /** @type {Map<string, Promise<void>>} Idempotent in-flight session closes. */
       this._closingSessions = new Map();
+      this._latencySessionID = null;
+      this._latencyTimer = null;
+      this._latencyGeneration = 0;
+      this._latencyPingInFlight = false;
       this.updateInfo = null;
       this.mode = "nexus";
     }
@@ -1362,17 +1366,44 @@
     }
 
     _startLatencyPing(sessionID) {
-      // Don't restart if already pinging the same session.
-      if (this._latencySessionID === sessionID && this._latencyTimer) return;
+      // Do not queue overlapping backend requests for the active session.
+      if (
+        this._latencySessionID === sessionID &&
+        (this._latencyTimer || this._latencyPingInFlight)
+      ) {
+        return;
+      }
       this._stopLatencyPing();
       this._latencySessionID = sessionID;
+      const generation = this._latencyGeneration;
+
+      const isCurrent = () =>
+        this._latencyGeneration === generation &&
+        this._latencySessionID === sessionID;
+
+      const scheduleNext = () => {
+        if (!isCurrent() || this._latencyTimer) return;
+        this._latencyTimer = setTimeout(() => {
+          this._latencyTimer = null;
+          void doPing();
+        }, 10000);
+      };
 
       const doPing = async () => {
-        if (!window.NexusTerminal?.wailsService) return;
+        if (!isCurrent()) return;
+        if (!window.NexusTerminal?.wailsService) {
+          scheduleNext();
+          return;
+        }
+
+        this._latencyPingInFlight = true;
+        let succeeded = false;
         try {
           const ms = await window.NexusTerminal.wailsService.PingSession(sessionID);
+          if (!isCurrent()) return;
+          succeeded = true;
           const el = document.getElementById("status-latency");
-          if (el && this._latencySessionID === sessionID) {
+          if (el) {
             el.textContent = ms + " ms";
             el.className =
               ms < 100
@@ -1382,6 +1413,7 @@
                   : "latency-bad";
           }
         } catch (_) {
+          if (!isCurrent()) return;
           // Session may have disconnected — clear indicator.
           const el = document.getElementById("status-latency");
           if (el) {
@@ -1389,18 +1421,24 @@
             el.className = "";
           }
           this._stopLatencyPing();
+        } finally {
+          if (isCurrent()) {
+            this._latencyPingInFlight = false;
+            if (succeeded) scheduleNext();
+          }
         }
       };
 
-      doPing();
-      this._latencyTimer = setInterval(doPing, 10000);
+      void doPing();
     }
 
     _stopLatencyPing() {
+      this._latencyGeneration = (this._latencyGeneration || 0) + 1;
       if (this._latencyTimer) {
-        clearInterval(this._latencyTimer);
+        clearTimeout(this._latencyTimer);
         this._latencyTimer = null;
       }
+      this._latencyPingInFlight = false;
       this._latencySessionID = null;
     }
 

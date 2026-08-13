@@ -222,11 +222,82 @@ async function testCompleteAppTeardownIsImmediateAndIdempotent() {
   assert.strictEqual(app._closingSessions.size, 0);
 }
 
+async function testLatencyPingIsSingleFlightAndIgnoresStaleResults() {
+  const flushAsync = () => new Promise((resolve) => setImmediate(resolve));
+  let nextTimerID = 1;
+  const timers = new Map();
+  const latencyEl = { textContent: "", className: "" };
+  const context = loadScript("src/js/app.js", {
+    setTimeout: (callback) => {
+      const id = nextTimerID++;
+      timers.set(id, callback);
+      return id;
+    },
+    clearTimeout: (id) => timers.delete(id),
+    document: {
+      querySelector: () => null,
+      getElementById: (id) => (id === "status-latency" ? latencyEl : null),
+      addEventListener: () => {},
+    },
+  });
+  const App = context.window.NexusTerminal.App;
+  const app = Object.create(App.prototype);
+  app._latencySessionID = null;
+  app._latencyTimer = null;
+  app._latencyGeneration = 0;
+  app._latencyPingInFlight = false;
+
+  const pending = [];
+  context.window.NexusTerminal.wailsService = {
+    PingSession: (sessionID) =>
+      new Promise((resolve, reject) => {
+        pending.push({ sessionID, resolve, reject });
+      }),
+  };
+
+  app._startLatencyPing("session-a");
+  app._startLatencyPing("session-a");
+  assert.strictEqual(pending.length, 1, "an in-flight ping must not overlap");
+  assert.strictEqual(timers.size, 0, "the next ping waits for completion");
+
+  app._startLatencyPing("session-b");
+  assert.strictEqual(pending.length, 2);
+  pending[0].reject(new Error("stale session closed"));
+  await flushAsync();
+  assert.strictEqual(app._latencySessionID, "session-b");
+  assert.strictEqual(
+    app._latencyPingInFlight,
+    true,
+    "a stale rejection must not stop the current session ping",
+  );
+
+  pending[1].resolve(42);
+  await flushAsync();
+  assert.strictEqual(latencyEl.textContent, "42 ms");
+  assert.strictEqual(latencyEl.className, "latency-good");
+  assert.strictEqual(timers.size, 1, "one follow-up ping should be scheduled");
+
+  const followUp = timers.values().next().value;
+  timers.clear();
+  followUp();
+  assert.strictEqual(pending.length, 3);
+  assert.strictEqual(pending[2].sessionID, "session-b");
+  assert.strictEqual(timers.size, 0, "follow-up pings must also be single-flight");
+
+  pending[2].resolve(250);
+  await flushAsync();
+  assert.strictEqual(latencyEl.className, "latency-bad");
+  assert.strictEqual(timers.size, 1);
+  app._stopLatencyPing();
+  assert.strictEqual(timers.size, 0);
+}
+
 (async () => {
   await testRepeatedSplitCleanup();
   testClosedPaneRejectsLateConnection();
   testPerSessionStoresReleaseIDs();
   await testCompleteAppTeardownIsImmediateAndIdempotent();
+  await testLatencyPingIsSingleFlightAndIgnoresStaleResults();
   console.log("Session lifecycle regression tests passed.");
 })().catch((err) => {
   console.error(err);
