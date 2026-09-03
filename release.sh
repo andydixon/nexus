@@ -13,8 +13,8 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m'
 
-DEFAULT_UPDATE_URL="https://dixon.cx/downloads/link/manifest-{platform}-{arch}.json"
-DEFAULT_RELEASE_BASE_URL="https://dixon.cx/downloads/link"
+DEFAULT_UPDATE_URL="https://alchementary.co.uk/download/link/manifest-{platform}-{arch}.json"
+DEFAULT_RELEASE_BASE_URL="https://alchementary.co.uk/download/link"
 WAILS_VERSION="$(link_wails_version go.mod)"
 GO_TOOLCHAIN_VERSION="$(
     awk '
