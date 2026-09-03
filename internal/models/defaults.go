@@ -128,8 +128,8 @@ func NewProfile(protocol Protocol) Profile {
 	case ProtocolIRC:
 		p.Port = DefaultIRCPort
 		p.IRC = &IRCConfig{
-			Nick:               "nexus",
-			RealName:           "Nexus Terminal",
+			Nick:               "link",
+			RealName:           "Alchementary Link",
 			ServerPasswordMode: SecretModeAskEveryTime,
 			NickServMode:       SecretModeSaved,
 			AutoJoinRooms:      []string{},

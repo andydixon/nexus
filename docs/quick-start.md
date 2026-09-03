@@ -1,10 +1,10 @@
-# Nexus Terminal Quick Start
+# Alchementary Link Quick Start
 
-Nexus Terminal is a desktop client for SSH, Telnet, RAW TCP, VNC, GitHub, local terminal sessions, and Leviathan binary analysis. This page is a shareable quick start for everyday use.
+Alchementary Link is a desktop client for SSH, Telnet, RAW TCP, VNC, GitHub, local terminal sessions, and Leviathan binary analysis. This page is a shareable quick start for everyday use.
 
 ## Get connected in minutes
 
-1. Open Nexus Terminal.
+1. Open Alchementary Link.
 2. Click **New** in the sidebar.
 3. Choose a protocol and enter the connection details.
 4. Click **Connect** to open the session in a new tab.
@@ -26,7 +26,7 @@ Create a **VNC** profile for remote desktop sessions. Use SSH tunnelling when po
 
 ## Leviathan binary tools
 
-Click **Leviathan** beside **Nexus Terminal** in the sidebar header to switch from connection profiles to binary-analysis tools. Use **Load** to choose a file, then open tools such as Hex Editor, Overview, Hashes, Entropy, Strings, Carve, BinSnoop, Structures, PDF, SquashFS, Transforms, and Spectrogram tools. Tools open in normal tabs and can be closed without a disconnect confirmation.
+Click **Leviathan** beside **Alchementary Link** in the sidebar header to switch from connection profiles to binary-analysis tools. Use **Load** to choose a file, then open tools such as Hex Editor, Overview, Hashes, Entropy, Strings, Carve, BinSnoop, Structures, PDF, SquashFS, Transforms, and Spectrogram tools. Tools open in normal tabs and can be closed without a disconnect confirmation.
 
 ## File transfers on SSH
 

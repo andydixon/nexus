@@ -1,10 +1,10 @@
 (function () {
   /**
-   * Nexus Terminal — SSH Key Manager.
+   * Alchementary Link — SSH Key Manager.
    * Panel for listing, generating, copying, and deleting SSH key pairs.
    */
 
-  const { createElement, dismissContextMenus } = window.NexusTerminal;
+  const { createElement, dismissContextMenus } = window.AlchementaryLink;
 
   class SSHKeyManager {
     constructor(app) {
@@ -81,7 +81,7 @@
       list.innerHTML = '<div class="sshkey-loading">Loading keys…</div>';
 
       try {
-        const keys = await window.NexusTerminal.wailsService.ListSSHKeyPairs();
+        const keys = await window.AlchementaryLink.wailsService.ListSSHKeyPairs();
         if (keys.length === 0) {
           list.innerHTML =
             '<div class="sshkey-empty">No SSH keys found in ~/.ssh/</div>';
@@ -138,7 +138,7 @@
 
     async _copyPublicKey(key) {
       try {
-        const pubKey = await window.NexusTerminal.wailsService.GetSSHPublicKey(key.name);
+        const pubKey = await window.AlchementaryLink.wailsService.GetSSHPublicKey(key.name);
         if (window.runtime && window.runtime.ClipboardSetText) {
           window.runtime.ClipboardSetText(pubKey);
         } else {
@@ -163,7 +163,7 @@
 
     async _deleteKey(key) {
       try {
-        await window.NexusTerminal.wailsService.DeleteSSHKey(key.name);
+        await window.AlchementaryLink.wailsService.DeleteSSHKey(key.name);
         this.app.notifications.success(`Key "${key.name}" deleted`);
         this._loadKeys();
       } catch (err) {
@@ -181,7 +181,7 @@
       form.innerHTML = `
         <div class="form-group">
           <label class="form-label">Key Name</label>
-          <input type="text" class="form-input sshkey-name-input" placeholder="id_ed25519_nexus" autocomplete="off" spellcheck="false" />
+          <input type="text" class="form-input sshkey-name-input" placeholder="id_ed25519_link" autocomplete="off" spellcheck="false" />
         </div>
         <div class="form-group">
           <label class="form-label">Type</label>
@@ -242,7 +242,7 @@
           }
 
           try {
-            await window.NexusTerminal.wailsService.GenerateSSHKey(
+            await window.AlchementaryLink.wailsService.GenerateSSHKey(
               name,
               keyType,
               bits,
@@ -332,6 +332,6 @@
     }
   }
 
-  window.NexusTerminal = window.NexusTerminal || {};
-  window.NexusTerminal.SSHKeyManager = SSHKeyManager;
+  window.AlchementaryLink = window.AlchementaryLink || {};
+  window.AlchementaryLink.SSHKeyManager = SSHKeyManager;
 })();

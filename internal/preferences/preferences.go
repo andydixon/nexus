@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/andydixon/nexus/internal/models"
+	"github.com/andydixon/link/internal/models"
 )
 
 // PreferenceStore is the persistence interface used by the Manager.

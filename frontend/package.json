@@ -1,8 +1,8 @@
 {
-  "name": "nexus-terminal-frontend",
+  "name": "alchementary-link-frontend",
   "version": "0.1.0",
   "private": true,
-  "description": "Frontend for Nexus Terminal desktop SSH client",
+  "description": "Frontend for Alchementary Link desktop SSH client",
   "scripts": {
     "install:assets": "node scripts/copy-assets.js",
     "bundle:novnc": "node scripts/bundle-novnc.js",

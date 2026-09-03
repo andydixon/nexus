@@ -1,5 +1,5 @@
 // Package sshconfig parses OpenSSH ~/.ssh/config files and converts
-// Host blocks into Nexus Terminal connection profiles. Supports a useful
+// Host blocks into Alchementary Link connection profiles. Supports a useful
 // subset of SSH config directives: HostName, Port, User, IdentityFile,
 // ProxyJump, ForwardAgent, and Compression.
 //
@@ -18,7 +18,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/andydixon/nexus/internal/models"
+	"github.com/andydixon/link/internal/models"
 	"github.com/google/uuid"
 )
 
@@ -170,7 +170,7 @@ func DefaultConfigPath() string {
 	return filepath.Join(home, ".ssh", "config")
 }
 
-// ToProfiles converts parsed Host blocks into Nexus Terminal profiles.
+// ToProfiles converts parsed Host blocks into Alchementary Link profiles.
 // Each block produces one profile; the first alias becomes the display name.
 func ToProfiles(blocks []HostBlock, folder string) []models.Profile {
 	profiles := make([]models.Profile, 0, len(blocks))

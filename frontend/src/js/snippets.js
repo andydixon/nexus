@@ -1,11 +1,11 @@
 (function () {
   /**
-   * Nexus Terminal — snippet / command library.
+   * Alchementary Link — snippet / command library.
    * Provides a panel for managing and sending reusable commands to active sessions.
    */
 
   const { createElement, escapeHtml, dismissContextMenus } =
-    window.NexusTerminal;
+    window.AlchementaryLink;
 
   class SnippetLibrary {
     /**
@@ -91,8 +91,8 @@
     /** @private */
     _sendCommand(sessionId, command) {
       try {
-        const b64 = window.NexusTerminal.utf8ToBase64(command + "\n");
-        window.NexusTerminal.wailsService.WriteSession(sessionId, b64);
+        const b64 = window.AlchementaryLink.utf8ToBase64(command + "\n");
+        window.AlchementaryLink.wailsService.WriteSession(sessionId, b64);
         this.app.notifications.info("Snippet sent");
       } catch (err) {
         this.app.notifications.error("Failed to send snippet: " + err);
@@ -171,7 +171,7 @@
     /** @private */
     async _loadSnippets() {
       try {
-        this.snippets = (await window.NexusTerminal.wailsService.ListSnippets()) || [];
+        this.snippets = (await window.AlchementaryLink.wailsService.ListSnippets()) || [];
       } catch (err) {
         this.snippets = [];
         console.error("Failed to load snippets:", err);
@@ -334,7 +334,7 @@
       });
       deleteBtn.addEventListener("click", async () => {
         try {
-          await window.NexusTerminal.wailsService.DeleteSnippet(snippet.id);
+          await window.AlchementaryLink.wailsService.DeleteSnippet(snippet.id);
           this.snippets = this.snippets.filter((s) => s.id !== snippet.id);
           this._renderList(modal, closeFn);
           detailPanel.innerHTML =
@@ -418,10 +418,10 @@
 
             let saved;
             if (isNew) {
-              saved = await window.NexusTerminal.wailsService.CreateSnippet(data);
+              saved = await window.AlchementaryLink.wailsService.CreateSnippet(data);
               this.snippets.push(saved);
             } else {
-              saved = await window.NexusTerminal.wailsService.UpdateSnippet(data);
+              saved = await window.AlchementaryLink.wailsService.UpdateSnippet(data);
               const idx = this.snippets.findIndex((s) => s.id === saved.id);
               if (idx !== -1) this.snippets[idx] = saved;
             }
@@ -449,6 +449,6 @@
     }
   }
 
-  window.NexusTerminal = window.NexusTerminal || {};
-  window.NexusTerminal.SnippetLibrary = SnippetLibrary;
+  window.AlchementaryLink = window.AlchementaryLink || {};
+  window.AlchementaryLink.SnippetLibrary = SnippetLibrary;
 })();

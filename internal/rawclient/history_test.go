@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/andydixon/nexus/internal/models"
+	"github.com/andydixon/link/internal/models"
 )
 
 func TestHistoryIsCappedByEntryCount(t *testing.T) {

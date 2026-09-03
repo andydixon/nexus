@@ -1,5 +1,5 @@
 /* ==========================================================================
-   Nexus Terminal — Sidebar
+   Alchementary Link — Sidebar
    Connection manager: logo, search, sections, profile list, footer.
    ========================================================================== */
 
@@ -72,6 +72,10 @@
 
 .sidebar-mode-toggle.is-active {
   color: var(--text-primary);
+}
+
+.sidebar-brand-gold {
+  color: var(--sidebar-group-title);
 }
 
 .sidebar-mode-toggle:hover {

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# build.sh — Build script for Nexus Terminal
+# build.sh — Build script for Alchementary Link
 # Provides a reproducible build process for CI and local builds.
 # Usage: ./build.sh [dev|build|test|clean|deps]
 set -euo pipefail
@@ -14,12 +14,12 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
-log()  { echo -e "${GREEN}[nexus]${NC} $1"; }
-warn() { echo -e "${YELLOW}[nexus]${NC} $1"; }
-err()  { echo -e "${RED}[nexus]${NC} $1" >&2; }
+log()  { echo -e "${GREEN}[link]${NC} $1"; }
+warn() { echo -e "${YELLOW}[link]${NC} $1"; }
+err()  { echo -e "${RED}[link]${NC} $1" >&2; }
 
 MIN_GO_VERSION="1.25.12"
-WAILS_VERSION="$(nexus_wails_version go.mod)"
+WAILS_VERSION="$(link_wails_version go.mod)"
 WAILS_BIN=""
 WAILS_USE_GO_RUN=0
 
@@ -93,16 +93,16 @@ wails_cmd() {
 }
 
 ensure_upx() {
-    if ! nexus_bool_enabled "${NEXUS_COMPRESS:-0}"; then
+    if ! link_bool_enabled "${LINK_COMPRESS:-0}"; then
         return
     fi
-    if nexus_skips_upx_for_target "$(host_os)"; then
+    if link_skips_upx_for_target "$(host_os)"; then
         return
     fi
     if command -v upx >/dev/null 2>&1; then
         return
     fi
-    err "NEXUS_COMPRESS=1 requires UPX. Install it first, for example: brew install upx"
+    err "LINK_COMPRESS=1 requires UPX. Install it first, for example: brew install upx"
     exit 1
 }
 
@@ -134,7 +134,7 @@ check_linux_deps() {
 }
 
 build_tags() {
-    nexus_build_tags
+    link_build_tags
 }
 
 host_os() {
@@ -146,11 +146,11 @@ host_os() {
 }
 
 build_version() {
-    nexus_build_version
+    link_build_version
 }
 
 build_ldflags() {
-    nexus_build_ldflags "$1"
+    link_build_ldflags "$1"
 }
 
 # Check prerequisites
@@ -200,16 +200,16 @@ build() {
     version="$(build_version)"
     local tags
     tags="$(build_tags)"
-    nexus_configure_pure_go_build
+    link_configure_pure_go_build
     local build_args=("-trimpath")
-    if nexus_bool_enabled "${NEXUS_COMPRESS:-0}"; then
-        if nexus_skips_upx_for_target "$(host_os)"; then
-            warn "Skipping UPX compression on macOS; distribute the zipped .app instead, or set NEXUS_FORCE_MACOS_UPX=1 with suitable NEXUS_UPX_FLAGS."
+    if link_bool_enabled "${LINK_COMPRESS:-0}"; then
+        if link_skips_upx_for_target "$(host_os)"; then
+            warn "Skipping UPX compression on macOS; distribute the zipped .app instead, or set LINK_FORCE_MACOS_UPX=1 with suitable LINK_UPX_FLAGS."
         else
             log "Using UPX compression"
             build_args+=("-upx")
-            if [ -n "${NEXUS_UPX_FLAGS:-}" ]; then
-                build_args+=("-upxflags" "$NEXUS_UPX_FLAGS")
+            if [ -n "${LINK_UPX_FLAGS:-}" ]; then
+                build_args+=("-upxflags" "$LINK_UPX_FLAGS")
             fi
         fi
     fi
@@ -222,7 +222,7 @@ build() {
 
     # Replace Wails-generated icon with custom app icon on macOS.
     if [[ "$OSTYPE" == darwin* ]]; then
-        local app_bundle="build/bin/nexus-terminal.app"
+        local app_bundle="build/bin/alchementary-link.app"
         local custom_icns="build/darwin/AppIcon.icns"
         if [ -d "$app_bundle" ] && [ -f "$custom_icns" ]; then
             cp "$custom_icns" "$app_bundle/Contents/Resources/iconfile.icns"

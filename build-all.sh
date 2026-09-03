@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# build-all.sh — Cross-build helper for Nexus Terminal (macOS/Linux hosts)
+# build-all.sh — Cross-build helper for Alchementary Link (macOS/Linux hosts)
 # Builds all supported targets where the required toolchains are installed.
 # Usage: ./build-all.sh
 set -euo pipefail
@@ -13,9 +13,9 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m'
 
-log()  { echo -e "${GREEN}[nexus]${NC} $1"; }
-warn() { echo -e "${YELLOW}[nexus]${NC} $1"; }
-err()  { echo -e "${RED}[nexus]${NC} $1" >&2; }
+log()  { echo -e "${GREEN}[link]${NC} $1"; }
+warn() { echo -e "${YELLOW}[link]${NC} $1"; }
+err()  { echo -e "${RED}[link]${NC} $1" >&2; }
 
 MIN_GO_VERSION="1.25.12"
 WAILS_VERSION="$(awk '$1 == "github.com/wailsapp/wails/v2" { print $2; exit }' go.mod)"
@@ -94,7 +94,7 @@ wails_cmd() {
 }
 
 ensure_upx() {
-    if ! nexus_bool_enabled "${NEXUS_COMPRESS:-0}"; then
+    if ! link_bool_enabled "${LINK_COMPRESS:-0}"; then
         return
     fi
     if command -v upx >/dev/null 2>&1; then
@@ -132,9 +132,9 @@ build_version() {
 
 build_ldflags() {
     local version="$1"
-    local flags="-s -w -X github.com/andydixon/nexus/internal/api.appVersion=${version}"
-    if [ -n "${NEXUS_UPDATE_URL:-}" ]; then
-        flags="${flags} -X github.com/andydixon/nexus/internal/api.appUpdateURL=${NEXUS_UPDATE_URL}"
+    local flags="-s -w -X github.com/andydixon/link/internal/api.appVersion=${version}"
+    if [ -n "${LINK_UPDATE_URL:-}" ]; then
+        flags="${flags} -X github.com/andydixon/link/internal/api.appUpdateURL=${LINK_UPDATE_URL}"
     fi
     echo "${flags}"
 }
@@ -186,24 +186,24 @@ build_target() {
     local host_arch_value="$4"
     local version="$5"
     local platform="${target_os}/${target_arch}"
-    nexus_configure_pure_go_build
+    link_configure_pure_go_build
     local ldflags
     ldflags="$(build_ldflags "${version}")"
     local tags
     tags="$(build_tags)"
     local build_args=("-platform" "$target_os/$target_arch" "-trimpath")
-    if nexus_use_upx_for_target "$target_os"; then
+    if link_use_upx_for_target "$target_os"; then
         if ! command -v upx >/dev/null 2>&1; then
-            warn "Skipping ${platform} (NEXUS_COMPRESS=1 requires UPX)"
+            warn "Skipping ${platform} (LINK_COMPRESS=1 requires UPX)"
             ((SKIPPED_TARGETS += 1))
             return 0
         fi
         build_args+=("-upx")
-        if [ -n "${NEXUS_UPX_FLAGS:-}" ]; then
-            build_args+=("-upxflags" "$NEXUS_UPX_FLAGS")
+        if [ -n "${LINK_UPX_FLAGS:-}" ]; then
+            build_args+=("-upxflags" "$LINK_UPX_FLAGS")
         fi
-    elif nexus_skips_upx_for_target "$target_os"; then
-        warn "Skipping UPX compression for ${platform}; distribute the zipped .app instead, or set NEXUS_FORCE_MACOS_UPX=1 with suitable NEXUS_UPX_FLAGS."
+    elif link_skips_upx_for_target "$target_os"; then
+        warn "Skipping UPX compression for ${platform}; distribute the zipped .app instead, or set LINK_FORCE_MACOS_UPX=1 with suitable LINK_UPX_FLAGS."
     fi
     if [ -n "$tags" ]; then
         build_args+=("-tags" "$tags")

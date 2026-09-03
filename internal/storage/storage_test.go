@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/andydixon/nexus/internal/models"
+	"github.com/andydixon/link/internal/models"
 	"github.com/google/uuid"
 )
 
@@ -37,8 +37,8 @@ func makeIRCProfile(name, host string) *models.Profile {
 	p := models.NewProfile(models.ProtocolIRC)
 	p.DisplayName = name
 	p.Host = host
-	p.Username = "nexus"
-	p.IRC.Nick = "nexus"
+	p.Username = "link"
+	p.IRC.Nick = "link"
 	return &p
 }
 
@@ -120,14 +120,14 @@ func TestIRCLastRoomsRoundTripReplaceAndDelete(t *testing.T) {
 		t.Fatalf("CreateProfile() error = %v", err)
 	}
 
-	if err := store.SaveIRCLastRooms(p.ID, []string{" #Go-Nuts ", "#nexus", "#go-nuts", ""}); err != nil {
+	if err := store.SaveIRCLastRooms(p.ID, []string{" #Go-Nuts ", "#link", "#go-nuts", ""}); err != nil {
 		t.Fatalf("SaveIRCLastRooms() error = %v", err)
 	}
 	rooms, err := store.GetIRCLastRooms(p.ID)
 	if err != nil {
 		t.Fatalf("GetIRCLastRooms() error = %v", err)
 	}
-	if got, want := strings.Join(rooms, ","), "#Go-Nuts,#nexus"; got != want {
+	if got, want := strings.Join(rooms, ","), "#Go-Nuts,#link"; got != want {
 		t.Fatalf("GetIRCLastRooms() = %q, want %q", got, want)
 	}
 

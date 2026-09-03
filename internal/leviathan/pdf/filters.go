@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/andydixon/nexus/internal/leviathan/transforms"
+	"github.com/andydixon/link/internal/leviathan/transforms"
 )
 
 const MaxDecodedStreamOutput = 64 << 20

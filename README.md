@@ -1,8 +1,8 @@
-# Nexus Terminal
+# Alchementary Link
 
 **A desktop client for SSH, Telnet, RAW TCP, VNC, GitHub, local terminals, and Leviathan binary analysis — with secure credential handling and a focused, multi-session workflow.**
 
-Nexus Terminal helps you manage many connections at once, keep terminal work organised, and move files with confidence.
+Alchementary Link helps you manage many connections at once, keep terminal work organised, and move files with confidence.
 
 ## Highlights
 
@@ -17,7 +17,7 @@ Nexus Terminal helps you manage many connections at once, keep terminal work org
 
 ## Quick start
 
-1. Launch Nexus Terminal.
+1. Launch Alchementary Link.
 2. Click **New** in the sidebar and create a connection profile.
 3. Click **Connect** to open a session in a new tab.
 

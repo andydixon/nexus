@@ -8,7 +8,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/andydixon/nexus/internal/models"
+	"github.com/andydixon/link/internal/models"
 	"github.com/lrstanley/girc"
 )
 

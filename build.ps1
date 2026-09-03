@@ -1,11 +1,11 @@
-# build.ps1 — Windows build script for Nexus Terminal
+# build.ps1 — Windows build script for Alchementary Link
 # Usage: .\build.ps1 [dev|build|test|clean|deps]
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-function Write-Info($Message) { Write-Host "[nexus] $Message" -ForegroundColor Green }
-function Write-Warn($Message) { Write-Host "[nexus] $Message" -ForegroundColor Yellow }
-function Write-Err($Message)  { Write-Host "[nexus] $Message" -ForegroundColor Red }
+function Write-Info($Message) { Write-Host "[link] $Message" -ForegroundColor Green }
+function Write-Warn($Message) { Write-Host "[link] $Message" -ForegroundColor Yellow }
+function Write-Err($Message)  { Write-Host "[link] $Message" -ForegroundColor Red }
 
 function Test-BoolEnabled([string]$Value) {
     return $Value -match '^(1|true|TRUE|yes|YES|on|ON)$'
@@ -67,9 +67,9 @@ function Get-BuildVersion {
 }
 
 function Get-Ldflags([string]$Version) {
-    $flags = "-s -w -buildid= -X github.com/andydixon/nexus/internal/api.appVersion=$Version"
-    if ($env:NEXUS_UPDATE_URL) {
-        $flags += " -X github.com/andydixon/nexus/internal/api.appUpdateURL=$($env:NEXUS_UPDATE_URL)"
+    $flags = "-s -w -buildid= -X github.com/andydixon/link/internal/api.appVersion=$Version"
+    if ($env:LINK_UPDATE_URL) {
+        $flags += " -X github.com/andydixon/link/internal/api.appUpdateURL=$($env:LINK_UPDATE_URL)"
     }
     return $flags
 }
@@ -92,13 +92,13 @@ function Build {
     Remove-Item Env:CGO_CXXFLAGS -ErrorAction SilentlyContinue
 
     $buildArgs = @('build', '-trimpath')
-    if (Test-BoolEnabled $env:NEXUS_COMPRESS) {
+    if (Test-BoolEnabled $env:LINK_COMPRESS) {
         if (-not (Get-Command upx -ErrorAction SilentlyContinue)) {
-            throw 'NEXUS_COMPRESS=1 requires UPX. Install it first.'
+            throw 'LINK_COMPRESS=1 requires UPX. Install it first.'
         }
         $buildArgs += '-upx'
-        if ($env:NEXUS_UPX_FLAGS) {
-            $buildArgs += @('-upxflags', $env:NEXUS_UPX_FLAGS)
+        if ($env:LINK_UPX_FLAGS) {
+            $buildArgs += @('-upxflags', $env:LINK_UPX_FLAGS)
         }
     }
     $buildArgs += @('-ldflags', $ldflags)

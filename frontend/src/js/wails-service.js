@@ -1,5 +1,5 @@
 (function () {
-  const root = (window.NexusTerminal = window.NexusTerminal || {});
+  const root = (window.AlchementaryLink = window.AlchementaryLink || {});
 
   const directService = () => window.go?.api?.Service || null;
   const unavailable = (name) =>

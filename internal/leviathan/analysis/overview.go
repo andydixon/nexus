@@ -1,7 +1,7 @@
 package analysis
 
 import (
-	"github.com/andydixon/nexus/internal/leviathan/document"
+	"github.com/andydixon/link/internal/leviathan/document"
 )
 
 // Overview returns a compact first-pass report intended for both UI

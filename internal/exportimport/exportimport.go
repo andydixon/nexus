@@ -18,7 +18,7 @@ import (
 
 	"golang.org/x/crypto/argon2"
 
-	"github.com/andydixon/nexus/internal/models"
+	"github.com/andydixon/link/internal/models"
 )
 
 const (

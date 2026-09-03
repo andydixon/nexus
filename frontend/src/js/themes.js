@@ -1,6 +1,6 @@
 (function () {
   /**
-   * Nexus Terminal — terminal colour themes.
+   * Alchementary Link — terminal colour themes.
    * Provides a collection of preset xterm.js colour schemes and a manager
    * for applying them to terminal instances.
    */
@@ -341,7 +341,7 @@
     }));
   }
 
-  window.NexusTerminal = window.NexusTerminal || {};
-  window.NexusTerminal.getTerminalTheme = getTerminalTheme;
-  window.NexusTerminal.listTerminalThemes = listTerminalThemes;
+  window.AlchementaryLink = window.AlchementaryLink || {};
+  window.AlchementaryLink.getTerminalTheme = getTerminalTheme;
+  window.AlchementaryLink.listTerminalThemes = listTerminalThemes;
 })();

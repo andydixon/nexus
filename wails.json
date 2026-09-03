@@ -1,19 +1,19 @@
 {
   "$schema": "https://wails.io/schemas/config.v2.json",
-  "name": "nexus-terminal",
-  "outputfilename": "NexusTerminal",
+  "name": "alchementary-link",
+  "outputfilename": "AlchementaryLink",
   "frontend:install": "npm ci",
   "frontend:build": "npm run build",
   "frontend:dev:watcher": "npm run dev",
   "frontend:dev:serverUrl": "auto",
   "author": {
-    "name": "Nexus Terminal Contributors"
+    "name": "Alchementary Link Contributors"
   },
   "info": {
-    "companyName": "Nexus Terminal",
-    "productName": "Nexus Terminal",
+    "companyName": "Alchementary Link",
+    "productName": "Alchementary Link",
     "productVersion": "0.1.0",
-    "copyright": "Copyright © 2024 Nexus Terminal Contributors",
+    "copyright": "Copyright © 2024 Alchementary Link Contributors",
     "comments": "A premium desktop SSH, Telnet, and RAW TCP client"
   },
   "windows": {

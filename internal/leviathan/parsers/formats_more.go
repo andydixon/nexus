@@ -15,7 +15,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/andydixon/nexus/internal/leviathan/document"
+	"github.com/andydixon/link/internal/leviathan/document"
 )
 
 // leaf builds a terminal Field with no children.

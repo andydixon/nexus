@@ -1,6 +1,6 @@
 (function () {
   /**
-   * Nexus Terminal — xterm.js terminal manager.
+   * Alchementary Link — xterm.js terminal manager.
    * Creates, manages, and destroys xterm.js instances for SSH and Telnet sessions.
    * Handles data routing, resizing, and search.
    */
@@ -52,7 +52,7 @@
       const themeName =
         (this.app.state.preferences || {}).terminalTheme || "charcoal";
       const term = new Terminal({
-        theme: window.NexusTerminal.getTerminalTheme(themeName),
+        theme: window.AlchementaryLink.getTerminalTheme(themeName),
         fontFamily:
           profile.terminalFontFamily ||
           'JetBrains Mono, Menlo, Monaco, Consolas, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", monospace',
@@ -155,7 +155,7 @@
             const data = seq.repeat(lines);
             const b64 = utf8ToBase64(data);
             try {
-              window.NexusTerminal.wailsService.WriteSession(sessionId, b64);
+              window.AlchementaryLink.wailsService.WriteSession(sessionId, b64);
             } catch (_) {
               /* non-critical */
             }
@@ -263,7 +263,7 @@
 
         try {
           const b64 = utf8ToBase64(data);
-          window.NexusTerminal.wailsService.WriteSession(sessionId, b64);
+          window.AlchementaryLink.wailsService.WriteSession(sessionId, b64);
 
           // Broadcast to other connected sessions if enabled
           if (this.app.state.broadcastMode) {
@@ -275,7 +275,7 @@
               const otherSession = this.app.state.getSession(otherId);
               if (otherSession && otherSession.state === "connected") {
                 try {
-                  window.NexusTerminal.wailsService.WriteSession(otherId, b64);
+                  window.AlchementaryLink.wailsService.WriteSession(otherId, b64);
                 } catch (_) {
                   /* non-critical */
                 }
@@ -570,7 +570,7 @@
      * @param {string} themeName
      */
     applyTheme(themeName) {
-      const themeObj = window.NexusTerminal.getTerminalTheme(themeName);
+      const themeObj = window.AlchementaryLink.getTerminalTheme(themeName);
       for (const [, entry] of this.terminals) {
         entry.term.options.theme = themeObj;
       }
@@ -584,7 +584,7 @@
       if (cols <= 0 || rows <= 0) return;
 
       Promise.resolve(
-        window.NexusTerminal.wailsService.ResizeSession(sessionId, cols, rows),
+        window.AlchementaryLink.wailsService.ResizeSession(sessionId, cols, rows),
       ).catch((err) => console.error("ResizeSession error:", err));
     }
 
@@ -593,7 +593,7 @@
       entry.localRestarting = true;
 
       try {
-        await window.NexusTerminal.wailsService.RestartLocalSession(
+        await window.AlchementaryLink.wailsService.RestartLocalSession(
           sessionId,
           entry.term.cols,
           entry.term.rows,
@@ -617,7 +617,7 @@
       let overlay = panel.querySelector(".terminal-disconnect-overlay");
       if (overlay) return overlay;
 
-      const { createElement } = window.NexusTerminal;
+      const { createElement } = window.AlchementaryLink;
       if (!createElement) return null;
 
       overlay = createElement("div", "terminal-disconnect-overlay");
@@ -653,7 +653,7 @@
      * @private
      */
     _showTerminalContextMenu(sessionId, term, x, y) {
-      const { createElement, dismissContextMenus } = window.NexusTerminal;
+      const { createElement, dismissContextMenus } = window.AlchementaryLink;
       dismissContextMenus();
 
       const isMac = navigator.platform.indexOf("Mac") !== -1;
@@ -813,7 +813,7 @@
     }
 
     _promptFileDropAction(files, canUpload) {
-      const { createElement, escapeHtml, formatBytes } = window.NexusTerminal;
+      const { createElement, escapeHtml, formatBytes } = window.AlchementaryLink;
       return new Promise((resolve) => {
         const backdrop = createElement("div", "modal-backdrop");
         const modal = createElement("div", "modal modal-sm");
@@ -951,7 +951,7 @@
       const totalBytes = typeof file.size === "number" ? file.size : 0;
       let uploadId = "";
       try {
-        uploadId = await window.NexusTerminal.wailsService.SFTPUploadStart(
+        uploadId = await window.AlchementaryLink.wailsService.SFTPUploadStart(
           sessionId,
           remoteDir,
           file.name,
@@ -962,14 +962,14 @@
           const end = Math.min(offset + UPLOAD_CHUNK_BYTES, totalBytes);
           const buffer = await this._readFileSlice(file, offset, end);
           const base64Data = this._arrayBufferToBase64(buffer);
-          await window.NexusTerminal.wailsService.SFTPUploadChunk(uploadId, base64Data);
+          await window.AlchementaryLink.wailsService.SFTPUploadChunk(uploadId, base64Data);
         }
 
-        await window.NexusTerminal.wailsService.SFTPUploadFinish(uploadId);
+        await window.AlchementaryLink.wailsService.SFTPUploadFinish(uploadId);
       } catch (err) {
         if (uploadId) {
           try {
-            await window.NexusTerminal.wailsService.SFTPUploadCancel(uploadId);
+            await window.AlchementaryLink.wailsService.SFTPUploadCancel(uploadId);
           } catch (_) {
             /* noop */
           }
@@ -1001,7 +1001,7 @@
     }
 
     _openUploadDirectoryPicker(sessionId) {
-      const { createElement, escapeHtml } = window.NexusTerminal;
+      const { createElement, escapeHtml } = window.AlchementaryLink;
       return new Promise((resolve) => {
         const backdrop = createElement("div", "modal-backdrop");
         const modal = createElement("div", "modal modal-lg");
@@ -1223,12 +1223,12 @@
           renderLoading();
           try {
             const targetPath =
-              path || (await window.NexusTerminal.wailsService.SFTPPwd(sessionId));
-            const files = await window.NexusTerminal.wailsService.SFTPList(
+              path || (await window.AlchementaryLink.wailsService.SFTPPwd(sessionId));
+            const files = await window.AlchementaryLink.wailsService.SFTPList(
               sessionId,
               targetPath,
             );
-            const stat = await window.NexusTerminal.wailsService.SFTPStat(
+            const stat = await window.AlchementaryLink.wailsService.SFTPStat(
               sessionId,
               targetPath,
             );
@@ -1320,7 +1320,7 @@
     }
 
     _buildPickerRow(entry, index) {
-      const { createElement } = window.NexusTerminal;
+      const { createElement } = window.AlchementaryLink;
       const dataset = { path: entry.path || "" };
       if (typeof index === "number") {
         dataset.index = String(index);
@@ -1395,7 +1395,7 @@
      * @private
      */
     _exportTerminalOutput(sessionId, term) {
-      const { createElement } = window.NexusTerminal;
+      const { createElement } = window.AlchementaryLink;
       const buffer = term.buffer.active;
       const lines = [];
       for (let i = 0; i < buffer.length; i++) {
@@ -1438,7 +1438,7 @@
      * @private
      */
     _showPortForwardPanel(sessionId) {
-      const { createElement, escapeHtml } = window.NexusTerminal;
+      const { createElement, escapeHtml } = window.AlchementaryLink;
       const session = this.app.state.getSession(sessionId);
       if (!session || session.protocol !== "ssh") {
         this.app.notifications.error(
@@ -1502,7 +1502,7 @@
       const renderForwards = async () => {
         try {
           const forwards =
-            (await window.NexusTerminal.wailsService.ListPortForwards(sessionId)) || [];
+            (await window.AlchementaryLink.wailsService.ListPortForwards(sessionId)) || [];
           listEl.innerHTML = "";
           if (forwards.length === 0) {
             listEl.innerHTML =
@@ -1528,7 +1528,7 @@
             });
             stopBtn.addEventListener("click", async () => {
               try {
-                await window.NexusTerminal.wailsService.StopPortForward(sessionId, fwd.id);
+                await window.AlchementaryLink.wailsService.StopPortForward(sessionId, fwd.id);
                 self.app.notifications.info("Forward stopped");
                 renderForwards();
               } catch (err) {
@@ -1573,7 +1573,7 @@
         }
 
         try {
-          await window.NexusTerminal.wailsService.StartPortForward(sessionId, {
+          await window.AlchementaryLink.wailsService.StartPortForward(sessionId, {
             id: "",
             direction: direction,
             bindHost: bindHost,
@@ -1604,10 +1604,10 @@
     _buildTheme() {
       const themeName =
         (this.app.state.preferences || {}).terminalTheme || "charcoal";
-      return window.NexusTerminal.getTerminalTheme(themeName);
+      return window.AlchementaryLink.getTerminalTheme(themeName);
     }
   }
 
-  window.NexusTerminal = window.NexusTerminal || {};
-  window.NexusTerminal.TerminalManager = TerminalManager;
+  window.AlchementaryLink = window.AlchementaryLink || {};
+  window.AlchementaryLink.TerminalManager = TerminalManager;
 })();

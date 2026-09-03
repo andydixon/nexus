@@ -6,7 +6,7 @@ import (
 	"errors"
 	"regexp"
 
-	"github.com/andydixon/nexus/internal/leviathan/document"
+	"github.com/andydixon/link/internal/leviathan/document"
 )
 
 // SearchHit describes one search result.

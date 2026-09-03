@@ -3,9 +3,9 @@
 # Resolve the Wails binary. Prefer wails on PATH; fall back to GOPATH/bin.
 WAILS := $(or $(shell which wails 2>/dev/null),$(shell go env GOPATH)/bin/wails)
 VERSION := $(shell git describe --tags --abbrev=0 2>/dev/null || echo dev)-$(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
-LD_UPDATE_URL := $(if $(NEXUS_UPDATE_URL),-X github.com/andydixon/nexus/internal/api.appUpdateURL=$(NEXUS_UPDATE_URL),)
+LD_UPDATE_URL := $(if $(LINK_UPDATE_URL),-X github.com/andydixon/link/internal/api.appUpdateURL=$(LINK_UPDATE_URL),)
 UPX_FLAGS ?=
-NEXUS_FORCE_MACOS_UPX ?= 0
+LINK_FORCE_MACOS_UPX ?= 0
 GOBIN_DIR := $(shell go env GOPATH)/bin
 export PATH := $(GOBIN_DIR):$(PATH)
 
@@ -18,11 +18,11 @@ deps: frontend-deps
 
 upx-check:
 	@command -v upx >/dev/null 2>&1 || { echo "UPX is required for compressed builds. Install it first, for example: brew install upx"; exit 1; }
-	@if [ "$$(uname -s)" = "Darwin" ] && [ "$(NEXUS_FORCE_MACOS_UPX)" != "1" ]; then \
-		echo "UPX compression is disabled for macOS by default. Use ./release.sh for a zipped .app, or run NEXUS_FORCE_MACOS_UPX=1 UPX_FLAGS='--force-macos --best --no-color --no-progress' make build-compressed."; \
+	@if [ "$$(uname -s)" = "Darwin" ] && [ "$(LINK_FORCE_MACOS_UPX)" != "1" ]; then \
+		echo "UPX compression is disabled for macOS by default. Use ./release.sh for a zipped .app, or run LINK_FORCE_MACOS_UPX=1 UPX_FLAGS='--force-macos --best --no-color --no-progress' make build-compressed."; \
 		exit 1; \
 	fi
-	@if [ "$$(uname -s)" = "Darwin" ] && [ "$(NEXUS_FORCE_MACOS_UPX)" = "1" ] && ! printf '%s\n' "$(UPX_FLAGS)" | grep -q -- '--force-macos'; then \
+	@if [ "$$(uname -s)" = "Darwin" ] && [ "$(LINK_FORCE_MACOS_UPX)" = "1" ] && ! printf '%s\n' "$(UPX_FLAGS)" | grep -q -- '--force-macos'; then \
 		echo "macOS UPX builds must pass --force-macos in UPX_FLAGS."; \
 		exit 1; \
 	fi
@@ -37,11 +37,11 @@ dev: deps
 
 # Production build
 build: deps
-	CGO_ENABLED=0 $(WAILS) build -trimpath -ldflags "-s -w -buildid= -X github.com/andydixon/nexus/internal/api.appVersion=$(VERSION) $(LD_UPDATE_URL)"
+	CGO_ENABLED=0 $(WAILS) build -trimpath -ldflags "-s -w -buildid= -X github.com/andydixon/link/internal/api.appVersion=$(VERSION) $(LD_UPDATE_URL)"
 
 # Production build with UPX compression
 build-compressed: deps upx-check
-	CGO_ENABLED=0 $(WAILS) build -trimpath -upx $(if $(UPX_FLAGS),-upxflags "$(UPX_FLAGS)",) -ldflags "-s -w -buildid= -X github.com/andydixon/nexus/internal/api.appVersion=$(VERSION) $(LD_UPDATE_URL)"
+	CGO_ENABLED=0 $(WAILS) build -trimpath -upx $(if $(UPX_FLAGS),-upxflags "$(UPX_FLAGS)",) -ldflags "-s -w -buildid= -X github.com/andydixon/link/internal/api.appVersion=$(VERSION) $(LD_UPDATE_URL)"
 
 # Run tests
 test:
@@ -74,7 +74,7 @@ release:
 
 # Help
 help:
-	@echo "Nexus Terminal — Build Targets"
+	@echo "Alchementary Link — Build Targets"
 	@echo ""
 	@echo "  make deps          — Install all dependencies"
 	@echo "  make dev           — Run in development mode with hot reload"

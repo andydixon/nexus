@@ -17,7 +17,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/andydixon/nexus/internal/models"
+	"github.com/andydixon/link/internal/models"
 )
 
 const (
@@ -90,7 +90,7 @@ func (c *Client) fetchRepos(ctx context.Context, progress func(done int, total i
 		}
 		req.Header.Set("Authorization", "Bearer "+c.token)
 		req.Header.Set("Accept", "application/vnd.github+json")
-		req.Header.Set("User-Agent", "NexusTerminal/1.0")
+		req.Header.Set("User-Agent", "AlchementaryLink/1.0")
 
 		resp, err := c.httpClient.Do(req)
 		if err != nil {
@@ -210,7 +210,7 @@ func (c *Client) FetchLatestCommit(ctx context.Context, fullName string, ref str
 	}
 	req.Header.Set("Authorization", "Bearer "+c.token)
 	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Set("User-Agent", "NexusTerminal/1.0")
+	req.Header.Set("User-Agent", "AlchementaryLink/1.0")
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -280,7 +280,7 @@ func (c *Client) DownloadRepoArchive(ctx context.Context, fullName string, ref s
 	}
 	req.Header.Set("Authorization", "Bearer "+c.token)
 	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Set("User-Agent", "NexusTerminal/1.0")
+	req.Header.Set("User-Agent", "AlchementaryLink/1.0")
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -319,7 +319,7 @@ func (c *Client) ValidateToken(ctx context.Context) (string, error) {
 	}
 	req.Header.Set("Authorization", "Bearer "+c.token)
 	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Set("User-Agent", "NexusTerminal/1.0")
+	req.Header.Set("User-Agent", "AlchementaryLink/1.0")
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {

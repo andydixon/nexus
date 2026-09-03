@@ -124,7 +124,7 @@ if (!$platform && !$arch) {
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Nexus Terminal Downloads</title>
+    <title>Alchementary Link Downloads</title>
     <style>
         :root {
             --bg: #111318;
@@ -210,7 +210,7 @@ if (!$platform && !$arch) {
 
 <body>
     <div class="wrap">
-        <h1>Nexus Terminal Downloads</h1>
+        <h1>Alchementary Link Downloads</h1>
         <div class="meta">Latest version: <span class="badge"><?php echo h($latest); ?></span><?php if ($platformLabel) {
                                                                                                     echo ' • ' . h($platformLabel);
                                                                                                 } ?><?php if ($published) {

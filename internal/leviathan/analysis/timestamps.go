@@ -5,7 +5,7 @@ import (
 	"math"
 	"time"
 
-	"github.com/andydixon/nexus/internal/leviathan/document"
+	"github.com/andydixon/link/internal/leviathan/document"
 )
 
 // ScanTimestamps walks the range looking for plausible timestamps in

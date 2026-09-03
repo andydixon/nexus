@@ -1,12 +1,12 @@
 (function () {
   /**
-   * Nexus Terminal — settings modal.
+   * Alchementary Link — settings modal.
    * Renders a tabbed settings dialog for application-wide preferences,
    * terminal defaults, security, known-hosts management, and about info.
    */
 
   const { createElement, escapeHtml, formatTimestamp, $ } =
-    window.NexusTerminal;
+    window.AlchementaryLink;
 
   /** Settings tab definitions. */
   const TABS = [
@@ -65,13 +65,13 @@
       this._activeTab = tabKey || this._activeTab || "general";
 
       try {
-        this._knownHosts = (await window.NexusTerminal.wailsService.ListKnownHosts()) || [];
+        this._knownHosts = (await window.AlchementaryLink.wailsService.ListKnownHosts()) || [];
       } catch (_) {
         this._knownHosts = [];
       }
 
       try {
-        this._defaultShell = await window.NexusTerminal.wailsService.GetDefaultShell();
+        this._defaultShell = await window.AlchementaryLink.wailsService.GetDefaultShell();
       } catch (_) {
         this._defaultShell = "";
       }
@@ -106,7 +106,7 @@
       this._collectValues();
 
       try {
-        await window.NexusTerminal.wailsService.SavePreferences(this._prefs);
+        await window.AlchementaryLink.wailsService.SavePreferences(this._prefs);
         this.app.state.setPreferences(this._prefs);
 
         // Apply terminal colour theme change immediately.
@@ -331,7 +331,7 @@
       });
       browseBtn.addEventListener("click", async () => {
         try {
-          const path = await window.NexusTerminal.wailsService.BrowseForShell();
+          const path = await window.AlchementaryLink.wailsService.BrowseForShell();
           if (path) {
             shellInput.value = path;
           }
@@ -356,7 +356,7 @@
       const p = this._prefs;
 
       // Terminal colour theme selector
-      const themes = window.NexusTerminal.listTerminalThemes();
+      const themes = window.AlchementaryLink.listTerminalThemes();
       body.appendChild(
         this._settingField(
           "select",
@@ -448,7 +448,7 @@
         initBtn.addEventListener("click", async () => {
           try {
             const pw = await this.app.secretPrompt.promptMasterPassword(true);
-            await window.NexusTerminal.wailsService.InitialiseSecretStore(pw);
+            await window.AlchementaryLink.wailsService.InitialiseSecretStore(pw);
             this.app.state.setSecretStoreInitialised(true);
             this.app.state.setSecretStoreState(true);
             this.app.notifications.success("Secret store created");
@@ -467,7 +467,7 @@
         unlockBtn.addEventListener("click", async () => {
           try {
             const pw = await this.app.secretPrompt.promptMasterPassword(false);
-            await window.NexusTerminal.wailsService.UnlockSecretStore(pw);
+            await window.AlchementaryLink.wailsService.UnlockSecretStore(pw);
             this.app.state.setSecretStoreState(true);
             this.app.notifications.success("Secret store unlocked");
             this._renderTabContent(body);
@@ -484,7 +484,7 @@
         });
         lockBtn.addEventListener("click", async () => {
           try {
-            await window.NexusTerminal.wailsService.LockSecretStore();
+            await window.AlchementaryLink.wailsService.LockSecretStore();
             this.app.state.setSecretStoreState(false);
             this.app.notifications.info("Secret store locked");
             this._renderTabContent(body);
@@ -541,7 +541,7 @@
         });
         deleteBtn.addEventListener("click", async () => {
           try {
-            await window.NexusTerminal.wailsService.DeleteKnownHost(kh.id);
+            await window.AlchementaryLink.wailsService.DeleteKnownHost(kh.id);
             this._knownHosts = this._knownHosts.filter((h) => h.id !== kh.id);
             this._renderTabContent(body);
             this.app.notifications.success("Known host removed");
@@ -568,7 +568,7 @@
           id: "getting-started",
           title: "Getting Started",
           content: `
-                <p>Welcome to <strong>Nexus Terminal</strong> — a desktop application for SSH, Telnet, RAW TCP, VNC, GitHub, local terminal, and Leviathan binary-analysis workflows.</p>
+                <p>Welcome to <strong>Alchementary Link</strong> — a desktop application for SSH, Telnet, RAW TCP, VNC, GitHub, local terminal, and Leviathan binary-analysis workflows.</p>
                 <h4>Creating Your First Connection</h4>
                 <ol>
                     <li>Click the <strong>+</strong> button at the top of the sidebar, or press <kbd>⌘N</kbd> (Mac) / <kbd>Ctrl+N</kbd> (Windows/Linux).</li>
@@ -578,7 +578,7 @@
                     <li>Click <strong>Save</strong>, then double-click the entry in the sidebar to connect.</li>
                 </ol>
                 <h4>Leviathan Tools</h4>
-                <p>Click <strong>Leviathan</strong> beside <strong>Nexus Terminal</strong> in the sidebar header to switch from connection profiles to binary-analysis tools. Use <strong>Load</strong> to choose a local file, then open tools such as Hex Editor, Overview, Entropy, Carve, BinSnoop, Structures, and Spectrogram View.</p>
+                <p>Click <strong>Leviathan</strong> beside <strong>Alchementary Link</strong> in the sidebar header to switch from connection profiles to binary-analysis tools. Use <strong>Load</strong> to choose a local file, then open tools such as Hex Editor, Overview, Entropy, Carve, BinSnoop, Structures, and Spectrogram View.</p>
                 <h4>Quick Connect</h4>
                 <p>Need to connect quickly without saving a profile? Press <kbd>⌘⇧Q</kbd> / <kbd>Ctrl+Shift+Q</kbd> to open the quick connect dialog. Choose SSH, Telnet, or RAW, enter the host and port, and you're connected immediately.</p>
                 <h4>Managing Connections</h4>
@@ -589,7 +589,7 @@
           id: "ssh",
           title: "SSH Connections",
           content: `
-                <p>SSH (Secure Shell) is the most common way to connect to remote servers. Nexus Terminal supports:</p>
+                <p>SSH (Secure Shell) is the most common way to connect to remote servers. Alchementary Link supports:</p>
                 <ul>
                     <li><strong>Password authentication</strong> — enter your password when prompted, or save it in the encrypted vault.</li>
                     <li><strong>Public key authentication</strong> — point to your private key file (e.g. <code>~/.ssh/id_rsa</code>). If the key has a passphrase, you will be prompted.</li>
@@ -597,13 +597,13 @@
                     <li><strong>SSH agent</strong> — tick "Use SSH Agent" to authenticate via your system's SSH agent (e.g. <code>ssh-agent</code> or 1Password).</li>
                 </ul>
                 <h4>TOTP / 2FA Auto-Fill</h4>
-                <p>If your server requires a time-based one-time password (TOTP) during login, you can store the TOTP secret in the profile editor under the <strong>TOTP / 2FA</strong> section. When connecting, Nexus Terminal will detect 2FA prompts (such as "Verification code" or "OTP") and automatically generate and submit a 6-digit code. Use the <strong>Test</strong> button to verify your secret generates valid codes before connecting.</p>
+                <p>If your server requires a time-based one-time password (TOTP) during login, you can store the TOTP secret in the profile editor under the <strong>TOTP / 2FA</strong> section. When connecting, Alchementary Link will detect 2FA prompts (such as "Verification code" or "OTP") and automatically generate and submit a 6-digit code. Use the <strong>Test</strong> button to verify your secret generates valid codes before connecting.</p>
                 <h4>Jump Hosts (Bastions)</h4>
-                <p>If you need to reach a server through an intermediate host, add one or more jump hosts in the connection editor. Nexus Terminal will tunnel through each hop automatically.</p>
+                <p>If you need to reach a server through an intermediate host, add one or more jump hosts in the connection editor. Alchementary Link will tunnel through each hop automatically.</p>
                 <h4>Port Forwarding</h4>
                 <p>You can set up <strong>local</strong>, <strong>remote</strong>, and <strong>dynamic</strong> (SOCKS proxy) port forwards in the connection editor. These start automatically when the session connects.</p>
                 <h4>Proxy Support</h4>
-                <p>If you need to connect through a proxy, open the <strong>Proxy</strong> section in the profile editor. Nexus Terminal supports <strong>SOCKS5</strong> and <strong>HTTP CONNECT</strong> proxies, with optional username/password authentication. The proxy is used to reach the SSH server (or the first jump host if jump hosts are configured).</p>
+                <p>If you need to connect through a proxy, open the <strong>Proxy</strong> section in the profile editor. Alchementary Link supports <strong>SOCKS5</strong> and <strong>HTTP CONNECT</strong> proxies, with optional username/password authentication. The proxy is used to reach the SSH server (or the first jump host if jump hosts are configured).</p>
                 <h4>SFTP File Browser</h4>
                 <p>Once connected to an SSH server, click the <strong>📁</strong> icon on the tab to open the SFTP file browser. You can browse directories, upload, download, rename, and delete files from a side panel.</p>
                 <h4>SSH Agent Forwarding</h4>
@@ -627,7 +627,7 @@
           content: `
                 <p>Telnet is an older, unencrypted protocol still used for network equipment, legacy systems, and some fun internet services.</p>
                 <ul>
-                    <li><strong>Option negotiation</strong> — Nexus Terminal handles standard Telnet options (echo, terminal type, window size) automatically.</li>
+                    <li><strong>Option negotiation</strong> — Alchementary Link handles standard Telnet options (echo, terminal type, window size) automatically.</li>
                     <li><strong>Character encoding</strong> — choose UTF-8, ASCII, or Latin-1 for the connection.</li>
                     <li><strong>Local echo</strong> — enable this if the remote host does not echo back what you type.</li>
                     <li><strong>Line mode</strong> — send data line-by-line (press Enter to send) rather than character-by-character.</li>
@@ -656,7 +656,7 @@
           id: "vnc",
           title: "VNC Connections",
           content: `
-                <p>VNC profiles open a remote desktop viewer inside the Nexus workspace.</p>
+                <p>VNC profiles open a remote desktop viewer inside the Link workspace.</p>
                 <ul>
                     <li><strong>Password handling</strong> — ask each time, use the session only, or save the password in the encrypted secret store.</li>
                     <li><strong>View-only mode</strong> — observe a desktop without sending mouse or keyboard input.</li>
@@ -672,7 +672,7 @@
           id: "github",
           title: "GitHub Connections",
           content: `
-                <p>The GitHub connection type lets you browse your repositories without leaving Nexus Terminal.</p>
+                <p>The GitHub connection type lets you browse your repositories without leaving Alchementary Link.</p>
                 <h4>Setting Up</h4>
                 <ol>
                     <li>Create a new connection and choose <strong>GitHub</strong> as the protocol.</li>
@@ -775,20 +775,20 @@
           title: "Security & Credentials",
           content: `
                 <h4>How Your Passwords Are Stored</h4>
-                <p>Nexus Terminal uses a <strong>two-tier</strong> approach to keep your credentials safe:</p>
+                <p>Alchementary Link uses a <strong>two-tier</strong> approach to keep your credentials safe:</p>
                 <ol>
                     <li><strong>OS keychain</strong> (preferred) — your operating system's built-in credential store (macOS Keychain, Windows Credential Manager, or Linux Secret Service). If available, this is used automatically.</li>
-                    <li><strong>Encrypted vault</strong> (fallback) — if the OS keychain is not available, Nexus Terminal creates a local vault encrypted with AES-256-GCM. You set a master password to unlock it.</li>
+                    <li><strong>Encrypted vault</strong> (fallback) — if the OS keychain is not available, Alchementary Link creates a local vault encrypted with AES-256-GCM. You set a master password to unlock it.</li>
                 </ol>
                 <h4>Encryption Details</h4>
                 <p>The vault uses <strong>Argon2id</strong> to derive the encryption key from your master password (128 MiB memory, making brute-force attacks very expensive). Each secret is individually encrypted and never stored in plain text.</p>
                 <h4>TOTP / 2FA Secrets</h4>
                 <p>TOTP secrets for SSH two-factor authentication are stored alongside your other credentials — encrypted in the OS keychain or the file vault. They are never saved in the profile database in plain text.</p>
                 <h4>Known Hosts</h4>
-                <p>When you connect to an SSH server for the first time, Nexus Terminal records the server's fingerprint. If the fingerprint changes on a subsequent connection, you'll be warned — this protects against man-in-the-middle attacks.</p>
+                <p>When you connect to an SSH server for the first time, Alchementary Link records the server's fingerprint. If the fingerprint changes on a subsequent connection, you'll be warned — this protects against man-in-the-middle attacks.</p>
                 <p>You can manage known hosts and change the verification policy in <strong>Settings → Known Hosts</strong>.</p>
                 <h4>Encrypted Export</h4>
-                <p>When exporting profiles, you can choose encrypted export (.nexus file) which protects the file with a password. This uses the same strong AES-256-GCM encryption as the vault.</p>
+                <p>When exporting profiles, you can choose encrypted export (.link file) which protects the file with a password. This uses the same strong AES-256-GCM encryption as the vault.</p>
             `,
         },
         {
@@ -822,11 +822,11 @@
           title: "Import & Export",
           content: `
                 <h4>Exporting Profiles</h4>
-                <p>Click the <strong>↗</strong> export button in the sidebar footer. You can choose which profiles to include, and set a password to encrypt the file. Exported files use the <code>.nexus</code> extension.</p>
+                <p>Click the <strong>↗</strong> export button in the sidebar footer. You can choose which profiles to include, and set a password to encrypt the file. Exported files use the <code>.link</code> extension.</p>
                 <h4>Importing Profiles</h4>
-                <p>Click the <strong>↙</strong> import button. Select a <code>.nexus</code> file and enter the password used when exporting. Imported profiles will appear in your sidebar immediately.</p>
+                <p>Click the <strong>↙</strong> import button. Select a <code>.link</code> file and enter the password used when exporting. Imported profiles will appear in your sidebar immediately.</p>
                 <h4>Importing from OpenSSH</h4>
-                <p>If you have an existing <code>~/.ssh/config</code> file, go to <strong>Settings → About</strong> and click <strong>Import ~/.ssh/config</strong>. Nexus Terminal will create profiles from your SSH Host blocks, including hostnames, usernames, ports, identity files, and jump hosts.</p>
+                <p>If you have an existing <code>~/.ssh/config</code> file, go to <strong>Settings → About</strong> and click <strong>Import ~/.ssh/config</strong>. Alchementary Link will create profiles from your SSH Host blocks, including hostnames, usernames, ports, identity files, and jump hosts.</p>
             `,
         },
         {
@@ -892,16 +892,16 @@
                 <h4>SFTP panel doesn't open</h4>
                 <p>SFTP is only available for <strong>SSH</strong> connections (not Telnet, RAW, or GitHub). Make sure you are connected to an SSH session first, then click the <strong>📁</strong> icon on the tab.</p>
                 <h4>The application looks blurry on my display</h4>
-                <p>Make sure your system display scaling is set correctly. On macOS, Nexus Terminal is fully Retina-aware. On Windows, check your DPI settings in Display preferences.</p>
+                <p>Make sure your system display scaling is set correctly. On macOS, Alchementary Link is fully Retina-aware. On Windows, check your DPI settings in Display preferences.</p>
                 <h4>Export/import isn't working</h4>
-                <p>Ensure you're using the same password to import that was used to export. The encrypted <code>.nexus</code> files cannot be opened with the wrong password.</p>
+                <p>Ensure you're using the same password to import that was used to export. The encrypted <code>.link</code> files cannot be opened with the wrong password.</p>
             `,
         },
         {
           id: "fun",
           title: "Fun Things to Try",
           content: `
-                <p>Nexus Terminal isn't just for work! Here are some entertaining things you can connect to:</p>
+                <p>Alchementary Link isn't just for work! Here are some entertaining things you can connect to:</p>
                 <h4>🌟 Star Wars in ASCII Art</h4>
                 <p>Create a <strong>Telnet</strong> connection to <code>towel.blinkenlights.nl</code> on port <strong>23</strong>. Sit back and enjoy the original Star Wars film retold entirely in ASCII art.</p>
                 <h4>🗺️ MapSCII — World Map in Your Terminal</h4>
@@ -974,9 +974,9 @@
     _renderAboutTab(body) {
       body.innerHTML = `
             <div class="about-section">
-                <h3 class="about-title">Nexus Terminal</h3>
+                <h3 class="about-title">Alchementary Link</h3>
                 <p class="about-version" data-role="app-version">Version …</p>
-                <p class="about-desc">Developed by Andy Dixon - www.dixon.cx/nexus</p>
+                <p class="about-desc">Developed by Andy Dixon - alchementary.co.uk</p>
                 <div class="about-links">
                     <p>AES-256-GCM encrypted credential vault</p>
                     <p>Platform-native keychain integration</p>
@@ -993,8 +993,8 @@
 
       const versionEl = body.querySelector("[data-role='app-version']");
       if (versionEl) {
-        if (window.NexusTerminal?.wailsService) {
-          window.NexusTerminal.wailsService.GetAppInfo()
+        if (window.AlchementaryLink?.wailsService) {
+          window.AlchementaryLink.wailsService.GetAppInfo()
             .then((info) => {
               const version = (info && info.version) || "dev";
               versionEl.textContent = `Version ${version}`;
@@ -1013,7 +1013,7 @@
           updateBtn.disabled = true;
           updateBtn.textContent = "Checking…";
           try {
-            const info = await window.NexusTerminal.wailsService.CheckForUpdates();
+            const info = await window.AlchementaryLink.wailsService.CheckForUpdates();
             const resultEl = body.querySelector("#settings-update-result");
             if (this.app && typeof this.app.setUpdateInfo === "function") {
               this.app.setUpdateInfo(info);
@@ -1061,7 +1061,7 @@
           importBtn.disabled = true;
           importBtn.textContent = "Importing…";
           try {
-            const count = await window.NexusTerminal.wailsService.ImportSSHConfig(
+            const count = await window.AlchementaryLink.wailsService.ImportSSHConfig(
               "",
               "SSH Config",
             );
@@ -1129,7 +1129,7 @@
       };
 
       try {
-        await window.NexusTerminal.wailsService.SavePreferences(prefs);
+        await window.AlchementaryLink.wailsService.SavePreferences(prefs);
         this._prefs.leviathanEnabled = enabled;
         this.app.state.setPreferences(prefs);
         this.app._applyPreferences?.();
@@ -1271,6 +1271,6 @@
     }
   }
 
-  window.NexusTerminal = window.NexusTerminal || {};
-  window.NexusTerminal.Settings = Settings;
+  window.AlchementaryLink = window.AlchementaryLink || {};
+  window.AlchementaryLink.Settings = Settings;
 })();

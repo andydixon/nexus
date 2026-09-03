@@ -100,35 +100,35 @@ jobs:
             - name: Package (zip)
               if: matrix.archive_type == 'zip' && matrix.runner != 'windows-latest'
               run: |
-                  archive="nexus-terminal-${{ matrix.platform }}.zip"
+                  archive="alchementary-link-${{ matrix.platform }}.zip"
                   cd build/bin
                   zip -r "../../${archive}" .
 
             - name: Package (tar)
               if: matrix.archive_type == 'tar'
               run: |
-                  archive="nexus-terminal-${{ matrix.platform }}.tar.gz"
+                  archive="alchementary-link-${{ matrix.platform }}.tar.gz"
                   tar -czf "${archive}" -C build/bin .
 
             - name: Package (Windows zip)
               if: matrix.archive_type == 'zip' && matrix.runner == 'windows-latest'
               shell: pwsh
               run: |
-                  $archive = "nexus-terminal-${{ matrix.platform }}.zip"
+                  $archive = "alchementary-link-${{ matrix.platform }}.zip"
                   Compress-Archive -Path "build/bin/*" -DestinationPath $archive
 
             - name: Upload artifact
               uses: actions/upload-artifact@v4
               with:
-                  name: nexus-terminal-${{ matrix.platform }}
+                  name: alchementary-link-${{ matrix.platform }}
                   path: |
-                      nexus-terminal-${{ matrix.platform }}.zip
-                      nexus-terminal-${{ matrix.platform }}.tar.gz
+                      alchementary-link-${{ matrix.platform }}.zip
+                      alchementary-link-${{ matrix.platform }}.tar.gz
 
             - name: Attach to GitHub Release
               if: startsWith(github.ref, 'refs/tags/')
               uses: softprops/action-gh-release@v2
               with:
                   files: |
-                      nexus-terminal-${{ matrix.platform }}.zip
-                      nexus-terminal-${{ matrix.platform }}.tar.gz
+                      alchementary-link-${{ matrix.platform }}.zip
+                      alchementary-link-${{ matrix.platform }}.tar.gz

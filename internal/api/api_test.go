@@ -7,10 +7,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/andydixon/nexus/internal/audit"
-	"github.com/andydixon/nexus/internal/leviathan/document"
-	"github.com/andydixon/nexus/internal/models"
-	"github.com/andydixon/nexus/internal/storage"
+	"github.com/andydixon/link/internal/audit"
+	"github.com/andydixon/link/internal/leviathan/document"
+	"github.com/andydixon/link/internal/models"
+	"github.com/andydixon/link/internal/storage"
 )
 
 type closeTrackingWriter struct {

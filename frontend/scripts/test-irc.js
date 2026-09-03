@@ -8,7 +8,7 @@ const frontendRoot = path.resolve(__dirname, "..");
 const source = fs.readFileSync(path.join(frontendRoot, "src/js/irc.js"), "utf8");
 const context = {
   window: {
-    NexusTerminal: {
+    AlchementaryLink: {
       createElement: () => {
         throw new Error("formatting tests must not create DOM elements");
       },
@@ -18,7 +18,7 @@ const context = {
 vm.createContext(context);
 vm.runInContext(source, context, { filename: "src/js/irc.js" });
 
-const formatting = context.window.NexusTerminal.IRCFormatting;
+const formatting = context.window.AlchementaryLink.IRCFormatting;
 assert.ok(formatting, "IRC formatting helpers should be exported");
 
 assert.strictEqual(

@@ -1,6 +1,6 @@
 (function () {
   /**
-   * Nexus Terminal — sidebar module.
+   * Alchementary Link — sidebar module.
    * Renders the profile list with search, sections (favourites, recent, all),
    * and context menus.
    */
@@ -12,7 +12,7 @@
     protocolColour,
     dismissContextMenus,
     truncate,
-  } = window.NexusTerminal;
+  } = window.AlchementaryLink;
 
   /** Maximum number of profiles shown in the "Recent" section. */
   const RECENT_LIMIT = 5;
@@ -441,7 +441,7 @@
     async _toggleFavourite(profile) {
       try {
         const newVal = !profile.favourite;
-        await window.NexusTerminal.wailsService.SetFavourite(profile.id, newVal);
+        await window.AlchementaryLink.wailsService.SetFavourite(profile.id, newVal);
         profile.favourite = newVal;
         this.app.state.updateProfile(profile);
         this.render();
@@ -457,7 +457,7 @@
      */
     async _duplicateProfile(profile) {
       try {
-        const dup = await window.NexusTerminal.wailsService.DuplicateProfile(profile.id);
+        const dup = await window.AlchementaryLink.wailsService.DuplicateProfile(profile.id);
         this.app.state.addProfile(dup);
         this.render();
         this.app.notifications.success(`Duplicated "${profile.displayName}"`);
@@ -478,7 +478,7 @@
       if (!ok) return;
 
       try {
-        await window.NexusTerminal.wailsService.DeleteProfile(profile.id);
+        await window.AlchementaryLink.wailsService.DeleteProfile(profile.id);
         this.app.state.removeProfile(profile.id);
         this.render();
         this.app.notifications.success("Profile deleted");
@@ -687,7 +687,7 @@
         }
 
         try {
-          const saved = await window.NexusTerminal.wailsService.UpdateProfile(updated);
+          const saved = await window.AlchementaryLink.wailsService.UpdateProfile(updated);
           this.app.state.updateProfile(saved);
         } catch (err) {
           this.app.notifications.error("Failed to update tags: " + err);
@@ -708,7 +708,7 @@
         const updated = JSON.parse(JSON.stringify(p));
         updated.folder = folder;
         try {
-          const saved = await window.NexusTerminal.wailsService.UpdateProfile(updated);
+          const saved = await window.AlchementaryLink.wailsService.UpdateProfile(updated);
           this.app.state.updateProfile(saved);
         } catch (err) {
           this.app.notifications.error("Failed to move group: " + err);
@@ -934,6 +934,6 @@
     }
   }
 
-  window.NexusTerminal = window.NexusTerminal || {};
-  window.NexusTerminal.Sidebar = Sidebar;
+  window.AlchementaryLink = window.AlchementaryLink || {};
+  window.AlchementaryLink.Sidebar = Sidebar;
 })();

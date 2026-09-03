@@ -14,7 +14,7 @@ function loadScript(relativePath, additions = {}) {
     Set,
     setTimeout,
     clearTimeout,
-    window: { NexusTerminal: {} },
+    window: { AlchementaryLink: {} },
     document: {
       querySelector: () => null,
       addEventListener: () => {},
@@ -32,7 +32,7 @@ function loadScript(relativePath, additions = {}) {
 
 async function testRepeatedSplitCleanup() {
   const context = loadScript("src/js/splitpane.js");
-  const SplitPaneManager = context.window.NexusTerminal.SplitPaneManager;
+  const SplitPaneManager = context.window.AlchementaryLink.SplitPaneManager;
   const closed = [];
   const app = {
     closeSessionImmediate: async (sessionId, options) => {
@@ -100,7 +100,7 @@ async function testRepeatedSplitCleanup() {
 
 function testClosedPaneRejectsLateConnection() {
   const context = loadScript("src/js/splitpane.js");
-  const SplitPaneManager = context.window.NexusTerminal.SplitPaneManager;
+  const SplitPaneManager = context.window.AlchementaryLink.SplitPaneManager;
   const manager = new SplitPaneManager({ closeSessionImmediate: async () => {} });
   const pane = {
     dataset: { paneId: "pane-1" },
@@ -128,7 +128,7 @@ function testClosedPaneRejectsLateConnection() {
 
 function testPerSessionStoresReleaseIDs() {
   const stateContext = loadScript("src/js/state.js");
-  const State = stateContext.window.NexusTerminal.State;
+  const State = stateContext.window.AlchementaryLink.State;
   const state = new State();
   state.addSession({ id: "session-1" });
   state.broadcastTargets = new Set(["session-1"]);
@@ -138,7 +138,7 @@ function testPerSessionStoresReleaseIDs() {
 
   const recordingContext = loadScript("src/js/recordings.js");
   const RecordingManager =
-    recordingContext.window.NexusTerminal.RecordingManager;
+    recordingContext.window.AlchementaryLink.RecordingManager;
   const recordings = new RecordingManager({});
   recordings.activeSessions.add("session-1");
   recordings.cleanup("session-1");
@@ -149,7 +149,7 @@ async function testCompleteAppTeardownIsImmediateAndIdempotent() {
   let finishBackendClose;
   let backendCloses = 0;
   const context = loadScript("src/js/app.js");
-  const App = context.window.NexusTerminal.App;
+  const App = context.window.AlchementaryLink.App;
   const app = Object.create(App.prototype);
   const resources = {
     sftp: new Set(["session-1"]),
@@ -195,10 +195,10 @@ async function testCompleteAppTeardownIsImmediateAndIdempotent() {
   };
   app.updateStatusBar = () => {};
 
-  context.window.NexusTerminal.GitHubViewer = drop("github");
-  context.window.NexusTerminal.VNCViewer = drop("vnc");
-  context.window.NexusTerminal.IRCViewer = drop("irc");
-  context.window.NexusTerminal.wailsService = {
+  context.window.AlchementaryLink.GitHubViewer = drop("github");
+  context.window.AlchementaryLink.VNCViewer = drop("vnc");
+  context.window.AlchementaryLink.IRCViewer = drop("irc");
+  context.window.AlchementaryLink.wailsService = {
     DisconnectSession: () => {
       backendCloses++;
       return new Promise((resolve) => {
@@ -240,7 +240,7 @@ async function testLatencyPingIsSingleFlightAndIgnoresStaleResults() {
       addEventListener: () => {},
     },
   });
-  const App = context.window.NexusTerminal.App;
+  const App = context.window.AlchementaryLink.App;
   const app = Object.create(App.prototype);
   app._latencySessionID = null;
   app._latencyTimer = null;
@@ -248,7 +248,7 @@ async function testLatencyPingIsSingleFlightAndIgnoresStaleResults() {
   app._latencyPingInFlight = false;
 
   const pending = [];
-  context.window.NexusTerminal.wailsService = {
+  context.window.AlchementaryLink.wailsService = {
     PingSession: (sessionID) =>
       new Promise((resolve, reject) => {
         pending.push({ sessionID, resolve, reject });

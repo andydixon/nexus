@@ -1,13 +1,13 @@
 (function () {
   /**
-   * Nexus Terminal - IRC viewer.
+   * Alchementary Link - IRC viewer.
    * Uses xterm.js as the chat stream, with room subtabs, a composer, and
    * room/user sidebars.
    */
 
   /* global Terminal, FitAddon, SearchAddon, WebLinksAddon */
 
-  const { createElement } = window.NexusTerminal;
+  const { createElement } = window.AlchementaryLink;
   const SERVER_TARGET = "server";
   const MAX_LINES_PER_TARGET = 2000;
   const MAX_LISTED_ROOMS = 200;
@@ -415,7 +415,7 @@
         const room = joinInput.value.trim();
         if (!room) return;
         try {
-          await window.NexusTerminal.wailsService.IRCJoin(this.sessionID, room);
+          await window.AlchementaryLink.wailsService.IRCJoin(this.sessionID, room);
           joinInput.value = "";
         } catch (err) {
           this._notifyError("Join failed: " + err);
@@ -439,7 +439,7 @@
         this.roomList = [];
         this._renderRoomList("Loading rooms...");
         try {
-          await window.NexusTerminal.wailsService.IRCListRooms(this.sessionID);
+          await window.AlchementaryLink.wailsService.IRCListRooms(this.sessionID);
         } catch (err) {
           this._renderRoomList("Room list failed");
           this._notifyError("Room list failed: " + err);
@@ -476,7 +476,7 @@
       const themeName =
         (this.app?.state?.preferences || {}).terminalTheme || "charcoal";
       this.term = new Terminal({
-        theme: window.NexusTerminal.getTerminalTheme(themeName),
+        theme: window.AlchementaryLink.getTerminalTheme(themeName),
         fontFamily:
           this.profile.terminalFontFamily ||
           'JetBrains Mono, Menlo, Monaco, Consolas, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", monospace',
@@ -668,7 +668,7 @@
       if (!text.trim()) return;
       this.inputEl.value = "";
       try {
-        await window.NexusTerminal.wailsService.IRCHandleInput(
+        await window.AlchementaryLink.wailsService.IRCHandleInput(
           this.sessionID,
           this.activeTarget,
           text,
@@ -686,7 +686,7 @@
     async _joinRoom(room) {
       if (!room) return;
       try {
-        await window.NexusTerminal.wailsService.IRCJoin(this.sessionID, room);
+        await window.AlchementaryLink.wailsService.IRCJoin(this.sessionID, room);
       } catch (err) {
         this._notifyError("Join failed: " + err);
       }
@@ -694,7 +694,7 @@
 
     async _refreshJoinedRooms() {
       try {
-        const rooms = await window.NexusTerminal.wailsService.IRCRooms(this.sessionID);
+        const rooms = await window.AlchementaryLink.wailsService.IRCRooms(this.sessionID);
         if (this.destroyed) return;
         this.handleEvent({ type: "rooms", rooms: Array.isArray(rooms) ? rooms : [] });
       } catch (_) {
@@ -785,11 +785,11 @@
     }
   }
 
-  window.NexusTerminal = window.NexusTerminal || {};
-  window.NexusTerminal.IRCFormatting = Object.freeze({
+  window.AlchementaryLink = window.AlchementaryLink || {};
+  window.AlchementaryLink.IRCFormatting = Object.freeze({
     formatEvent: formatIRCEvent,
     formatText: formatIRCText,
     plainText: plainIRCText,
   });
-  window.NexusTerminal.IRCViewer = new IRCViewer();
+  window.AlchementaryLink.IRCViewer = new IRCViewer();
 })();

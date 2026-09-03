@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/andydixon/nexus/internal/leviathan/document"
+	"github.com/andydixon/link/internal/leviathan/document"
 )
 
 // fuzzy.go implements context-triggered piecewise hashing (CTPH) compatible

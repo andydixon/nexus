@@ -1,12 +1,12 @@
-# Nexus Terminal Overview
+# Alchementary Link Overview
 
-Nexus Terminal is a desktop connection and analysis workspace for people who manage servers, network services, remote desktops, repositories, and binary artefacts every day. It brings SSH, Telnet, RAW TCP, VNC, GitHub, local shell, and Leviathan binary-analysis workflows into one focused app with secure credential handling, multi-session organisation, file transfer, automation, recording, and inspection tooling built in.
+Alchementary Link is a desktop connection and analysis workspace for people who manage servers, network services, remote desktops, repositories, and binary artefacts every day. It brings SSH, Telnet, RAW TCP, VNC, GitHub, local shell, and Leviathan binary-analysis workflows into one focused app with secure credential handling, multi-session organisation, file transfer, automation, recording, and inspection tooling built in.
 
 ## Product positioning
 
-Nexus is more than an SSH client. It is a single command centre for remote access, terminal operations, file movement, raw socket inspection, GitHub repository visibility, binary triage, and repeatable operational workflows.
+Link is more than an SSH client. It is a single command centre for remote access, terminal operations, file movement, raw socket inspection, GitHub repository visibility, binary triage, and repeatable operational workflows.
 
-Use Nexus when you need to:
+Use Link when you need to:
 
 - Connect quickly to many systems without re-entering credentials.
 - Keep multiple live sessions organised with tabs, pinned tabs, split panes, and status indicators.
@@ -37,7 +37,7 @@ Use Nexus when you need to:
 - Filter profiles by protocol, group, tag, and favourite status.
 - Test basic host and port reachability before connecting.
 - Import existing OpenSSH config entries from `~/.ssh/config`, including hostnames, usernames, ports, identity files, and jump hosts.
-- Export and import profiles using encrypted `.nexus` bundles.
+- Export and import profiles using encrypted `.link` bundles.
 - Choose import behaviour for duplicates: skip, overwrite, or duplicate.
 
 ### Multi-session workspace
@@ -149,7 +149,7 @@ Use Nexus when you need to:
 ### VNC capabilities
 
 - VNC remote desktop sessions.
-- noVNC-based viewer inside the Nexus workspace.
+- noVNC-based viewer inside the Link workspace.
 - Password prompt and password storage modes.
 - View-only mode.
 - Scale-to-fit display.
@@ -173,7 +173,7 @@ Use Nexus when you need to:
 
 ### Leviathan binary workbench
 
-- Switch from **Nexus Terminal** to **Leviathan** from the sidebar header.
+- Switch from **Alchementary Link** to **Leviathan** from the sidebar header.
 - Load a local file into a working document, inspect it with multiple tools, then save the patched working copy.
 - Tools open as normal tabs beside connection sessions.
 - Leviathan tabs close immediately without connection-disconnect confirmation.
@@ -271,7 +271,7 @@ Use Nexus when you need to:
 
 ### Suggested headline
 
-Nexus Terminal: one desktop workspace for SSH, files, sockets, remote desktops, repositories, and binary artefacts.
+Alchementary Link: one desktop workspace for SSH, files, sockets, remote desktops, repositories, and binary artefacts.
 
 ### Suggested subheadline
 
@@ -279,7 +279,7 @@ Manage SSH, Telnet, RAW TCP, VNC, GitHub, local shell, and Leviathan binary-anal
 
 ### Short product description
 
-Nexus Terminal helps developers, operators, support engineers, reverse engineers, firmware analysts, and homelab users manage many connections and artefacts without juggling separate tools. Save profiles, organise them with groups and tags, connect in tabs or split panes, move files over SFTP, inspect raw TCP traffic, open VNC desktops, browse GitHub repositories, triage binaries with Leviathan, and keep credentials protected with keychain and encrypted-vault storage.
+Alchementary Link helps developers, operators, support engineers, reverse engineers, firmware analysts, and homelab users manage many connections and artefacts without juggling separate tools. Save profiles, organise them with groups and tags, connect in tabs or split panes, move files over SFTP, inspect raw TCP traffic, open VNC desktops, browse GitHub repositories, triage binaries with Leviathan, and keep credentials protected with keychain and encrypted-vault storage.
 
 ### Product page feature bullets
 

@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/andydixon/nexus/internal/leviathan/document"
+	"github.com/andydixon/link/internal/leviathan/document"
 )
 
 // ParseCerts scans the whole document for PEM-encoded certificates

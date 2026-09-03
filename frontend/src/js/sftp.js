@@ -1,6 +1,6 @@
 (function () {
   /**
-   * Nexus Terminal — SFTP File Browser
+   * Alchementary Link — SFTP File Browser
    *
    * Provides a right-side panel for browsing, uploading, downloading,
    * renaming and deleting remote files alongside the terminal.
@@ -12,7 +12,7 @@
     formatBytes,
     relativeTime,
     dismissContextMenus,
-  } = window.NexusTerminal;
+  } = window.AlchementaryLink;
 
   /* ── Helpers ──────────────────────────────────────────────────────── */
 
@@ -282,9 +282,9 @@
 
       try {
         if (path === null) {
-          path = await window.NexusTerminal.wailsService.SFTPPwd(sessionId);
+          path = await window.AlchementaryLink.wailsService.SFTPPwd(sessionId);
         }
-        var files = await window.NexusTerminal.wailsService.SFTPList(sessionId, path);
+        var files = await window.AlchementaryLink.wailsService.SFTPList(sessionId, path);
         state.cwd = path;
         state.files = this._sortFiles(files || []);
         state.loading = false;
@@ -604,7 +604,7 @@
 
     async _download(sessionId, filePath) {
       try {
-        await window.NexusTerminal.wailsService.SFTPDownload(sessionId, filePath);
+        await window.AlchementaryLink.wailsService.SFTPDownload(sessionId, filePath);
         this.app.notifications.success("Download started");
       } catch (err) {
         this.app.notifications.error(
@@ -617,7 +617,7 @@
       var state = this.panels.get(sessionId);
       if (!state) return;
       try {
-        await window.NexusTerminal.wailsService.SFTPUpload(sessionId, state.cwd);
+        await window.AlchementaryLink.wailsService.SFTPUpload(sessionId, state.cwd);
         this.app.notifications.success("Upload complete");
         await this._refresh(sessionId);
       } catch (err) {
@@ -634,7 +634,7 @@
       if (!state) return;
       var fullPath = pathJoin(state.cwd, name);
       try {
-        await window.NexusTerminal.wailsService.SFTPMkdir(sessionId, fullPath);
+        await window.AlchementaryLink.wailsService.SFTPMkdir(sessionId, fullPath);
         this.app.notifications.success("Directory created");
         await this._refresh(sessionId);
       } catch (err) {
@@ -647,7 +647,7 @@
       if (!state) return;
       var newPath = pathJoin(parentPath(oldPath), newName);
       try {
-        await window.NexusTerminal.wailsService.SFTPRename(sessionId, oldPath, newPath);
+        await window.AlchementaryLink.wailsService.SFTPRename(sessionId, oldPath, newPath);
         this.app.notifications.success("Renamed");
         await this._refresh(sessionId);
       } catch (err) {
@@ -657,7 +657,7 @@
 
     async _delete(sessionId, entry) {
       try {
-        await window.NexusTerminal.wailsService.SFTPRemove(sessionId, entry.path);
+        await window.AlchementaryLink.wailsService.SFTPRemove(sessionId, entry.path);
         this.app.notifications.success(
           (entry.isDir ? "Directory" : "File") + " deleted",
         );
@@ -672,7 +672,7 @@
       var failed = 0;
       for (var i = 0; i < files.length; i++) {
         try {
-          await window.NexusTerminal.wailsService.SFTPDownload(sessionId, files[i].path);
+          await window.AlchementaryLink.wailsService.SFTPDownload(sessionId, files[i].path);
         } catch (err) {
           failed++;
           this.app.notifications.error(
@@ -706,7 +706,7 @@
       var failed = 0;
       for (var i = 0; i < entries.length; i++) {
         try {
-          await window.NexusTerminal.wailsService.SFTPRemove(sessionId, entries[i].path);
+          await window.AlchementaryLink.wailsService.SFTPRemove(sessionId, entries[i].path);
         } catch (err) {
           failed++;
           this.app.notifications.error(
@@ -1242,6 +1242,6 @@
   }
 
   /* ── Export ────────────────────────────────────────────────────────── */
-  window.NexusTerminal = window.NexusTerminal || {};
-  window.NexusTerminal.SFTPBrowser = SFTPBrowser;
+  window.AlchementaryLink = window.AlchementaryLink || {};
+  window.AlchementaryLink.SFTPBrowser = SFTPBrowser;
 })();

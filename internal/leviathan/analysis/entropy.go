@@ -4,7 +4,7 @@ import (
 	"context"
 	"math"
 
-	"github.com/andydixon/nexus/internal/leviathan/document"
+	"github.com/andydixon/link/internal/leviathan/document"
 )
 
 // Entropy computes Shannon entropy per sliding window over the range.

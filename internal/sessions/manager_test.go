@@ -14,9 +14,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/andydixon/nexus/internal/audit"
-	"github.com/andydixon/nexus/internal/models"
-	"github.com/andydixon/nexus/internal/storage"
+	"github.com/andydixon/link/internal/audit"
+	"github.com/andydixon/link/internal/models"
+	"github.com/andydixon/link/internal/storage"
 	"golang.org/x/crypto/ssh"
 )
 

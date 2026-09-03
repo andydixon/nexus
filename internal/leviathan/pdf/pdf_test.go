@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/andydixon/nexus/internal/leviathan/document"
+	"github.com/andydixon/link/internal/leviathan/document"
 )
 
 func TestParseRejectsOversizedPDFBeforeWholeRange(t *testing.T) {

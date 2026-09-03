@@ -14,7 +14,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/andydixon/nexus/internal/leviathan/document"
+	"github.com/andydixon/link/internal/leviathan/document"
 )
 
 // Step is one parsed instruction.

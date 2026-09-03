@@ -20,8 +20,8 @@ const (
 	// defaultOwner and defaultRepo identify the GitHub repository to check.
 	// These should be overridden via SetRepository if the project is hosted
 	// elsewhere.
-	defaultOwner = "nexus-terminal"
-	defaultRepo  = "nexus-terminal"
+	defaultOwner = "alchementary-link"
+	defaultRepo  = "alchementary-link"
 
 	// requestTimeout limits the HTTP request duration.
 	requestTimeout = 10 * time.Second
@@ -118,7 +118,7 @@ func (c *Checker) Check(ctx context.Context) (*UpdateInfo, error) {
 		return nil, fmt.Errorf("updater: failed to create request: %w", err)
 	}
 	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Set("User-Agent", "NexusTerminal-UpdateChecker")
+	req.Header.Set("User-Agent", "AlchementaryLink-UpdateChecker")
 
 	resp, err := c.client.Do(req)
 	if err != nil {
@@ -183,7 +183,7 @@ func (c *URLChecker) Check(ctx context.Context) (*UpdateInfo, error) {
 		return nil, fmt.Errorf("updater: failed to create request: %w", err)
 	}
 	req.Header.Set("Accept", "application/json, text/plain")
-	req.Header.Set("User-Agent", "NexusTerminal-UpdateChecker")
+	req.Header.Set("User-Agent", "AlchementaryLink-UpdateChecker")
 
 	resp, err := c.client.Do(req)
 	if err != nil {

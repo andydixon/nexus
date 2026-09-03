@@ -1,6 +1,6 @@
 (function () {
   /**
-   * Nexus Terminal — application state management.
+   * Alchementary Link — application state management.
    * Provides a centralised store for profiles, sessions, and preferences,
    * emitting change events so the UI stays in sync.
    */
@@ -235,6 +235,6 @@
     }
   }
 
-  window.NexusTerminal = window.NexusTerminal || {};
-  window.NexusTerminal.State = State;
+  window.AlchementaryLink = window.AlchementaryLink || {};
+  window.AlchementaryLink.State = State;
 })();

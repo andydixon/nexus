@@ -1,4 +1,4 @@
-// Package ircclient wraps a full IRC client with Nexus-specific event and
+// Package ircclient wraps a full IRC client with Link-specific event and
 // command handling, including optional SSH tunnelling.
 package ircclient
 
@@ -216,7 +216,7 @@ func (c *Client) Close() {
 	c.mu.Unlock()
 
 	if c.client != nil {
-		c.client.Quit("Nexus Terminal disconnected")
+		c.client.Quit("Alchementary Link disconnected")
 		c.client.Close()
 	}
 	if c.sshClient != nil {
@@ -305,7 +305,7 @@ func (c *Client) HandleInput(target string, input string) error {
 		}
 	case "quit":
 		if args == "" {
-			args = "Nexus Terminal disconnected"
+			args = "Alchementary Link disconnected"
 		}
 		c.client.Quit(args)
 		c.client.Close()

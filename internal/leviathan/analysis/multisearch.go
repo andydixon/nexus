@@ -7,7 +7,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/andydixon/nexus/internal/leviathan/document"
+	"github.com/andydixon/link/internal/leviathan/document"
 )
 
 type MultiSearchQuery struct {

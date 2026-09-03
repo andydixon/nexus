@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/andydixon/nexus/internal/leviathan/document"
+	"github.com/andydixon/link/internal/leviathan/document"
 )
 
 // Rule represents a lightweight YARA-like rule. A rule matches when

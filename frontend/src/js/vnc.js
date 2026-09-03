@@ -1,11 +1,11 @@
 (function () {
   /**
-   * Nexus Terminal — VNC viewer.
+   * Alchementary Link — VNC viewer.
    * Renders a noVNC canvas inside a session panel, connecting to the local
    * WebSocket proxy started by the Go backend.
    */
 
-  const { createElement, $ } = window.NexusTerminal;
+  const { createElement, $ } = window.AlchementaryLink;
 
   class VNCViewer {
     constructor() {
@@ -327,5 +327,5 @@
   }
 
   // Export to global namespace.
-  window.NexusTerminal.VNCViewer = new VNCViewer();
+  window.AlchementaryLink.VNCViewer = new VNCViewer();
 })();

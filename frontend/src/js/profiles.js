@@ -1,11 +1,11 @@
 (function () {
   /**
-   * Nexus Terminal — connection profile editor.
+   * Alchementary Link — connection profile editor.
    * Renders a slide-out drawer for creating and editing connection profiles.
    * Dynamically switches form sections based on the selected protocol.
    */
 
-  const { createElement, escapeHtml, generateId, $ } = window.NexusTerminal;
+  const { createElement, escapeHtml, generateId, $ } = window.AlchementaryLink;
 
   /**
    * Default values mirroring the Go backend defaults.
@@ -90,8 +90,8 @@
       port: 6667,
       protocol: "irc",
       irc: {
-        nick: "nexus",
-        realName: "Nexus Terminal",
+        nick: "link",
+        realName: "Alchementary Link",
         useTLS: false,
         serverPasswordRequired: false,
         serverPasswordMode: "ask-every-time",
@@ -467,10 +467,10 @@
 
     _loadSSHKeyOptions() {
       if (this._sshKeyOptionsLoading || this._sshKeyOptionsLoaded) return;
-      if (!window.NexusTerminal?.wailsService) return;
+      if (!window.AlchementaryLink?.wailsService) return;
 
       this._sshKeyOptionsLoading = true;
-      window.NexusTerminal.wailsService.ListSSHKeys()
+      window.AlchementaryLink.wailsService.ListSSHKeys()
         .then((keys) => {
           this._sshKeyOptions = Array.isArray(keys) ? keys : [];
           this._sshKeyOptionsLoaded = true;
@@ -1424,7 +1424,7 @@
         const profileId = profile.id;
         if (profileId) {
           try {
-            const code = await window.NexusTerminal.wailsService.GetTOTPCode(profileId);
+            const code = await window.AlchementaryLink.wailsService.GetTOTPCode(profileId);
             testBtn.textContent = code;
             setTimeout(() => {
               testBtn.textContent = "Test";
@@ -1454,7 +1454,7 @@
         const profileId = profile.id;
         const secret = secretInput.value.trim();
         if (!profileId) {
-          NexusTerminal.Notifications.show(
+          AlchementaryLink.Notifications.show(
             "Save the profile first, then set the TOTP secret.",
             "warning",
           );
@@ -1463,10 +1463,10 @@
         if (!secret) {
           // Delete existing secret
           try {
-            await window.NexusTerminal.wailsService.DeleteTOTPSecret(profileId);
-            NexusTerminal.Notifications.show("TOTP secret removed.", "info");
+            await window.AlchementaryLink.wailsService.DeleteTOTPSecret(profileId);
+            AlchementaryLink.Notifications.show("TOTP secret removed.", "info");
           } catch (err) {
-            NexusTerminal.Notifications.show(
+            AlchementaryLink.Notifications.show(
               "Failed to remove TOTP secret.",
               "error",
             );
@@ -1474,15 +1474,15 @@
           return;
         }
         try {
-          await window.NexusTerminal.wailsService.SetTOTPSecret(profileId, secret);
-          NexusTerminal.Notifications.show(
+          await window.AlchementaryLink.wailsService.SetTOTPSecret(profileId, secret);
+          AlchementaryLink.Notifications.show(
             "TOTP secret saved securely.",
             "success",
           );
           secretInput.value = "";
           secretInput.placeholder = "••••••••• (secret saved)";
         } catch (err) {
-          NexusTerminal.Notifications.show(
+          AlchementaryLink.Notifications.show(
             "Failed to save TOTP secret: " + err,
             "error",
           );
@@ -1504,12 +1504,12 @@
         const profileId = profile.id;
         if (!profileId) return;
         try {
-          await window.NexusTerminal.wailsService.DeleteTOTPSecret(profileId);
-          NexusTerminal.Notifications.show("TOTP secret removed.", "info");
+          await window.AlchementaryLink.wailsService.DeleteTOTPSecret(profileId);
+          AlchementaryLink.Notifications.show("TOTP secret removed.", "info");
           secretInput.placeholder =
             "Base32-encoded secret (e.g. from authenticator app setup)";
         } catch (err) {
-          NexusTerminal.Notifications.show(
+          AlchementaryLink.Notifications.show(
             "Failed to remove TOTP secret.",
             "error",
           );
@@ -1528,7 +1528,7 @@
       if (profile.id) {
         (async () => {
           try {
-            const has = await window.NexusTerminal.wailsService.HasTOTPSecret(profile.id);
+            const has = await window.AlchementaryLink.wailsService.HasTOTPSecret(profile.id);
             if (has) {
               secretInput.placeholder = "••••••••• (secret saved)";
             }
@@ -1972,8 +1972,8 @@
       });
       browseBtn.addEventListener("mousedown", (e) => e.preventDefault());
       browseBtn.addEventListener("click", () => {
-        if (!window.NexusTerminal?.wailsService) return;
-        window.NexusTerminal.wailsService.SelectFile("Select SSH Private Key", "*")
+        if (!window.AlchementaryLink?.wailsService) return;
+        window.AlchementaryLink.wailsService.SelectFile("Select SSH Private Key", "*")
           .then((path) => {
             if (path) input.value = path;
           })
@@ -2040,8 +2040,8 @@
 
         browseBtn.addEventListener("mousedown", (e) => e.preventDefault());
         browseBtn.addEventListener("click", () => {
-          if (!window.NexusTerminal?.wailsService) return;
-          window.NexusTerminal.wailsService.SelectFile("Select SSH Private Key", "*")
+          if (!window.AlchementaryLink?.wailsService) return;
+          window.AlchementaryLink.wailsService.SelectFile("Select SSH Private Key", "*")
             .then((path) => {
               if (path) keyInput.value = path;
               this._validateKeyPath(keyInput, error);
@@ -2117,10 +2117,10 @@
         }
         return;
       }
-      if (!window.NexusTerminal?.wailsService) {
+      if (!window.AlchementaryLink?.wailsService) {
         return;
       }
-      window.NexusTerminal.wailsService.FileExists(value)
+      window.AlchementaryLink.wailsService.FileExists(value)
         .then((exists) => {
           if (!exists) {
             errorEl.textContent = "Key file not found.";
@@ -2131,7 +2131,7 @@
             }
             return;
           }
-          return window.NexusTerminal.wailsService.FileIsPrivateKey(value).then((isKey) => {
+          return window.AlchementaryLink.wailsService.FileIsPrivateKey(value).then((isKey) => {
             if (!isKey) {
               errorEl.textContent = "File is not a recognised private key.";
               errorEl.style.display = "block";
@@ -2488,8 +2488,8 @@
       // IRC-specific
       if (p.protocol === "irc") {
         if (!p.irc) p.irc = {};
-        p.irc.nick = val("irc.nick") || "nexus";
-        p.irc.realName = val("irc.realName") || "Nexus Terminal";
+        p.irc.nick = val("irc.nick") || "link";
+        p.irc.realName = val("irc.realName") || "Alchementary Link";
         p.irc.useTLS = val("irc.useTLS") || false;
         p.irc.serverPasswordRequired =
           val("irc.serverPasswordRequired") || false;
@@ -2584,11 +2584,11 @@
       try {
         let saved;
         if (this._isNew) {
-          saved = await window.NexusTerminal.wailsService.CreateProfile(this._profile);
+          saved = await window.AlchementaryLink.wailsService.CreateProfile(this._profile);
           this.app.state.addProfile(saved);
           this.app.notifications.success("Profile created");
         } else {
-          saved = await window.NexusTerminal.wailsService.UpdateProfile(this._profile);
+          saved = await window.AlchementaryLink.wailsService.UpdateProfile(this._profile);
           this.app.state.updateProfile(saved);
           this.app.notifications.success("Profile updated");
         }
@@ -2609,7 +2609,7 @@
       if (!ok) return;
 
       try {
-        await window.NexusTerminal.wailsService.DeleteProfile(this._profile.id);
+        await window.AlchementaryLink.wailsService.DeleteProfile(this._profile.id);
         this.app.state.removeProfile(this._profile.id);
         this.app.sidebar.render();
         this.app.notifications.success("Profile deleted");
@@ -2633,7 +2633,7 @@
       this.app.notifications.info(`Testing connection to ${host}:${port}…`);
 
       try {
-        const result = await window.NexusTerminal.wailsService.TestConnection(host, port);
+        const result = await window.AlchementaryLink.wailsService.TestConnection(host, port);
         this.app.notifications.success(
           `Reachable — ${result.latencyMs}ms latency`,
         );
@@ -2764,6 +2764,6 @@
     }
   }
 
-  window.NexusTerminal = window.NexusTerminal || {};
-  window.NexusTerminal.ProfileEditor = ProfileEditor;
+  window.AlchementaryLink = window.AlchementaryLink || {};
+  window.AlchementaryLink.ProfileEditor = ProfileEditor;
 })();

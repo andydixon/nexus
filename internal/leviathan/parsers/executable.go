@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/andydixon/nexus/internal/leviathan/document"
+	"github.com/andydixon/link/internal/leviathan/document"
 )
 
 // ExecutableRegion is a file-backed executable code range.

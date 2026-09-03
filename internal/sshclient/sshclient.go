@@ -13,8 +13,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/andydixon/nexus/internal/models"
-	"github.com/andydixon/nexus/internal/terminalenv"
+	"github.com/andydixon/link/internal/models"
+	"github.com/andydixon/link/internal/terminalenv"
 	"github.com/pquerna/otp/totp"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/net/proxy"

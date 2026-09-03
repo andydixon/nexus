@@ -1,11 +1,11 @@
 (function() {
 /**
- * Nexus Terminal — toast notification system.
+ * Alchementary Link — toast notification system.
  * Provides non-blocking, auto-dismissing notifications that stack
  * in the top-right corner of the viewport.
  */
 
-const { createElement, escapeHtml } = window.NexusTerminal;
+const { createElement, escapeHtml } = window.AlchementaryLink;
 
 /** Small SVG icons for each notification type (16×16 viewBox). */
 const ICONS = {
@@ -95,7 +95,7 @@ class Notifications {
     }
 }
 
-window.NexusTerminal = window.NexusTerminal || {};
-window.NexusTerminal.Notifications = Notifications;
+window.AlchementaryLink = window.AlchementaryLink || {};
+window.AlchementaryLink.Notifications = Notifications;
 
 })();

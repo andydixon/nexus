@@ -1,11 +1,11 @@
 (function () {
   /**
-   * Nexus Terminal — command palette (Ctrl+K).
+   * Alchementary Link — command palette (Ctrl+K).
    * Provides a searchable overlay for quick access to application commands,
    * profile connections, and utility actions.
    */
 
-  const { createElement, escapeHtml, fuzzyMatch, $ } = window.NexusTerminal;
+  const { createElement, escapeHtml, fuzzyMatch, $ } = window.AlchementaryLink;
 
   class CommandPalette {
     /**
@@ -172,7 +172,7 @@
           section: "Security",
           action: async () => {
             try {
-              await window.NexusTerminal.wailsService.LockSecretStore();
+              await window.AlchementaryLink.wailsService.LockSecretStore();
               this.app.state.setSecretStoreState(false);
               this.app.notifications.info("Secret store locked");
             } catch (err) {
@@ -189,7 +189,7 @@
             try {
               const pw =
                 await this.app.secretPrompt.promptMasterPassword(false);
-              await window.NexusTerminal.wailsService.UnlockSecretStore(pw);
+              await window.AlchementaryLink.wailsService.UnlockSecretStore(pw);
               this.app.state.setSecretStoreState(true);
               this.app.notifications.success("Secret store unlocked");
             } catch (err) {
@@ -441,6 +441,6 @@
     }
   }
 
-  window.NexusTerminal = window.NexusTerminal || {};
-  window.NexusTerminal.CommandPalette = CommandPalette;
+  window.AlchementaryLink = window.AlchementaryLink || {};
+  window.AlchementaryLink.CommandPalette = CommandPalette;
 })();

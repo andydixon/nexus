@@ -9,7 +9,7 @@ import (
 	"hash"
 	"hash/crc32"
 
-	"github.com/andydixon/nexus/internal/leviathan/document"
+	"github.com/andydixon/link/internal/leviathan/document"
 )
 
 // HashSet contains CRC32/MD5/SHA-1/SHA-256/SHA-512 for a range.

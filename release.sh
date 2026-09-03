@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# release.sh — Build and package release artefacts for Nexus Terminal.
+# release.sh — Build and package release artefacts for Alchementary Link.
 # Produces per-platform zips, manifests, and version files for every supported
 # 64-bit desktop OS/architecture combination.
 set -euo pipefail
@@ -13,9 +13,9 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m'
 
-DEFAULT_UPDATE_URL="https://dixon.cx/downloads/nexus/manifest-{platform}-{arch}.json"
-DEFAULT_RELEASE_BASE_URL="https://dixon.cx/downloads/nexus"
-WAILS_VERSION="$(nexus_wails_version go.mod)"
+DEFAULT_UPDATE_URL="https://dixon.cx/downloads/link/manifest-{platform}-{arch}.json"
+DEFAULT_RELEASE_BASE_URL="https://dixon.cx/downloads/link"
+WAILS_VERSION="$(link_wails_version go.mod)"
 GO_TOOLCHAIN_VERSION="$(
     awk '
         $1 == "go" { go_version = $2 }
@@ -35,9 +35,9 @@ GO_TOOLCHAIN_VERSION="$(
 DEFAULT_LINUX_BUILD_IMAGE="docker.io/library/golang:${GO_TOOLCHAIN_VERSION:-1.26}-bookworm"
 DEFAULT_NODE_VERSION="20.19.4"
 
-log()  { echo -e "${GREEN}[nexus]${NC} $1"; }
-warn() { echo -e "${YELLOW}[nexus]${NC} $1"; }
-err()  { echo -e "${RED}[nexus]${NC} $1" >&2; }
+log()  { echo -e "${GREEN}[link]${NC} $1"; }
+warn() { echo -e "${YELLOW}[link]${NC} $1"; }
+err()  { echo -e "${RED}[link]${NC} $1" >&2; }
 
 host_os() {
     case "$(uname -s)" in
@@ -49,7 +49,7 @@ host_os() {
 }
 
 build_tags() {
-    nexus_build_tags
+    link_build_tags
 }
 
 default_targets() {
@@ -63,8 +63,8 @@ default_targets() {
 }
 
 release_targets() {
-    if [ -n "${NEXUS_RELEASE_TARGETS:-}" ]; then
-        echo "$NEXUS_RELEASE_TARGETS" | tr ',' '\n' | sed '/^[[:space:]]*$/d'
+    if [ -n "${LINK_RELEASE_TARGETS:-}" ]; then
+        echo "$LINK_RELEASE_TARGETS" | tr ',' '\n' | sed '/^[[:space:]]*$/d'
         return
     fi
 
@@ -109,11 +109,11 @@ install_deps() {
 }
 
 build_version() {
-    nexus_build_version
+    link_build_version
 }
 
 build_ldflags() {
-    nexus_build_ldflags "$1"
+    link_build_ldflags "$1"
 }
 
 container_engine() {
@@ -129,7 +129,7 @@ container_engine() {
 }
 
 ensure_upx() {
-    if ! nexus_bool_enabled "${NEXUS_COMPRESS:-0}"; then
+    if ! link_bool_enabled "${LINK_COMPRESS:-0}"; then
         return
     fi
     local requires_upx=0
@@ -137,7 +137,7 @@ ensure_upx() {
     while IFS= read -r target; do
         [ -n "$target" ] || continue
         local target_os="${target%%/*}"
-        if nexus_use_upx_for_target "$target_os"; then
+        if link_use_upx_for_target "$target_os"; then
             requires_upx=1
             break
         fi
@@ -148,7 +148,7 @@ ensure_upx() {
     if command -v upx >/dev/null 2>&1; then
         return
     fi
-    err "NEXUS_COMPRESS=1 requires UPX. Install it first, for example: brew install upx"
+    err "LINK_COMPRESS=1 requires UPX. Install it first, for example: brew install upx"
     exit 1
 }
 
@@ -179,9 +179,9 @@ build_linux_target_in_container() {
     local container_release_dir
     container_release_dir="$(mktemp -d "$SCRIPT_DIR/build/.release-linux.XXXXXX")"
     local container_release_root="build/$(basename "$container_release_dir")"
-    local image="${NEXUS_LINUX_BUILD_IMAGE:-$DEFAULT_LINUX_BUILD_IMAGE}"
-    local node_version="${NEXUS_NODE_VERSION:-$DEFAULT_NODE_VERSION}"
-    local builder_image="nexus-linux-release:${GO_TOOLCHAIN_VERSION:-1.26}-${node_version}-${target_arch}"
+    local image="${LINK_LINUX_BUILD_IMAGE:-$DEFAULT_LINUX_BUILD_IMAGE}"
+    local node_version="${LINK_NODE_VERSION:-$DEFAULT_NODE_VERSION}"
+    local builder_image="link-linux-release:${GO_TOOLCHAIN_VERSION:-1.26}-${node_version}-${target_arch}"
 
     log "Preparing the ${engine} Linux/${target_arch} release builder..."
     if ! "$engine" build \
@@ -204,10 +204,10 @@ build_linux_target_in_container() {
         -v "${SCRIPT_DIR}:/src" \
         --tmpfs /src/frontend/node_modules \
         -w /src \
-        -e "NEXUS_RELEASE_TARGETS=${target}" \
-        -e "NEXUS_RELEASE_ROOT=${container_release_root}" \
-        -e "NEXUS_UPDATE_URL=${NEXUS_UPDATE_URL}" \
-        -e "NEXUS_RELEASE_BASE_URL=${NEXUS_RELEASE_BASE_URL}" \
+        -e "LINK_RELEASE_TARGETS=${target}" \
+        -e "LINK_RELEASE_ROOT=${container_release_root}" \
+        -e "LINK_UPDATE_URL=${LINK_UPDATE_URL}" \
+        -e "LINK_RELEASE_BASE_URL=${LINK_RELEASE_BASE_URL}" \
         -e "GIT_CONFIG_COUNT=1" \
         -e "GIT_CONFIG_KEY_0=safe.directory" \
         -e "GIT_CONFIG_VALUE_0=/src" \
@@ -218,7 +218,7 @@ build_linux_target_in_container() {
         return 1
     fi
 
-    local output_base="NexusTerminal-${target_os}-${target_arch}"
+    local output_base="AlchementaryLink-${target_os}-${target_arch}"
     local container_out="${container_release_dir}/${version}"
     if [ ! -f "${container_out}/${output_base}" ] \
         || [ ! -f "${container_out}/${output_base}.zip" ]; then
@@ -241,7 +241,7 @@ build_target() {
 
     local platform="${target_os}/${target_arch}"
 
-    local output_base="NexusTerminal-${target_os}-${target_arch}"
+    local output_base="AlchementaryLink-${target_os}-${target_arch}"
     local output_path
     if [ "$target_os" = "darwin" ]; then
         output_path="${out_dir}/${output_base}.app"
@@ -252,19 +252,19 @@ build_target() {
     fi
 
     log "Building ${platform}..."
-    nexus_configure_pure_go_build
+    link_configure_pure_go_build
     local ldflags
     ldflags="$(build_ldflags "$version")"
     local tags
     tags="$(build_tags)"
     local build_args=("-platform" "$platform" "-trimpath")
-    if nexus_use_upx_for_target "$target_os"; then
+    if link_use_upx_for_target "$target_os"; then
         build_args+=("-upx")
-        if [ -n "${NEXUS_UPX_FLAGS:-}" ]; then
-            build_args+=("-upxflags" "$NEXUS_UPX_FLAGS")
+        if [ -n "${LINK_UPX_FLAGS:-}" ]; then
+            build_args+=("-upxflags" "$LINK_UPX_FLAGS")
         fi
-    elif nexus_skips_upx_for_target "$target_os"; then
-        warn "Skipping UPX compression for ${platform}; distribute the zipped .app instead, or set NEXUS_FORCE_MACOS_UPX=1 with suitable NEXUS_UPX_FLAGS."
+    elif link_skips_upx_for_target "$target_os"; then
+        warn "Skipping UPX compression for ${platform}; distribute the zipped .app instead, or set LINK_FORCE_MACOS_UPX=1 with suitable LINK_UPX_FLAGS."
     fi
     if [ -n "$tags" ]; then
         build_args+=("-tags" "$tags")
@@ -334,7 +334,7 @@ write_manifest() {
     local version="$1"
     local out_dir="$2"
     local release_root="$3"
-    local base_url="${NEXUS_RELEASE_BASE_URL:-}"
+    local base_url="${LINK_RELEASE_BASE_URL:-}"
 
     local published_at
     published_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
@@ -382,14 +382,14 @@ main() {
     local version
     version="$(build_version)"
 
-    if [ -z "${NEXUS_UPDATE_URL:-}" ]; then
-        NEXUS_UPDATE_URL="${DEFAULT_UPDATE_URL}"
+    if [ -z "${LINK_UPDATE_URL:-}" ]; then
+        LINK_UPDATE_URL="${DEFAULT_UPDATE_URL}"
     fi
-    if [ -z "${NEXUS_RELEASE_BASE_URL:-}" ]; then
-        NEXUS_RELEASE_BASE_URL="${DEFAULT_RELEASE_BASE_URL}"
+    if [ -z "${LINK_RELEASE_BASE_URL:-}" ]; then
+        LINK_RELEASE_BASE_URL="${DEFAULT_RELEASE_BASE_URL}"
     fi
 
-    local release_root="${NEXUS_RELEASE_ROOT:-build/releases}"
+    local release_root="${LINK_RELEASE_ROOT:-build/releases}"
     local out_dir="${release_root}/${version}"
     mkdir -p "$out_dir"
 

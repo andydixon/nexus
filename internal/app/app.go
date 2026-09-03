@@ -1,4 +1,4 @@
-// Package app provides the core application lifecycle for Nexus Terminal.
+// Package app provides the core application lifecycle for Alchementary Link.
 // It wires together storage, secrets, sessions, preferences, known hosts,
 // and the audit log, and exposes Wails lifecycle hooks.
 package app
@@ -11,15 +11,15 @@ import (
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
-	"github.com/andydixon/nexus/internal/api"
-	"github.com/andydixon/nexus/internal/audit"
-	"github.com/andydixon/nexus/internal/config"
-	"github.com/andydixon/nexus/internal/knownhosts"
-	"github.com/andydixon/nexus/internal/preferences"
-	"github.com/andydixon/nexus/internal/recording"
-	"github.com/andydixon/nexus/internal/secrets"
-	"github.com/andydixon/nexus/internal/sessions"
-	"github.com/andydixon/nexus/internal/storage"
+	"github.com/andydixon/link/internal/api"
+	"github.com/andydixon/link/internal/audit"
+	"github.com/andydixon/link/internal/config"
+	"github.com/andydixon/link/internal/knownhosts"
+	"github.com/andydixon/link/internal/preferences"
+	"github.com/andydixon/link/internal/recording"
+	"github.com/andydixon/link/internal/secrets"
+	"github.com/andydixon/link/internal/sessions"
+	"github.com/andydixon/link/internal/storage"
 )
 
 // App is the central application struct. Wails binds its lifecycle methods
@@ -85,7 +85,7 @@ func (a *App) Startup(ctx context.Context) {
 
 	// Initialise secret stores (keychain preferred, encrypted file fallback).
 	a.SecretStore = secrets.NewSecretStore(cfg.SecretPath)
-	a.KeychainStore = secrets.NewKeychainStore("NexusTerminal")
+	a.KeychainStore = secrets.NewKeychainStore("AlchementaryLink")
 
 	// Initialise the audit logger backed by SQLite.
 	a.AuditLog = audit.NewLogger(store)

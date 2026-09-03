@@ -1,12 +1,12 @@
 (function () {
   /**
-   * Nexus Terminal — GitHub repository viewer.
+   * Alchementary Link — GitHub repository viewer.
    * Renders a scrollable list of repositories grouped by owner/organisation,
    * sorted by last commit date (newest first). Automatically refreshes via
    * Wails events emitted by the Go backend.
    */
 
-  const { createElement, escapeHtml, relativeTime, $ } = window.NexusTerminal;
+  const { createElement, escapeHtml, relativeTime, $ } = window.AlchementaryLink;
 
   class GitHubViewer {
     constructor() {
@@ -425,7 +425,7 @@
       this._statusEl.textContent = `Downloading ${repo.fullName}...`;
 
       try {
-        await window.NexusTerminal.wailsService.DownloadGitHubRepoArchive(
+        await window.AlchementaryLink.wailsService.DownloadGitHubRepoArchive(
           this.sessionID,
           repo.fullName,
           ref,
@@ -441,7 +441,7 @@
       if (!this._statusEl) return;
       this._statusEl.textContent = "Refreshing…";
       try {
-        await window.NexusTerminal.wailsService.RefreshGitHubRepos(this.sessionID);
+        await window.AlchementaryLink.wailsService.RefreshGitHubRepos(this.sessionID);
       } catch (err) {
         this.showError(err.message || "Refresh failed");
       }
@@ -492,6 +492,6 @@
     }
   }
 
-  window.NexusTerminal = window.NexusTerminal || {};
-  window.NexusTerminal.GitHubViewer = new GitHubViewer();
+  window.AlchementaryLink = window.AlchementaryLink || {};
+  window.AlchementaryLink.GitHubViewer = new GitHubViewer();
 })();

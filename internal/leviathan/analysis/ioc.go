@@ -4,7 +4,7 @@ import (
 	"context"
 	"regexp"
 
-	"github.com/andydixon/nexus/internal/leviathan/document"
+	"github.com/andydixon/link/internal/leviathan/document"
 )
 
 // ioc regexes. They run against printable ASCII strings extracted

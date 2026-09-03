@@ -24,17 +24,17 @@ import (
 	"github.com/pquerna/otp/totp"
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 
-	"github.com/andydixon/nexus/internal/audit"
-	"github.com/andydixon/nexus/internal/exportimport"
-	"github.com/andydixon/nexus/internal/localshell"
-	"github.com/andydixon/nexus/internal/models"
-	"github.com/andydixon/nexus/internal/preferences"
-	"github.com/andydixon/nexus/internal/secrets"
-	"github.com/andydixon/nexus/internal/sessions"
-	"github.com/andydixon/nexus/internal/sshconfig"
-	"github.com/andydixon/nexus/internal/storage"
-	"github.com/andydixon/nexus/internal/updater"
-	"github.com/andydixon/nexus/internal/validation"
+	"github.com/andydixon/link/internal/audit"
+	"github.com/andydixon/link/internal/exportimport"
+	"github.com/andydixon/link/internal/localshell"
+	"github.com/andydixon/link/internal/models"
+	"github.com/andydixon/link/internal/preferences"
+	"github.com/andydixon/link/internal/secrets"
+	"github.com/andydixon/link/internal/sessions"
+	"github.com/andydixon/link/internal/sshconfig"
+	"github.com/andydixon/link/internal/storage"
+	"github.com/andydixon/link/internal/updater"
+	"github.com/andydixon/link/internal/validation"
 	"github.com/google/uuid"
 )
 
@@ -1291,9 +1291,9 @@ func (s *Service) ExportProfilesEncrypted(profileIDs []string, password string) 
 	// Prompt for save location.
 	path, err := wailsRuntime.SaveFileDialog(s.ctx, wailsRuntime.SaveDialogOptions{
 		Title:           "Export Encrypted Profiles",
-		DefaultFilename: "nexus-profiles.nexus",
+		DefaultFilename: "link-profiles.link",
 		Filters: []wailsRuntime.FileFilter{
-			{DisplayName: "Nexus Export (*.nexus)", Pattern: "*.nexus"},
+			{DisplayName: "Link Export (*.link)", Pattern: "*.link"},
 		},
 	})
 	if err != nil {
@@ -1303,9 +1303,9 @@ func (s *Service) ExportProfilesEncrypted(profileIDs []string, password string) 
 		return "", fmt.Errorf("export cancelled")
 	}
 
-	// Ensure .nexus extension.
-	if filepath.Ext(path) != ".nexus" {
-		path += ".nexus"
+	// Ensure .link extension.
+	if filepath.Ext(path) != ".link" {
+		path += ".link"
 	}
 
 	if err := exportimport.EncryptAndExport(profiles, password, path); err != nil {
@@ -1327,7 +1327,7 @@ func (s *Service) ImportProfilesEncrypted(password string, strategy string) (int
 	path, err := wailsRuntime.OpenFileDialog(s.ctx, wailsRuntime.OpenDialogOptions{
 		Title: "Import Encrypted Profiles",
 		Filters: []wailsRuntime.FileFilter{
-			{DisplayName: "Nexus Export (*.nexus)", Pattern: "*.nexus"},
+			{DisplayName: "Link Export (*.link)", Pattern: "*.link"},
 		},
 	})
 	if err != nil {
@@ -2023,7 +2023,7 @@ func (s *Service) GenerateSSHKey(name string, keyType string, bits int, passphra
 	}
 
 	// Build ssh-keygen arguments
-	args := []string{"-t", keyType, "-f", keyPath, "-C", name + "@nexus-terminal"}
+	args := []string{"-t", keyType, "-f", keyPath, "-C", name + "@alchementary-link"}
 	if passphrase != "" {
 		args = append(args, "-N", passphrase)
 	} else {

@@ -16,7 +16,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/andydixon/nexus/internal/terminalenv"
+	"github.com/andydixon/link/internal/terminalenv"
 	"github.com/creack/pty"
 )
 

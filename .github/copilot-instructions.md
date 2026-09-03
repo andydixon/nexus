@@ -1,10 +1,10 @@
-# Copilot Instructions — Nexus Terminal
+# Copilot Instructions — Alchementary Link
 
 ## Build & Test
 
 ```bash
 make deps              # go mod download + npm install
-make build             # production build → build/bin/nexus-terminal.app
+make build             # production build → build/bin/alchementary-link.app
 make dev               # wails dev with hot reload
 make test              # go test ./... -v -count=1
 make lint              # golangci-lint run ./...
@@ -31,7 +31,7 @@ Wails v2 desktop app: Go backend + HTML/CSS/JS frontend rendered in a native web
 - `sftpclient/` — SFTP file operations (browse, upload, download, rename, delete)
 - `sshconfig/` — OpenSSH `~/.ssh/config` parser and importer
 - `recording/` — asciicast v2 session recording and playback
-- `exportimport/` — encrypted profile bundles (.nexus format)
+- `exportimport/` — encrypted profile bundles (.link format)
 - `updater/` — GitHub Releases update checker
 - `knownhosts/` — SSH host key management
 - `validation/` — profile and protocol validation
@@ -40,7 +40,7 @@ Wails v2 desktop app: Go backend + HTML/CSS/JS frontend rendered in a native web
 **Frontend** (`frontend/`):
 - Plain HTML/CSS/JS — no framework, no bundler, no ES modules
 - `index.html` is the app shell; loads CSS then JS in strict order
-- `src/js/` — 18 modules, each IIFE-wrapped, exporting to `window.NexusTerminal`
+- `src/js/` — 18 modules, each IIFE-wrapped, exporting to `window.AlchementaryLink`
 - `src/css/` — modular stylesheets; `tokens.css` defines all design tokens
 - Vendor libs (xterm.js, addons) live in `src/js/lib/` and `src/css/lib/` — auto-copied, gitignored
 
@@ -77,7 +77,7 @@ The macOS webview silently blocks or breaks several standard web APIs. These con
 - Tests use `t.TempDir()` for isolation, `t.Fatalf()` for setup failures
 
 **Frontend patterns:**
-- Every JS file is IIFE-wrapped and exports to `window.NexusTerminal` namespace
+- Every JS file is IIFE-wrapped and exports to `window.AlchementaryLink` namespace
 - Script load order matters (defined in `index.html`) — utils → state → notifications → sidebar → tabs → themes → terminal → profiles → raw → github → settings → commands → secrets → recordings → sftp → splitpane → snippets → app
 - DOM helpers: `createElement(tag, className, attrs)` from utils.js (supports `textContent`, `innerHTML`, `dataset`, `on*` event handlers)
 - Profile editor uses `_renderSection(title, fields)` pattern with `_field(type, name, label, value, opts)` helper for form generation

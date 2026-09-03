@@ -3,7 +3,7 @@ package analysis
 import (
 	"context"
 
-	"github.com/andydixon/nexus/internal/leviathan/document"
+	"github.com/andydixon/link/internal/leviathan/document"
 )
 
 // StringHit represents one extracted string.

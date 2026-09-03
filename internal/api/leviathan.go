@@ -17,17 +17,17 @@ import (
 
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 
-	"github.com/andydixon/nexus/internal/leviathan/analysis"
-	"github.com/andydixon/nexus/internal/leviathan/binsnoop"
-	"github.com/andydixon/nexus/internal/leviathan/disasm"
-	"github.com/andydixon/nexus/internal/leviathan/document"
-	"github.com/andydixon/nexus/internal/leviathan/parsers"
-	"github.com/andydixon/nexus/internal/leviathan/patch"
-	"github.com/andydixon/nexus/internal/leviathan/pdf"
-	"github.com/andydixon/nexus/internal/leviathan/spectrogram"
-	"github.com/andydixon/nexus/internal/leviathan/squashfs"
-	"github.com/andydixon/nexus/internal/leviathan/stego"
-	"github.com/andydixon/nexus/internal/leviathan/transforms"
+	"github.com/andydixon/link/internal/leviathan/analysis"
+	"github.com/andydixon/link/internal/leviathan/binsnoop"
+	"github.com/andydixon/link/internal/leviathan/disasm"
+	"github.com/andydixon/link/internal/leviathan/document"
+	"github.com/andydixon/link/internal/leviathan/parsers"
+	"github.com/andydixon/link/internal/leviathan/patch"
+	"github.com/andydixon/link/internal/leviathan/pdf"
+	"github.com/andydixon/link/internal/leviathan/spectrogram"
+	"github.com/andydixon/link/internal/leviathan/squashfs"
+	"github.com/andydixon/link/internal/leviathan/stego"
+	"github.com/andydixon/link/internal/leviathan/transforms"
 )
 
 type leviathanState struct {

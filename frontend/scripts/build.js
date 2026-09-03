@@ -1,5 +1,5 @@
 /**
- * build.js — Build script for the Nexus Terminal frontend.
+ * build.js — Build script for the Alchementary Link frontend.
  *
  * In production mode (no flags): copies vendor assets, assembles the
  * dist/ directory with all files needed by the Wails embed, and validates

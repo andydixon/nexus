@@ -1,5 +1,5 @@
 // Package models defines the core data structures used throughout
-// the Nexus Terminal application.
+// the Alchementary Link application.
 package models
 
 import "time"

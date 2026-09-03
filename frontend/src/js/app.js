@@ -1,6 +1,6 @@
 (function () {
   /**
-   * Nexus Terminal — main application entry point.
+   * Alchementary Link — main application entry point.
    * Initialises the application shell, loads profiles, and sets up event listeners.
    */
 
@@ -24,7 +24,7 @@
     TriggerEngine,
     LeviathanWorkbench,
     stateLabel,
-  } = window.NexusTerminal;
+  } = window.AlchementaryLink;
 
   class App {
     constructor() {
@@ -35,7 +35,7 @@
       this.terminals = new TerminalManager(this);
       this.profileEditor = new ProfileEditor(this);
       this.rawViewer = new RawViewer(this);
-      window.NexusTerminal.IRCViewer?.setApp(this);
+      window.AlchementaryLink.IRCViewer?.setApp(this);
       this.settings = new Settings(this);
       this.commandPalette = new CommandPalette(this);
       this.secretPrompt = new SecretPrompt(this);
@@ -54,7 +54,7 @@
       this._latencyGeneration = 0;
       this._latencyPingInFlight = false;
       this.updateInfo = null;
-      this.mode = "nexus";
+      this.mode = "link";
     }
 
     /**
@@ -92,10 +92,10 @@
         const start = Date.now();
         const check = () => {
           const hasBridge =
-            typeof window.NexusTerminal?.hasWailsService === "function"
-              ? window.NexusTerminal.hasWailsService()
-              : Boolean(window.NexusTerminal?.wailsService && window.runtime);
-          if (window.NexusTerminal?.wailsService && hasBridge) {
+            typeof window.AlchementaryLink?.hasWailsService === "function"
+              ? window.AlchementaryLink.hasWailsService()
+              : Boolean(window.AlchementaryLink?.wailsService && window.runtime);
+          if (window.AlchementaryLink?.wailsService && hasBridge) {
             resolve();
           } else if (Date.now() - start < maxWait) {
             setTimeout(check, 50);
@@ -108,7 +108,7 @@
             resolve();
           }
         };
-        Promise.resolve(window.NexusTerminal?.wailsServiceReady)
+        Promise.resolve(window.AlchementaryLink?.wailsServiceReady)
           .catch(() => null)
           .finally(check);
       });
@@ -121,7 +121,7 @@
      */
     async loadProfiles() {
       try {
-        const profiles = await window.NexusTerminal.wailsService.ListProfiles();
+        const profiles = await window.AlchementaryLink.wailsService.ListProfiles();
         this.state.setProfiles(profiles || []);
         this.sidebar.render();
       } catch (err) {
@@ -134,7 +134,7 @@
      */
     async loadPreferences() {
       try {
-        const prefs = await window.NexusTerminal.wailsService.GetPreferences();
+        const prefs = await window.AlchementaryLink.wailsService.GetPreferences();
         this.state.setPreferences(prefs || {});
         this._applyPreferences();
       } catch (err) {
@@ -149,10 +149,10 @@
     async checkSecretStore() {
       try {
         const initialised =
-          await window.NexusTerminal.wailsService.IsSecretStoreInitialised();
+          await window.AlchementaryLink.wailsService.IsSecretStoreInitialised();
         this.state.setSecretStoreInitialised(!!initialised);
         if (initialised) {
-          const unlocked = await window.NexusTerminal.wailsService.IsSecretStoreUnlocked();
+          const unlocked = await window.AlchementaryLink.wailsService.IsSecretStoreUnlocked();
           this.state.setSecretStoreState(!!unlocked);
         } else {
           this.state.setSecretStoreState(false);
@@ -240,7 +240,7 @@
           if (entry) {
             const { cols, rows } = entry.term;
             try {
-              window.NexusTerminal.wailsService.ResizeSession(
+              window.AlchementaryLink.wailsService.ResizeSession(
                 payload.sessionID,
                 cols,
                 rows,
@@ -256,7 +256,7 @@
           setTimeout(fit, 50);
           setTimeout(fit, 300);
           setTimeout(fit, 800);
-          setTimeout(() => window.NexusTerminal.IRCViewer?.fit(payload.sessionID), 50);
+          setTimeout(() => window.AlchementaryLink.IRCViewer?.fit(payload.sessionID), 50);
         }
       });
 
@@ -275,7 +275,7 @@
 
       // GitHub repository data
       window.runtime.EventsOn("session:github:repos", (payload) => {
-        window.NexusTerminal.GitHubViewer.updateRepos(
+        window.AlchementaryLink.GitHubViewer.updateRepos(
           payload.sessionID,
           payload.login,
           payload.repos,
@@ -284,7 +284,7 @@
 
       // GitHub refresh errors
       window.runtime.EventsOn("session:github:error", (payload) => {
-        window.NexusTerminal.GitHubViewer.showError(
+        window.AlchementaryLink.GitHubViewer.showError(
           payload.sessionID,
           payload.error,
         );
@@ -292,7 +292,7 @@
 
       // GitHub status updates
       window.runtime.EventsOn("session:github:status", (payload) => {
-        window.NexusTerminal.GitHubViewer.setStatus(
+        window.AlchementaryLink.GitHubViewer.setStatus(
           payload.sessionID,
           payload.status,
         );
@@ -300,7 +300,7 @@
 
       // VNC WebSocket proxy ready — connect the viewer
       window.runtime.EventsOn("session:vnc:ready", (payload) => {
-        window.NexusTerminal.VNCViewer.connect(
+        window.AlchementaryLink.VNCViewer.connect(
           payload.sessionID,
           payload.wsURL,
         );
@@ -308,7 +308,7 @@
 
       // IRC events
       window.runtime.EventsOn("session:irc:event", (payload) => {
-        window.NexusTerminal.IRCViewer.handleEvent(payload);
+        window.AlchementaryLink.IRCViewer.handleEvent(payload);
         this.tabs.markActivity(payload.sessionID);
       });
 
@@ -462,9 +462,9 @@
         () => this.recordings.cleanup(sessionId),
         () => this.terminals.destroyTerminal(sessionId),
         () => this.rawViewer.destroyViewer(sessionId),
-        () => window.NexusTerminal.GitHubViewer?.destroyViewer(sessionId),
-        () => window.NexusTerminal.VNCViewer?.destroyViewer(sessionId),
-        () => window.NexusTerminal.IRCViewer?.destroyViewer(sessionId),
+        () => window.AlchementaryLink.GitHubViewer?.destroyViewer(sessionId),
+        () => window.AlchementaryLink.VNCViewer?.destroyViewer(sessionId),
+        () => window.AlchementaryLink.IRCViewer?.destroyViewer(sessionId),
         () => this.leviathan?.destroyPanel(sessionId),
       ];
       for (const cleanup of localCleanups) {
@@ -486,7 +486,7 @@
       let backendCleanup = Promise.resolve();
       try {
         backendCleanup = Promise.resolve(
-          window.NexusTerminal.wailsService.DisconnectSession(sessionId),
+          window.AlchementaryLink.wailsService.DisconnectSession(sessionId),
         );
       } catch (_) {
         // Ignore failures; all local resources have already been released.
@@ -646,7 +646,7 @@
       this._bindClick("btn-recordings", () => this.recordings.openBrowser());
       this._bindClick("btn-new-tab", () => this.profileEditor.openNew());
       this._bindClick("btn-broadcast", () => this.toggleBroadcast());
-      this._bindClick("mode-nexus", () => this.setMode("nexus"));
+      this._bindClick("mode-link", () => this.setMode("link"));
       this._bindClick("mode-leviathan", () => this.setMode("leviathan"));
 
       // Wire the "Local Machine" sidebar button
@@ -679,7 +679,7 @@
       }
 
       // Window resize → re-fit active terminal (debounced)
-      const { debounce } = window.NexusTerminal;
+      const { debounce } = window.AlchementaryLink;
       window.addEventListener(
         "resize",
         debounce(() => {
@@ -698,21 +698,21 @@
     // ── App mode switching ─────────────────────────────────────────
 
     /**
-     * Switches the sidebar between Nexus profiles and Leviathan tools.
-     * @param {"nexus"|"leviathan"} mode
+     * Switches the sidebar between Link profiles and Leviathan tools.
+     * @param {"link"|"leviathan"} mode
      */
     setMode(mode) {
       const leviathanEnabled =
         this.state.preferences?.leviathanEnabled === true;
       this.mode =
-        mode === "leviathan" && leviathanEnabled ? "leviathan" : "nexus";
+        mode === "leviathan" && leviathanEnabled ? "leviathan" : "link";
       const root = document.getElementById("app");
       if (root) {
         root.classList.toggle("mode-leviathan", this.mode === "leviathan");
       }
       document
-        .getElementById("mode-nexus")
-        ?.classList.toggle("is-active", this.mode === "nexus");
+        .getElementById("mode-link")
+        ?.classList.toggle("is-active", this.mode === "link");
       document
         .getElementById("mode-leviathan")
         ?.classList.toggle("is-active", this.mode === "leviathan");
@@ -769,7 +769,7 @@
      * Opens a modal to select which sessions receive broadcast input.
      */
     selectBroadcastTargets() {
-      const { createElement, escapeHtml } = window.NexusTerminal;
+      const { createElement, escapeHtml } = window.AlchementaryLink;
       const sessions = this.state
         .getAllSessions()
         .filter(
@@ -925,7 +925,7 @@
 
       try {
         const sessionInfo =
-          await window.NexusTerminal.wailsService.ConnectSession(profileId);
+          await window.AlchementaryLink.wailsService.ConnectSession(profileId);
         this.state.addSession(sessionInfo);
         this.tabs.addTab(sessionInfo);
 
@@ -936,7 +936,7 @@
         } else if (profile.protocol === "github") {
           const container = document.getElementById(panelId);
           if (container) {
-            window.NexusTerminal.GitHubViewer.createViewer(
+            window.AlchementaryLink.GitHubViewer.createViewer(
               sessionInfo.id,
               container,
               profile.displayName || profile.host,
@@ -945,7 +945,7 @@
         } else if (profile.protocol === "vnc") {
           const container = document.getElementById(panelId);
           if (container) {
-            window.NexusTerminal.VNCViewer.createViewer(
+            window.AlchementaryLink.VNCViewer.createViewer(
               sessionInfo.id,
               container,
               profile,
@@ -954,7 +954,7 @@
         } else if (profile.protocol === "irc") {
           const container = document.getElementById(panelId);
           if (container) {
-            window.NexusTerminal.IRCViewer.createViewer(
+            window.AlchementaryLink.IRCViewer.createViewer(
               sessionInfo.id,
               container,
               profile,
@@ -977,7 +977,7 @@
      */
     async connectLocal() {
       try {
-        const sessionInfo = await window.NexusTerminal.wailsService.ConnectLocal();
+        const sessionInfo = await window.AlchementaryLink.wailsService.ConnectLocal();
         this.state.addSession(sessionInfo);
         this.tabs.addTab(sessionInfo);
 
@@ -1000,7 +1000,7 @@
      * Opens a quick connect dialog for ad-hoc connections without saving a profile.
      */
     async quickConnect() {
-      const createElement = window.NexusTerminal.createElement;
+      const createElement = window.AlchementaryLink.createElement;
       const result = await new Promise((resolve) => {
         const backdrop = createElement("div", "modal-backdrop");
         const modal = createElement("div", "modal modal-sm");
@@ -1033,7 +1033,7 @@
                     </div>
                     <div class="form-group qc-nick-group" style="display:none">
                         <label class="form-label">Nick</label>
-                        <input class="form-input qc-nick" type="text" value="nexus" />
+                        <input class="form-input qc-nick" type="text" value="link" />
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -1115,12 +1115,12 @@
         };
         if (result.protocol === "irc") {
           profile.irc = {
-            nick: result.nick || "nexus",
-            realName: "Nexus Terminal",
+            nick: result.nick || "link",
+            realName: "Alchementary Link",
             autoJoinRooms: [],
           };
         }
-        const sessionInfo = await window.NexusTerminal.wailsService.ConnectQuick(profile);
+        const sessionInfo = await window.AlchementaryLink.wailsService.ConnectQuick(profile);
         this.state.addSession(sessionInfo);
         this.tabs.addTab(sessionInfo);
 
@@ -1133,7 +1133,7 @@
         } else if (result.protocol === "irc") {
           const container = document.getElementById(panelId);
           if (container) {
-            window.NexusTerminal.IRCViewer.createViewer(
+            window.AlchementaryLink.IRCViewer.createViewer(
               sessionInfo.id,
               container,
               profile,
@@ -1159,8 +1159,8 @@
      * @private
      */
     _confirmReuseSession(profile, session) {
-      const createElement = window.NexusTerminal.createElement;
-      const label = window.NexusTerminal.escapeHtml(
+      const createElement = window.AlchementaryLink.createElement;
+      const label = window.AlchementaryLink.escapeHtml(
         (profile.displayName || profile.host || "Untitled").trim(),
       );
       const stateLabel =
@@ -1240,7 +1240,7 @@
      * @returns {Promise<boolean>}
      */
     confirmDirectVNCProfile(profile, action) {
-      const { createElement, createModalShell } = window.NexusTerminal;
+      const { createElement, createModalShell } = window.AlchementaryLink;
       const label = (
         profile.displayName ||
         profile.vnc?.vncHost ||
@@ -1391,7 +1391,7 @@
 
       const doPing = async () => {
         if (!isCurrent()) return;
-        if (!window.NexusTerminal?.wailsService) {
+        if (!window.AlchementaryLink?.wailsService) {
           scheduleNext();
           return;
         }
@@ -1399,7 +1399,7 @@
         this._latencyPingInFlight = true;
         let succeeded = false;
         try {
-          const ms = await window.NexusTerminal.wailsService.PingSession(sessionID);
+          const ms = await window.AlchementaryLink.wailsService.PingSession(sessionID);
           if (!isCurrent()) return;
           succeeded = true;
           const el = document.getElementById("status-latency");
@@ -1443,12 +1443,12 @@
     }
 
     async checkForUpdates(silent) {
-      if (!window.NexusTerminal?.wailsService) {
+      if (!window.AlchementaryLink?.wailsService) {
         return;
       }
 
       try {
-        const info = await window.NexusTerminal.wailsService.CheckForUpdates();
+        const info = await window.AlchementaryLink.wailsService.CheckForUpdates();
         this.setUpdateInfo(info);
         if (!silent && info && info.available) {
           this.notifications.info(
@@ -1508,7 +1508,7 @@
         leviathanButton.hidden = !leviathanEnabled;
       }
       if (!leviathanEnabled && this.mode === "leviathan") {
-        this.setMode("nexus");
+        this.setMode("link");
       }
 
       // Refit any visible terminal after geometry changes.
@@ -1600,10 +1600,10 @@
      * @private
      */
     _showGuidedErrorModal(title, label, message, onAction, actions) {
-      const createElement = window.NexusTerminal.createElement;
+      const createElement = window.AlchementaryLink.createElement;
       const backdrop = createElement("div", "modal-backdrop");
       const modal = createElement("div", "modal modal-sm");
-      const safeLabel = window.NexusTerminal.escapeHtml(label || "Session");
+      const safeLabel = window.AlchementaryLink.escapeHtml(label || "Session");
 
       modal.innerHTML = `
         <div class="modal-header">
@@ -1615,7 +1615,7 @@
             <strong>${safeLabel}</strong>
           </p>
           <p style="font-size:var(--text-sm);color:var(--text-secondary);white-space:pre-line;">
-            ${window.NexusTerminal.escapeHtml(message)}
+            ${window.AlchementaryLink.escapeHtml(message)}
           </p>
         </div>
         <div class="modal-footer"></div>
@@ -1888,7 +1888,7 @@
      * @private
      */
     _inputPrompt(title, label, placeholder) {
-      const createElement = window.NexusTerminal.createElement;
+      const createElement = window.AlchementaryLink.createElement;
       return new Promise((resolve) => {
         const backdrop = createElement("div", "modal-backdrop");
         const modal = createElement("div", "modal modal-sm");
@@ -1943,7 +1943,7 @@
 
   // ── Bootstrap ────────────────────────────────────────────────────────
 
-  window.NexusTerminal.App = App;
+  window.AlchementaryLink.App = App;
 
   document.addEventListener("DOMContentLoaded", () => {
     try {

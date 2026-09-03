@@ -143,7 +143,7 @@ assertContains(
 assertContains(
   "frontend/index.html",
   "mode-leviathan",
-  "Leviathan mode toggle must be present beside Nexus Terminal",
+  "Leviathan mode toggle must be present beside Alchementary Link",
 );
 assertContains(
   "frontend/index.html",
@@ -232,12 +232,12 @@ assertContains(
 );
 assertContains(
   "frontend/src/js/app.js",
-  "window.NexusTerminal.VNCViewer?.destroyViewer(sessionId)",
+  "window.AlchementaryLink.VNCViewer?.destroyViewer(sessionId)",
   "session teardown must disconnect and remove VNC viewers",
 );
 assertContains(
   "frontend/src/js/app.js",
-  "window.NexusTerminal.IRCViewer?.destroyViewer(sessionId)",
+  "window.AlchementaryLink.IRCViewer?.destroyViewer(sessionId)",
   "session teardown must dispose IRC terminals and resize observers",
 );
 assertContains(
@@ -262,7 +262,7 @@ assertContains(
 );
 assertContains(
   "frontend/src/js/splitpane.js",
-  "await window.NexusTerminal.wailsService.DisconnectSession(sessionInfo.id)",
+  "await window.AlchementaryLink.wailsService.DisconnectSession(sessionInfo.id)",
   "late split-pane connection results must be disconnected after their pane closes",
 );
 assertContains(
@@ -404,7 +404,7 @@ assertContains(
 assertContains(
   "internal/api/leviathan.go",
   "LeviathanRunTool",
-  "Nexus API must expose the imported Leviathan engine",
+  "Link API must expose the imported Leviathan engine",
 );
 assertNotContains(
   "internal/api/leviathan.go",
@@ -528,12 +528,12 @@ assertNotContains(
 );
 assertContains(
   "build.sh",
-  "NEXUS_COMPRESS",
+  "LINK_COMPRESS",
   "local builds must expose an explicit compression switch",
 );
 assertContains(
   "scripts/build-common.sh",
-  "nexus_use_upx_for_target",
+  "link_use_upx_for_target",
   "build scripts must share one UPX target-selection helper",
 );
 assertContains(
@@ -563,7 +563,7 @@ assertContains(
 );
 assertContains(
   "Makefile",
-  "NEXUS_FORCE_MACOS_UPX",
+  "LINK_FORCE_MACOS_UPX",
   "Makefile compressed builds must make macOS UPX opt-in",
 );
 assertTreeNotContains(

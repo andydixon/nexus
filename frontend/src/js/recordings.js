@@ -1,12 +1,12 @@
 (function() {
 /**
- * Nexus Terminal — Session Recording & Playback.
+ * Alchementary Link — Session Recording & Playback.
  * Provides controls for starting/stopping recordings on active sessions,
  * listing saved recordings, and a terminal-based playback viewer with
  * speed controls and a progress scrubber.
  */
 
-const { createElement, formatDuration } = window.NexusTerminal;
+const { createElement, formatDuration } = window.AlchementaryLink;
 
 // ---------------------------------------------------------------------------
 // Recording Manager
@@ -41,7 +41,7 @@ class RecordingManager {
             const cols = entry ? entry.term.cols : 80;
             const rows = entry ? entry.term.rows : 24;
 
-            await window.NexusTerminal.wailsService.StartRecording(sessionId, cols, rows);
+            await window.AlchementaryLink.wailsService.StartRecording(sessionId, cols, rows);
             this.activeSessions.add(sessionId);
             this._updateRecordingIndicator(sessionId, true);
             this.app.notifications.success('Recording started');
@@ -56,7 +56,7 @@ class RecordingManager {
      */
     async stop(sessionId) {
         try {
-            await window.NexusTerminal.wailsService.StopRecording(sessionId);
+            await window.AlchementaryLink.wailsService.StopRecording(sessionId);
             this.activeSessions.delete(sessionId);
             this._updateRecordingIndicator(sessionId, false);
             this.app.notifications.success('Recording saved');
@@ -81,8 +81,8 @@ class RecordingManager {
     async openBrowser() {
         try {
             const [recordings, storageInfo] = await Promise.all([
-                window.NexusTerminal.wailsService.ListRecordings(),
-                window.NexusTerminal.wailsService.GetRecordingStorageInfo(),
+                window.AlchementaryLink.wailsService.ListRecordings(),
+                window.AlchementaryLink.wailsService.GetRecordingStorageInfo(),
             ]);
             this._showBrowserModal(recordings || [], storageInfo || {});
         } catch (err) {
@@ -96,7 +96,7 @@ class RecordingManager {
      */
     async playback(id) {
         try {
-            const data = await window.NexusTerminal.wailsService.GetRecording(id);
+            const data = await window.AlchementaryLink.wailsService.GetRecording(id);
             this._showPlaybackModal(data);
         } catch (err) {
             this.app.notifications.error('Failed to load recording: ' + err);
@@ -109,7 +109,7 @@ class RecordingManager {
      */
     async deleteRecording(id) {
         try {
-            await window.NexusTerminal.wailsService.DeleteRecording(id);
+            await window.AlchementaryLink.wailsService.DeleteRecording(id);
             this.app.notifications.success('Recording deleted');
         } catch (err) {
             this.app.notifications.error('Failed to delete recording: ' + err);
@@ -235,11 +235,11 @@ class RecordingManager {
             status.textContent = '';
             btn.disabled = true;
             try {
-                const result = await window.NexusTerminal.wailsService.CleanupRecordings(ageDays, maxBytes);
+                const result = await window.AlchementaryLink.wailsService.CleanupRecordings(ageDays, maxBytes);
                 status.textContent = `Deleted ${result.deleted || 0}; freed ${_formatBytes(result.freedBytes || 0)}.`;
-                const fresh = await window.NexusTerminal.wailsService.ListRecordings();
+                const fresh = await window.AlchementaryLink.wailsService.ListRecordings();
                 close();
-                this._showBrowserModal(fresh || [], await window.NexusTerminal.wailsService.GetRecordingStorageInfo());
+                this._showBrowserModal(fresh || [], await window.AlchementaryLink.wailsService.GetRecordingStorageInfo());
             } catch (err) {
                 status.textContent = 'Cleanup failed: ' + err;
             } finally {
@@ -314,7 +314,7 @@ class RecordingManager {
 
         // Create xterm instance for playback.
         const termContainer = modal.querySelector('#playback-terminal');
-        const { getTerminalTheme } = window.NexusTerminal;
+        const { getTerminalTheme } = window.AlchementaryLink;
         const themeName = (this.app.state.preferences && this.app.state.preferences.terminalTheme) || 'charcoal';
         const theme = getTerminalTheme ? getTerminalTheme(themeName) : {};
 
@@ -566,7 +566,7 @@ class ExportImportUI {
             }
 
             try {
-                const path = await window.NexusTerminal.wailsService.ExportProfilesEncrypted(selectedIds, password);
+                const path = await window.AlchementaryLink.wailsService.ExportProfilesEncrypted(selectedIds, password);
                 this.app.notifications.success(`Exported ${selectedIds.length} profile(s) to ${path}`);
                 close();
             } catch (err) {
@@ -638,7 +638,7 @@ class ExportImportUI {
             try {
                 confirmBtn.disabled = true;
                 confirmBtn.textContent = 'Importing...';
-                const count = await window.NexusTerminal.wailsService.ImportProfilesEncrypted(password, strategy);
+                const count = await window.AlchementaryLink.wailsService.ImportProfilesEncrypted(password, strategy);
                 this.app.notifications.success(`Imported ${count} profile(s)`);
                 await this.app.loadProfiles();
                 close();
@@ -694,8 +694,8 @@ function _formatBytes(bytes) {
 // Export to global namespace
 // ---------------------------------------------------------------------------
 
-window.NexusTerminal = window.NexusTerminal || {};
-window.NexusTerminal.RecordingManager = RecordingManager;
-window.NexusTerminal.ExportImportUI = ExportImportUI;
+window.AlchementaryLink = window.AlchementaryLink || {};
+window.AlchementaryLink.RecordingManager = RecordingManager;
+window.AlchementaryLink.ExportImportUI = ExportImportUI;
 
 })();

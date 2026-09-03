@@ -21,7 +21,7 @@ import (
 	"path"
 	"sort"
 
-	"github.com/andydixon/nexus/internal/leviathan/document"
+	"github.com/andydixon/link/internal/leviathan/document"
 	"github.com/klauspost/compress/zstd"
 	"github.com/ulikunitz/xz"
 )

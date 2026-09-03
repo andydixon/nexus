@@ -3,7 +3,7 @@ package validation
 import (
 	"testing"
 
-	"github.com/andydixon/nexus/internal/models"
+	"github.com/andydixon/link/internal/models"
 )
 
 // ---------------------------------------------------------------------------

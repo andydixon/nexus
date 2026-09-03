@@ -7,7 +7,7 @@ import (
 	"encoding/binary"
 	"io"
 
-	"github.com/andydixon/nexus/internal/leviathan/document"
+	"github.com/andydixon/link/internal/leviathan/document"
 )
 
 // Signature describes a carveable object. `validate` is run against

@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/andydixon/nexus/internal/models"
+	"github.com/andydixon/link/internal/models"
 	"github.com/google/uuid"
 )
 

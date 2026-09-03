@@ -100,10 +100,10 @@
     <circle cx="198" cy="266" r="10" fill="#FFBD2E"/>
     <circle cx="234" cy="266" r="10" fill="#28C840"/>
 
-    <!-- Title bar text: "nexus ssh" -->
+    <!-- Title bar text: "link ssh" -->
     <text x="512" y="273" font-family="'SF Mono', 'Courier New', monospace"
           font-size="20" fill="#8892A4" text-anchor="middle" dominant-baseline="middle"
-          letter-spacing="3">nexus — ssh</text>
+          letter-spacing="3">link — ssh</text>
 
     <!-- Terminal separator line -->
     <line x1="112" y1="292" x2="912" y2="292" stroke="#00D4FF" stroke-width="1" stroke-opacity="0.2"/>
@@ -111,7 +111,7 @@
     <!-- MAIN TERMINAL CONTENT -->
     <!-- Line 1: prompt line -->
     <text x="152" y="360" font-family="'SF Mono', 'Courier New', monospace"
-          font-size="38" fill="#8892A4" filter="url(#softGlow)">user@nexus:~$</text>
+          font-size="38" fill="#8892A4" filter="url(#softGlow)">user@link:~$</text>
 
     <!-- THE BIG PROMPT SYMBOL: ">_" — cyan glowing, centered -->
     <text x="512" y="560" font-family="'SF Mono', 'Courier New', monospace"

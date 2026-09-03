@@ -14,7 +14,7 @@ import (
 	"encoding/binary"
 	"errors"
 
-	"github.com/andydixon/nexus/internal/leviathan/document"
+	"github.com/andydixon/link/internal/leviathan/document"
 )
 
 // ---------------------------------------------------------------------------

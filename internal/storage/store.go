@@ -11,8 +11,8 @@ import (
 
 	_ "modernc.org/sqlite"
 
-	"github.com/andydixon/nexus/internal/models"
-	"github.com/andydixon/nexus/internal/storage/migrations"
+	"github.com/andydixon/link/internal/models"
+	"github.com/andydixon/link/internal/storage/migrations"
 	"github.com/google/uuid"
 )
 

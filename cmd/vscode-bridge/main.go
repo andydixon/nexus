@@ -1,4 +1,4 @@
-// Command vscode-bridge exposes the Nexus backend to VS Code extensions over a
+// Command vscode-bridge exposes the Link backend to VS Code extensions over a
 // localhost-only JSON-RPC and event stream.
 package main
 
@@ -22,14 +22,14 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/andydixon/nexus/internal/api"
-	"github.com/andydixon/nexus/internal/audit"
-	"github.com/andydixon/nexus/internal/config"
-	"github.com/andydixon/nexus/internal/preferences"
-	"github.com/andydixon/nexus/internal/recording"
-	"github.com/andydixon/nexus/internal/secrets"
-	"github.com/andydixon/nexus/internal/sessions"
-	"github.com/andydixon/nexus/internal/storage"
+	"github.com/andydixon/link/internal/api"
+	"github.com/andydixon/link/internal/audit"
+	"github.com/andydixon/link/internal/config"
+	"github.com/andydixon/link/internal/preferences"
+	"github.com/andydixon/link/internal/recording"
+	"github.com/andydixon/link/internal/secrets"
+	"github.com/andydixon/link/internal/sessions"
+	"github.com/andydixon/link/internal/storage"
 )
 
 type rpcRequest struct {
@@ -160,7 +160,7 @@ func newBridgeApp() (*bridgeApp, error) {
 	}
 
 	secretStore := secrets.NewSecretStore(cfg.SecretPath)
-	keychainStore := secrets.NewKeychainStore("NexusTerminal")
+	keychainStore := secrets.NewKeychainStore("AlchementaryLink")
 	auditLog := audit.NewLogger(store)
 	prefs := preferences.NewManager(store)
 	if err := prefs.Load(); err != nil {

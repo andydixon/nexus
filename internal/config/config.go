@@ -7,7 +7,7 @@ import (
 	"runtime"
 )
 
-const appName = "NexusTerminal"
+const appName = "AlchementaryLink"
 
 // AppConfig holds the resolved application configuration paths.
 type AppConfig struct {
@@ -19,9 +19,9 @@ type AppConfig struct {
 
 // Load resolves the application configuration.
 // Data directory follows platform conventions:
-//   - macOS: ~/Library/Application Support/NexusTerminal
-//   - Linux: ~/.config/NexusTerminal
-//   - Windows: %APPDATA%/NexusTerminal
+//   - macOS: ~/Library/Application Support/AlchementaryLink
+//   - Linux: ~/.config/AlchementaryLink
+//   - Windows: %APPDATA%/AlchementaryLink
 func Load() (*AppConfig, error) {
 	dataDir, err := resolveDataDir()
 	if err != nil {
@@ -30,9 +30,9 @@ func Load() (*AppConfig, error) {
 
 	cfg := &AppConfig{
 		DataDir:    dataDir,
-		DBPath:     filepath.Join(dataDir, "nexus.db"),
+		DBPath:     filepath.Join(dataDir, "link.db"),
 		SecretPath: filepath.Join(dataDir, "vault"),
-		LogPath:    filepath.Join(dataDir, "nexus.log"),
+		LogPath:    filepath.Join(dataDir, "link.log"),
 	}
 	return cfg, nil
 }

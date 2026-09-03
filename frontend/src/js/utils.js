@@ -1,6 +1,6 @@
 (function () {
   /**
-   * Nexus Terminal — utility functions.
+   * Alchementary Link — utility functions.
    * General-purpose helpers used throughout the application.
    */
 
@@ -348,8 +348,8 @@
     }
   }
 
-  window.NexusTerminal = window.NexusTerminal || {};
-  Object.assign(window.NexusTerminal, {
+  window.AlchementaryLink = window.AlchementaryLink || {};
+  Object.assign(window.AlchementaryLink, {
     $,
     $$,
     createElement,

@@ -1,6 +1,6 @@
 (function() {
 /**
- * Nexus Terminal — Split Pane Manager.
+ * Alchementary Link — Split Pane Manager.
  * Enables splitting session panels into multiple panes, each hosting
  * its own terminal session. Supports horizontal (top/bottom) and
  * vertical (left/right) splits with draggable resize dividers.
@@ -522,10 +522,10 @@ class SplitPaneManager {
         if (placeholder) placeholder.remove();
 
         // Connect via backend
-        window.NexusTerminal.wailsService.ConnectSession(profile.id).then(async function(sessionInfo) {
+        window.AlchementaryLink.wailsService.ConnectSession(profile.id).then(async function(sessionInfo) {
             if (!self._completePendingConnection(paneEl, ownerSessionId, token)) {
                 try {
-                    await window.NexusTerminal.wailsService.DisconnectSession(sessionInfo.id);
+                    await window.AlchementaryLink.wailsService.DisconnectSession(sessionInfo.id);
                 } catch (_) {
                     // The backend may already have completed the close.
                 }
@@ -556,10 +556,10 @@ class SplitPaneManager {
         var placeholder = paneEl.querySelector('.split-pane-placeholder');
         if (placeholder) placeholder.remove();
 
-        window.NexusTerminal.wailsService.ConnectLocal().then(async function(sessionInfo) {
+        window.AlchementaryLink.wailsService.ConnectLocal().then(async function(sessionInfo) {
             if (!self._completePendingConnection(paneEl, ownerSessionId, token)) {
                 try {
-                    await window.NexusTerminal.wailsService.DisconnectSession(sessionInfo.id);
+                    await window.AlchementaryLink.wailsService.DisconnectSession(sessionInfo.id);
                 } catch (_) {
                     // The backend may already have completed the close.
                 }
@@ -791,7 +791,7 @@ class SplitPaneManager {
     }
 }
 
-window.NexusTerminal = window.NexusTerminal || {};
-window.NexusTerminal.SplitPaneManager = SplitPaneManager;
+window.AlchementaryLink = window.AlchementaryLink || {};
+window.AlchementaryLink.SplitPaneManager = SplitPaneManager;
 
 })();

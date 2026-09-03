@@ -1,13 +1,13 @@
 (function () {
   /**
-   * Nexus Terminal — Trigger Rules Engine.
+   * Alchementary Link — Trigger Rules Engine.
    * Monitors terminal output and fires actions (highlight, notify, sound)
    * when patterns match. Rules are stored in localStorage.
    */
 
-  const { createElement } = window.NexusTerminal;
+  const { createElement } = window.AlchementaryLink;
 
-  const STORAGE_KEY = "nexus:trigger-rules";
+  const STORAGE_KEY = "link:trigger-rules";
 
   class TriggerEngine {
     constructor(app) {
@@ -376,6 +376,6 @@
     }
   }
 
-  window.NexusTerminal = window.NexusTerminal || {};
-  window.NexusTerminal.TriggerEngine = TriggerEngine;
+  window.AlchementaryLink = window.AlchementaryLink || {};
+  window.AlchementaryLink.TriggerEngine = TriggerEngine;
 })();

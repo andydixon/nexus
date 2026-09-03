@@ -1,4 +1,4 @@
-# Nexus Terminal User Manual
+# Alchementary Link User Manual
 
 ## Contents
 
@@ -23,7 +23,7 @@
 
 ### Launch and connect
 
-- Start Nexus Terminal.
+- Start Alchementary Link.
 - Click **New** in the sidebar, choose a protocol, and fill in the profile details.
 - Click **Connect** to open a session in a new tab.
 
@@ -89,7 +89,7 @@ Tip: Use the search box to filter profiles by name, host, or tag.
 
 ### VNC
 
-- Remote desktop viewer embedded in the Nexus workspace.
+- Remote desktop viewer embedded in the Link workspace.
 - Password prompt and saved-password modes.
 - View-only mode, scale-to-fit, shared sessions, and quality controls.
 - Optional SSH tunnel for safer VNC transport.
@@ -169,7 +169,7 @@ Screenshot: SFTP browser open alongside the terminal.
 
 ## 9. Drag-and-drop uploads and paste
 
-When you drop file(s) into an active terminal, Nexus Terminal asks whether to:
+When you drop file(s) into an active terminal, Alchementary Link asks whether to:
 
 - **Upload** to a chosen remote directory, or
 - **Paste contents** into the terminal as if typed.
@@ -205,11 +205,11 @@ Screenshot: Recordings list with playback controls.
 
 ## 11. Leviathan binary workbench
 
-Leviathan is the integrated binary-analysis and editing workspace inside Nexus Terminal. It is useful for firmware images, unknown binaries, archives, captures, embedded files, suspicious documents, and audio spectrogram experiments.
+Leviathan is the integrated binary-analysis and editing workspace inside Alchementary Link. It is useful for firmware images, unknown binaries, archives, captures, embedded files, suspicious documents, and audio spectrogram experiments.
 
 ### Switching to Leviathan
 
-Click **Leviathan** in the top-left sidebar header. The normal connection list changes into a tool list. Click **Nexus Terminal** to return to saved servers and groups.
+Click **Leviathan** in the top-left sidebar header. The normal connection list changes into a tool list. Click **Alchementary Link** to return to saved servers and groups.
 
 Use **Load** to select a local file. The selected file becomes the current Leviathan working document. Use **Save** to write the patched working copy to a chosen destination.
 
@@ -267,7 +267,7 @@ Leviathan keeps loaded files file-backed where possible and writes patched worki
 
 ## 12. Security and credentials
 
-Nexus Terminal stores credentials securely:
+Alchementary Link stores credentials securely:
 
 - **OS keychain first** (Keychain, Secret Service, or Credential Manager).
 - **Encrypted vault** fallback using AES-256-GCM with Argon2id.

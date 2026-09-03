@@ -1,4 +1,4 @@
-module github.com/andydixon/nexus
+module github.com/andydixon/link
 
 go 1.25.12
 

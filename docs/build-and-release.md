@@ -69,7 +69,7 @@ checkout.
 The release scripts disable CGO and use a pure-Go SQLite driver, so Linux and Windows cross-targets do not need C cross-compilers for the application backend. To build a smaller set, override the default targets:
 
 ```bash
-NEXUS_RELEASE_TARGETS=linux/amd64,windows/amd64 ./release.sh
+LINK_RELEASE_TARGETS=linux/amd64,windows/amd64 ./release.sh
 ```
 
 ## Platform caveats

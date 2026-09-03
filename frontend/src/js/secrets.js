@@ -1,11 +1,11 @@
 (function() {
 /**
- * Nexus Terminal — secret/passphrase prompt dialogs.
+ * Alchementary Link — secret/passphrase prompt dialogs.
  * Provides modal prompts for collecting passwords, master-vault passphrases,
  * and SSH host-key verification confirmations.
  */
 
-const { createElement, escapeHtml } = window.NexusTerminal;
+const { createElement, escapeHtml } = window.AlchementaryLink;
 
 class SecretPrompt {
     constructor(app) {
@@ -367,7 +367,7 @@ function _measureStrength(pw) {
     return { percent: score, level: 'strong', label: 'Strong' };
 }
 
-window.NexusTerminal = window.NexusTerminal || {};
-window.NexusTerminal.SecretPrompt = SecretPrompt;
+window.AlchementaryLink = window.AlchementaryLink || {};
+window.AlchementaryLink.SecretPrompt = SecretPrompt;
 
 })();

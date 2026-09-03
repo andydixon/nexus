@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/andydixon/nexus/internal/leviathan/document"
+	"github.com/andydixon/link/internal/leviathan/document"
 )
 
 // ParseASN1 produces a field tree for the DER TLV structure starting

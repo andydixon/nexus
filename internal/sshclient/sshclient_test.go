@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/andydixon/nexus/internal/models"
+	"github.com/andydixon/link/internal/models"
 	"golang.org/x/crypto/ssh"
 )
 

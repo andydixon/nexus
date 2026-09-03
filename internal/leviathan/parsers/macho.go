@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/andydixon/nexus/internal/leviathan/document"
+	"github.com/andydixon/link/internal/leviathan/document"
 )
 
 // Mach-O magic values (32/64, LE/BE) plus fat (universal) magic.

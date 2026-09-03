@@ -1,4 +1,4 @@
--- Initial schema for Nexus Terminal
+-- Initial schema for Alchementary Link
 -- Creates the core tables for profiles, known hosts, preferences, and audit log.
 
 CREATE TABLE IF NOT EXISTS profiles (

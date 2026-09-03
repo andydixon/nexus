@@ -27,7 +27,7 @@ func NewKeychainStore(serviceName string) *KeychainStore {
 // without error.
 func (k *KeychainStore) Available() bool {
 	// Attempt a round-trip to verify the keychain is usable.
-	probeKey := "__nexus_keychain_probe__"
+	probeKey := "__link_keychain_probe__"
 	probeVal := "probe"
 
 	if err := keyring.Set(k.serviceName, probeKey, probeVal); err != nil {

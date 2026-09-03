@@ -1,12 +1,12 @@
 (function () {
   /**
-   * Nexus Terminal — RAW TCP data viewer.
+   * Alchementary Link — RAW TCP data viewer.
    * Provides text, hex, and split display modes for raw socket data,
    * along with a send bar, pause/resume, and capture saving.
    */
 
   const { createElement, escapeHtml, formatTimestamp, formatBytes } =
-    window.NexusTerminal;
+    window.AlchementaryLink;
 
   /**
    * Maximum number of data entries retained in the scrollback buffer.
@@ -214,7 +214,7 @@
           return `[${ts}] [${dir}] ${e.data}`;
         });
         const content = lines.join("\n");
-        await window.NexusTerminal.wailsService.SaveSessionCapture(sessionId, content);
+        await window.AlchementaryLink.wailsService.SaveSessionCapture(sessionId, content);
         this.app.notifications.success("Capture saved");
       } catch (err) {
         this.app.notifications.error("Save failed: " + err);
@@ -256,8 +256,8 @@
         const b64 =
           format === "hex" || format === "escaped"
             ? btoa(dataToSend)
-            : window.NexusTerminal.utf8ToBase64(dataToSend);
-        await window.NexusTerminal.wailsService.WriteSession(sessionId, b64);
+            : window.AlchementaryLink.utf8ToBase64(dataToSend);
+        await window.AlchementaryLink.wailsService.WriteSession(sessionId, b64);
         input.value = "";
 
         // Also show in viewer as sent data
@@ -620,6 +620,6 @@
     }
   }
 
-  window.NexusTerminal = window.NexusTerminal || {};
-  window.NexusTerminal.RawViewer = RawViewer;
+  window.AlchementaryLink = window.AlchementaryLink || {};
+  window.AlchementaryLink.RawViewer = RawViewer;
 })();

@@ -1,8 +1,8 @@
 package disasm
 
 import (
-	"github.com/andydixon/nexus/internal/leviathan/document"
-	"github.com/andydixon/nexus/internal/leviathan/parsers"
+	"github.com/andydixon/link/internal/leviathan/document"
+	"github.com/andydixon/link/internal/leviathan/parsers"
 )
 
 // ImageAnalysis is a metadata-seeded analysis across file-backed executable

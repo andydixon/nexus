@@ -9,7 +9,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/andydixon/nexus/internal/leviathan/document"
+	"github.com/andydixon/link/internal/leviathan/document"
 )
 
 // MetaEntry is one piece of textual/EXIF metadata recovered from an image.

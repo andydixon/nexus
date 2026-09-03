@@ -6,12 +6,12 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/andydixon/nexus/internal/models"
+	"github.com/andydixon/link/internal/models"
 )
 
 func TestEncryptDecryptRoundTrip(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "test-export.nexus")
+	path := filepath.Join(dir, "test-export.link")
 
 	profiles := []models.Profile{
 		{
@@ -73,7 +73,7 @@ func TestEncryptDecryptRoundTrip(t *testing.T) {
 
 func TestDecryptWrongPassword(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "test-export.nexus")
+	path := filepath.Join(dir, "test-export.link")
 
 	profiles := []models.Profile{
 		{
@@ -97,7 +97,7 @@ func TestDecryptWrongPassword(t *testing.T) {
 
 func TestEncryptEmptyProfiles(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "test.nexus")
+	path := filepath.Join(dir, "test.link")
 
 	err := EncryptAndExport(nil, "password", path)
 	if err == nil {
@@ -109,7 +109,7 @@ func TestEncryptAndExportRestrictsExistingFilePermissions(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("POSIX permission bits are not enforced on Windows")
 	}
-	path := filepath.Join(t.TempDir(), "profiles.nexus")
+	path := filepath.Join(t.TempDir(), "profiles.link")
 	if err := os.WriteFile(path, []byte("old"), 0644); err != nil {
 		t.Fatal(err)
 	}
@@ -127,7 +127,7 @@ func TestEncryptAndExportRestrictsExistingFilePermissions(t *testing.T) {
 
 func TestEncryptEmptyPassword(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "test.nexus")
+	path := filepath.Join(dir, "test.link")
 
 	profiles := []models.Profile{{ID: "1"}}
 	err := EncryptAndExport(profiles, "", path)
@@ -138,7 +138,7 @@ func TestEncryptEmptyPassword(t *testing.T) {
 
 func TestDecryptCorruptFile(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "corrupt.nexus")
+	path := filepath.Join(dir, "corrupt.link")
 
 	// Write garbage data.
 	if err := os.WriteFile(path, []byte("corrupt"), 0600); err != nil {
@@ -153,7 +153,7 @@ func TestDecryptCorruptFile(t *testing.T) {
 
 func TestDecryptRejectsOversizedFile(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "huge.nexus")
+	path := filepath.Join(dir, "huge.link")
 	f, err := os.Create(path)
 	if err != nil {
 		t.Fatal(err)

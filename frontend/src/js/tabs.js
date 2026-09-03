@@ -1,6 +1,6 @@
 (function () {
   /**
-   * Nexus Terminal — tab management.
+   * Alchementary Link — tab management.
    * Handles the tab bar: adding, removing, reordering, renaming,
    * pinning tabs, and context menus.
    */
@@ -11,7 +11,7 @@
     protocolColour,
     stateLabel,
     dismissContextMenus,
-  } = window.NexusTerminal;
+  } = window.AlchementaryLink;
 
   class TabManager {
     /**
@@ -192,7 +192,7 @@
      * @private
      */
     _confirmClose(sessionId) {
-      const createElement = window.NexusTerminal.createElement;
+      const createElement = window.AlchementaryLink.createElement;
       const label = escapeHtml(this._tabLabel(sessionId));
       return new Promise((resolve) => {
         const backdrop = createElement("div", "modal-backdrop");
@@ -928,6 +928,6 @@
     }
   }
 
-  window.NexusTerminal = window.NexusTerminal || {};
-  window.NexusTerminal.TabManager = TabManager;
+  window.AlchementaryLink = window.AlchementaryLink || {};
+  window.AlchementaryLink.TabManager = TabManager;
 })();

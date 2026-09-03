@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/andydixon/nexus/internal/models"
+	"github.com/andydixon/link/internal/models"
 )
 
 const (

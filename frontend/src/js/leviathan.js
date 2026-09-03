@@ -1,6 +1,6 @@
 (function () {
   const { createElement, escapeHtml, formatBytes, generateId } =
-    window.NexusTerminal;
+    window.AlchementaryLink;
 
   const tools = [
     {
@@ -116,7 +116,7 @@
 
     async loadFile() {
       try {
-        const payload = await window.NexusTerminal.wailsService.LeviathanOpenFile();
+        const payload = await window.AlchementaryLink.wailsService.LeviathanOpenFile();
         this.applyState(payload);
         this.refreshOpenHexTabs();
       } catch (err) {
@@ -127,9 +127,9 @@
 
     async saveFile() {
       try {
-        const path = await window.NexusTerminal.wailsService.LeviathanSaveWorking();
+        const path = await window.AlchementaryLink.wailsService.LeviathanSaveWorking();
         if (path) this.app.notifications.success("Saved working copy");
-        const state = await window.NexusTerminal.wailsService.LeviathanState();
+        const state = await window.AlchementaryLink.wailsService.LeviathanState();
         this.applyState(state);
       } catch (err) {
         this.app.notifications.error("Save failed: " + err);
@@ -231,7 +231,7 @@
       const load = async () => {
         try {
           status.textContent = "Loading hex...";
-          const result = await window.NexusTerminal.wailsService.LeviathanRunTool("hex", {
+          const result = await window.AlchementaryLink.wailsService.LeviathanRunTool("hex", {
             start: Number(start.input.value || 0),
             bytes: Number(bytes.input.value || 2048),
             width: Number(width.input.value || 16),
@@ -288,7 +288,7 @@
             length: Number(length.input.value || -1),
             max: Number(max.input.value || 1000),
           };
-          const out = await window.NexusTerminal.wailsService.LeviathanRunTool("search", payload);
+          const out = await window.AlchementaryLink.wailsService.LeviathanRunTool("search", payload);
           this.lastResults.set(sessionId, out);
           this._renderResult(summary, results, out, "search");
         } catch (err) {
@@ -304,7 +304,7 @@
         const out = this.lastResults.get(sessionId);
         if (!out) return;
         try {
-          await window.NexusTerminal.wailsService.LeviathanExportJSON("search.json", out);
+          await window.AlchementaryLink.wailsService.LeviathanExportJSON("search.json", out);
           this.app.notifications.success("Exported JSON");
         } catch (err) {
           this.app.notifications.error("Export failed: " + err);
@@ -339,7 +339,7 @@
       let selectedImagePath = "";
       chooseImage.addEventListener("click", async () => {
         try {
-          const path = await window.NexusTerminal.wailsService.SelectFile("Select Image to Insert", "");
+          const path = await window.AlchementaryLink.wailsService.SelectFile("Select Image to Insert", "");
           if (!path) return;
           selectedImagePath = path;
           imagePath.textContent = path;
@@ -369,7 +369,7 @@
             if (!selectedImagePath) throw new Error("Select an image to insert first.");
             payload.imagePath = selectedImagePath;
           }
-          const out = await window.NexusTerminal.wailsService.LeviathanRunTool(toolId, payload);
+          const out = await window.AlchementaryLink.wailsService.LeviathanRunTool(toolId, payload);
           this.lastResults.set(sessionId, out);
           summary.innerHTML = "";
           results.innerHTML = "";
@@ -416,7 +416,7 @@
           results.appendChild(createElement("div", "leviathan-empty", { textContent: "Rendering spectrogram..." }));
           const payload = {};
           for (const field of fields) payload[field.key] = this._fieldValue(field);
-          const out = await window.NexusTerminal.wailsService.LeviathanRunTool("spectrogram-view", payload);
+          const out = await window.AlchementaryLink.wailsService.LeviathanRunTool("spectrogram-view", payload);
           this.lastResults.set(sessionId, out);
           summary.innerHTML = "";
           results.innerHTML = "";
@@ -442,7 +442,7 @@
         const out = this.lastResults.get(sessionId);
         if (!out) return;
         try {
-          await window.NexusTerminal.wailsService.LeviathanExportJSON("spectrogram-view.json", out);
+          await window.AlchementaryLink.wailsService.LeviathanExportJSON("spectrogram-view.json", out);
           this.app.notifications.success("Exported JSON");
         } catch (err) {
           this.app.notifications.error("Export failed: " + err);
@@ -480,7 +480,7 @@
         running = true;
         try {
           if (tool.id === "diff" && !this.state?.compare) {
-            const compare = await window.NexusTerminal.wailsService.LeviathanOpenCompare();
+            const compare = await window.AlchementaryLink.wailsService.LeviathanOpenCompare();
             this.applyState(compare);
           }
           results.innerHTML = "";
@@ -489,7 +489,7 @@
           for (const field of fields) {
             payload[field.key] = this._fieldValue(field);
           }
-          const out = await window.NexusTerminal.wailsService.LeviathanRunTool(tool.id, payload);
+          const out = await window.AlchementaryLink.wailsService.LeviathanRunTool(tool.id, payload);
           this.lastResults.set(sessionId, out);
           this._renderResult(summary, results, out, tool.id);
           if (out && out.state) this.applyState(out.state);
@@ -505,7 +505,7 @@
         const out = this.lastResults.get(sessionId);
         if (!out) return;
         try {
-          await window.NexusTerminal.wailsService.LeviathanExportJSON(`${tool.id}.json`, out);
+          await window.AlchementaryLink.wailsService.LeviathanExportJSON(`${tool.id}.json`, out);
           this.app.notifications.success("Exported JSON");
         } catch (err) {
           this.app.notifications.error("Export failed: " + err);
@@ -697,7 +697,7 @@
       const offset = Number(cell.dataset.offset || 0);
       cell.dataset.pendingHex = hex;
       cell.classList.add("is-saving");
-      window.NexusTerminal.wailsService
+      window.AlchementaryLink.wailsService
         .LeviathanSetByte(offset, hex)
         .then((payload) => {
           if (cell.dataset.pendingHex === hex) {
@@ -1125,7 +1125,7 @@
       }
       const name = typeof nameBuilder === "function" ? nameBuilder(row) : this._foundFileName(row, "found");
       try {
-        const path = await window.NexusTerminal.wailsService.LeviathanExportRange(name, range.offset, range.length);
+        const path = await window.AlchementaryLink.wailsService.LeviathanExportRange(name, range.offset, range.length);
         if (path) this.app.notifications.success("Exported " + path);
       } catch (err) {
         this.app.notifications.error("Export failed: " + err);
@@ -1164,7 +1164,7 @@
     }
 
     _stateAction(method, sessionId) {
-      return window.NexusTerminal.wailsService[method]()
+      return window.AlchementaryLink.wailsService[method]()
         .then((state) => {
           this.applyState(state);
           const session = this.app.state.getSession(sessionId);
@@ -1299,7 +1299,7 @@
       const search = async () => {
         try {
           status.textContent = "Searching...";
-          const out = await window.NexusTerminal.wailsService.LeviathanRunTool("search", {
+          const out = await window.AlchementaryLink.wailsService.LeviathanRunTool("search", {
             mode: mode.input.value,
             query: query.input.value,
             start: 0,
@@ -1435,7 +1435,7 @@
     }
   }
 
-  window.NexusTerminal = window.NexusTerminal || {};
-  window.NexusTerminal.LeviathanWorkbench = LeviathanWorkbench;
-  window.NexusTerminal.LeviathanTools = tools;
+  window.AlchementaryLink = window.AlchementaryLink || {};
+  window.AlchementaryLink.LeviathanWorkbench = LeviathanWorkbench;
+  window.AlchementaryLink.LeviathanTools = tools;
 })();

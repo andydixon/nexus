@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/andydixon/nexus/internal/leviathan/document"
+	"github.com/andydixon/link/internal/leviathan/document"
 )
 
 // KeyArtefact is a single key-ish object we've found in the raw file.
