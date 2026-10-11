@@ -67,6 +67,8 @@ pub struct Pane {
     pub connected_since: Option<chrono::DateTime<chrono::Local>>,
     /// Bumped to make trigger highlights flash.
     pub highlight_until: f64,
+    /// Serial DTR / RTS as last set (starts from the profile's on-connect settings).
+    pub lines: (bool, bool),
 }
 
 /// A tab. Its session is `id`; `split` lays out extra panes (which have no tab of their own).

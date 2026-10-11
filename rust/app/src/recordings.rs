@@ -223,7 +223,7 @@ impl Recordings {
         ui.separator();
         if self.list.is_empty() {
             if !self.loading {
-                widgets::empty(ui, icon::RECORD, "No recordings yet", "Use the record button on a terminal tab to capture a session.");
+                widgets::empty(ui, icon::RECORD, "No recordings yet", "Press Ctrl/Cmd+Shift+R in a terminal, or use Session → Toggle recording.");
             }
             return;
         }

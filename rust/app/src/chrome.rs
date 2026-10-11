@@ -77,7 +77,7 @@ pub fn title_bar(app: &mut App, ui: &mut Ui) {
                     app.s.request(Request::ExportEncrypted(vec![]));
                 }
                 if item(ui, icon::FILE_ARROW_DOWN, "Import ~/.ssh/config", "") {
-                    match app.s.svc.import_ssh_config(None, "Imported") {
+                    match app.s.svc.import_ssh_config(None, "SSH Config") {
                         Ok(n) => {
                             app.s.success(format!("Imported {n} host(s) from ~/.ssh/config"));
                             app.s.reload_profiles();

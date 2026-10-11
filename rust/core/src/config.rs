@@ -11,7 +11,6 @@ pub struct AppConfig {
     pub db_path: PathBuf,
     pub vault_dir: PathBuf,
     pub recordings_dir: PathBuf,
-    pub log_path: PathBuf,
     /// Set when this run copied data across from Alchementary Link.
     pub migrated_from: Option<PathBuf>,
 }
@@ -35,7 +34,6 @@ impl AppConfig {
             db_path: data_dir.join("nexus.db"),
             vault_dir: data_dir.join("vault"),
             recordings_dir: data_dir.join("recordings"),
-            log_path: data_dir.join("nexus.log"),
             data_dir,
             migrated_from: None,
         }

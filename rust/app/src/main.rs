@@ -56,7 +56,9 @@ fn main() -> eframe::Result {
                 return Ok(());
             }
             _ => {
-                println!("usage: nexus-terminal [--theme pro|midnight|light] [--data-dir DIR] [--screenshot out.png] [--size WxH]");
+                println!(
+                    "usage: nexus-terminal [--theme pro|midnight|light] [--data-dir DIR] [--connect NAME] [--open WINDOW] [--run-local CMD] [--screenshot out.png] [--size WxH] [--version]"
+                );
                 return Ok(());
             }
         }

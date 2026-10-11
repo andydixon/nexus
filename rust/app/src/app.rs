@@ -244,7 +244,8 @@ impl App {
         };
         let profile = self.s.svc.sessions.profile(id);
         let view = self.view_for(&info, profile.as_ref());
-        self.s.panes.insert(id.into(), Pane { info, view, recording: false, local_exited: false, connected_since: None, highlight_until: 0.0 });
+        let lines = profile.as_ref().and_then(|p| p.serial.as_ref()).map_or((true, true), |c| (c.dtr_on_connect, c.rts_on_connect));
+        self.s.panes.insert(id.into(), Pane { info, view, recording: false, local_exited: false, connected_since: None, highlight_until: 0.0, lines });
         if tab {
             self.s.tabs.push(Tab { id: id.into(), activity: false, split: None });
             self.s.active = Some(id.into());
@@ -688,6 +689,29 @@ impl App {
                 Ok(()) => self.s.info("Recording started"),
                 Err(e) => self.s.error(e.to_string()),
             }
+        }
+    }
+
+    /// Telnet or serial break.
+    pub fn send_break(&mut self, id: &str) {
+        match self.s.svc.sessions.send_break(id) {
+            Ok(()) => self.s.info("Break sent"),
+            Err(e) => self.s.error(e.to_string()),
+        }
+    }
+
+    /// Toggles a serial modem line: `dtr` true for DTR, false for RTS.
+    pub fn toggle_line(&mut self, id: &str, dtr: bool) {
+        let Some((d, r)) = self.s.pane(id).map(|p| p.lines) else { return };
+        let (d, r) = if dtr { (!d, r) } else { (d, !r) };
+        match self.s.svc.sessions.set_serial_lines(id, d, r) {
+            Ok(()) => {
+                if let Some(p) = self.s.pane_mut(id) {
+                    p.lines = (d, r);
+                }
+                self.s.info(format!("DTR {} · RTS {}", if d { "on" } else { "off" }, if r { "on" } else { "off" }));
+            }
+            Err(e) => self.s.error(e.to_string()),
         }
     }
 

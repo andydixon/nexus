@@ -95,7 +95,7 @@ fn strip(app: &mut App, ui: &mut Ui) {
             for id in &order {
                 let Some(p) = app.s.pane(id) else { continue };
                 let p_info = p.info.clone();
-                let (p_recording, p_since) = (p.recording, p.connected_since);
+                let (p_recording, p_since, lines) = (p.recording, p.connected_since, p.lines);
                 let p = PaneInfo { info: p_info, recording: p_recording, connected_since: p_since };
                 let tab_activity = app.s.tab(id).is_some_and(|tb| tb.activity);
                 let active = app.s.active.as_deref() == Some(id.as_str());
@@ -203,6 +203,24 @@ fn strip(app: &mut App, ui: &mut Ui) {
                             ui.close();
                         }
                     }
+                    if matches!(p.info.protocol, Protocol::Telnet | Protocol::Serial) {
+                        ui.separator();
+                        if ui.button(format!("{}  Send Break", icon::LIGHTNING)).clicked() {
+                            menu_action = Some((id.clone(), "break"));
+                            ui.close();
+                        }
+                    }
+                    if p.info.protocol == Protocol::Serial {
+                        let (d, r) = lines;
+                        if ui.button(format!("{}  DTR", if d { icon::CHECK_SQUARE } else { icon::SQUARE })).clicked() {
+                            menu_action = Some((id.clone(), "dtr"));
+                            ui.close();
+                        }
+                        if ui.button(format!("{}  RTS", if r { icon::CHECK_SQUARE } else { icon::SQUARE })).clicked() {
+                            menu_action = Some((id.clone(), "rts"));
+                            ui.close();
+                        }
+                    }
                 });
             }
             if !ui.input(|i| i.pointer.primary_down()) {
@@ -284,6 +302,9 @@ fn tab_action(app: &mut App, id: &str, a: &str) {
             }
         }
         "reconnect" => app.reconnect(id),
+        "break" => app.send_break(id),
+        "dtr" => app.toggle_line(id, true),
+        "rts" => app.toggle_line(id, false),
         "close" => app.request_close(id),
         _ => {}
     }

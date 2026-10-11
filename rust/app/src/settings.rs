@@ -692,7 +692,7 @@ If your server requires a time-based one-time password (TOTP) during login, stor
 ## Jump Hosts (Bastions)
 If you need to reach a server through an intermediate host, add one or more jump hosts in the connection editor. Nexus Terminal tunnels through each hop automatically.
 ## Port Forwarding
-You can set up **local**, **remote**, and **dynamic** (SOCKS proxy) port forwards in the connection editor. These start automatically when the session connects.
+You can set up **local** and **remote** port forwards in the connection editor. These start automatically when the session connects.
 ## Proxy Support
 Open the **Proxy** section in the profile editor to connect through a **SOCKS5** or **HTTP CONNECT** proxy, with optional username/password authentication. The proxy is used to reach the SSH server (or the first jump host if jump hosts are configured).
 ## SFTP File Browser
@@ -738,7 +738,7 @@ Enable **Auto-Reconnect** in the Advanced section to reconnect automatically whe
 - **Device** — pick the port from the list (refresh after plugging in an adapter), e.g. `/dev/ttyUSB0`, `/dev/cu.usbserial-…` or `COM3`.
 - **Line settings** — baud rate (default 115200), data bits, parity, stop bits and flow control (none, XON/XOFF, RTS/CTS).
 - **Behaviour** — line ending, local echo, encoding, and whether DTR/RTS are raised on connect.
-- **Tab controls** — send a break and toggle DTR/RTS from the tab.
+- **Tab controls** — right-click the tab to send a break or toggle DTR/RTS.
 - **Auto-reconnect** — unplugging the adapter disconnects the session; it reopens the port when it comes back.
 
 On Linux your user usually needs to be in the `dialout` (or `uucp`) group. On macOS use the `/dev/cu.*` device. A \"busy\" error means another program has the port open.",

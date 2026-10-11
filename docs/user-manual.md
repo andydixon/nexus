@@ -148,6 +148,8 @@ Serial profiles open a terminal on a local serial port.
 
 The defaults are 115200 baud, 8 data bits, no parity, 1 stop bit, no flow control, CR line endings, and DTR and RTS asserted.
 
+While connected, right-click the tab to **Send Break** or toggle **DTR** and **RTS**. Telnet tabs also offer **Send Break**.
+
 When the adapter is unplugged the session disconnects; with auto-reconnect on, the port is reopened when the device returns. Serial sessions support everything other terminals do: recording, triggers, broadcast, snippets, find and split panes.
 
 ### VNC
@@ -156,7 +158,7 @@ When the adapter is unplugged the session disconnects; with auto-reconnect on, t
 - **Display**: **View Only**, **Scale to Fit**, **Shared Session** and **Quality (0-9)**.
 - **SSH Tunnel**: carry VNC traffic through SSH, with host, port, username and password, public key or SSH agent authentication.
 
-The viewer's toolbar shows the connection state and desktop size, and has buttons to switch between scaled and 1:1 display, refresh the screen, **Paste Clipboard** (send your local clipboard to the remote desktop) and **Ctrl+Alt+Del**. Click the desktop to give it keyboard focus.
+The viewer's toolbar shows the connection state and desktop size, and has buttons to switch between scaled and 1:1 display, refresh the screen, **Paste Clipboard** (send your local clipboard to the remote desktop) and **Ctrl+Alt+Del**. Text the remote desktop copies arrives on your local clipboard. Click the desktop to give it keyboard focus.
 
 Use SSH tunnelling for VNC whenever possible. If a VNC profile has no tunnel, Nexus Terminal warns that the traffic is unencrypted and offers **Connect Anyway**, **Edit Profile** or **Cancel**.
 
