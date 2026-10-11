@@ -894,3 +894,25 @@ mod tests {
         assert_eq!(mouse_report(0, 2, 3, true, TermMode::empty()), vec![0x1b, b'[', b'M', 32, 35, 36]);
     }
 }
+
+#[cfg(test)]
+mod perf {
+    /// `cargo test --release -p nexus perf -- --ignored --nocapture`
+    #[test]
+    #[ignore]
+    fn feed_throughput() {
+        let mut t = super::TermView::new(10_000, 14.0, super::CursorStyle::Block);
+        let line = b"drwxr-xr-x  22 root root   4096 Oct  1 00:01 \x1b[01;34msome-directory-name\x1b[0m and more text\r\n";
+        let chunk: Vec<u8> = line.iter().copied().cycle().take(64 * 1024).collect();
+        let total = 50 * 1024 * 1024;
+        let start = std::time::Instant::now();
+        let mut n = 0;
+        while n < total {
+            t.feed(&chunk);
+            n += chunk.len();
+        }
+        let secs = start.elapsed().as_secs_f64();
+        eprintln!("fed {} MiB in {secs:.2}s = {:.0} MiB/s", total >> 20, (total >> 20) as f64 / secs);
+        assert!(secs < 30.0, "too slow even allowing for a loaded machine");
+    }
+}
