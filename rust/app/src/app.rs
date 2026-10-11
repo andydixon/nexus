@@ -490,6 +490,7 @@ impl App {
                 }
             }
             Event::VncFrame { .. } => {}
+            Event::VncClipboard { text, .. } => self.s.ctx.copy_text(text),
         }
     }
 

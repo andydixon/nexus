@@ -19,25 +19,96 @@ use std::time::Duration;
 
 /// Everything the UI hears about. Prompts carry their reply channel; dropping it cancels.
 pub enum Event {
-    Data { session: String, data: Vec<u8> },
-    State { session: String, state: SessionState, error: String, retry: Option<Retry> },
-    Closed { session: String },
-    RawData { session: String, data: Vec<u8>, direction: String, timestamp: i64 },
-    Debug { session: String, message: String },
-    GithubStatus { session: String, status: String },
-    GithubRepos { session: String, login: String, repos: Vec<GitHubRepo> },
-    GithubError { session: String, error: String },
-    Irc { session: String, event: irc::Event },
-    ForwardStarted { session: String, forward: PortForward },
-    ForwardStopped { session: String, forward_id: String },
-    ForwardError { session: String, forward_id: String, label: String, error: String },
-    RecordingStarted { session: String },
-    RecordingStopped { session: String, duration: f64, events: usize },
-    SftpProgress { session: String, progress: clients::sftp::Progress },
-    SecretPrompt { session: String, title: String, message: String, reply: mpsc::Sender<String> },
-    HostKeyVerify { session: String, host: String, key_type: String, fingerprint: String, reply: mpsc::Sender<bool> },
-    VncReady { session: String },
-    VncFrame { session: String },
+    Data {
+        session: String,
+        data: Vec<u8>,
+    },
+    State {
+        session: String,
+        state: SessionState,
+        error: String,
+        retry: Option<Retry>,
+    },
+    Closed {
+        session: String,
+    },
+    RawData {
+        session: String,
+        data: Vec<u8>,
+        direction: String,
+        timestamp: i64,
+    },
+    Debug {
+        session: String,
+        message: String,
+    },
+    GithubStatus {
+        session: String,
+        status: String,
+    },
+    GithubRepos {
+        session: String,
+        login: String,
+        repos: Vec<GitHubRepo>,
+    },
+    GithubError {
+        session: String,
+        error: String,
+    },
+    Irc {
+        session: String,
+        event: irc::Event,
+    },
+    ForwardStarted {
+        session: String,
+        forward: PortForward,
+    },
+    ForwardStopped {
+        session: String,
+        forward_id: String,
+    },
+    ForwardError {
+        session: String,
+        forward_id: String,
+        label: String,
+        error: String,
+    },
+    RecordingStarted {
+        session: String,
+    },
+    RecordingStopped {
+        session: String,
+        duration: f64,
+        events: usize,
+    },
+    SftpProgress {
+        session: String,
+        progress: clients::sftp::Progress,
+    },
+    SecretPrompt {
+        session: String,
+        title: String,
+        message: String,
+        reply: mpsc::Sender<String>,
+    },
+    HostKeyVerify {
+        session: String,
+        host: String,
+        key_type: String,
+        fingerprint: String,
+        reply: mpsc::Sender<bool>,
+    },
+    VncReady {
+        session: String,
+    },
+    VncFrame {
+        session: String,
+    },
+    /// The remote desktop's clipboard changed.
+    VncClipboard {
+        session: String,
+        text: String,
+    },
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -671,6 +742,8 @@ impl Manager {
         let password = self.secret_fn(&p.id, "vnc-password", vc.secret_mode, prompt);
         let cb = self.terminal_callbacks(id, epoch);
         let (me, sid) = (self.clone(), id.to_string());
+        let (me2, sid2) = (self.clone(), id.to_string());
+        let clip: clients::vnc::ClipboardFn = Arc::new(move |text| me2.emit(Event::VncClipboard { session: sid2.clone(), text }));
         let c = connect_vnc_client(
             &host,
             port,
@@ -680,6 +753,7 @@ impl Manager {
             tunnel.clone(),
             cb,
             Arc::new(move || me.emit(Event::VncFrame { session: sid.clone() })),
+            clip,
         );
         match c {
             Ok(c) => {
@@ -1192,6 +1266,7 @@ fn connect_vnc_client(
     tunnel: Option<Arc<SshClient>>,
     cb: Callbacks,
     on_frame: Arc<dyn Fn() + Send + Sync>,
+    on_clipboard: clients::vnc::ClipboardFn,
 ) -> Result<Arc<clients::vnc::Client>> {
     let connector: Option<irc::Connector> = tunnel.map(|t| {
         let host = host.to_string();
@@ -1211,6 +1286,7 @@ fn connect_vnc_client(
         connector,
         connect_timeout: Duration::from_secs(timeout.max(1) as u64),
         on_frame,
+        on_clipboard,
         on_error: cb.on_error,
         on_close: cb.on_close,
         ..Default::default()
