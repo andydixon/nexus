@@ -80,6 +80,8 @@ pub struct App {
     screenshot: Option<(PathBuf, u32)>,
     shot_settle: u32,
     run_local: Option<(String, Option<String>)>,
+    /// Apply `prefs.sidebar_width` to the panel on the next frame (after Settings changed it).
+    resize_sidebar: bool,
 }
 
 const fn sc(m: Modifiers, k: Key) -> KeyboardShortcut {
@@ -125,6 +127,7 @@ impl App {
             screenshot: opts.screenshot.map(|p| (p, 0)),
             shot_settle: 0,
             run_local: opts.run_local.map(|c| (c, None)),
+            resize_sidebar: false,
         };
         if let Some((_, sid)) = &mut app.run_local {
             let id = app.s.svc.connect_local();
@@ -488,6 +491,7 @@ impl App {
                 Request::ReloadProfiles => self.s.reload_profiles(),
                 Request::ReloadPreferences => {
                     self.s.prefs = self.s.svc.preferences();
+                    self.resize_sidebar = true;
                     self.theme = theme_for(&self.s.prefs.theme);
                     theme::apply(&self.s.ctx, self.theme);
                 }
@@ -783,8 +787,11 @@ impl eframe::App for App {
             egui::Panel::bottom("status").exact_size(26.0).frame(egui::Frame::NONE.fill(t.chrome)).show(ui, |ui| chrome::status_bar(self, ui));
         }
         let width = self.s.prefs.sidebar_width.clamp(180, 500) as f32;
-        let side = egui::Panel::left("sidebar")
-            .default_size(width)
+        let mut panel = egui::Panel::left("sidebar").default_size(width);
+        if std::mem::take(&mut self.resize_sidebar) {
+            panel = panel.exact_size(width);
+        }
+        let side = panel
             .min_size(180.0)
             .max_size(500.0)
             .resizable(true)

@@ -32,7 +32,7 @@ pub fn ui(app: &mut App, ui: &mut Ui) {
     ui.add_space(4.0);
 
     // Footer actions, pinned to the bottom of the sidebar.
-    egui::Panel::bottom("sidebar-footer").exact_size(36.0).frame(egui::Frame::NONE.fill(t.dock)).show_inside(ui, |ui| {
+    egui::Panel::bottom("sidebar-footer").exact_size(36.0).frame(egui::Frame::NONE.fill(t.dock)).show(ui, |ui| {
         ui.horizontal_centered(|ui| {
             ui.add_space(6.0);
             if widgets::icon_button(ui, icon::PLUS, "New connection (Ctrl/Cmd+N)").clicked() {
@@ -56,7 +56,7 @@ pub fn ui(app: &mut App, ui: &mut Ui) {
         });
     });
     if !app.sidebar.selected.is_empty() {
-        egui::Panel::bottom("sidebar-bulk").frame(egui::Frame::NONE.fill(t.dock).inner_margin(6)).show_inside(ui, |ui| bulk_bar(app, ui));
+        egui::Panel::bottom("sidebar-bulk").frame(egui::Frame::NONE.fill(t.dock).inner_margin(6)).show(ui, |ui| bulk_bar(app, ui));
     }
     egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| list(app, ui));
 }
