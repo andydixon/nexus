@@ -11,7 +11,7 @@ use alacritty_terminal::term::cell::Flags;
 use alacritty_terminal::term::test::TermSize;
 use alacritty_terminal::term::{Config, Term, TermMode};
 use alacritty_terminal::vte::ansi::{self, Color, CursorShape, NamedColor, Processor, StdSyncHandler};
-use egui::{Color32, Event, FontId, Key, Modifiers, PointerButton, Pos2, Rect, Sense, Stroke, Ui, Vec2, pos2, vec2};
+use egui::{Color32, Event, FontId, Key, Modifiers, PointerButton, Pos2, Rect, Sense, Stroke, Ui, pos2, vec2};
 use std::sync::{Arc, Mutex};
 
 #[derive(Clone, Default)]
@@ -290,7 +290,7 @@ impl TermView {
             self.keyboard(ui, &mut out);
             let cur = self.term.grid().cursor.point;
             let cursor_rect = Rect::from_min_size(origin + vec2(cur.column.0 as f32 * cw, cur.line.0 as f32 * ch), vec2(cw, ch));
-            ui.output_mut(|o| o.ime = Some(egui::output::IMEOutput { rect, cursor_rect }));
+            ui.output_mut(|o| o.ime = Some(egui::output::IMEOutput { purpose: egui::IMEPurpose::Terminal, rect, cursor_rect, should_interrupt_composition: false }));
         }
         self.mouse(ui, &resp, origin, cw, ch, &mut out);
 
@@ -429,7 +429,7 @@ impl TermView {
         };
         for e in &events {
             match e {
-                Event::MouseWheel { delta, unit, modifiers } if hover.is_some() => {
+                Event::MouseWheel { delta, unit, modifiers, .. } if hover.is_some() => {
                     if modifiers.command {
                         continue; // left for zoom
                     }
@@ -669,8 +669,12 @@ impl TermView {
                             painter.text(r.left_top(), egui::Align2::LEFT_TOP, cell.c, font.clone(), rgb(theme.cursor_accent));
                         }
                     }
-                    CursorStyle::Underline => painter.rect_filled(Rect::from_min_max(pos2(r.left(), r.bottom() - 2.0), r.max), 0.0, c),
-                    CursorStyle::Bar => painter.rect_filled(Rect::from_min_size(r.min, vec2(2.0, ch)), 0.0, c),
+                    CursorStyle::Underline => {
+                        painter.rect_filled(Rect::from_min_max(pos2(r.left(), r.bottom() - 2.0), r.max), 0.0, c);
+                    }
+                    CursorStyle::Bar => {
+                        painter.rect_filled(Rect::from_min_size(r.min, vec2(2.0, ch)), 0.0, c);
+                    }
                 }
             }
         }

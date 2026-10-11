@@ -3,7 +3,6 @@
 
 use crate::theme::{self, Tokens};
 use egui::{Align, Color32, Layout, Response, RichText, Sense, Ui, vec2};
-use egui_phosphor::regular as icon;
 
 /// Small uppercase section header with a hairline.
 pub fn section(ui: &mut Ui, title: &str) {
