@@ -6,7 +6,18 @@
 //! - `write`/`resize`/`close` are callable from any thread; `close` is idempotent and must not
 //!   fire `on_close` re-entrantly while holding locks.
 
-use std::sync::Arc;
+pub mod sftp;
+pub mod ssh;
+
+use std::sync::{Arc, OnceLock};
+
+/// The shared tokio runtime for async protocol stacks (russh). Blocking clients use threads.
+pub fn rt() -> &'static tokio::runtime::Runtime {
+    static RT: OnceLock<tokio::runtime::Runtime> = OnceLock::new();
+    RT.get_or_init(|| {
+        tokio::runtime::Builder::new_multi_thread().worker_threads(2).enable_all().thread_name("nexus-net").build().expect("tokio runtime")
+    })
+}
 
 pub type DataFn = Arc<dyn Fn(&[u8]) + Send + Sync>;
 pub type ErrorFn = Arc<dyn Fn(String) + Send + Sync>;
