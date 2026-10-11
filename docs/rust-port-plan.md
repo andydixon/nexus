@@ -25,13 +25,13 @@ style of Leviathan Desktop (`../leviathan/rust`).
 | Terminal emulation | `alacritty_terminal` | VT parser, grid, scrollback, selection and regex search (the same engine Zed uses). We draw it with egui's painter (§6) |
 | Local shell | `portable-pty` | `forkpty` on Unix, ConPTY on Windows |
 | Serial | `serialport` | Baud/bits/parity/stop, RTS/CTS and XON/XOFF, DTR/RTS, break, port enumeration |
-| IRC | `irc` (tokio, rustls) | Registration, PING, CTCP, NickServ via PRIVMSG; reconnect and channel-state persistence are ours |
-| VNC | `vnc-rs` | RFB handshake, VNC auth, Raw/CopyRect/Tight/ZRLE → egui texture |
+| IRC | none (our own client over std TCP, `rustls` for TLS) | Registration, PING, CTCP, NickServ via PRIVMSG; reconnect and channel-state persistence are ours |
+| VNC | none (our own RFB client; `des`, `flate2`, `image` for Tight JPEG) | RFB 3.3–3.8, VNC auth, Raw/CopyRect/Hextile/ZRLE/Tight → egui texture |
 | HTTP (GitHub, updater) | `ureq` 3 | Blocking calls on `spawn_blocking` |
 | SQLite | `rusqlite` (`bundled`) | SQLite compiled in, so no system library is needed |
 | Vault, export | `argon2`, `aes-gcm`, `rand` | Native Argon2id at 128 MiB takes about 0.3 s |
-| Keychain | `keyring` 3 | Must read entries written by go-keyring (§3) |
-| TOTP | `totp-rs` | |
+| Keychain | `keyring` 3 (pure-Rust D-Bus via zbus on Linux) | Must read entries written by go-keyring (§3) |
+| TOTP | none (`hmac` + `sha1`, ~30 lines) | RFC 6238, normalised like pquerna/otp |
 | JSON | `serde`, `serde_json` | Protocol configs stay JSON columns |
 | Telnet, RAW, recordings | none (tokio `TcpStream`, serde) | Small ports of the Go code |
 
@@ -234,6 +234,8 @@ Terminal views are repainted only when their session receives data, and for inpu
   because it lags egui releases.
 
 ## 6a. VNC
+
+**As built:** `vnc-rs` was not used; the fallback below (our own RFB client) is what shipped.
 
 - `vnc-rs` on a tokio task, with an optional SSH tunnel through §2's `direct-tcpip`.
 - Decoded rectangles are applied to an RGBA buffer, and dirty frames update a `TextureHandle`, scaled to fit.

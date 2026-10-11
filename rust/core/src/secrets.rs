@@ -177,6 +177,12 @@ pub const KEYCHAIN_SERVICE: &str = "NexusTerminal";
 /// The service name Alchementary Link wrote under; read as a fallback (§7 of the port plan).
 pub const LEGACY_KEYCHAIN_SERVICE: &str = "AlchementaryLink";
 
+/// Runs a keychain call on a plain thread: the D-Bus backend may start its own async runtime,
+/// which panics if the caller is already inside tokio (as SSH authentication is).
+fn off_runtime<T: Send + 'static>(f: impl FnOnce() -> T + Send + 'static) -> T {
+    std::thread::spawn(f).join().expect("keychain thread panicked")
+}
+
 fn entry(service: &str, key: &str) -> keyring::Result<keyring::Entry> {
     // go-keyring's Windows target is "service:user"; keyring's default differs.
     if cfg!(windows) {
@@ -199,30 +205,32 @@ impl Keychain {
     }
 
     pub fn available(&self) -> bool {
-        let probe = "__nexus_keychain_probe__";
-        entry(&self.service, probe).and_then(|e| e.set_password("probe").and_then(|_| e.delete_credential())).is_ok()
+        let service = self.service.clone();
+        off_runtime(move || entry(&service, "__nexus_keychain_probe__").and_then(|e| e.set_password("probe").and_then(|_| e.delete_credential())).is_ok())
     }
 
     /// Reads a secret; a miss under the current service falls back to the legacy one and copies
     /// the value forward. Legacy items are never deleted, so the old app keeps working.
     pub fn get(&self, key: &str) -> Option<String> {
-        if let Ok(v) = entry(&self.service, key).and_then(|e| e.get_password()) {
+        let (service, key2) = (self.service.clone(), key.to_string());
+        if let Ok(v) = off_runtime(move || entry(&service, &key2).and_then(|e| e.get_password())) {
             return Some(v);
         }
-        let legacy = self.legacy.as_deref()?;
-        let v = entry(legacy, key).and_then(|e| e.get_password()).ok()?;
+        let (legacy, key2) = (self.legacy.clone()?, key.to_string());
+        let v = off_runtime(move || entry(&legacy, &key2).and_then(|e| e.get_password())).ok()?;
         let _ = self.set(key, &v);
         Some(v)
     }
 
     pub fn set(&self, key: &str, value: &str) -> Result<()> {
-        entry(&self.service, key)
-            .and_then(|e| e.set_password(value))
+        let (service, key2, value) = (self.service.clone(), key.to_string(), value.to_string());
+        off_runtime(move || entry(&service, &key2).and_then(|e| e.set_password(&value)))
             .map_err(|e| format!("keychain: failed to store secret {key:?}: {e}").into())
     }
 
     pub fn delete(&self, key: &str) {
-        let _ = entry(&self.service, key).and_then(|e| e.delete_credential());
+        let (service, key) = (self.service.clone(), key.to_string());
+        let _ = off_runtime(move || entry(&service, &key).and_then(|e| e.delete_credential()));
     }
 }
 
