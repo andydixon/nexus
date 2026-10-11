@@ -23,6 +23,8 @@ pub struct Options {
     /// Open a window at startup: editor, quick, settings[:tab], keys, snippets, triggers,
     /// recordings, palette, export, import (screenshot checks).
     pub open: Option<String>,
+    /// Connect a saved profile (by name or id) at startup.
+    pub connect: Option<String>,
 }
 
 /// Errors from worker threads, drained into toasts each frame.
@@ -158,6 +160,12 @@ impl App {
             run_local: opts.run_local.map(|c| (c, None)),
             resize_sidebar: false,
         };
+        if let Some(c) = opts.connect.as_deref() {
+            match app.s.profiles.iter().find(|p| p.id == c || p.display_name == c).map(|p| p.id.clone()) {
+                Some(id) => app.connect_profile(&id, true),
+                None => eprintln!("--connect: no profile named {c:?}"),
+            }
+        }
         if let Some(w) = opts.open.as_deref() {
             app.open_window(w);
         }

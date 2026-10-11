@@ -33,7 +33,7 @@ use nexus_core::service::Service;
 use std::sync::Arc;
 
 fn main() -> eframe::Result {
-    let mut opts = app::Options { screenshot: None, theme: None, run_local: None, open: None };
+    let mut opts = app::Options { screenshot: None, theme: None, run_local: None, open: None, connect: None };
     let mut size = [1360.0, 860.0];
     let mut data_dir = None;
     let mut args = std::env::args().skip(1);
@@ -42,6 +42,7 @@ fn main() -> eframe::Result {
             "--theme" => opts.theme = args.next(),
             "--run-local" => opts.run_local = args.next(),
             "--open" => opts.open = args.next(),
+            "--connect" => opts.connect = args.next(),
             "--screenshot" => opts.screenshot = args.next().map(Into::into),
             // Use another data directory (testing, screenshots, portable installs).
             "--data-dir" => data_dir = args.next(),

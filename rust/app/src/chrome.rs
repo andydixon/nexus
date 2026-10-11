@@ -194,14 +194,11 @@ pub fn title_bar(app: &mut App, ui: &mut Ui) {
     let resp = ui.interact(r, ui.id().with("palette-launch"), Sense::click());
     ui.painter().rect(r, 6.0, if resp.hovered() { t.hover } else { t.field }, Stroke::new(1.0, t.field_border), egui::StrokeKind::Inside);
     ui.painter().text(r.left_center() + vec2(9.0, 0.0), Align2::LEFT_CENTER, icon::MAGNIFYING_GLASS, egui::FontId::proportional(13.0), t.text_faint);
-    ui.painter().with_clip_rect(r.shrink(2.0)).text(
-        r.left_center() + vec2(28.0, 0.0),
-        Align2::LEFT_CENTER,
-        "Search connections and commands",
-        egui::FontId::proportional(12.0),
-        t.text_faint,
-    );
-    if w > 250.0 {
+    let show_keys = w > 250.0;
+    let clip = Rect::from_min_max(r.min, pos2(r.right() - if show_keys { 52.0 } else { 4.0 }, r.bottom()));
+    let hint = if w > 290.0 { "Search connections and commands" } else { "Search" };
+    ui.painter().with_clip_rect(clip).text(r.left_center() + vec2(28.0, 0.0), Align2::LEFT_CENTER, hint, egui::FontId::proportional(12.0), t.text_faint);
+    if show_keys {
         ui.painter().text(r.right_center() - vec2(8.0, 0.0), Align2::RIGHT_CENTER, keys("Mod+K").replace('+', " "), theme::semibold(10.5), t.text_faint);
     }
     if resp.clicked() {
