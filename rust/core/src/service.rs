@@ -13,7 +13,11 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+/// The release version (`NEXUS_VERSION` from release.sh, e.g. "v1.2.0-abc1234"), else the crate version.
+pub const VERSION: &str = match option_env!("NEXUS_VERSION") {
+    Some(v) => v,
+    None => env!("CARGO_PKG_VERSION"),
+};
 const MAX_IMPORT_JSON_BYTES: usize = 5 * 1024 * 1024;
 
 pub struct Service {

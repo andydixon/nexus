@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Nexus Terminal
+GenericName=Terminal and Remote Connections
+Comment=SSH, Telnet, RAW TCP, Serial, VNC, IRC and GitHub sessions in one window
+Exec=nexus-terminal
+Icon=nexus-terminal
+Terminal=false
+Categories=System;TerminalEmulator;Network;RemoteAccess;
+Keywords=ssh;telnet;serial;sftp;vnc;irc;terminal;
+StartupWMClass=nexus-terminal
