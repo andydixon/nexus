@@ -20,6 +20,9 @@ pub struct Options {
     pub theme: Option<String>,
     /// Open a local terminal at startup and type this command once connected (testing aid).
     pub run_local: Option<String>,
+    /// Open a window at startup: editor, quick, settings[:tab], keys, snippets, triggers,
+    /// recordings, palette, export, import (screenshot checks).
+    pub open: Option<String>,
 }
 
 /// Errors from worker threads, drained into toasts each frame.
@@ -129,6 +132,9 @@ impl App {
             run_local: opts.run_local.map(|c| (c, None)),
             resize_sidebar: false,
         };
+        if let Some(w) = opts.open.as_deref() {
+            app.open_window(w);
+        }
         if let Some((_, sid)) = &mut app.run_local {
             let id = app.s.svc.connect_local();
             *sid = Some(id.clone());
@@ -149,6 +155,33 @@ impl App {
             });
         }
         app
+    }
+
+    fn open_window(&mut self, w: &str) {
+        let (w, arg) = w.split_once(':').unwrap_or((w, ""));
+        match w {
+            "editor" => match self.s.profiles.iter().find(|p| p.protocol.id() == arg || p.id == arg).map(|p| p.id.clone()) {
+                Some(id) => self.editor.open_edit(&self.s, &id),
+                None => self.editor.open_new(&self.s, Protocol::from_id(arg), ""),
+            },
+            "quick" => self.quick.open(),
+            "settings" => self.settings.open(match arg {
+                "terminal" => SettingsTab::Terminal,
+                "security" => SettingsTab::Security,
+                "knownhosts" => SettingsTab::KnownHosts,
+                "help" => SettingsTab::Help,
+                "about" => SettingsTab::About,
+                _ => SettingsTab::General,
+            }),
+            "keys" => self.keys.open(),
+            "snippets" => self.snippets.open(),
+            "triggers" => self.triggers.open(),
+            "recordings" => self.recordings.open(),
+            "palette" => self.palette = Some(Default::default()),
+            "export" => self.transfer.export_encrypted(vec![]),
+            "import" => self.transfer.import_encrypted(),
+            _ => eprintln!("--open: unknown window {w:?}"),
+        }
     }
 
     // --- sessions -------------------------------------------------------------------------
