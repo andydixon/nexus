@@ -1,5 +1,22 @@
 # Rust port plan: Nexus Terminal, a native egui app with no Go and no webview
 
+> **Status (11 October 2026): converted.** Every phase below has been carried out on the
+> `rust-port` branch; Go, Node and Wails are gone. What was verified and what wasn't:
+>
+> - **Verified here (Linux):** the Go-generated fixtures (database, vault, `.link` export,
+>   recording) load; SSH against a real OpenSSH server (key and agent auth, PTY shell, exec,
+>   local/remote forwards, SFTP, jump host, agent forwarding, host-key rejection), including
+>   through the GUI with the host-key prompt and login scripts; local shell, RAW, Telnet/RAW/serial
+>   client tests (serial on a pty pair); the session manager (events, reconnect backoff, restart of
+>   an exited local shell); the terminal renderer (colours, 256/true colour, CJK fallback); every
+>   window rendered headlessly; `cargo clippy` clean; the Windows target builds and links.
+> - **Not verified:** macOS builds (need Apple's C toolchain), running on Windows or macOS, the OS
+>   keychain on a real desktop session (none was available, so the go-keyring compatibility in §3
+>   is untested), IRC, GitHub and VNC against real servers (tested against fakes), serial hardware.
+> - **Still open:** the update/release URLs still point at alchementary.co.uk (§7) — to move to
+>   dixon.cx, change `DEFAULT_UPDATE_URL`/`DEFAULT_RELEASE_BASE_URL` in `rust/release.sh` and
+>   `DEFAULT_UPDATE_URL` in `rust/core/src/updater.rs`.
+
 Goal: rebuild Alchementary Link in Rust as **Nexus Terminal**, a single Rust application in the
 style of Leviathan Desktop (`../leviathan/rust`).
 - **UI:** the Wails webview (HTML/CSS/JS, xterm.js) is replaced by an **eframe/egui 0.36** shell with
