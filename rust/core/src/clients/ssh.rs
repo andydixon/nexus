@@ -432,7 +432,33 @@ impl SshClient {
     /// Connects, authenticates and starts the shell. Blocks the calling thread.
     pub fn connect(self: &Arc<Self>, check: HostKeyCheck, password: Option<SecretFn>, passphrase: Option<SecretFn>) -> Result<()> {
         let me = self.clone();
-        rt().block_on(async move { me.connect_async(check, password, passphrase).await })
+        rt().block_on(async move { me.connect_async(check, password, passphrase, true).await })
+    }
+
+    /// Connects and authenticates without opening a shell, for tunnelling another protocol.
+    pub fn connect_tunnel_only(self: &Arc<Self>, check: HostKeyCheck, password: Option<SecretFn>, passphrase: Option<SecretFn>) -> Result<()> {
+        let me = self.clone();
+        rt().block_on(async move { me.connect_async(check, password, passphrase, false).await })
+    }
+
+    /// A `direct-tcpip` channel to `host:port` presented as an ordinary loopback TCP stream,
+    /// so blocking clients (IRC, VNC) can use it with read timeouts.
+    pub fn open_tunnel(&self, host: &str, port: u16) -> Result<std::net::TcpStream> {
+        let h = self.handle()?;
+        let host = host.to_string();
+        let listener = std::net::TcpListener::bind("127.0.0.1:0")?;
+        let addr = listener.local_addr()?;
+        let ch = rt().block_on(h.channel_open_direct_tcpip(host.clone(), port as u32, "127.0.0.1", 0)).map_err(|e| format!("SSH tunnel to {host}:{port} failed: {e}"))?;
+        let client = std::net::TcpStream::connect(addr)?;
+        let (server, _) = listener.accept()?;
+        server.set_nonblocking(true)?;
+        rt().spawn(async move {
+            if let Ok(mut local) = tokio::net::TcpStream::from_std(server) {
+                let mut remote = ch.into_stream();
+                let _ = tokio::io::copy_bidirectional(&mut local, &mut remote).await;
+            }
+        });
+        Ok(client)
     }
 
     async fn handshake(
@@ -454,7 +480,7 @@ impl SshClient {
         }
     }
 
-    async fn connect_async(self: &Arc<Self>, check: HostKeyCheck, password: Option<SecretFn>, passphrase: Option<SecretFn>) -> Result<()> {
+    async fn connect_async(self: &Arc<Self>, check: HostKeyCheck, password: Option<SecretFn>, passphrase: Option<SecretFn>, shell: bool) -> Result<()> {
         let sc = self.sc();
         let p = &self.profile;
         let port = if p.port == 0 { 22 } else { p.port as u16 };
@@ -484,6 +510,10 @@ impl SshClient {
         )
         .await?;
         let handle = Arc::new(handle);
+        if !shell {
+            *self.handle.lock().unwrap() = Some(handle);
+            return Ok(());
+        }
 
         let ch = handle.channel_open_session().await.map_err(|e| format!("failed to create SSH session: {e}"))?;
         for (k, v) in crate::terminalenv::ssh_env_vars(&sc.env_vars) {

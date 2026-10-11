@@ -226,6 +226,56 @@ impl Keychain {
     }
 }
 
+/// Keychain first, vault second — how every credential lookup in the app works.
+pub struct Secrets {
+    pub vault: Vault,
+    pub keychain: Keychain,
+    /// Probed once at startup (the probe writes an item, so don't repeat it per lookup).
+    pub keychain_ok: bool,
+}
+
+impl Secrets {
+    pub fn new(vault: Vault, keychain: Keychain) -> Secrets {
+        let keychain_ok = keychain.available();
+        Secrets { vault, keychain, keychain_ok }
+    }
+
+    pub fn get(&self, key: &str) -> Option<String> {
+        if self.keychain_ok
+            && let Some(v) = self.keychain.get(key).filter(|v| !v.is_empty())
+        {
+            return Some(v);
+        }
+        self.vault.get(key).ok().filter(|v| !v.is_empty())
+    }
+
+    /// Stores where possible: the keychain, else the vault if it's unlocked.
+    pub fn set(&self, key: &str, value: &str) {
+        let _ = self.set_checked(key, value);
+    }
+
+    pub fn set_checked(&self, key: &str, value: &str) -> Result<()> {
+        if self.keychain_ok && self.keychain.set(key, value).is_ok() {
+            return Ok(());
+        }
+        if !self.vault.is_unlocked() {
+            return Err("secret store is locked; unlock it first".into());
+        }
+        self.vault.set(key, value)
+    }
+
+    pub fn delete(&self, key: &str) {
+        if self.keychain_ok {
+            self.keychain.delete(key);
+        }
+        let _ = self.vault.delete(key);
+    }
+
+    pub fn delete_profile(&self, profile_id: &str) {
+        let _ = self.vault.delete_prefix(&format!("profile:{profile_id}:"));
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
