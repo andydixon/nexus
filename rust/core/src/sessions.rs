@@ -61,7 +61,7 @@ enum Client {
     Local(Arc<LocalShell>),
     Github(Arc<github::Client>, Arc<AtomicBool>),
     Irc(Arc<irc::Client>, Option<Arc<SshClient>>),
-    Vnc(Arc<vnc_stub::VncClient>, Option<Arc<SshClient>>),
+    Vnc(Arc<clients::vnc::Client>, Option<Arc<SshClient>>),
 }
 
 impl Client {
@@ -636,7 +636,7 @@ impl Manager {
         let password = self.secret_fn(&p.id, "vnc-password", vc.secret_mode, prompt);
         let cb = self.terminal_callbacks(id, epoch);
         let (me, sid) = (self.clone(), id.to_string());
-        let c = vnc_stub::connect_profile(&host, port, &vc, p.connect_timeout, password, tunnel.clone(), cb, Arc::new(move || me.emit(Event::VncFrame { session: sid.clone() })));
+        let c = connect_vnc_client(&host, port, &vc, p.connect_timeout, password, tunnel.clone(), cb, Arc::new(move || me.emit(Event::VncFrame { session: sid.clone() })));
         match c {
             Ok(c) => {
                 self.emit(Event::VncReady { session: id.into() });
@@ -1048,7 +1048,7 @@ impl Manager {
         }
     }
 
-    pub fn vnc(&self, id: &str) -> Result<Arc<vnc_stub::VncClient>> {
+    pub fn vnc(&self, id: &str) -> Result<Arc<clients::vnc::Client>> {
         match self.client(id)? {
             Client::Vnc(c, _) => Ok(c),
             _ => err(format!("sessions: session {id:?} is not a VNC connection")),
@@ -1127,18 +1127,51 @@ impl Manager {
     }
 }
 
-// ponytail: placeholder until the VNC client lands; replaced by clients::vnc.
-mod vnc_stub {
-    use crate::clients::Callbacks;
-    use crate::clients::ssh::{SecretFn, SshClient};
-    use std::sync::Arc;
-    pub struct VncClient;
-    impl VncClient {
-        pub fn close(&self) {}
-    }
-    #[allow(clippy::too_many_arguments)]
-    pub fn connect_profile(_: &str, _: u16, _: &crate::models::VncConfig, _: i64, _: SecretFn, _: Option<Arc<SshClient>>, _: Callbacks, _: Arc<dyn Fn() + Send + Sync>) -> crate::Result<Arc<VncClient>> {
-        Err("VNC is not available yet".into())
+/// Builds and connects a VNC client from a profile's settings, optionally through an SSH tunnel.
+#[allow(clippy::too_many_arguments)]
+fn connect_vnc_client(
+    host: &str,
+    port: u16,
+    vc: &VncConfig,
+    timeout: i64,
+    password: SecretFn,
+    tunnel: Option<Arc<SshClient>>,
+    cb: Callbacks,
+    on_frame: Arc<dyn Fn() + Send + Sync>,
+) -> Result<Arc<clients::vnc::Client>> {
+    let connector: Option<irc::Connector> = tunnel.map(|t| {
+        let host = host.to_string();
+        Arc::new(move || {
+            let s = t.open_tunnel(&host, port)?;
+            s.set_read_timeout(Some(Duration::from_millis(50)))?;
+            Ok(Box::new(s) as Box<dyn irc::ReadWrite>)
+        }) as irc::Connector
+    });
+    let mut cfg = clients::vnc::Config {
+        host: host.into(),
+        port,
+        password: None,
+        shared: vc.shared_session,
+        view_only: vc.view_only,
+        quality: vc.quality.clamp(0, 9) as u8,
+        connector,
+        connect_timeout: Duration::from_secs(timeout.max(1) as u64),
+        on_frame,
+        on_error: cb.on_error,
+        on_close: cb.on_close,
+        ..Default::default()
+    };
+    let c = clients::vnc::Client::new(cfg.clone());
+    match c.connect() {
+        Ok(()) => Ok(c),
+        // Ask for the password only when the server wants one.
+        Err(e) if e.to_string().to_lowercase().contains("password") => {
+            cfg.password = Some(password()?);
+            let c = clients::vnc::Client::new(cfg);
+            c.connect()?;
+            Ok(c)
+        }
+        Err(e) => Err(e),
     }
 }
 
