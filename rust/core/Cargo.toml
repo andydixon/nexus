@@ -22,3 +22,7 @@ sha2 = "0.11.0"
 hmac = "0.13.0"
 sha1 = "0.11.0"
 portable-pty = "0.9.0"
+serialport = { version = "4", default-features = false }
+
+[target.'cfg(target_os = "linux")'.dev-dependencies]
+libc = "0.2"
