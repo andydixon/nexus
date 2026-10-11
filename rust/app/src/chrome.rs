@@ -611,7 +611,7 @@ pub fn palette(app: &mut App, ctx: &egui::Context) {
 
 // --- prompts --------------------------------------------------------------------------------
 
-fn modal(ctx: &egui::Context, id: &str, width: f32, body: impl FnOnce(&mut Ui)) {
+pub fn modal(ctx: &egui::Context, id: &str, width: f32, body: impl FnOnce(&mut Ui)) {
     modal_backdrop(ctx);
     egui::Area::new(egui::Id::new(id)).order(egui::Order::Foreground).anchor(Align2::CENTER_CENTER, vec2(0.0, -40.0)).show(ctx, |ui| {
         egui::Frame::popup(ui.style()).corner_radius(10).inner_margin(16).show(ui, |ui| {
