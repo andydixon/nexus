@@ -1,42 +1,46 @@
-# Alchementary Link Quick Start
+# Nexus Terminal Quick Start
 
-Alchementary Link is a desktop client for SSH, Telnet, RAW TCP, VNC, GitHub, local terminal sessions, and Leviathan binary analysis. This page is a shareable quick start for everyday use.
+Nexus Terminal is a native desktop client for SSH, Telnet, RAW TCP, Serial, VNC, IRC, GitHub and local terminal sessions. This page is a shareable quick start for everyday use.
 
 ## Get connected in minutes
 
-1. Open Alchementary Link.
-2. Click **New** in the sidebar.
-3. Choose a protocol and enter the connection details.
-4. Click **Connect** to open the session in a new tab.
+1. Open Nexus Terminal.
+2. Click **+** at the bottom of the sidebar, or press **Cmd+N** (macOS) / **Ctrl+N** (Windows/Linux).
+3. Choose a protocol at the top of the editor and enter the connection details.
+4. Click **Create & Connect** to save the profile and open the session in a new tab.
 
-One-off session? Use **Cmd+Shift+Q** / **Ctrl+Shift+Q** for quick connect.
+Next time, just click the profile in the sidebar.
+
+One-off session? Use **Cmd+Shift+Q** / **Ctrl+Shift+Q** for quick connect. Need a local shell? Click **Local Machine** at the top of the sidebar.
 
 ## Daily workflow
 
-- **Tabs and splits**: Drag tabs to reorder, and split the workspace to view multiple sessions at once.
-- **Scrollable tabs**: Use the tab bar scrollbar or mouse wheel/trackpad over the tab strip when many tabs are open. Hover a tab to see its full name and connection start time.
-- **Broadcast input**: Toggle with **Cmd+Shift+B** (macOS) or **Ctrl+Shift+B** (Windows/Linux) to send the same command to all connected sessions.
-- **Snippets**: Save common commands and run them with one click.
-- **Search**: Press **Cmd+F** (macOS) or **Ctrl+F** (Windows/Linux) to search within the active terminal.
+- **Command palette**: Press **Cmd+K** / **Ctrl+K** to connect, switch tabs or run any command by typing a few letters.
+- **Tabs and splits**: Drag tabs to reorder them, right-click a tab to pin, rename, duplicate or reconnect it, and split the workspace with **Cmd+Shift+D** / **Ctrl+Shift+D** (right) or **Cmd+Shift+E** / **Ctrl+Shift+E** (down).
+- **Scrollable tabs**: Use the mouse wheel or trackpad over the tab strip when many tabs are open. Hover a tab to see its host, state and connection start time.
+- **Broadcast input**: Toggle with **Cmd+Shift+B** / **Ctrl+Shift+B** to send the same keystrokes to every connected terminal. Right-click the broadcast button on the tab strip to pick targets.
+- **Snippets**: Save common commands with **Cmd+Shift+S** / **Ctrl+Shift+S** and send them with one click.
+- **Search**: Press **Cmd+F** / **Ctrl+F** to search within the active terminal.
+- **Copy, paste and links**: Select text and press **Cmd+C** / **Ctrl+C** to copy (with nothing selected, Ctrl+C interrupts as usual). **Cmd+V** / **Ctrl+V** pastes. **Cmd-click** / **Ctrl-click** a URL to open it.
 - **Reconnect quickly**: If a session drops, click **Reconnect** on the disconnected overlay.
+
+## Serial consoles
+
+Create a **Serial** profile, pick the device from the list (click refresh after plugging in an adapter) and set the baud rate and line settings to match the device — 115200 8N1 with no flow control is the default. On Linux your user needs to be in the `dialout` (or `uucp`) group; on macOS use the `/dev/cu.*` device.
 
 ## VNC remote desktops
 
-Create a **VNC** profile for remote desktop sessions. Use SSH tunnelling when possible, especially outside trusted networks. Direct VNC is available for isolated or trusted networks, but classic VNC traffic may not be encrypted.
-
-## Leviathan binary tools
-
-Click **Leviathan** beside **Alchementary Link** in the sidebar header to switch from connection profiles to binary-analysis tools. Use **Load** to choose a file, then open tools such as Hex Editor, Overview, Hashes, Entropy, Strings, Carve, BinSnoop, Structures, PDF, SquashFS, Transforms, and Spectrogram tools. Tools open in normal tabs and can be closed without a disconnect confirmation.
+Create a **VNC** profile for remote desktop sessions. Use the SSH tunnel option when possible, especially outside trusted networks. Direct VNC is available for isolated or trusted networks, but classic VNC traffic is not encrypted, so Nexus Terminal asks before connecting without a tunnel.
 
 ## File transfers on SSH
 
-Click the **folder** icon on an SSH tab to open the SFTP browser. You can browse, upload, download, rename, and delete files.
+Click the **folder** icon on an SSH tab to open the SFTP browser. You can browse, upload, download, rename and delete files, create folders and bookmark locations.
 
 ### Drag and drop files
 
-Drop file(s) into the terminal and choose to:
+Drop file(s) onto a terminal and choose to:
 
-- **Upload** to a selected remote folder, or
+- **Upload to current directory** — pick a remote folder (SSH sessions only), or
 - **Paste contents** into the terminal as if typed.
 
 The upload picker lists folders only and marks permissions:
@@ -47,8 +51,13 @@ The upload picker lists folders only and marks permissions:
 ## Security basics
 
 - Credentials are stored in the OS keychain where available.
-- An encrypted vault is used as a fallback.
+- An encrypted vault (AES-256-GCM, Argon2id) is used as a fallback; set it up in **Settings → Security**.
+- Each password, passphrase or token can be saved, remembered for the session only, or asked for every time.
 - SSH host key checks can be set per profile (Strict, Ask, Accept new, Insecure).
+
+## Coming from Alchementary Link
+
+Your profiles, vault and recordings are copied across automatically on first run, and keychain entries are picked up the first time they are needed. Your old Alchementary Link data is left untouched.
 
 ## Common shortcuts
 
@@ -62,8 +71,8 @@ The upload picker lists folders only and marks permissions:
 | Cmd + Shift + B | Ctrl + Shift + B       | Broadcast input          |
 | Cmd + Shift + Q | Ctrl + Shift + Q       | Quick connect            |
 | Cmd + Shift + R | Ctrl + Shift + R       | Toggle session recording |
-| Cmd + Shift + D | Ctrl + Shift + D       | Split pane vertically    |
-| Cmd + Shift + E | Ctrl + Shift + E       | Split pane horizontally  |
+| Cmd + Shift + D | Ctrl + Shift + D       | Split pane right         |
+| Cmd + Shift + E | Ctrl + Shift + E       | Split pane down          |
 
 ## Need more detail?
 
