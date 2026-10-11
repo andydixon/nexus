@@ -16,11 +16,7 @@ pub fn local_shell_env(env: Vec<String>) -> Vec<String> {
 /// Variables to request for an SSH session. A locale set by the profile is kept as is; otherwise
 /// a UTF-8 `LC_CTYPE` is added. Keys are trimmed and empty keys dropped. Iteration order is sorted.
 pub fn ssh_env_vars(profile_env: &BTreeMap<String, String>) -> BTreeMap<String, String> {
-    let mut out: BTreeMap<String, String> = profile_env
-        .iter()
-        .map(|(k, v)| (k.trim().to_string(), v.clone()))
-        .filter(|(k, _)| !k.is_empty())
-        .collect();
+    let mut out: BTreeMap<String, String> = profile_env.iter().map(|(k, v)| (k.trim().to_string(), v.clone())).filter(|(k, _)| !k.is_empty()).collect();
     if ![LC_ALL, LC_CTYPE, LANG].iter().any(|k| out.contains_key(*k)) {
         out.insert(LC_CTYPE.into(), default_utf8_locale(std::env::consts::OS).into());
     }

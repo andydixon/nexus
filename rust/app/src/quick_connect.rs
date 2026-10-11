@@ -24,7 +24,16 @@ pub struct QuickConnect {
 
 impl Default for QuickConnect {
     fn default() -> Self {
-        QuickConnect { open: false, focus: false, protocol: Protocol::Ssh, host: String::new(), port: 22, username: String::new(), nick: "nexus".into(), ports: vec![] }
+        QuickConnect {
+            open: false,
+            focus: false,
+            protocol: Protocol::Ssh,
+            host: String::new(),
+            port: 22,
+            username: String::new(),
+            nick: "nexus".into(),
+            ports: vec![],
+        }
     }
 }
 
@@ -97,7 +106,8 @@ impl QuickConnect {
             let r = ui
                 .horizontal(|ui| {
                     let w = if serial { ui.available_width() - 34.0 } else { ui.available_width() };
-                    let r = ui.add(TextEdit::singleline(&mut self.host).hint_text(if serial { "/dev/ttyUSB0 or COM3" } else { "e.g. 192.168.1.1" }).desired_width(w));
+                    let r = ui
+                        .add(TextEdit::singleline(&mut self.host).hint_text(if serial { "/dev/ttyUSB0 or COM3" } else { "e.g. 192.168.1.1" }).desired_width(w));
                     if serial {
                         ui.menu_button(icon::CARET_DOWN, |ui| {
                             if self.ports.is_empty() {

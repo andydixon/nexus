@@ -367,8 +367,7 @@ mod tests {
         let (mut srv, _) = listener.accept().unwrap();
         srv.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
 
-        srv.write_all(&[IAC, DO, OPT_TERM_TYPE, IAC, DO, OPT_NAWS, IAC, WILL, OPT_ECHO, IAC, WILL, OPT_SGA, IAC, DO, 99])
-            .unwrap();
+        srv.write_all(&[IAC, DO, OPT_TERM_TYPE, IAC, DO, OPT_NAWS, IAC, WILL, OPT_ECHO, IAC, WILL, OPT_SGA, IAC, DO, 99]).unwrap();
         let mut want = vec![IAC, WILL, OPT_TERM_TYPE, IAC, WILL, OPT_NAWS, IAC, SB, OPT_NAWS, 0, 80, 0, 24, IAC, SE];
         want.extend_from_slice(&[IAC, DO, OPT_ECHO, IAC, DO, OPT_SGA, IAC, WONT, 99]);
         assert_eq!(read_n(&mut srv, want.len()), want);

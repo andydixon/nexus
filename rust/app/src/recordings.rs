@@ -15,7 +15,7 @@ const SPEEDS: [f64; 5] = [0.5, 1.0, 2.0, 5.0, 10.0];
 
 /// m:ss, as the JS `_formatSeconds`.
 pub fn mmss(secs: f64) -> String {
-    if !(secs > 0.0) {
+    if secs.is_nan() || secs <= 0.0 {
         return "0:00".into();
     }
     let s = secs.floor() as u64;
@@ -97,7 +97,18 @@ pub struct Recordings {
 
 impl Default for Recordings {
     fn default() -> Self {
-        Recordings { open: false, list: vec![], info: None, loading: false, rx: None, age: 30, size: 1 << 30, status: String::new(), confirm_delete: None, playback: None }
+        Recordings {
+            open: false,
+            list: vec![],
+            info: None,
+            loading: false,
+            rx: None,
+            age: 30,
+            size: 1 << 30,
+            status: String::new(),
+            confirm_delete: None,
+            playback: None,
+        }
     }
 }
 
@@ -150,7 +161,8 @@ impl Recordings {
                 }
                 let total = events.last().map_or(1.0, |e| e.elapsed).max(f64::EPSILON);
                 let title = if header.title.is_empty() { title } else { header.title };
-                let mut p = Playback { title, term: TermView::new(10_000, 13.0, CursorStyle::Block), events, total, pos: 0.0, next: 0, playing: false, speed: 1.0 };
+                let mut p =
+                    Playback { title, term: TermView::new(10_000, 13.0, CursorStyle::Block), events, total, pos: 0.0, next: 0, playing: false, speed: 1.0 };
                 p.play(); // autoplay
                 self.playback = Some(p);
             }
@@ -222,7 +234,11 @@ impl Recordings {
                 ui.set_width(ui.available_width() - 64.0);
                 ui.label(RichText::new(if r.title.is_empty() { &r.id } else { &r.title }).font(theme::semibold(13.0)));
                 let date = r.created_at.with_timezone(&chrono::Local).format("%Y-%m-%d %H:%M");
-                ui.label(RichText::new(format!("{date} · {} · {} · {}×{}", mmss(r.duration), widgets::human_size(r.size), r.width, r.height)).size(11.5).color(t.text_dim));
+                ui.label(
+                    RichText::new(format!("{date} · {} · {} · {}×{}", mmss(r.duration), widgets::human_size(r.size), r.width, r.height))
+                        .size(11.5)
+                        .color(t.text_dim),
+                );
             });
             if widgets::icon_button(ui, icon::PLAY, "Play").clicked() {
                 play = Some(i);
@@ -245,7 +261,9 @@ impl Recordings {
     }
 
     fn delete_dialog(&mut self, ctx: &egui::Context, s: &mut Shared) {
-        let Some(r) = &self.confirm_delete else { return };
+        let Some(r) = &self.confirm_delete else {
+            return;
+        };
         let (mut yes, mut no) = (false, ctx.input(|i| i.key_pressed(Key::Escape)));
         let name = if r.title.is_empty() { r.id.clone() } else { r.title.clone() };
         crate::chrome::modal(ctx, "rec-delete", 380.0, |ui| {
@@ -309,11 +327,14 @@ impl Recordings {
                         });
                     });
                 });
-                egui::Frame::NONE.fill(egui::Color32::from_rgba_unmultiplied(theme.background[0], theme.background[1], theme.background[2], 255)).corner_radius(t.radius).show(ui, |ui| {
-                    ui.set_min_size(ui.available_size());
-                    // Read-only: keyboard input and terminal replies are dropped.
-                    let _ = p.term.ui(ui, theme, false);
-                });
+                egui::Frame::NONE
+                    .fill(egui::Color32::from_rgba_unmultiplied(theme.background[0], theme.background[1], theme.background[2], 255))
+                    .corner_radius(t.radius)
+                    .show(ui, |ui| {
+                        ui.set_min_size(ui.available_size());
+                        // Read-only: keyboard input and terminal replies are dropped.
+                        let _ = p.term.ui(ui, theme, false);
+                    });
             });
         if !open {
             self.playback = None;

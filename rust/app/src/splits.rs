@@ -52,7 +52,13 @@ impl Split {
 
     fn at(&mut self, path: &[bool]) -> &mut Split {
         match (self, path.split_first()) {
-            (Split::Node { a, b, .. }, Some((side, rest))) => if *side { b.at(rest) } else { a.at(rest) },
+            (Split::Node { a, b, .. }, Some((side, rest))) => {
+                if *side {
+                    b.at(rest)
+                } else {
+                    a.at(rest)
+                }
+            }
             (s, _) => s,
         }
     }
@@ -124,20 +130,32 @@ fn divide(r: Rect, dir: Dir, ratio: f32) -> (Rect, Rect, Rect) {
     match dir {
         Dir::Right => {
             let x = r.left() + (r.width() - GAP) * ratio;
-            (Rect::from_min_max(r.min, pos2(x, r.bottom())), Rect::from_min_max(pos2(x + GAP, r.top()), r.max), Rect::from_min_max(pos2(x, r.top()), pos2(x + GAP, r.bottom())))
+            (
+                Rect::from_min_max(r.min, pos2(x, r.bottom())),
+                Rect::from_min_max(pos2(x + GAP, r.top()), r.max),
+                Rect::from_min_max(pos2(x, r.top()), pos2(x + GAP, r.bottom())),
+            )
         }
         Dir::Down => {
             let y = r.top() + (r.height() - GAP) * ratio;
-            (Rect::from_min_max(r.min, pos2(r.right(), y)), Rect::from_min_max(pos2(r.left(), y + GAP), r.max), Rect::from_min_max(pos2(r.left(), y), pos2(r.right(), y + GAP)))
+            (
+                Rect::from_min_max(r.min, pos2(r.right(), y)),
+                Rect::from_min_max(pos2(r.left(), y + GAP), r.max),
+                Rect::from_min_max(pos2(r.left(), y), pos2(r.right(), y + GAP)),
+            )
         }
     }
 }
 
 /// Splits the focused pane of the active tab.
 pub fn split_focused(app: &mut App, dir: Dir) {
-    let Some(tab_id) = app.s.active.clone() else { return };
+    let Some(tab_id) = app.s.active.clone() else {
+        return;
+    };
     let focused = app.s.focused_session().unwrap_or(tab_id.clone());
-    let Some(tab) = app.s.tabs.iter_mut().find(|t| t.id == tab_id) else { return };
+    let Some(tab) = app.s.tabs.iter_mut().find(|t| t.id == tab_id) else {
+        return;
+    };
     match &mut tab.split {
         None => tab.split = Some(Split::Node { dir, ratio: 0.5, a: Box::new(Split::Leaf(Some(tab_id.clone()))), b: Box::new(Split::Leaf(None)) }),
         Some(sp) => {
@@ -152,7 +170,9 @@ pub fn split_focused(app: &mut App, dir: Dir) {
 /// removed too: the next pane takes over the tab.
 pub fn remove_session(s: &mut Shared, session: &str) {
     for i in 0..s.tabs.len() {
-        let Some(sp) = &mut s.tabs[i].split else { continue };
+        let Some(sp) = &mut s.tabs[i].split else {
+            continue;
+        };
         let mut path = vec![];
         if !sp.find(session, &mut path) {
             continue;
@@ -202,7 +222,8 @@ pub fn render(app: &mut App, ui: &mut Ui, tab_id: &str) {
             };
             let min = (MIN_PANE / len).min(0.45);
             let ratio = ((pos - start) / len).clamp(min, 1.0 - min);
-            if let Some(Split::Node { ratio: r, .. }) = app.s.tabs.iter_mut().find(|tb| tb.id == tab_id).and_then(|tb| tb.split.as_mut()).map(|sp| sp.at(&path)) {
+            if let Some(Split::Node { ratio: r, .. }) = app.s.tabs.iter_mut().find(|tb| tb.id == tab_id).and_then(|tb| tb.split.as_mut()).map(|sp| sp.at(&path))
+            {
                 *r = ratio;
             }
         }
@@ -213,9 +234,19 @@ pub fn render(app: &mut App, ui: &mut Ui, tab_id: &str) {
         let body = Rect::from_min_max(pos2(rect.left(), head.bottom()), rect.max);
         let focused = session.is_some() && app.s.focused == session;
         ui.painter().rect_filled(head, 0.0, if focused { t.card } else { t.tab_strip });
-        let title = session.as_deref().and_then(|s| app.s.pane(s)).map(|p| (p.info.tab_name.clone(), protocol_color(p.info.protocol))).unwrap_or(("New pane".into(), t.text_faint));
+        let title = session
+            .as_deref()
+            .and_then(|s| app.s.pane(s))
+            .map(|p| (p.info.tab_name.clone(), protocol_color(p.info.protocol)))
+            .unwrap_or(("New pane".into(), t.text_faint));
         ui.painter().circle_filled(head.left_center() + vec2(10.0, 0.0), 3.5, title.1);
-        ui.painter().with_clip_rect(head.shrink2(vec2(24.0, 0.0))).text(head.left_center() + vec2(20.0, 0.0), Align2::LEFT_CENTER, title.0, egui::FontId::proportional(11.5), if focused { t.text } else { t.text_dim });
+        ui.painter().with_clip_rect(head.shrink2(vec2(24.0, 0.0))).text(
+            head.left_center() + vec2(20.0, 0.0),
+            Align2::LEFT_CENTER,
+            title.0,
+            egui::FontId::proportional(11.5),
+            if focused { t.text } else { t.text_dim },
+        );
         let xr = Rect::from_center_size(head.right_center() - vec2(12.0, 0.0), vec2(16.0, 16.0));
         if widgets::icon_button(&mut ui.new_child(egui::UiBuilder::new().max_rect(xr)), icon::X, "Close pane").clicked() {
             close = Some((path.clone(), session.clone()));

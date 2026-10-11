@@ -61,12 +61,16 @@ fn grouped<'a>(repos: &'a [GitHubRepo], login: &str, filter: &str) -> Vec<(Strin
 
 /// "just now", "3 minutes ago", "1 day ago"… (the web build's relativeTime).
 fn relative_time(iso: &str, now: DateTime<Utc>) -> String {
-    let Some(d) = parse_time(iso) else { return String::new() };
+    let Some(d) = parse_time(iso) else {
+        return String::new();
+    };
     let secs = (now - d).num_seconds();
     if secs < 60 {
         return "just now".into();
     }
-    let plural = |n: i64, unit: &str| if n == 1 { format!("1 {unit} ago") } else { format!("{n} {unit}s ago") };
+    let plural = |n: i64, unit: &str| {
+        if n == 1 { format!("1 {unit} ago") } else { format!("{n} {unit}s ago") }
+    };
     let mins = secs / 60;
     let hrs = mins / 60;
     let days = hrs / 24;
@@ -120,6 +124,7 @@ fn lang_colour(lang: &str) -> Color32 {
     Color32::from_rgb((hex >> 16) as u8, (hex >> 8) as u8, hex as u8)
 }
 
+#[allow(clippy::large_enum_variant)] // short-lived, one per click
 enum Action {
     Zip(GitHubRepo),
     Visit(String),
@@ -178,7 +183,9 @@ impl GithubView {
     fn download(&mut self, s: &Shared, repo: &GitHubRepo) {
         let reference = repo.default_branch.clone();
         let name = if reference.is_empty() { format!("{}.zip", repo.name) } else { format!("{}-{reference}.zip", repo.name) };
-        let Some(path) = rfd::FileDialog::new().set_file_name(name).add_filter("ZIP archive", &["zip"]).save_file() else { return };
+        let Some(path) = rfd::FileDialog::new().set_file_name(name).add_filter("ZIP archive", &["zip"]).save_file() else {
+            return;
+        };
         self.on_status(format!("Downloading {}...", repo.full_name));
         let (svc, sid, inbox, ctx, full) = (s.svc.clone(), self.session.clone(), self.inbox.clone(), s.ctx.clone(), repo.full_name.clone());
         std::thread::spawn(move || {
@@ -221,7 +228,11 @@ impl GithubView {
                     if widgets::icon_button(ui, icon::ARROW_CLOCKWISE, "Refresh now").clicked() {
                         self.refresh(s);
                     }
-                    ui.add(egui::TextEdit::singleline(&mut self.filter).hint_text(format!("{}  Filter repositories…", icon::MAGNIFYING_GLASS)).desired_width(240.0));
+                    ui.add(
+                        egui::TextEdit::singleline(&mut self.filter)
+                            .hint_text(format!("{}  Filter repositories…", icon::MAGNIFYING_GLASS))
+                            .desired_width(240.0),
+                    );
                 });
             });
             let c = if self.status_error { t.danger } else { t.text_dim };
@@ -270,50 +281,55 @@ impl GithubView {
 fn card(ui: &mut Ui, r: &GitHubRepo, now: DateTime<Utc>) -> Option<Action> {
     let t = Tokens::get(ui.ctx());
     let mut action = None;
-    let resp = egui::Frame::new().fill(t.card).stroke(egui::Stroke::new(1.0, t.card_border)).corner_radius(6).inner_margin(egui::Margin::symmetric(12, 9)).show(ui, |ui| {
-        ui.set_width(ui.available_width());
-        ui.horizontal(|ui| {
-            ui.label(RichText::new(&r.name).font(theme::semibold(13.5)).color(t.accent));
-            if r.private {
-                widgets::chip(ui, "Private", t.warning);
-            }
-            if r.fork {
-                widgets::chip(ui, "Fork", t.text_dim);
-            }
-            if r.archived {
-                widgets::chip(ui, "Archived", t.danger);
-            }
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if ui.button(format!("{} Visit", icon::ARROW_SQUARE_OUT)).on_hover_text("Open repository in browser").clicked() {
-                    action = Some(Action::Visit(r.html_url.clone()));
+    let resp = egui::Frame::new()
+        .fill(t.card)
+        .stroke(egui::Stroke::new(1.0, t.card_border))
+        .corner_radius(6)
+        .inner_margin(egui::Margin::symmetric(12, 9))
+        .show(ui, |ui| {
+            ui.set_width(ui.available_width());
+            ui.horizontal(|ui| {
+                ui.label(RichText::new(&r.name).font(theme::semibold(13.5)).color(t.accent));
+                if r.private {
+                    widgets::chip(ui, "Private", t.warning);
                 }
-                if ui.button(format!("{} ZIP", icon::FILE_ZIP)).on_hover_text("Download repository as zip").clicked() {
-                    action = Some(Action::Zip(r.clone()));
+                if r.fork {
+                    widgets::chip(ui, "Fork", t.text_dim);
+                }
+                if r.archived {
+                    widgets::chip(ui, "Archived", t.danger);
+                }
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if ui.button(format!("{} Visit", icon::ARROW_SQUARE_OUT)).on_hover_text("Open repository in browser").clicked() {
+                        action = Some(Action::Visit(r.html_url.clone()));
+                    }
+                    if ui.button(format!("{} ZIP", icon::FILE_ZIP)).on_hover_text("Download repository as zip").clicked() {
+                        action = Some(Action::Zip(r.clone()));
+                    }
+                });
+            });
+            if !r.latest_committer.is_empty() && !r.latest_commit_at.is_empty() {
+                ui.label(RichText::new(format!("Last commit: {} by {}", local_time(&r.latest_commit_at), r.latest_committer)).color(t.text_faint).size(11.5));
+            }
+            if !r.description.is_empty() {
+                ui.label(RichText::new(&r.description).color(t.text_dim));
+            }
+            ui.horizontal(|ui| {
+                if !r.language.is_empty() {
+                    let (dot, _) = ui.allocate_exact_size(vec2(10.0, 10.0), Sense::hover());
+                    ui.painter().circle_filled(dot.center(), 5.0, lang_colour(&r.language));
+                    ui.label(RichText::new(&r.language).color(t.text_dim).size(11.5));
+                    ui.add_space(8.0);
+                }
+                if r.stars > 0 {
+                    ui.label(RichText::new(format!("{} {}", icon::STAR, widgets::group(r.stars as u64))).color(t.text_dim).size(11.5));
+                    ui.add_space(8.0);
+                }
+                if !r.pushed_at.is_empty() {
+                    ui.label(RichText::new(relative_time(&r.pushed_at, now)).color(t.text_faint).size(11.5)).on_hover_text(local_time(&r.pushed_at));
                 }
             });
         });
-        if !r.latest_committer.is_empty() && !r.latest_commit_at.is_empty() {
-            ui.label(RichText::new(format!("Last commit: {} by {}", local_time(&r.latest_commit_at), r.latest_committer)).color(t.text_faint).size(11.5));
-        }
-        if !r.description.is_empty() {
-            ui.label(RichText::new(&r.description).color(t.text_dim));
-        }
-        ui.horizontal(|ui| {
-            if !r.language.is_empty() {
-                let (dot, _) = ui.allocate_exact_size(vec2(10.0, 10.0), Sense::hover());
-                ui.painter().circle_filled(dot.center(), 5.0, lang_colour(&r.language));
-                ui.label(RichText::new(&r.language).color(t.text_dim).size(11.5));
-                ui.add_space(8.0);
-            }
-            if r.stars > 0 {
-                ui.label(RichText::new(format!("{} {}", icon::STAR, widgets::group(r.stars as u64))).color(t.text_dim).size(11.5));
-                ui.add_space(8.0);
-            }
-            if !r.pushed_at.is_empty() {
-                ui.label(RichText::new(relative_time(&r.pushed_at, now)).color(t.text_faint).size(11.5)).on_hover_text(local_time(&r.pushed_at));
-            }
-        });
-    });
     let resp = resp.response.interact(Sense::click());
     if resp.double_clicked() {
         action = Some(Action::Visit(r.html_url.clone()));

@@ -14,15 +14,6 @@ pub enum View {
     Vnc(Box<VncView>),
 }
 
-impl View {
-    pub fn terminal(&mut self) -> Option<&mut TermView> {
-        match self {
-            View::Terminal(t) => Some(t),
-            _ => None,
-        }
-    }
-}
-
 /// Protocol badge colour (the web build's --protocol-* tokens).
 pub fn protocol_color(p: nexus_core::models::Protocol) -> egui::Color32 {
     use nexus_core::models::Protocol::*;

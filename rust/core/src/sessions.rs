@@ -2,14 +2,14 @@
 //! internal/sessions — same lifecycle, reconnect backoff, login scripts, recording hooks and
 //! credential resolution — reporting to the UI through `Event`s.
 
-use crate::clients::{self, Callbacks, github, irc, raw, serial, telnet};
+use crate::Result;
 use crate::clients::local::LocalShell;
 use crate::clients::ssh::{HostKeyCheck, HostKeyInfo, SecretFn, SshClient};
+use crate::clients::{self, Callbacks, github, irc, raw, serial, telnet};
 use crate::models::*;
 use crate::recording::{self, Recorder};
 use crate::secrets::Secrets;
 use crate::storage::Store;
-use crate::Result;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -214,7 +214,9 @@ impl Manager {
         let id2 = id.clone();
         std::thread::spawn(move || {
             let r = me.connect_protocol(&id2, epoch, &profile, prompt);
-            me.finish_connect(&id2, epoch, r, |me| me.store.add_audit("connect", &profile.id, &id2, &format!("Connected via {} to {}", profile.protocol.id(), profile.host)));
+            me.finish_connect(&id2, epoch, r, |me| {
+                me.store.add_audit("connect", &profile.id, &id2, &format!("Connected via {} to {}", profile.protocol.id(), profile.host))
+            });
         });
         id
     }
@@ -266,9 +268,8 @@ impl Manager {
             Protocol::Raw => {
                 let cb = self.terminal_callbacks(id, epoch);
                 let (me, sid) = (self.clone(), id.to_string());
-                let on_data: raw::RawDataFn = Arc::new(move |d, dir, ts| {
-                    me.emit(Event::RawData { session: sid.clone(), data: d.to_vec(), direction: dir.into(), timestamp: ts })
-                });
+                let on_data: raw::RawDataFn =
+                    Arc::new(move |d, dir, ts| me.emit(Event::RawData { session: sid.clone(), data: d.to_vec(), direction: dir.into(), timestamp: ts }));
                 let c = Arc::new(raw::RawClient::new(p, on_data, cb.on_error, cb.on_close));
                 c.connect()?;
                 Ok(Client::Raw(c))
@@ -465,7 +466,20 @@ impl Manager {
 
     /// An SSH connection used only to tunnel another protocol (IRC, VNC).
     #[allow(clippy::too_many_arguments)]
-    fn tunnel(self: &Arc<Self>, id: &str, profile_id: &str, host: &str, port: i64, user: &str, method: &str, key: &str, agent: bool, mode: SecretMode, kind: &str, prompt: Prompt) -> Result<Arc<SshClient>> {
+    fn tunnel(
+        self: &Arc<Self>,
+        id: &str,
+        profile_id: &str,
+        host: &str,
+        port: i64,
+        user: &str,
+        method: &str,
+        key: &str,
+        agent: bool,
+        mode: SecretMode,
+        kind: &str,
+        prompt: Prompt,
+    ) -> Result<Arc<SshClient>> {
         let mut tp = Profile::new(Protocol::Ssh);
         tp.host = host.into();
         tp.port = if port == 0 { 22 } else { port };
@@ -493,10 +507,7 @@ impl Manager {
             Err(e) => {
                 let msg = e.to_string().to_lowercase();
                 let auth = ["token validation failed", "authentication failed", "http 401", "http 403"].iter().any(|k| msg.contains(k));
-                let retry = auth
-                    .then(|| prompt("GitHub token did not work. Please enter a valid token:").ok())
-                    .flatten()
-                    .filter(|t| !t.is_empty());
+                let retry = auth.then(|| prompt("GitHub token did not work. Please enter a valid token:").ok()).flatten().filter(|t| !t.is_empty());
                 let Some(t) = retry else { return err(format!("GitHub authentication failed: {e}")) };
                 if gh.secret_mode == SecretMode::Saved {
                     self.secrets.set(&format!("profile:{}:github-token", p.id), &t);
@@ -562,7 +573,19 @@ impl Manager {
             rooms = crate::storage::dedup_rooms(&[&rooms, &last]);
         }
         let tunnel = if ic.ssh_tunnel {
-            Some(self.tunnel(id, &p.id, &ic.ssh_host, ic.ssh_port, &ic.ssh_username, &ic.ssh_auth_method, &ic.ssh_private_key, ic.ssh_agent_auth, ic.ssh_secret_mode, "irc", prompt)?)
+            Some(self.tunnel(
+                id,
+                &p.id,
+                &ic.ssh_host,
+                ic.ssh_port,
+                &ic.ssh_username,
+                &ic.ssh_auth_method,
+                &ic.ssh_private_key,
+                ic.ssh_agent_auth,
+                ic.ssh_secret_mode,
+                "irc",
+                prompt,
+            )?)
         } else {
             None
         };
@@ -629,14 +652,35 @@ impl Manager {
         let host = if vc.vnc_host.is_empty() { p.host.clone() } else { vc.vnc_host.clone() };
         let port = if vc.vnc_port == 0 { 5900 } else { vc.vnc_port } as u16;
         let tunnel = if vc.ssh_tunnel {
-            Some(self.tunnel(id, &p.id, &vc.ssh_host, vc.ssh_port, &vc.ssh_username, &vc.ssh_auth_method, &vc.ssh_private_key, vc.ssh_agent_auth, vc.ssh_secret_mode, "vnc", prompt.clone())?)
+            Some(self.tunnel(
+                id,
+                &p.id,
+                &vc.ssh_host,
+                vc.ssh_port,
+                &vc.ssh_username,
+                &vc.ssh_auth_method,
+                &vc.ssh_private_key,
+                vc.ssh_agent_auth,
+                vc.ssh_secret_mode,
+                "vnc",
+                prompt.clone(),
+            )?)
         } else {
             None
         };
         let password = self.secret_fn(&p.id, "vnc-password", vc.secret_mode, prompt);
         let cb = self.terminal_callbacks(id, epoch);
         let (me, sid) = (self.clone(), id.to_string());
-        let c = connect_vnc_client(&host, port, &vc, p.connect_timeout, password, tunnel.clone(), cb, Arc::new(move || me.emit(Event::VncFrame { session: sid.clone() })));
+        let c = connect_vnc_client(
+            &host,
+            port,
+            &vc,
+            p.connect_timeout,
+            password,
+            tunnel.clone(),
+            cb,
+            Arc::new(move || me.emit(Event::VncFrame { session: sid.clone() })),
+        );
         match c {
             Ok(c) => {
                 self.emit(Event::VncReady { session: id.into() });
@@ -811,7 +855,12 @@ impl Manager {
             return;
         };
         let delay = (1u64 << (attempt - 1).min(5)).min(30);
-        self.emit(Event::State { session: id.into(), state: SessionState::Reconnecting, error: String::new(), retry: Some(Retry { attempt, max, delay_secs: delay }) });
+        self.emit(Event::State {
+            session: id.into(),
+            state: SessionState::Reconnecting,
+            error: String::new(),
+            retry: Some(Retry { attempt, max, delay_secs: delay }),
+        });
         let (me, id) = (self.clone(), id.to_string());
         std::thread::spawn(move || {
             let deadline = std::time::Instant::now() + Duration::from_secs(delay);
@@ -903,7 +952,10 @@ impl Manager {
                     "wait" => {
                         let timeout = Duration::from_secs(if step.timeout <= 0 { 10 } else { step.timeout as u64 });
                         if !wait_for_output(&login, &step.value, timeout) {
-                            me.emit(Event::Debug { session: id.clone(), message: format!("login script step {} timed out waiting for {:?}", i + 1, step.value) });
+                            me.emit(Event::Debug {
+                                session: id.clone(),
+                                message: format!("login script step {} timed out waiting for {:?}", i + 1, step.value),
+                            });
                             break;
                         }
                     }
@@ -1105,7 +1157,9 @@ impl Manager {
         if exists {
             return err(format!("sessions: session {id:?} is already being recorded"));
         }
-        let r = Arc::new(Recorder::new(self.recordings.dir(), id, &title, cols as i64, rows as i64).map_err(|e| format!("sessions: failed to start recording: {e}"))?);
+        let r = Arc::new(
+            Recorder::new(self.recordings.dir(), id, &title, cols as i64, rows as i64).map_err(|e| format!("sessions: failed to start recording: {e}"))?,
+        );
         self.with(id, |s| s.recorder = Some(r))?;
         self.emit(Event::RecordingStarted { session: id.into() });
         Ok(())

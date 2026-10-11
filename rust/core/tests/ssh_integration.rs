@@ -40,9 +40,8 @@ fn free_port() -> u16 {
 fn start(name: &str) -> Option<Server> {
     let sshd = which("sshd")?;
     let keygen = which("ssh-keygen")?;
-    let sftp_server = ["/usr/lib/openssh/sftp-server", "/usr/libexec/openssh/sftp-server", "/usr/libexec/sftp-server"]
-        .iter()
-        .find(|p| Path::new(p).exists())?;
+    let sftp_server =
+        ["/usr/lib/openssh/sftp-server", "/usr/libexec/openssh/sftp-server", "/usr/libexec/sftp-server"].iter().find(|p| Path::new(p).exists())?;
     let dir = std::env::temp_dir().join(format!("nexus-sshd-{name}-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
@@ -95,10 +94,13 @@ fn callbacks() -> (Callbacks, Seen) {
 fn accept_all() -> (HostKeyCheck, Arc<Mutex<Vec<String>>>) {
     let fps: Arc<Mutex<Vec<String>>> = Arc::default();
     let f2 = fps.clone();
-    (Arc::new(move |i| {
-        f2.lock().unwrap().push(format!("{} {}", i.key_type, i.fingerprint));
-        Ok(())
-    }), fps)
+    (
+        Arc::new(move |i| {
+            f2.lock().unwrap().push(format!("{} {}", i.key_type, i.fingerprint));
+            Ok(())
+        }),
+        fps,
+    )
 }
 
 fn wait_for(seen: &Seen, needle: &str) -> bool {
@@ -151,7 +153,9 @@ fn echo_through(port: u16) -> String {
 
 #[test]
 fn shell_exec_forwards_sftp() {
-    let Some(s) = start("main") else { return eprintln!("sshd not available; skipping") };
+    let Some(s) = start("main") else {
+        return eprintln!("sshd not available; skipping");
+    };
     let (cb, seen) = callbacks();
     let (check, fps) = accept_all();
     let c = SshClient::new(&profile(&s), cb);
@@ -166,11 +170,28 @@ fn shell_exec_forwards_sftp() {
 
     let echo = echo_server();
     let lport = free_port();
-    let rule = PortForward { id: "l".into(), direction: ForwardDirection::Local, bind_port: lport as i64, dest_host: "127.0.0.1".into(), dest_port: echo as i64, enabled: true, ..Default::default() };
+    let rule = PortForward {
+        id: "l".into(),
+        direction: ForwardDirection::Local,
+        bind_port: lport as i64,
+        dest_host: "127.0.0.1".into(),
+        dest_port: echo as i64,
+        enabled: true,
+        ..Default::default()
+    };
     c.start_forward(rule).unwrap();
     assert_eq!(echo_through(lport), "ping");
     let rport = free_port();
-    let rule = PortForward { id: "r".into(), direction: ForwardDirection::Remote, bind_host: "127.0.0.1".into(), bind_port: rport as i64, dest_host: "127.0.0.1".into(), dest_port: echo as i64, enabled: true, ..Default::default() };
+    let rule = PortForward {
+        id: "r".into(),
+        direction: ForwardDirection::Remote,
+        bind_host: "127.0.0.1".into(),
+        bind_port: rport as i64,
+        dest_host: "127.0.0.1".into(),
+        dest_port: echo as i64,
+        enabled: true,
+        ..Default::default()
+    };
     c.start_forward(rule).unwrap();
     assert_eq!(echo_through(rport), "ping");
     assert_eq!(c.active_forwards().len(), 2);
@@ -226,7 +247,8 @@ fn jump_host_chain() {
     let Some(s) = start("jump") else { return };
     let mut p = profile(&s);
     let key = p.ssh.as_ref().unwrap().private_key_path.clone();
-    p.ssh.as_mut().unwrap().jump_hosts = vec![JumpHost { host: "127.0.0.1".into(), port: s.port as i64, username: p.username.clone(), private_key_path: key, ..Default::default() }];
+    p.ssh.as_mut().unwrap().jump_hosts =
+        vec![JumpHost { host: "127.0.0.1".into(), port: s.port as i64, username: p.username.clone(), private_key_path: key, ..Default::default() }];
     let (check, fps) = accept_all();
     let c = SshClient::new(&p, Callbacks::noop());
     c.connect(check, None, None).unwrap();
@@ -238,7 +260,9 @@ fn jump_host_chain() {
 #[test]
 fn agent_auth_and_forwarding() {
     let Some(mut s) = start("agent") else { return };
-    let (Some(agent), Some(add)) = (which("ssh-agent"), which("ssh-add")) else { return };
+    let (Some(agent), Some(add)) = (which("ssh-agent"), which("ssh-add")) else {
+        return;
+    };
     let sock = s.dir.join("agent.sock");
     s.agent = Some(Command::new(agent).arg("-D").arg("-a").arg(&sock).spawn().unwrap());
     let start = Instant::now();

@@ -3,8 +3,8 @@
 //! port forwards, agent forwarding and SFTP. A port of internal/sshclient + sftpclient.
 
 use super::{Callbacks, rt};
-use crate::models::{ForwardDirection, JumpHost, PortForward, Profile, SshConfig};
 use crate::Result;
+use crate::models::{ForwardDirection, JumpHost, PortForward, Profile, SshConfig};
 use base64::Engine;
 use russh::client::{self, Handle, Msg};
 use russh::keys::{HashAlg, PrivateKeyWithHashAlg, PublicKey};
@@ -160,12 +160,9 @@ async fn connect_agent() -> Result<Agent> {
 
 fn is_totp_prompt(q: &str) -> bool {
     let q = q.to_lowercase();
-    [
-        "verification code", "otp", "one-time", "one time", "two-factor", "two factor", "2fa", "totp", "authenticator",
-        "security code", "6-digit", "6 digit",
-    ]
-    .iter()
-    .any(|k| q.contains(k))
+    ["verification code", "otp", "one-time", "one time", "two-factor", "two factor", "2fa", "totp", "authenticator", "security code", "6-digit", "6 digit"]
+        .iter()
+        .any(|k| q.contains(k))
 }
 
 /// RFC 6238 code (SHA-1, 6 digits, 30 s) for a base32 secret, normalised as pquerna/otp does.
@@ -448,7 +445,9 @@ impl SshClient {
         let host = host.to_string();
         let listener = std::net::TcpListener::bind("127.0.0.1:0")?;
         let addr = listener.local_addr()?;
-        let ch = rt().block_on(h.channel_open_direct_tcpip(host.clone(), port as u32, "127.0.0.1", 0)).map_err(|e| format!("SSH tunnel to {host}:{port} failed: {e}"))?;
+        let ch = rt()
+            .block_on(h.channel_open_direct_tcpip(host.clone(), port as u32, "127.0.0.1", 0))
+            .map_err(|e| format!("SSH tunnel to {host}:{port} failed: {e}"))?;
         let client = std::net::TcpStream::connect(addr)?;
         let (server, _) = listener.accept()?;
         server.set_nonblocking(true)?;
@@ -488,7 +487,11 @@ impl SshClient {
         let methods = if sc.auth_methods.is_empty() { SshConfig::defaults().auth_methods } else { sc.auth_methods.clone() };
         let key = if methods.iter().any(|m| m == "publickey") && !sc.private_key_path.is_empty() {
             let (path, pp) = (sc.private_key_path.clone(), passphrase.clone());
-            Some(blocking(move || load_private_key(&path, pp.as_ref())).await.map_err(|e| format!("failed to build auth methods: failed to parse private key {}: {e}", sc.private_key_path))?)
+            Some(
+                blocking(move || load_private_key(&path, pp.as_ref()))
+                    .await
+                    .map_err(|e| format!("failed to build auth methods: failed to parse private key {}: {e}", sc.private_key_path))?,
+            )
         } else {
             None
         };
@@ -498,17 +501,16 @@ impl SshClient {
             self.handshake(tcp, &p.host, port, &check).await?
         } else {
             let (prev, h) = self.via_jumps(&sc, &check, passphrase.clone(), timeout).await?;
-            let ch = prev.channel_open_direct_tcpip(p.host.clone(), port as u32, "127.0.0.1", 0).await.map_err(|e| format!("failed to dial target {}:{port} through jump hosts: {e}", p.host))?;
+            let ch = prev
+                .channel_open_direct_tcpip(p.host.clone(), port as u32, "127.0.0.1", 0)
+                .await
+                .map_err(|e| format!("failed to dial target {}:{port} through jump hosts: {e}", p.host))?;
             self.hops.lock().unwrap().extend(h);
             self.hops.lock().unwrap().push(prev);
             self.handshake(ch.into_stream(), &p.host, port, &check).await?
         };
 
-        authenticate(
-            &mut handle,
-            Auth { user: &p.username, methods, agent: sc.agent_auth, key, password, totp_secret: sc.totp_secret.clone() },
-        )
-        .await?;
+        authenticate(&mut handle, Auth { user: &p.username, methods, agent: sc.agent_auth, key, password, totp_secret: sc.totp_secret.clone() }).await?;
         let handle = Arc::new(handle);
         if !shell {
             *self.handle.lock().unwrap() = Some(handle);
@@ -565,7 +567,13 @@ impl SshClient {
     }
 
     /// Authenticates through each jump host in turn; returns the last hop and the ones before it.
-    async fn via_jumps(&self, sc: &SshConfig, check: &HostKeyCheck, passphrase: Option<SecretFn>, timeout: Duration) -> Result<(Arc<Handle<Handler>>, Vec<Arc<Handle<Handler>>>)> {
+    async fn via_jumps(
+        &self,
+        sc: &SshConfig,
+        check: &HostKeyCheck,
+        passphrase: Option<SecretFn>,
+        timeout: Duration,
+    ) -> Result<(Arc<Handle<Handler>>, Vec<Arc<Handle<Handler>>>)> {
         let mut chain: Vec<Arc<Handle<Handler>>> = vec![];
         for (i, j) in sc.jump_hosts.iter().enumerate() {
             let JumpHost { host, port, username, private_key_path, .. } = j;
@@ -585,13 +593,23 @@ impl SshClient {
                     self.handshake(tcp, host, jport, check).await?
                 }
                 Some(prev) => {
-                    let ch = prev.channel_open_direct_tcpip(host.clone(), jport as u32, "127.0.0.1", 0).await.map_err(|e| format!("failed to dial through jump host {i} ({host}:{jport}): {e}"))?;
+                    let ch = prev
+                        .channel_open_direct_tcpip(host.clone(), jport as u32, "127.0.0.1", 0)
+                        .await
+                        .map_err(|e| format!("failed to dial through jump host {i} ({host}:{jport}): {e}"))?;
                     self.handshake(ch.into_stream(), host, jport, check).await?
                 }
             };
             authenticate(
                 &mut h,
-                Auth { user: username, methods: vec!["publickey".into()], agent: key.is_none() || sc.agent_auth, key, password: None, totp_secret: String::new() },
+                Auth {
+                    user: username,
+                    methods: vec!["publickey".into()],
+                    agent: key.is_none() || sc.agent_auth,
+                    key,
+                    password: None,
+                    totp_secret: String::new(),
+                },
             )
             .await
             .map_err(|e| format!("failed to establish SSH through jump host {i}: {e}"))?;
@@ -678,9 +696,8 @@ impl SshClient {
             ForwardDirection::Local => {
                 let bind = if rule.bind_host.is_empty() { "127.0.0.1".to_string() } else { rule.bind_host.clone() };
                 let addr = format!("{bind}:{}", rule.bind_port);
-                let listener = rt()
-                    .block_on(tokio::net::TcpListener::bind(addr.clone()))
-                    .map_err(|e| format!("local forward: listen on {addr} failed: {e}"))?;
+                let listener =
+                    rt().block_on(tokio::net::TcpListener::bind(addr.clone())).map_err(|e| format!("local forward: listen on {addr} failed: {e}"))?;
                 let (dhost, dport) = (rule.dest_host.clone(), rule.dest_port as u32);
                 let t2 = tasks.clone();
                 let task = rt().spawn(async move {
@@ -755,9 +772,8 @@ impl SshClient {
             let h = self.handle()?;
             let ch = h.channel_open_session().await?;
             ch.request_subsystem(true, "sftp").await?;
-            let s = Arc::new(
-                russh_sftp::client::SftpSession::new(ch.into_stream()).await.map_err(|e| format!("sftpclient: failed to start SFTP subsystem: {e}"))?,
-            );
+            let s =
+                Arc::new(russh_sftp::client::SftpSession::new(ch.into_stream()).await.map_err(|e| format!("sftpclient: failed to start SFTP subsystem: {e}"))?);
             *slot = Some(s.clone());
             Ok(s)
         })

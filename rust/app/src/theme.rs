@@ -212,7 +212,12 @@ pub fn install_fonts(ctx: &egui::Context) {
 /// The first wide-coverage (CJK) system font found on this machine.
 fn system_fallback_font() -> Option<Vec<u8>> {
     let candidates: &[&str] = if cfg!(target_os = "macos") {
-        &["/System/Library/Fonts/PingFang.ttc", "/System/Library/Fonts/Hiragino Sans GB.ttc", "/Library/Fonts/Arial Unicode.ttf", "/System/Library/Fonts/Supplemental/Arial Unicode.ttf"]
+        &[
+            "/System/Library/Fonts/PingFang.ttc",
+            "/System/Library/Fonts/Hiragino Sans GB.ttc",
+            "/Library/Fonts/Arial Unicode.ttf",
+            "/System/Library/Fonts/Supplemental/Arial Unicode.ttf",
+        ]
     } else if cfg!(windows) {
         &["C:\\Windows\\Fonts\\msyh.ttc", "C:\\Windows\\Fonts\\YuGothM.ttc", "C:\\Windows\\Fonts\\msgothic.ttc", "C:\\Windows\\Fonts\\malgun.ttf"]
     } else {

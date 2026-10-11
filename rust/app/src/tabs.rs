@@ -141,7 +141,13 @@ fn strip(app: &mut App, ui: &mut Ui) {
                 if sftp {
                     let fr = Rect::from_center_size(pos2(body.right() - 33.0, body.center().y), vec2(16.0, 16.0));
                     let fresp = ui.interact(fr, ui.id().with(("sftp", id)), Sense::click());
-                    let c = if app.sftp.open_for() == Some(id.as_str()) { t.accent } else if fresp.hovered() { t.text } else { t.text_faint };
+                    let c = if app.sftp.open_for() == Some(id.as_str()) {
+                        t.accent
+                    } else if fresp.hovered() {
+                        t.text
+                    } else {
+                        t.text_faint
+                    };
                     ui.painter().text(fr.center(), Align2::CENTER_CENTER, icon::FOLDER_SIMPLE, egui::FontId::proportional(12.0), c);
                     if fresp.on_hover_text("SFTP browser").clicked() {
                         app.s.request(Request::Sftp(id.clone()));
@@ -211,7 +217,11 @@ fn strip(app: &mut App, ui: &mut Ui) {
     if widgets::icon_button(&mut right, icon::PLUS, "New connection").clicked() {
         app.s.request(Request::NewProfile { protocol: None, folder: String::new() });
     }
-    let b = widgets::icon_button(&mut right, icon::BROADCAST, if app.s.broadcast { "Broadcast ON — click to stop, right-click for targets" } else { "Broadcast input (right-click to pick targets)" });
+    let b = widgets::icon_button(
+        &mut right,
+        icon::BROADCAST,
+        if app.s.broadcast { "Broadcast ON — click to stop, right-click for targets" } else { "Broadcast input (right-click to pick targets)" },
+    );
     if app.s.broadcast {
         right.painter().rect_stroke(b.rect, 4.0, Stroke::new(1.5, t.warning), egui::StrokeKind::Inside);
     }
@@ -281,7 +291,9 @@ fn tab_action(app: &mut App, id: &str, a: &str) {
 
 /// Draws one session into `rect`.
 pub fn pane(app: &mut App, ui: &mut Ui, id: &str, rect: Rect) {
-    let Some(mut pane) = app.s.panes.remove(id) else { return };
+    let Some(mut pane) = app.s.panes.remove(id) else {
+        return;
+    };
     let t = Tokens::get(ui.ctx());
     let theme_id = app.s.prefs.terminal_theme.clone();
     let focused_tab = app.s.focused.as_deref() == Some(id) || (app.s.focused.is_none() && app.s.active.as_deref() == Some(id));

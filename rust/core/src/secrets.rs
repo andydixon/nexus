@@ -43,9 +43,7 @@ pub fn open(key: &[u8; 32], data: &[u8]) -> Result<Vec<u8>> {
     if data.len() < 12 {
         return Err("ciphertext too short".into());
     }
-    Aes256Gcm::new(key.into())
-        .decrypt(Nonce::from_slice(&data[..12]), &data[12..])
-        .map_err(|_| "decryption failed".into())
+    Aes256Gcm::new(key.into()).decrypt(Nonce::from_slice(&data[..12]), &data[12..]).map_err(|_| "decryption failed".into())
 }
 
 #[derive(Serialize, Deserialize)]
@@ -93,10 +91,7 @@ impl Vault {
             return Err("secrets: vault already initialised".into());
         }
         let salt = random_bytes::<32>();
-        let u = Unlocked {
-            key: derive_key(password, &salt)?,
-            vault: VaultFile { version: 1, salt: B64.encode(salt), secrets: BTreeMap::new() },
-        };
+        let u = Unlocked { key: derive_key(password, &salt)?, vault: VaultFile { version: 1, salt: B64.encode(salt), secrets: BTreeMap::new() } };
         std::fs::create_dir_all(&self.dir)?;
         self.save(&u)?;
         *self.state.lock().unwrap() = Some(u);
@@ -185,11 +180,7 @@ fn off_runtime<T: Send + 'static>(f: impl FnOnce() -> T + Send + 'static) -> T {
 
 fn entry(service: &str, key: &str) -> keyring::Result<keyring::Entry> {
     // go-keyring's Windows target is "service:user"; keyring's default differs.
-    if cfg!(windows) {
-        keyring::Entry::new_with_target(&format!("{service}:{key}"), service, key)
-    } else {
-        keyring::Entry::new(service, key)
-    }
+    if cfg!(windows) { keyring::Entry::new_with_target(&format!("{service}:{key}"), service, key) } else { keyring::Entry::new(service, key) }
 }
 
 /// The OS keychain. Every call can fail (no secret service, locked keyring); callers fall back

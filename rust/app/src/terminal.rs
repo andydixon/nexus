@@ -143,14 +143,6 @@ impl TermView {
         self.focus_requested = true;
     }
 
-    pub fn alt_screen(&self) -> bool {
-        self.term.mode().contains(TermMode::ALT_SCREEN)
-    }
-
-    pub fn has_selection(&self) -> bool {
-        self.term.selection.as_ref().is_some_and(|s| !s.is_empty())
-    }
-
     pub fn selection_text(&self) -> Option<String> {
         self.term.selection_to_string().filter(|s| !s.is_empty())
     }
@@ -284,13 +276,13 @@ impl TermView {
         let focused = ui.memory(|m| m.has_focus(id));
         out.focused = focused;
         if focused {
-            ui.memory_mut(|m| {
-                m.set_focus_lock_filter(id, egui::EventFilter { tab: true, horizontal_arrows: true, vertical_arrows: true, escape: true })
-            });
+            ui.memory_mut(|m| m.set_focus_lock_filter(id, egui::EventFilter { tab: true, horizontal_arrows: true, vertical_arrows: true, escape: true }));
             self.keyboard(ui, &mut out);
             let cur = self.term.grid().cursor.point;
             let cursor_rect = Rect::from_min_size(origin + vec2(cur.column.0 as f32 * cw, cur.line.0 as f32 * ch), vec2(cw, ch));
-            ui.output_mut(|o| o.ime = Some(egui::output::IMEOutput { purpose: egui::IMEPurpose::Terminal, rect, cursor_rect, should_interrupt_composition: false }));
+            ui.output_mut(|o| {
+                o.ime = Some(egui::output::IMEOutput { purpose: egui::IMEPurpose::Terminal, rect, cursor_rect, should_interrupt_composition: false })
+            });
         }
         self.mouse(ui, &resp, origin, cw, ch, &mut out);
 
@@ -475,7 +467,9 @@ impl TermView {
                         continue;
                     }
                     if *pressed {
-                        if modifiers.command && let Some(url) = self.url_at(origin, cw, ch, *pos) {
+                        if modifiers.command
+                            && let Some(url) = self.url_at(origin, cw, ch, *pos)
+                        {
                             ui.ctx().open_url(egui::OpenUrl::new_tab(url));
                             continue;
                         }
@@ -560,11 +554,8 @@ impl TermView {
         let selection = self.term.selection.as_ref().and_then(|s| s.to_range(&self.term));
         let sel_bg = rgb(theme.selection);
         self.refresh_find();
-        let finds: Vec<(i32, usize, usize, bool)> = self
-            .find
-            .as_ref()
-            .map(|f| f.matches.iter().enumerate().map(|(i, &(l, a, b))| (l, a, b, i == f.current)).collect())
-            .unwrap_or_default();
+        let finds: Vec<(i32, usize, usize, bool)> =
+            self.find.as_ref().map(|f| f.matches.iter().enumerate().map(|(i, &(l, a, b))| (l, a, b, i == f.current)).collect()).unwrap_or_default();
         let ncols = self.cols as usize;
         for vr in 0..self.rows as i32 {
             let line = Line(vr - offset);
@@ -818,7 +809,7 @@ pub fn key_bytes(key: Key, m: Modifiers, mode: TermMode) -> Option<Vec<u8>> {
         Key::F10 => tilde(21),
         Key::F11 => tilde(23),
         Key::F12 => tilde(24),
-        _ if m.ctrl && !m.command_only() => {
+        _ if m.ctrl && !mac_cmd_only(m) => {
             let b = match key {
                 Key::Space | Key::Num2 => 0,
                 Key::OpenBracket | Key::Num3 => 0x1b,
@@ -840,15 +831,9 @@ pub fn key_bytes(key: Key, m: Modifiers, mode: TermMode) -> Option<Vec<u8>> {
     })
 }
 
-trait CommandOnly {
-    fn command_only(&self) -> bool;
-}
-
-impl CommandOnly for Modifiers {
-    /// On macOS, Cmd is the app's modifier; Ctrl still produces control codes.
-    fn command_only(&self) -> bool {
-        cfg!(target_os = "macos") && self.mac_cmd && !self.ctrl
-    }
+/// On macOS Cmd is the app's modifier while Ctrl still produces control codes.
+fn mac_cmd_only(m: Modifiers) -> bool {
+    cfg!(target_os = "macos") && m.mac_cmd && !m.ctrl
 }
 
 #[cfg(test)]
@@ -862,6 +847,9 @@ mod tests {
         assert_eq!(key_bytes(Key::ArrowUp, none, TermMode::APP_CURSOR).unwrap(), b"\x1bOA");
         assert_eq!(key_bytes(Key::ArrowLeft, Modifiers::CTRL, TermMode::empty()).unwrap(), b"\x1b[1;5D");
         assert_eq!(key_bytes(Key::C, Modifiers::CTRL, TermMode::empty()).unwrap(), [3]);
+        // egui reports Ctrl as ctrl + command on Linux/Windows; it must still send a control code.
+        let ctrl_cmd = Modifiers { ctrl: true, command: true, ..Default::default() };
+        assert_eq!(key_bytes(Key::D, ctrl_cmd, TermMode::empty()).unwrap(), [4]);
         assert_eq!(key_bytes(Key::F5, none, TermMode::empty()).unwrap(), b"\x1b[15~");
         assert_eq!(key_bytes(Key::Backspace, none, TermMode::empty()).unwrap(), [0x7f]);
         assert!(key_bytes(Key::A, none, TermMode::empty()).is_none());

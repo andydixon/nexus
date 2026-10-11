@@ -409,10 +409,7 @@ mod tests {
     fn hex_colours() {
         assert_eq!(
             format_text("\x04ff8800orange\x04 default"),
-            vec![
-                span("orange", Style { fg_rgb: Some([255, 136, 0]), ..Style::default() }),
-                span(" default", Style::default())
-            ]
+            vec![span("orange", Style { fg_rgb: Some([255, 136, 0]), ..Style::default() }), span(" default", Style::default())]
         );
         let s = format_text("\x0400ff00,0000FFx");
         assert_eq!(s[0].style, Style { fg_rgb: Some([0, 255, 0]), bg_rgb: Some([0, 0, 255]), ..Style::default() });
@@ -444,10 +441,8 @@ mod tests {
 
     #[test]
     fn event_lines() {
-        let message = format_event(
-            &Event { kind: "message".into(), from: "alice".into(), text: "hello \x02world\x02".into(), ..Default::default() },
-            "12:34:56",
-        );
+        let message =
+            format_event(&Event { kind: "message".into(), from: "alice".into(), text: "hello \x02world\x02".into(), ..Default::default() }, "12:34:56");
         assert_eq!(message[0], span("[12:34:56]", Style { dim: true, ..Style::fg(GREY) }));
         assert!(message.iter().any(|s| s.text == "world" && s.style.bold));
         let nick = message.iter().find(|s| s.text == "alice").unwrap();
@@ -458,10 +453,7 @@ mod tests {
         let action = format_event(&Event { kind: "action".into(), from: "bob".into(), text: "waves".into(), ..Default::default() }, "01:02:03");
         assert!(action.iter().any(|s| s.text.ends_with("waves") && s.style.italic && s.style.fg == Some(MAGENTA)));
 
-        let kick = format_event(
-            &Event { kind: "kick".into(), from: "op".into(), command: "eve".into(), text: "spam".into(), ..Default::default() },
-            "t",
-        );
+        let kick = format_event(&Event { kind: "kick".into(), from: "op".into(), command: "eve".into(), text: "spam".into(), ..Default::default() }, "t");
         assert_eq!(kick.iter().map(|s| s.text.as_str()).collect::<String>(), "[t] <-- eve was kicked by op (spam)");
         let system = format_event(&Event { kind: "system".into(), text: "hi".into(), ..Default::default() }, "t");
         assert_eq!(system.last().unwrap(), &span("hi", Style::fg(CYAN)));

@@ -90,7 +90,8 @@ impl SshKeys {
                                     }
                                 });
                             });
-                            ui.add(egui::Label::new(RichText::new(&k.public_key).font(theme::mono(11.0)).color(t.text_dim)).truncate()).on_hover_text(&k.public_key);
+                            ui.add(egui::Label::new(RichText::new(&k.public_key).font(theme::mono(11.0)).color(t.text_dim)).truncate())
+                                .on_hover_text(&k.public_key);
                         });
                         ui.add_space(2.0);
                     }
@@ -111,7 +112,8 @@ impl SshKeys {
                                 s.error("Passphrases do not match");
                             } else {
                                 let (svc, kind, bits, pass) = (s.svc.clone(), f.kind, f.bits, f.pass.clone());
-                                self.job = Some(Job::spawn(ctx, move || svc.generate_ssh_key(&name, kind, bits, &pass).map(|_| name).map_err(|e| e.to_string())));
+                                self.job =
+                                    Some(Job::spawn(ctx, move || svc.generate_ssh_key(&name, kind, bits, &pass).map(|_| name).map_err(|e| e.to_string())));
                             }
                         }
                         if self.job.is_none() && ui.button("Cancel").clicked() {
@@ -125,7 +127,9 @@ impl SshKeys {
     }
 
     fn delete_dialog(&mut self, ctx: &egui::Context, s: &mut Shared) {
-        let Some(name) = self.confirm_delete.clone() else { return };
+        let Some(name) = self.confirm_delete.clone() else {
+            return;
+        };
         let t = Tokens::get(ctx);
         let mut done = false;
         let r = egui::Modal::new(egui::Id::new("delete-key")).show(ctx, |ui| {

@@ -1,8 +1,8 @@
 //! SQLite persistence: profiles, known hosts, preferences, audit log, snippets and IRC channel
 //! state. The schema and migration files are the Go app's, so existing databases open unchanged.
 
-use crate::models::*;
 use crate::Result;
+use crate::models::*;
 use chrono::{DateTime, SecondsFormat};
 use rusqlite::{Connection, OptionalExtension, Row, params};
 use std::path::Path;
@@ -228,10 +228,7 @@ impl Store {
     }
 
     pub fn set_favourite(&self, id: &str, fav: bool) -> Result<()> {
-        let n = self.db.lock().unwrap().execute(
-            "UPDATE profiles SET favourite = ?, updated_at = ? WHERE id = ?",
-            params![fav as i64, fmt_time(&now()), id],
-        )?;
+        let n = self.db.lock().unwrap().execute("UPDATE profiles SET favourite = ?, updated_at = ? WHERE id = ?", params![fav as i64, fmt_time(&now()), id])?;
         if n == 0 {
             return Err(format!("storage: profile {id:?} not found").into());
         }
@@ -240,10 +237,7 @@ impl Store {
 
     pub fn update_last_connected(&self, id: &str) -> Result<()> {
         let now = fmt_time(&now());
-        self.db
-            .lock()
-            .unwrap()
-            .execute("UPDATE profiles SET last_connected = ?, updated_at = ? WHERE id = ?", params![now, now, id])?;
+        self.db.lock().unwrap().execute("UPDATE profiles SET last_connected = ?, updated_at = ? WHERE id = ?", params![now, now, id])?;
         Ok(())
     }
 
@@ -337,9 +331,7 @@ impl Store {
 
     pub fn list_audit(&self, limit: i64) -> Result<Vec<AuditEntry>> {
         let db = self.db.lock().unwrap();
-        let mut st = db.prepare(
-            "SELECT id, timestamp, action, profile_id, session_id, details FROM audit_log ORDER BY timestamp DESC LIMIT ?",
-        )?;
+        let mut st = db.prepare("SELECT id, timestamp, action, profile_id, session_id, details FROM audit_log ORDER BY timestamp DESC LIMIT ?")?;
         let rows = st
             .query_map([limit], |r| {
                 Ok(AuditEntry {
@@ -357,8 +349,7 @@ impl Store {
 
     pub fn irc_last_rooms(&self, profile_id: &str) -> Result<Vec<String>> {
         let db = self.db.lock().unwrap();
-        let mut st =
-            db.prepare("SELECT room_name FROM irc_channel_state WHERE profile_id = ? ORDER BY position, room_name")?;
+        let mut st = db.prepare("SELECT room_name FROM irc_channel_state WHERE profile_id = ? ORDER BY position, room_name")?;
         let rows = st.query_map([profile_id], |r| r.get(0))?.collect::<rusqlite::Result<Vec<String>>>()?;
         Ok(rows)
     }
@@ -384,14 +375,8 @@ impl Store {
     }
 
     pub fn preferences(&self) -> AppPreferences {
-        let v: Option<String> = self
-            .db
-            .lock()
-            .unwrap()
-            .query_row("SELECT value FROM preferences WHERE key = '_all'", [], |r| r.get(0))
-            .optional()
-            .ok()
-            .flatten();
+        let v: Option<String> =
+            self.db.lock().unwrap().query_row("SELECT value FROM preferences WHERE key = '_all'", [], |r| r.get(0)).optional().ok().flatten();
         let mut p = v.and_then(|v| serde_json::from_str::<AppPreferences>(&v).ok()).unwrap_or_default();
         p.apply_defaults();
         p
@@ -407,9 +392,7 @@ impl Store {
 
     pub fn list_snippets(&self) -> Result<Vec<Snippet>> {
         let db = self.db.lock().unwrap();
-        let mut st = db.prepare(
-            "SELECT id, name, command, description, folder, tags, created_at, updated_at FROM snippets ORDER BY name ASC",
-        )?;
+        let mut st = db.prepare("SELECT id, name, command, description, folder, tags, created_at, updated_at FROM snippets ORDER BY name ASC")?;
         let rows = st.query_map([], scan_snippet)?.collect::<rusqlite::Result<Vec<_>>>()?;
         Ok(rows)
     }

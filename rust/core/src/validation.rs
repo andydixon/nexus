@@ -380,8 +380,7 @@ pub fn validate_serial_config(cfg: &SerialConfig) -> Result<(), ValidationErrors
 fn is_valid_nick(nick: &str) -> bool {
     let b = nick.as_bytes();
     let Some((&first, rest)) = b.split_first() else { return false };
-    ((b'A'..=b'}').contains(&first) || first == b'?')
-        && rest.iter().all(|c| (b'A'..=b'}').contains(c) || c.is_ascii_digit() || *c == b'-')
+    ((b'A'..=b'}').contains(&first) || first == b'?') && rest.iter().all(|c| (b'A'..=b'}').contains(c) || c.is_ascii_digit() || *c == b'-')
 }
 
 /// girc's IsValidChannel.
@@ -526,14 +525,8 @@ mod tests {
         assert!(validate_vnc_config("", &named).is_ok());
         assert!(validate_vnc_config("desktop.local", &base).is_ok());
         assert!(validate_vnc_config("", &base).is_err());
-        let tunnel = VncConfig {
-            ssh_tunnel: true,
-            ssh_host: "jump.local".into(),
-            ssh_port: 22,
-            ssh_username: "admin".into(),
-            ssh_auth_method: "token".into(),
-            ..base
-        };
+        let tunnel =
+            VncConfig { ssh_tunnel: true, ssh_host: "jump.local".into(), ssh_port: 22, ssh_username: "admin".into(), ssh_auth_method: "token".into(), ..base };
         assert!(validate_vnc_config("desktop.local", &tunnel).is_err());
     }
 

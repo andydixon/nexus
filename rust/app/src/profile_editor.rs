@@ -208,7 +208,10 @@ impl ProfileEditor {
         });
         ui.add_space(2.0);
         let errs = if self.show_errors { self.validate() } else { vec![] };
-        egui::Panel::bottom("profile-editor-footer").resizable(false).frame(egui::Frame::NONE.fill(t.dock).inner_margin(egui::Margin::symmetric(0, 6))).show(ui, |ui| self.footer(ui, s, &errs));
+        egui::Panel::bottom("profile-editor-footer")
+            .resizable(false)
+            .frame(egui::Frame::NONE.fill(t.dock).inner_margin(egui::Margin::symmetric(0, 6)))
+            .show(ui, |ui| self.footer(ui, s, &errs));
         egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
             ui.add_space(4.0);
             self.general(ui, &errs);
@@ -240,7 +243,12 @@ impl ProfileEditor {
         if !errs.is_empty() {
             let all = errs.iter().map(|e| e.message.clone()).collect::<Vec<_>>().join("\n");
             let n = errs.len();
-            ui.label(RichText::new(format!("{}  {n} problem{} — see the highlighted fields", icon::WARNING_CIRCLE, if n == 1 { "" } else { "s" })).color(t.danger).size(12.0)).on_hover_text(all);
+            ui.label(
+                RichText::new(format!("{}  {n} problem{} — see the highlighted fields", icon::WARNING_CIRCLE, if n == 1 { "" } else { "s" }))
+                    .color(t.danger)
+                    .size(12.0),
+            )
+            .on_hover_text(all);
         }
         if self.confirm_delete {
             ui.horizontal(|ui| {
@@ -435,11 +443,14 @@ impl ProfileEditor {
                 item(ui, |ui| {
                     ui.horizontal(|ui| {
                         let opts = [(ForwardDirection::Local, "Local →"), (ForwardDirection::Remote, "← Remote")];
-                        ComboBox::from_id_salt(("pf-dir", i)).width(84.0).selected_text(if pf.direction == ForwardDirection::Local { opts[0].1 } else { opts[1].1 }).show_ui(ui, |ui| {
-                            for (v, l) in opts {
-                                ui.selectable_value(&mut pf.direction, v, l);
-                            }
-                        });
+                        ComboBox::from_id_salt(("pf-dir", i))
+                            .width(84.0)
+                            .selected_text(if pf.direction == ForwardDirection::Local { opts[0].1 } else { opts[1].1 })
+                            .show_ui(ui, |ui| {
+                                for (v, l) in opts {
+                                    ui.selectable_value(&mut pf.direction, v, l);
+                                }
+                            });
                         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                             act = row_buttons(ui, i, n).or(act.take());
                             ui.checkbox(&mut pf.enabled, "Active").on_hover_text("Start on connect");
@@ -460,13 +471,22 @@ impl ProfileEditor {
             apply(&mut c.port_forwards, act);
             list_errs(ui, errs, "ssh.portForwards");
             if ui.button(format!("{}  Add Port Forward", icon::PLUS)).clicked() {
-                c.port_forwards.push(PortForward { id: new_id(), bind_host: "127.0.0.1".into(), bind_port: 1, dest_port: 1, enabled: true, ..Default::default() });
+                c.port_forwards.push(PortForward {
+                    id: new_id(),
+                    bind_host: "127.0.0.1".into(),
+                    bind_port: 1,
+                    dest_port: 1,
+                    enabled: true,
+                    ..Default::default()
+                });
             }
         });
         section(ui, "Startup", |ui| {
             text(ui, "Startup Command", &mut c.startup_command, "Optional command to run after connecting");
             label(ui, "Environment Variables");
-            ui.add(TextEdit::multiline(env).hint_text("KEY=VALUE (one per line)").desired_rows(3).desired_width(f32::INFINITY).font(egui::TextStyle::Monospace));
+            ui.add(
+                TextEdit::multiline(env).hint_text("KEY=VALUE (one per line)").desired_rows(3).desired_width(f32::INFINITY).font(egui::TextStyle::Monospace),
+            );
         });
         section(ui, "Login Script", |ui| login_script(ui, "ssh-login", &mut c.login_scripts));
         section(ui, "SSH Agent", |ui| {
@@ -488,7 +508,9 @@ impl ProfileEditor {
                 if let Some((_, until)) = totp_flash {
                     ui.ctx().request_repaint_after(std::time::Duration::from_secs_f64((*until - s.now).max(0.0)));
                 }
-                let test = ui.add(Button::new(RichText::new(flash.as_deref().unwrap_or("Test")).font(theme::mono(12.5)))).on_hover_text("Generate a code with the saved secret");
+                let test = ui
+                    .add(Button::new(RichText::new(flash.as_deref().unwrap_or("Test")).font(theme::mono(12.5))))
+                    .on_hover_text("Generate a code with the saved secret");
                 if test.clicked() {
                     *totp_flash = Some(match (*is_new, s.svc.totp_code(&id)) {
                         (false, Ok(code)) => (code, s.now + 5.0),
@@ -634,7 +656,24 @@ impl ProfileEditor {
             err(ui, errs, "vnc.quality");
         });
         section(ui, "SSH Tunnel", |ui| {
-            tunnel(ui, "vnc", Tunnel { on: &mut c.ssh_tunnel, host: &mut c.ssh_host, port: &mut c.ssh_port, user: &mut c.ssh_username, auth: &mut c.ssh_auth_method, key: &mut c.ssh_private_key, agent: &mut c.ssh_agent_auth, mode: &mut c.ssh_secret_mode }, keys, key_checks, secrets, errs);
+            tunnel(
+                ui,
+                "vnc",
+                Tunnel {
+                    on: &mut c.ssh_tunnel,
+                    host: &mut c.ssh_host,
+                    port: &mut c.ssh_port,
+                    user: &mut c.ssh_username,
+                    auth: &mut c.ssh_auth_method,
+                    key: &mut c.ssh_private_key,
+                    agent: &mut c.ssh_agent_auth,
+                    mode: &mut c.ssh_secret_mode,
+                },
+                keys,
+                key_checks,
+                secrets,
+                errs,
+            );
         });
     }
 
@@ -686,7 +725,24 @@ impl ProfileEditor {
             }
         });
         section(ui, "SSH Tunnel", |ui| {
-            tunnel(ui, "irc", Tunnel { on: &mut c.ssh_tunnel, host: &mut c.ssh_host, port: &mut c.ssh_port, user: &mut c.ssh_username, auth: &mut c.ssh_auth_method, key: &mut c.ssh_private_key, agent: &mut c.ssh_agent_auth, mode: &mut c.ssh_secret_mode }, keys, key_checks, secrets, errs);
+            tunnel(
+                ui,
+                "irc",
+                Tunnel {
+                    on: &mut c.ssh_tunnel,
+                    host: &mut c.ssh_host,
+                    port: &mut c.ssh_port,
+                    user: &mut c.ssh_username,
+                    auth: &mut c.ssh_auth_method,
+                    key: &mut c.ssh_private_key,
+                    agent: &mut c.ssh_agent_auth,
+                    mode: &mut c.ssh_secret_mode,
+                },
+                keys,
+                key_checks,
+                secrets,
+                errs,
+            );
         });
         section(ui, "Reconnection", |ui| reconnect(ui, &mut c.auto_reconnect, &mut c.max_reconnect_tries));
     }
@@ -696,11 +752,13 @@ impl ProfileEditor {
         section(ui, "Line Settings", |ui| {
             label(ui, "Baud Rate");
             ui.horizontal(|ui| {
-                ComboBox::from_id_salt("serial-baud").selected_text(if BAUDS.contains(&c.baud_rate) { c.baud_rate.to_string() } else { "Custom".into() }).show_ui(ui, |ui| {
-                    for b in BAUDS {
-                        ui.selectable_value(&mut c.baud_rate, b, b.to_string());
-                    }
-                });
+                ComboBox::from_id_salt("serial-baud")
+                    .selected_text(if BAUDS.contains(&c.baud_rate) { c.baud_rate.to_string() } else { "Custom".into() })
+                    .show_ui(ui, |ui| {
+                        for b in BAUDS {
+                            ui.selectable_value(&mut c.baud_rate, b, b.to_string());
+                        }
+                    });
                 ui.add(DragValue::new(&mut c.baud_rate).range(1..=20_000_000)).on_hover_text("Any rate the adapter supports");
             });
             err(ui, errs, "serial.baudRate");
@@ -709,7 +767,12 @@ impl ProfileEditor {
             combo(ui, "Parity", &mut c.parity, &[(Parity::None, "None"), (Parity::Odd, "Odd"), (Parity::Even, "Even")]);
             combo(ui, "Stop Bits", &mut c.stop_bits, &[(1, "1"), (2, "2")]);
             err(ui, errs, "serial.stopBits");
-            combo(ui, "Flow Control", &mut c.flow_control, &[(FlowControl::None, "None"), (FlowControl::Xonxoff, "XON/XOFF (software)"), (FlowControl::Rtscts, "RTS/CTS (hardware)")]);
+            combo(
+                ui,
+                "Flow Control",
+                &mut c.flow_control,
+                &[(FlowControl::None, "None"), (FlowControl::Xonxoff, "XON/XOFF (software)"), (FlowControl::Rtscts, "RTS/CTS (hardware)")],
+            );
         });
         section(ui, "Behaviour", |ui| {
             line_ending(ui, &mut c.line_ending);
@@ -799,11 +862,7 @@ fn prep(p: &mut Profile) {
 }
 
 fn parse_env(text: &str) -> BTreeMap<String, String> {
-    text.lines()
-        .filter_map(|l| l.split_once('='))
-        .map(|(k, v)| (k.trim().to_string(), v.trim().to_string()))
-        .filter(|(k, _)| !k.is_empty())
-        .collect()
+    text.lines().filter_map(|l| l.split_once('=')).map(|(k, v)| (k.trim().to_string(), v.trim().to_string())).filter(|(k, _)| !k.is_empty()).collect()
 }
 
 /// "ssh.jumpHosts[2].host" → 2
@@ -1059,7 +1118,9 @@ fn login_script(ui: &mut Ui, id: &str, steps: &mut Vec<LoginScriptStep>) {
                 } else {
                     ui.add_space(56.0 + ui.spacing().item_spacing.x);
                 }
-                ui.add(TextEdit::singleline(&mut st.value).hint_text(if wait { "Text to match…" } else { "Text to send…" }).desired_width(ui.available_width()));
+                ui.add(
+                    TextEdit::singleline(&mut st.value).hint_text(if wait { "Text to match…" } else { "Text to send…" }).desired_width(ui.available_width()),
+                );
             });
         });
     }

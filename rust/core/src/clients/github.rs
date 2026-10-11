@@ -70,11 +70,7 @@ struct ApiPerson {
 impl Client {
     /// `base_url` is the API root, e.g. `https://api.github.com` or `https://ghe.example.com/api/v3`.
     pub fn new(base_url: &str, token: &str) -> Client {
-        let agent = ureq::Agent::config_builder()
-            .timeout_global(Some(Duration::from_secs(30)))
-            .http_status_as_error(false)
-            .build()
-            .into();
+        let agent = ureq::Agent::config_builder().timeout_global(Some(Duration::from_secs(30))).http_status_as_error(false).build().into();
         Client { base_url: base_url.trim_end_matches('/').to_string(), token: token.to_string(), agent }
     }
 
@@ -89,15 +85,12 @@ impl Client {
 
     /// Confirms the token works and returns the authenticated login.
     pub fn validate_token(&self) -> crate::Result<String> {
-        let mut resp = self
-            .get(&format!("{}/user", self.base_url))
-            .map_err(|e| format!("contacting GitHub API: {e}"))?;
+        let mut resp = self.get(&format!("{}/user", self.base_url)).map_err(|e| format!("contacting GitHub API: {e}"))?;
         let status = resp.status().as_u16();
         if status != 200 {
             return Err(format!("token validation failed (HTTP {status})").into());
         }
-        let body = read_limited(resp.body_mut().as_reader(), MAX_JSON_BODY_BYTES)
-            .map_err(|e| format!("reading user response: {e}"))?;
+        let body = read_limited(resp.body_mut().as_reader(), MAX_JSON_BODY_BYTES).map_err(|e| format!("reading user response: {e}"))?;
         #[derive(Deserialize)]
         struct User {
             #[serde(default)]
@@ -114,35 +107,21 @@ impl Client {
 
     /// Like `fetch_repos`, reporting commit-enrichment progress as `(done, total)`; it is called
     /// from worker threads.
-    pub fn fetch_repos_with_progress(
-        &self,
-        progress: impl Fn(usize, usize) + Sync,
-    ) -> crate::Result<Vec<GitHubRepo>> {
+    pub fn fetch_repos_with_progress(&self, progress: impl Fn(usize, usize) + Sync) -> crate::Result<Vec<GitHubRepo>> {
         let mut all: Vec<ApiRepo> = Vec::new();
         let mut page = 1;
         loop {
-            let url = format!(
-                "{}/user/repos?per_page=100&page={page}&sort=pushed&direction=desc",
-                self.base_url
-            );
+            let url = format!("{}/user/repos?per_page=100&page={page}&sort=pushed&direction=desc", self.base_url);
             let mut resp = self.get(&url).map_err(|e| format!("fetching repos page {page}: {e}"))?;
-            let body = read_limited(resp.body_mut().as_reader(), MAX_JSON_BODY_BYTES)
-                .map_err(|e| format!("reading response body: {e}"))?;
+            let body = read_limited(resp.body_mut().as_reader(), MAX_JSON_BODY_BYTES).map_err(|e| format!("reading response body: {e}"))?;
             let status = resp.status().as_u16();
             if status == 401 || status == 403 {
-                return Err(
-                    format!("authentication failed (HTTP {status}) — check your access token").into()
-                );
+                return Err(format!("authentication failed (HTTP {status}) — check your access token").into());
             }
             if status != 200 {
-                return Err(format!(
-                    "GitHub API returned HTTP {status}: {}",
-                    String::from_utf8_lossy(&body)
-                )
-                .into());
+                return Err(format!("GitHub API returned HTTP {status}: {}", String::from_utf8_lossy(&body)).into());
             }
-            let batch: Vec<ApiRepo> =
-                serde_json::from_slice(&body).map_err(|e| format!("decoding repos: {e}"))?;
+            let batch: Vec<ApiRepo> = serde_json::from_slice(&body).map_err(|e| format!("decoding repos: {e}"))?;
             if batch.is_empty() {
                 break;
             }
@@ -161,7 +140,7 @@ impl Client {
             let updated = parse_time(r.updated_at.as_deref()).map_err(|e| format!("decoding repos: {e}"))?;
             parsed.push((r, pushed, updated));
         }
-        parsed.sort_by(|a, b| b.1.cmp(&a.1));
+        parsed.sort_by_key(|p| std::cmp::Reverse(p.1));
 
         let mut result: Vec<GitHubRepo> = parsed
             .into_iter()
@@ -234,14 +213,9 @@ impl Client {
             return Err(format!("authentication failed (HTTP {status})").into());
         }
         if status != 200 {
-            return Err(format!(
-                "GitHub API returned HTTP {status}: {}",
-                read_error_body(resp.body_mut().as_reader())
-            )
-            .into());
+            return Err(format!("GitHub API returned HTTP {status}: {}", read_error_body(resp.body_mut().as_reader())).into());
         }
-        let body = read_limited(resp.body_mut().as_reader(), MAX_JSON_BODY_BYTES)
-            .map_err(|e| format!("reading commit response: {e}"))?;
+        let body = read_limited(resp.body_mut().as_reader(), MAX_JSON_BODY_BYTES).map_err(|e| format!("reading commit response: {e}"))?;
 
         #[derive(Deserialize)]
         struct Payload {
@@ -284,25 +258,14 @@ impl Client {
             return Err(format!("authentication failed (HTTP {status}) — check your access token").into());
         }
         if status != 200 {
-            return Err(format!(
-                "GitHub API returned HTTP {status}: {}",
-                read_error_body(resp.body_mut().as_reader())
-            )
-            .into());
+            return Err(format!("GitHub API returned HTTP {status}: {}", read_error_body(resp.body_mut().as_reader())).into());
         }
-        let length = resp
-            .headers()
-            .get("content-length")
-            .and_then(|v| v.to_str().ok())
-            .and_then(|v| v.trim().parse::<u64>().ok());
+        let length = resp.headers().get("content-length").and_then(|v| v.to_str().ok()).and_then(|v| v.trim().parse::<u64>().ok());
         if let Some(length) = length.filter(|&l| l > MAX_ARCHIVE_BYTES) {
-            return Err(
-                format!("archive is too large: {length} bytes exceeds {MAX_ARCHIVE_BYTES} bytes").into()
-            );
+            return Err(format!("archive is too large: {length} bytes exceeds {MAX_ARCHIVE_BYTES} bytes").into());
         }
         let mut file = std::fs::File::create(dest_path).map_err(|e| format!("creating file: {e}"))?;
-        copy_limited_archive(&mut file, resp.body_mut().as_reader(), MAX_ARCHIVE_BYTES)
-            .map_err(|e| format!("writing archive: {e}"))?;
+        copy_limited_archive(&mut file, resp.body_mut().as_reader(), MAX_ARCHIVE_BYTES).map_err(|e| format!("writing archive: {e}"))?;
         Ok(())
     }
 
@@ -446,9 +409,7 @@ mod tests {
         let log = seen.clone();
         std::thread::spawn(move || {
             for req in server.incoming_requests() {
-                let header = |name: &'static str| {
-                    req.headers().iter().find(|h| h.field.equiv(name)).map(|h| h.value.to_string())
-                };
+                let header = |name: &'static str| req.headers().iter().find(|h| h.field.equiv(name)).map(|h| h.value.to_string());
                 log.lock().unwrap().push((req.url().to_string(), header("Authorization"), header("User-Agent")));
                 let (status, body) = handler(req.url());
                 let _ = req.respond(tiny_http::Response::from_string(body).with_status_code(status));
@@ -475,7 +436,7 @@ mod tests {
         serde_json::json!({
             "full_name": format!("me/r{n}"), "name": format!("r{n}"), "description": null,
             "html_url": format!("https://example/me/r{n}"), "default_branch": if n == 0 { "" } else { "main" },
-            "private": n % 2 == 0, "fork": false, "archived": false, "language": null,
+            "private": n.is_multiple_of(2), "fork": false, "archived": false, "language": null,
             "stargazers_count": n, "pushed_at": pushed, "updated_at": "2024-01-01T00:00:00Z",
             "owner": {"login": "me"}
         })
@@ -485,9 +446,7 @@ mod tests {
     fn fetch_repos_paginates_sorts_and_enriches() {
         let (base, seen) = serve(|url| {
             if url.starts_with("/user/repos") && url.contains("page=1&") {
-                let repos: Vec<_> = (0..100)
-                    .map(|n| repo_json(n, &format!("2024-02-{:02}T00:00:00Z", 1 + n % 28)))
-                    .collect();
+                let repos: Vec<_> = (0..100).map(|n| repo_json(n, &format!("2024-02-{:02}T00:00:00Z", 1 + n % 28))).collect();
                 (200, serde_json::to_string(&repos).unwrap())
             } else if url.starts_with("/user/repos") {
                 (200, serde_json::to_string(&[repo_json(100, "2025-06-01T12:00:00Z")]).unwrap())
@@ -500,9 +459,7 @@ mod tests {
             }
         });
         let calls = Mutex::new(Vec::new());
-        let repos = Client::new(&base, "t")
-            .fetch_repos_with_progress(|done, total| calls.lock().unwrap().push((done, total)))
-            .unwrap();
+        let repos = Client::new(&base, "t").fetch_repos_with_progress(|done, total| calls.lock().unwrap().push((done, total))).unwrap();
         assert_eq!(repos.len(), 101);
         assert_eq!(repos[0].full_name, "me/r100");
         assert_eq!(repos[0].pushed_at, "2025-06-01T12:00:00Z");

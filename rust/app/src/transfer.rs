@@ -14,10 +14,25 @@ const STRATEGIES: [(&str, &str); 3] = [("skip", "Skip existing"), ("overwrite", 
 
 enum Mode {
     /// `selected` is filled from `preselect` (or every profile) on the first frame.
-    Export { preselect: Option<Vec<String>>, selected: HashSet<String>, pw: String, confirm: String },
-    Import { path: PathBuf, pw: String, strategy: &'static str, status: String },
-    ExportJson { include_secrets: bool },
-    ImportJson { path: PathBuf, strategy: &'static str },
+    Export {
+        preselect: Option<Vec<String>>,
+        selected: HashSet<String>,
+        pw: String,
+        confirm: String,
+    },
+    Import {
+        path: PathBuf,
+        pw: String,
+        strategy: &'static str,
+        status: String,
+    },
+    ExportJson {
+        include_secrets: bool,
+    },
+    ImportJson {
+        path: PathBuf,
+        strategy: &'static str,
+    },
 }
 
 enum Done {
@@ -38,7 +53,9 @@ impl Transfer {
     }
 
     pub fn import_encrypted(&mut self) {
-        if let Some(path) = rfd::FileDialog::new().set_title("Import Profiles").add_filter("Nexus Export", &[EXTENSION, "link"]).add_filter("All files", &["*"]).pick_file() {
+        if let Some(path) =
+            rfd::FileDialog::new().set_title("Import Profiles").add_filter("Nexus Export", &[EXTENSION, "link"]).add_filter("All files", &["*"]).pick_file()
+        {
             self.mode = Some(Mode::Import { path, pw: String::new(), strategy: "skip", status: String::new() });
         }
     }
@@ -112,7 +129,11 @@ impl Transfer {
                                 let name = if p.display_name.is_empty() { &p.host } else { &p.display_name };
                                 let label = format!("{name}  ({})", p.protocol.id());
                                 if ui.checkbox(&mut on, label).changed() {
-                                    if on { selected.insert(p.id.clone()) } else { selected.remove(&p.id) };
+                                    if on {
+                                        selected.insert(p.id.clone())
+                                    } else {
+                                        selected.remove(&p.id)
+                                    };
                                 }
                             }
                         });
@@ -131,11 +152,18 @@ impl Transfer {
                             s.error("Passwords do not match.");
                         } else if selected.is_empty() {
                             s.error("Please select at least one profile.");
-                        } else if let Some(path) = rfd::FileDialog::new().set_title("Export Profiles").set_file_name(format!("nexus-profiles.{EXTENSION}")).add_filter("Nexus Export", &[EXTENSION]).save_file() {
+                        } else if let Some(path) = rfd::FileDialog::new()
+                            .set_title("Export Profiles")
+                            .set_file_name(format!("nexus-profiles.{EXTENSION}"))
+                            .add_filter("Nexus Export", &[EXTENSION])
+                            .save_file()
+                        {
                             // Keep the sidebar's order.
                             let ids: Vec<String> = s.profiles.iter().filter(|p| selected.contains(&p.id)).map(|p| p.id.clone()).collect();
                             let (svc, pw) = (s.svc.clone(), pw.clone());
-                            start = Some(Box::new(move || svc.export_encrypted(&ids, &pw, &path).map(|p| Done::Exported(ids.len(), p)).map_err(|e| format!("Export failed: {e}"))));
+                            start = Some(Box::new(move || {
+                                svc.export_encrypted(&ids, &pw, &path).map(|p| Done::Exported(ids.len(), p)).map_err(|e| format!("Export failed: {e}"))
+                            }));
                         }
                     }
                 }
@@ -169,10 +197,18 @@ impl Transfer {
                     ui.label(format!("Exports all {} profile(s) as plain JSON.", s.profiles.len()));
                     ui.checkbox(include_secrets, "Include secrets (proxy passwords, TOTP secrets)");
                     if *include_secrets {
-                        ui.label(RichText::new(format!("{}  The file will contain secrets in plain text. Prefer the encrypted export.", icon::WARNING)).color(t.warning).size(12.0));
+                        ui.label(
+                            RichText::new(format!("{}  The file will contain secrets in plain text. Prefer the encrypted export.", icon::WARNING))
+                                .color(t.warning)
+                                .size(12.0),
+                        );
                     }
                     if buttons(ui, false, icon::FILE_ARROW_UP, "Export", &mut close)
-                        && let Some(path) = rfd::FileDialog::new().set_title("Export Profiles (JSON)").set_file_name("nexus-profiles.json").add_filter("JSON", &["json"]).save_file()
+                        && let Some(path) = rfd::FileDialog::new()
+                            .set_title("Export Profiles (JSON)")
+                            .set_file_name("nexus-profiles.json")
+                            .add_filter("JSON", &["json"])
+                            .save_file()
                     {
                         match s.svc.export_json(*include_secrets).map_err(|e| e.to_string()).and_then(|j| std::fs::write(&path, j).map_err(|e| e.to_string())) {
                             Ok(()) => {
@@ -189,7 +225,8 @@ impl Transfer {
                     file_line(ui, path);
                     strategy_combo(ui, strategy);
                     if buttons(ui, false, icon::FILE_ARROW_DOWN, "Import", &mut close) {
-                        match std::fs::read_to_string(&path).map_err(|e| e.to_string()).and_then(|j| s.svc.import_json(&j, strategy).map_err(|e| e.to_string())) {
+                        match std::fs::read_to_string(&path).map_err(|e| e.to_string()).and_then(|j| s.svc.import_json(&j, strategy).map_err(|e| e.to_string()))
+                        {
                             Ok(n) => {
                                 s.success(format!("Imported {n} profile(s)"));
                                 s.request(Request::ReloadProfiles);

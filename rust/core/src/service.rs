@@ -229,7 +229,12 @@ impl Service {
                 }
             }
         }
-        self.store.add_audit("export", "", "", &format!("Exported {} profile(s) {}", ps.len(), if include_secrets { "with secrets" } else { "without secrets" }));
+        self.store.add_audit(
+            "export",
+            "",
+            "",
+            &format!("Exported {} profile(s) {}", ps.len(), if include_secrets { "with secrets" } else { "without secrets" }),
+        );
         Ok(serde_json::to_string_pretty(&ps)?)
     }
 
@@ -238,7 +243,11 @@ impl Service {
             return Err(format!("import data is too large (max {MAX_IMPORT_JSON_BYTES} bytes)").into());
         }
         let ps: Vec<Option<Profile>> = serde_json::from_str(json).map_err(|e| format!("invalid JSON: {e}"))?;
-        let ps = ps.into_iter().enumerate().map(|(i, p)| p.ok_or_else(|| format!("profile import entry {i} is null"))).collect::<std::result::Result<Vec<_>, _>>()?;
+        let ps = ps
+            .into_iter()
+            .enumerate()
+            .map(|(i, p)| p.ok_or_else(|| format!("profile import entry {i} is null")))
+            .collect::<std::result::Result<Vec<_>, _>>()?;
         self.import(ps, strategy)
     }
 

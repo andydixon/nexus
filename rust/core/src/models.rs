@@ -52,8 +52,7 @@ pub enum Protocol {
 }
 
 impl Protocol {
-    pub const SAVED: [Protocol; 7] =
-        [Protocol::Ssh, Protocol::Telnet, Protocol::Raw, Protocol::Github, Protocol::Vnc, Protocol::Irc, Protocol::Serial];
+    pub const SAVED: [Protocol; 7] = [Protocol::Ssh, Protocol::Telnet, Protocol::Raw, Protocol::Github, Protocol::Vnc, Protocol::Irc, Protocol::Serial];
     pub fn id(self) -> &'static str {
         match self {
             Protocol::Ssh => "ssh",

@@ -254,7 +254,11 @@ impl VncView {
                 }
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     ui.add_enabled_ui(self.ready, |ui| {
-                        let (g, tip) = if self.scale_to_fit { (icon::CORNERS_IN, "Scaled to fit (click for 1:1)") } else { (icon::CORNERS_OUT, "1:1 (click to scale to fit)") };
+                        let (g, tip) = if self.scale_to_fit {
+                            (icon::CORNERS_IN, "Scaled to fit (click for 1:1)")
+                        } else {
+                            (icon::CORNERS_OUT, "1:1 (click to scale to fit)")
+                        };
                         if widgets::icon_button(ui, g, tip).clicked() {
                             self.scale_to_fit = !self.scale_to_fit;
                         }
@@ -264,7 +268,10 @@ impl VncView {
                             let _ = c.request_full_update();
                         }
                         if !self.view_only {
-                            if widgets::button(ui, icon::CLIPBOARD_TEXT, "Paste Clipboard").on_hover_text("Send the local clipboard to the remote desktop").clicked() {
+                            if widgets::button(ui, icon::CLIPBOARD_TEXT, "Paste Clipboard")
+                                .on_hover_text("Send the local clipboard to the remote desktop")
+                                .clicked()
+                            {
                                 match arboard::Clipboard::new().and_then(|mut c| c.get_text()) {
                                     Ok(text) if !text.is_empty() => {
                                         self.paste(s, &text);
@@ -293,9 +300,7 @@ impl VncView {
         let focused = resp.has_focus();
         if focused {
             ui.painter().rect_stroke(img, 0.0, egui::Stroke::new(1.0, Tokens::get(ui.ctx()).accent.gamma_multiply(0.6)), egui::StrokeKind::Outside);
-            ui.memory_mut(|m| {
-                m.set_focus_lock_filter(id, egui::EventFilter { tab: true, horizontal_arrows: true, vertical_arrows: true, escape: true })
-            });
+            ui.memory_mut(|m| m.set_focus_lock_filter(id, egui::EventFilter { tab: true, horizontal_arrows: true, vertical_arrows: true, escape: true }));
         } else if self.had_focus {
             self.release_all();
         }
@@ -344,7 +349,8 @@ impl VncView {
         for e in events {
             match e {
                 Event::Key { key, pressed, modifiers, .. } => {
-                    let sym = named_keysym(key).or_else(|| (modifiers.ctrl || modifiers.alt || modifiers.mac_cmd).then(|| chord_keysym(key, modifiers.shift)).flatten());
+                    let sym = named_keysym(key)
+                        .or_else(|| (modifiers.ctrl || modifiers.alt || modifiers.mac_cmd).then(|| chord_keysym(key, modifiers.shift)).flatten());
                     if let Some(sym) = sym {
                         self.key(sym, pressed);
                     }

@@ -227,7 +227,9 @@ impl RawView {
             s.warn("Nothing to save");
             return;
         }
-        let Some(path) = rfd::FileDialog::new().set_file_name("capture.json").add_filter("JSON", &["json"]).save_file() else { return };
+        let Some(path) = rfd::FileDialog::new().set_file_name("capture.json").add_filter("JSON", &["json"]).save_file() else {
+            return;
+        };
         match s.svc.sessions.raw_save_capture(&self.session, &path) {
             Ok(()) => s.success("Capture saved"),
             Err(e) => s.error(format!("Save failed: {e}")),
@@ -450,7 +452,9 @@ fn hex_job(line: &str, font: &FontId, t: &Tokens, fg: Color32) -> LayoutJob {
 /// HH:MM:SS for today, otherwise "Mon DD HH:MM:SS" (the web build's formatTimestamp).
 fn format_time(ms: i64) -> String {
     use chrono::{Local, TimeZone};
-    let Some(d) = Local.timestamp_millis_opt(ms).single() else { return String::new() };
+    let Some(d) = Local.timestamp_millis_opt(ms).single() else {
+        return String::new();
+    };
     if d.date_naive() == Local::now().date_naive() { d.format("%H:%M:%S").to_string() } else { d.format("%b %d %H:%M:%S").to_string() }
 }
 

@@ -74,7 +74,7 @@ fn list(app: &mut App, ui: &mut Ui) {
                 fuzzy_score(&fields, &q).map(|s| (s, p.clone()))
             })
             .collect();
-        hits.sort_by(|a, b| b.0.cmp(&a.0));
+        hits.sort_by_key(|h| std::cmp::Reverse(h.0));
         if hits.is_empty() {
             widgets::empty(ui, icon::MAGNIFYING_GLASS, "No matches", "Try a host, name, tag or protocol.");
         }
@@ -91,7 +91,7 @@ fn list(app: &mut App, ui: &mut Ui) {
         section(app, ui, "★ Favourites", "favourites", &favs);
     }
     let mut recent: Vec<&Profile> = profiles.iter().filter(|p| p.last_connected.is_some()).collect();
-    recent.sort_by(|a, b| b.last_connected.cmp(&a.last_connected));
+    recent.sort_by_key(|p| std::cmp::Reverse(p.last_connected));
     recent.truncate(RECENT);
     if !recent.is_empty() {
         section(app, ui, "Recent", "recent", &recent);
@@ -169,7 +169,13 @@ fn local_row(app: &mut App, ui: &mut Ui) {
     if resp.hovered() {
         ui.painter().rect_filled(r, 6.0, t.hover);
     }
-    ui.painter().text(r.left_center() + vec2(10.0, 0.0), Align2::LEFT_CENTER, icon::TERMINAL_WINDOW, egui::FontId::proportional(15.0), crate::views::protocol_color(nexus_core::models::Protocol::Local));
+    ui.painter().text(
+        r.left_center() + vec2(10.0, 0.0),
+        Align2::LEFT_CENTER,
+        icon::TERMINAL_WINDOW,
+        egui::FontId::proportional(15.0),
+        crate::views::protocol_color(nexus_core::models::Protocol::Local),
+    );
     ui.painter().text(r.left_center() + vec2(32.0, 0.0), Align2::LEFT_CENTER, "Local Machine", egui::FontId::proportional(13.0), t.text);
     if resp.on_hover_text("Open a terminal on this computer").clicked() {
         app.connect_local();
@@ -204,7 +210,14 @@ fn row(app: &mut App, ui: &mut Ui, p: &Profile, section: &str) {
     if p.favourite {
         ui.painter().text(r.right_center() - vec2(36.0, 0.0), Align2::RIGHT_CENTER, "★", egui::FontId::proportional(11.0), t.warning);
     }
-    let tip = format!("{}\n{} {}:{}{}", name, protocol_badge(p.protocol), p.host, p.port, if p.description.is_empty() { String::new() } else { format!("\n{}", p.description) });
+    let tip = format!(
+        "{}\n{} {}:{}{}",
+        name,
+        protocol_badge(p.protocol),
+        p.host,
+        p.port,
+        if p.description.is_empty() { String::new() } else { format!("\n{}", p.description) }
+    );
     let resp = resp.on_hover_text(tip);
     let multi = ui.input(|i| i.modifiers.command);
     if resp.double_clicked() {
@@ -281,16 +294,31 @@ fn bulk_bar(app: &mut App, ui: &mut Ui) {
             }
             ui.menu_button(format!("{} Tags", icon::TAG), |ui| {
                 if ui.button("Add tags…").clicked() {
-                    app.dialog = Some(Dialog::Input { title: "Add tags".into(), label: "Comma-separated tags to add".into(), value: String::new(), then: InputThen::Tags { profiles: ids.clone(), replace: false } });
+                    app.dialog = Some(Dialog::Input {
+                        title: "Add tags".into(),
+                        label: "Comma-separated tags to add".into(),
+                        value: String::new(),
+                        then: InputThen::Tags { profiles: ids.clone(), replace: false },
+                    });
                     ui.close();
                 }
                 if ui.button("Replace tags…").clicked() {
-                    app.dialog = Some(Dialog::Input { title: "Replace tags".into(), label: "Comma-separated tags".into(), value: String::new(), then: InputThen::Tags { profiles: ids.clone(), replace: true } });
+                    app.dialog = Some(Dialog::Input {
+                        title: "Replace tags".into(),
+                        label: "Comma-separated tags".into(),
+                        value: String::new(),
+                        then: InputThen::Tags { profiles: ids.clone(), replace: true },
+                    });
                     ui.close();
                 }
             });
             if ui.small_button(format!("{} Move group", icon::FOLDER)).clicked() {
-                app.dialog = Some(Dialog::Input { title: "Move to group".into(), label: "Group name (empty for Ungrouped)".into(), value: String::new(), then: InputThen::MoveGroup { profiles: ids.clone() } });
+                app.dialog = Some(Dialog::Input {
+                    title: "Move to group".into(),
+                    label: "Group name (empty for Ungrouped)".into(),
+                    value: String::new(),
+                    then: InputThen::MoveGroup { profiles: ids.clone() },
+                });
             }
             if ui.small_button(format!("{} Delete", icon::TRASH)).clicked() {
                 app.dialog = Some(Dialog::Delete { profiles: ids.clone() });

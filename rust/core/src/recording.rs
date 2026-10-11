@@ -340,10 +340,7 @@ impl Store {
             }
         }
         let id = filename.trim_end_matches(".cast").to_string();
-        let created_at = chrono::DateTime::from_timestamp(hdr.timestamp, 0)
-            .ok_or("recording: invalid timestamp")?
-            .with_timezone(&chrono::Local)
-            .fixed_offset();
+        let created_at = chrono::DateTime::from_timestamp(hdr.timestamp, 0).ok_or("recording: invalid timestamp")?.with_timezone(&chrono::Local).fixed_offset();
         Ok(RecordingMeta {
             session_id: id.clone(), // recording ID matches session ID by default
             id,

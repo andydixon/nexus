@@ -70,17 +70,8 @@ pub fn expand_update_url(template: &str) -> String {
 
 /// GET with the updater headers; the body is read (bounded) only on 200.
 fn fetch(url: &str, accept: &str) -> Result<(u16, Vec<u8>)> {
-    let agent: ureq::Agent = ureq::Agent::config_builder()
-        .timeout_global(Some(REQUEST_TIMEOUT))
-        .http_status_as_error(false)
-        .build()
-        .into();
-    let resp = agent
-        .get(url)
-        .header("Accept", accept)
-        .header("User-Agent", USER_AGENT)
-        .call()
-        .map_err(|e| format!("updater: request failed: {e}"))?;
+    let agent: ureq::Agent = ureq::Agent::config_builder().timeout_global(Some(REQUEST_TIMEOUT)).http_status_as_error(false).build().into();
+    let resp = agent.get(url).header("Accept", accept).header("User-Agent", USER_AGENT).call().map_err(|e| format!("updater: request failed: {e}"))?;
     let status = resp.status().as_u16();
     if status != 200 {
         return Ok((status, vec![]));
@@ -130,8 +121,7 @@ pub fn check_github(current_version: &str) -> Result<UpdateInfo> {
     if status != 200 {
         return Err(format!("updater: GitHub API returned {status}").into());
     }
-    let release: Release =
-        serde_json::from_slice(&body).map_err(|e| format!("updater: failed to decode response: {e}"))?;
+    let release: Release = serde_json::from_slice(&body).map_err(|e| format!("updater: failed to decode response: {e}"))?;
     let latest = normalise_version(&release.tag_name);
     if release.draft || release.prerelease {
         return Ok(UpdateInfo { current_version: current, latest_version: latest, ..Default::default() });
@@ -189,10 +179,7 @@ fn is_newer(latest: &str, current: &str) -> bool {
 /// Go's `fmt.Sscanf(s, "%d")`: optional sign then digits; anything else is 0.
 fn leading_int(s: Option<&&str>) -> i64 {
     let s = s.map_or("", |s| s.trim_start());
-    let end = s
-        .char_indices()
-        .find(|&(i, c)| !(c.is_ascii_digit() || (i == 0 && (c == '+' || c == '-'))))
-        .map_or(s.len(), |(i, _)| i);
+    let end = s.char_indices().find(|&(i, c)| !(c.is_ascii_digit() || (i == 0 && (c == '+' || c == '-')))).map_or(s.len(), |(i, _)| i);
     s[..end].parse().unwrap_or(0)
 }
 
@@ -228,10 +215,7 @@ mod tests {
                 }
                 req.extend(&buf[..n]);
             }
-            let head = format!(
-                "HTTP/1.1 200 OK\r\nContent-Type: {content_type}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
-                body.len()
-            );
+            let head = format!("HTTP/1.1 200 OK\r\nContent-Type: {content_type}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n", body.len());
             let _ = s.write_all(head.as_bytes());
             let _ = s.write_all(&body);
         });

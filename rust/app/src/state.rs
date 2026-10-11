@@ -8,36 +8,27 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 /// Things a feature asks the main window to do (handled once per frame, in order).
+#[allow(clippy::large_enum_variant)] // a per-frame queue; boxing buys nothing
 pub enum Request {
     /// Open the profile editor for a new profile (optionally pre-set protocol / folder).
-    NewProfile { protocol: Option<Protocol>, folder: String },
+    NewProfile {
+        protocol: Option<Protocol>,
+        folder: String,
+    },
     EditProfile(String),
     Connect(String),
     ConnectQuick(Profile),
-    ConnectLocal,
     /// Reload `Shared::profiles` from the database.
     ReloadProfiles,
     /// Re-read and apply preferences (theme, terminal theme, fonts…).
     ReloadPreferences,
-    QuickConnect,
-    Settings(SettingsTab),
-    SshKeys,
     ExportEncrypted(Vec<String>),
     ImportEncrypted,
-    ExportJson,
-    ImportJson,
-    Recordings,
-    Snippets,
-    Triggers,
     Sftp(String),
-    PortForwards(String),
     /// Type text into the active session (snippets).
     SendToActive(String),
     /// Bytes to a specific session.
     Write(String, Vec<u8>),
-    Disconnect(String),
-    CommandPalette,
-    About,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
@@ -174,11 +165,6 @@ impl Shared {
         self.panes.get_mut(id)
     }
 
-    /// The tab that shows `session` (its own, or the one it's split into).
-    pub fn tab_of(&self, session: &str) -> Option<&Tab> {
-        self.tabs.iter().find(|t| t.id == session || t.split.as_ref().is_some_and(|sp| sp.sessions().iter().any(|x| x == session)))
-    }
-
     /// The session keyboard actions apply to: the focused pane, else the active tab.
     pub fn focused_session(&self) -> Option<String> {
         self.focused.clone().or_else(|| self.active.clone())
@@ -208,9 +194,5 @@ impl Shared {
 
 /// Formats a command-key shortcut for menus: "⌘K" on macOS, "Ctrl+K" elsewhere.
 pub fn keys(s: &str) -> String {
-    if cfg!(target_os = "macos") {
-        s.replace("Mod+Shift+", "⇧⌘").replace("Mod+", "⌘")
-    } else {
-        s.replace("Mod+", "Ctrl+")
-    }
+    if cfg!(target_os = "macos") { s.replace("Mod+Shift+", "⇧⌘").replace("Mod+", "⌘") } else { s.replace("Mod+", "Ctrl+") }
 }

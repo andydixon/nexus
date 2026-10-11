@@ -19,14 +19,27 @@ use std::sync::{Arc, Mutex};
 
 /// Worker results, applied on the UI thread.
 enum Done {
-    Listed { session: String, path: String, files: Result<Vec<FileEntry>, String> },
-    Picker { session: String, result: Result<(String, Vec<FileEntry>, bool), String> },
+    Listed {
+        session: String,
+        path: String,
+        files: Result<Vec<FileEntry>, String>,
+    },
+    Picker {
+        session: String,
+        result: Result<(String, Vec<FileEntry>, bool), String>,
+    },
     Refresh(String),
-    TransferEnded { session: String, path: String },
+    TransferEnded {
+        session: String,
+        path: String,
+    },
     /// Always shown.
     Toast(String),
     /// Shown only while the panel for `session` is open (otherwise per-file toasts cover it).
-    Summary { session: String, text: String },
+    Summary {
+        session: String,
+        text: String,
+    },
 }
 
 #[derive(Clone)]
@@ -372,10 +385,14 @@ impl Sftp {
 
     fn download(&mut self, s: &Shared, session: &str, files: Vec<FileEntry>) {
         let targets: Vec<(FileEntry, PathBuf)> = if files.len() == 1 {
-            let Some(p) = rfd::FileDialog::new().set_file_name(&files[0].name).save_file() else { return };
+            let Some(p) = rfd::FileDialog::new().set_file_name(&files[0].name).save_file() else {
+                return;
+            };
             vec![(files[0].clone(), p)]
         } else {
-            let Some(dir) = rfd::FileDialog::new().set_title("Download to folder").pick_folder() else { return };
+            let Some(dir) = rfd::FileDialog::new().set_title("Download to folder").pick_folder() else {
+                return;
+            };
             files.into_iter().filter_map(|e| safe_sftp_upload_name(&e.name).ok().map(|n| (e, dir.join(n)))).collect()
         };
         for (e, _) in &targets {
@@ -422,7 +439,14 @@ impl Sftp {
     }
 
     /// Runs a single SFTP operation, then toasts `ok` and refreshes the listing.
-    fn op(&mut self, s: &Shared, session: &str, ok: &'static str, what: &'static str, f: impl FnOnce(&Service, &str) -> nexus_core::Result<()> + Send + 'static) {
+    fn op(
+        &mut self,
+        s: &Shared,
+        session: &str,
+        ok: &'static str,
+        what: &'static str,
+        f: impl FnOnce(&Service, &str) -> nexus_core::Result<()> + Send + 'static,
+    ) {
         let sid = session.to_string();
         self.work(s, move |svc, out| {
             match f(svc, &sid) {
@@ -460,7 +484,9 @@ impl Sftp {
     /// The dock panel.
     pub fn ui(&mut self, ui: &mut Ui, s: &mut Shared) {
         self.drain(s);
-        let Some(session) = self.open_for.clone() else { return };
+        let Some(session) = self.open_for.clone() else {
+            return;
+        };
         if !self.panels.contains_key(&session) {
             self.navigate(s, &session, None);
         }
@@ -535,7 +561,9 @@ impl Sftp {
             });
         });
 
-        let Some(p) = self.panels.get(&session) else { return };
+        let Some(p) = self.panels.get(&session) else {
+            return;
+        };
         if let Some(go) = breadcrumb(ui, &p.cwd) {
             act = Some(Act::Nav(go));
         }
@@ -555,7 +583,11 @@ impl Sftp {
                             ui.add(egui::Label::new(base_name(&x.path)).truncate()).on_hover_text(&x.path);
                             ui.add(egui::ProgressBar::new(frac).desired_height(4.0).fill(t.accent));
                             let total = if x.total > 0 { widgets::human_size(x.total) } else { "?".into() };
-                            ui.label(RichText::new(format!("{} / {total} ({:.0}%)", widgets::human_size(x.transferred), frac * 100.0)).size(11.0).color(t.text_faint));
+                            ui.label(
+                                RichText::new(format!("{} / {total} ({:.0}%)", widgets::human_size(x.transferred), frac * 100.0))
+                                    .size(11.0)
+                                    .color(t.text_faint),
+                            );
                         });
                     });
                 }
@@ -595,7 +627,13 @@ impl Sftp {
                 if p.selected.contains(&e.path) {
                     ui.painter().rect_filled(r.expand2(vec2(6.0, 0.0)), 3.0, t.row_selected);
                 }
-                ui.painter().text(r.left_center() + vec2(8.0, 0.0), egui::Align2::CENTER_CENTER, file_icon(e), egui::FontId::proportional(14.0), if e.is_dir { t.accent } else { t.text_dim });
+                ui.painter().text(
+                    r.left_center() + vec2(8.0, 0.0),
+                    egui::Align2::CENTER_CENTER,
+                    file_icon(e),
+                    egui::FontId::proportional(14.0),
+                    if e.is_dir { t.accent } else { t.text_dim },
+                );
                 let meta_w = if e.is_dir { 0.0 } else { 72.0 };
                 let nr = egui::Rect::from_min_max(egui::pos2(r.min.x + 22.0, r.min.y), egui::pos2(r.max.x - meta_w - 4.0, r.max.y));
                 ui.scope_builder(egui::UiBuilder::new().max_rect(nr).layout(Layout::left_to_right(Align::Center)), |ui| {
@@ -603,7 +641,13 @@ impl Sftp {
                 });
                 if !e.is_dir {
                     let mr = egui::Rect::from_min_max(egui::pos2(r.max.x - meta_w, r.min.y), r.max);
-                    ui.painter().text(mr.right_center(), egui::Align2::RIGHT_CENTER, widgets::human_size(e.size), egui::FontId::proportional(11.5), t.text_faint);
+                    ui.painter().text(
+                        mr.right_center(),
+                        egui::Align2::RIGHT_CENTER,
+                        widgets::human_size(e.size),
+                        egui::FontId::proportional(11.5),
+                        t.text_faint,
+                    );
                     if e.modified_at > 0 {
                         ui.interact(mr, ui.id().with(("meta", i)), Sense::hover()).on_hover_text(modified(e.modified_at));
                     }
@@ -718,14 +762,14 @@ impl Sftp {
         }
     }
 
-
-
     // --- dialogs --------------------------------------------------------------------------
 
     /// Modal dialogs (file drop, directory picker), drawn every frame.
     pub fn dialogs(&mut self, ctx: &egui::Context, s: &mut Shared) {
         self.drain(s);
-        let Some(mut d) = self.dialog.take() else { return };
+        let Some(mut d) = self.dialog.take() else {
+            return;
+        };
         let t = Tokens::get(ctx);
         let esc = ctx.input(|i| i.key_pressed(Key::Escape));
         let enter = ctx.input(|i| i.key_pressed(Key::Enter));
@@ -802,7 +846,9 @@ impl Sftp {
                 modal(ctx, "sftp-drop", 420.0, |ui| {
                     ui.label(RichText::new(format!("{}  File Drop", icon::FILE_ARROW_UP)).font(theme::semibold(15.0)));
                     ui.label(RichText::new(title).strong());
-                    ui.label(RichText::new(format!("Choose what to do with the dropped {}.", if paths.len() == 1 { "file" } else { "files" })).color(t.text_dim));
+                    ui.label(
+                        RichText::new(format!("Choose what to do with the dropped {}.", if paths.len() == 1 { "file" } else { "files" })).color(t.text_dim),
+                    );
                     ui.add_space(8.0);
                     ui.horizontal(|ui| {
                         upload = ui
@@ -894,8 +940,15 @@ impl Sftp {
 
         // Keyboard: ↑↓ move (skipping unreadable folders), Enter uses, Backspace goes up.
         if ready {
-            let (down, up, back) = ctx.input_mut(|i| (i.consume_key(Modifiers::NONE, Key::ArrowDown), i.consume_key(Modifiers::NONE, Key::ArrowUp), i.key_pressed(Key::Backspace)));
-            let delta: isize = if down { 1 } else if up { -1 } else { 0 };
+            let (down, up, back) = ctx
+                .input_mut(|i| (i.consume_key(Modifiers::NONE, Key::ArrowDown), i.consume_key(Modifiers::NONE, Key::ArrowUp), i.key_pressed(Key::Backspace)));
+            let delta: isize = if down {
+                1
+            } else if up {
+                -1
+            } else {
+                0
+            };
             if delta != 0 && !visible.is_empty() {
                 let n = visible.len() as isize;
                 let mut idx = pk.cursor.map_or(if delta > 0 { -1 } else { n }, |c| c as isize);
@@ -1003,7 +1056,8 @@ impl Sftp {
             ui.separator();
             ui.horizontal(|ui| {
                 let suffix = if sel.is_none() && !pk.cwd_writable { " (read only)" } else { "" };
-                ui.add(egui::Label::new(RichText::new(format!("{target}{suffix}")).font(theme::mono(11.5)).color(t.text_dim)).truncate()).on_hover_text(&target);
+                ui.add(egui::Label::new(RichText::new(format!("{target}{suffix}")).font(theme::mono(11.5)).color(t.text_dim)).truncate())
+                    .on_hover_text(&target);
                 let status = match (sel.is_some(), writable) {
                     (_, true) => "",
                     (true, false) => "No write permission",

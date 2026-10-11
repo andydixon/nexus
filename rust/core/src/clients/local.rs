@@ -9,9 +9,7 @@ use std::sync::{Arc, Mutex};
 
 pub fn default_shell() -> String {
     if cfg!(windows) {
-        let ps = std::env::var_os("SystemRoot")
-            .map(|r| PathBuf::from(r).join(r"System32\WindowsPowerShell\v1.0\powershell.exe"))
-            .filter(|p| p.exists());
+        let ps = std::env::var_os("SystemRoot").map(|r| PathBuf::from(r).join(r"System32\WindowsPowerShell\v1.0\powershell.exe")).filter(|p| p.exists());
         return ps.map_or_else(|| "cmd.exe".into(), |p| p.to_string_lossy().into());
     }
     std::env::var("SHELL").ok().filter(|s| !s.is_empty()).unwrap_or_else(|| "/bin/sh".into())

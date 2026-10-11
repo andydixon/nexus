@@ -31,19 +31,18 @@ pub struct Progress {
 }
 
 fn mode_string(m: &russh_sftp::protocol::FileAttributes) -> String {
-    let kind = if m.is_dir() { 'd' } else if m.is_symlink() { 'L' } else { '-' };
+    let kind = if m.is_dir() {
+        'd'
+    } else if m.is_symlink() {
+        'L'
+    } else {
+        '-'
+    };
     format!("{kind}{}", m.permissions())
 }
 
 fn entry(name: String, path: String, m: &russh_sftp::protocol::FileAttributes) -> FileEntry {
-    FileEntry {
-        name,
-        path,
-        size: m.size.unwrap_or(0),
-        is_dir: m.is_dir(),
-        mode: mode_string(m),
-        modified_at: m.mtime.map_or(0, |t| t as i64 * 1000),
-    }
+    FileEntry { name, path, size: m.size.unwrap_or(0), is_dir: m.is_dir(), mode: mode_string(m), modified_at: m.mtime.map_or(0, |t| t as i64 * 1000) }
 }
 
 /// `path.Join` for remote (always '/') paths.
@@ -60,10 +59,8 @@ pub fn join(dir: &str, name: &str) -> String {
 /// Directories first, then case-insensitive name order.
 pub fn list(s: &Arc<SftpSession>, path: &str) -> Result<Vec<FileEntry>> {
     let rd = rt().block_on(s.read_dir(path)).map_err(|e| format!("sftpclient: failed to list {path}: {e}"))?;
-    let mut out: Vec<FileEntry> = rd
-        .filter(|e| e.file_name() != "." && e.file_name() != "..")
-        .map(|e| entry(e.file_name(), join(path, &e.file_name()), &e.metadata()))
-        .collect();
+    let mut out: Vec<FileEntry> =
+        rd.filter(|e| e.file_name() != "." && e.file_name() != "..").map(|e| entry(e.file_name(), join(path, &e.file_name()), &e.metadata())).collect();
     out.sort_by(|a, b| b.is_dir.cmp(&a.is_dir).then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase())));
     Ok(out)
 }

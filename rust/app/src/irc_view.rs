@@ -317,7 +317,9 @@ impl IrcView {
     fn log(&mut self, ui: &mut Ui, theme: &'static TermTheme) {
         let font = FontId::monospace(self.font_size);
         let wrap = ui.available_width().max(100.0);
-        let Some(target) = self.targets.iter_mut().find(|t| t.name == self.active) else { return };
+        let Some(target) = self.targets.iter_mut().find(|t| t.name == self.active) else {
+            return;
+        };
         // Lay out lines once per width/theme; the galley cache keeps scrolling cheap.
         let mut tops = Vec::with_capacity(target.lines.len());
         let mut y = 0.0;
@@ -453,7 +455,8 @@ impl IrcView {
                         ui.label(RichText::new(r.users.to_string()).color(t.text_faint).size(11.0));
                         ui.label(RichText::new(ircformat::plain_text(&r.topic)).color(t.text_faint).size(11.0));
                     });
-                    ui.interact(ui.max_rect(), ui.id().with("tip"), Sense::hover()).on_hover_text(format!("{}\nClick to join", ircformat::plain_text(if r.topic.is_empty() { &r.name } else { &r.topic })));
+                    ui.interact(ui.max_rect(), ui.id().with("tip"), Sense::hover())
+                        .on_hover_text(format!("{}\nClick to join", ircformat::plain_text(if r.topic.is_empty() { &r.name } else { &r.topic })));
                 });
                 join_room = clicked.map(|i| listed[i].name.clone());
             });
@@ -474,7 +477,7 @@ impl IrcView {
                     ui.interact(ui.max_rect(), ui.id().with("tip"), Sense::hover()).on_hover_text(format!("{}\nClick to mention", u[i]));
                 });
                 if let Some(i) = clicked {
-                    self.insert_mention(&display_nick(&u[i]).to_string());
+                    self.insert_mention(display_nick(&u[i]));
                 }
             }
             _ => widgets::hint(ui, "No users yet"),

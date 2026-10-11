@@ -76,7 +76,7 @@ pub struct Framebuffer {
 impl Framebuffer {
     fn new(width: u16, height: u16) -> Framebuffer {
         let mut rgba = vec![0u8; width as usize * height as usize * 4];
-        rgba.chunks_exact_mut(4).for_each(|p| p[3] = 255);
+        rgba.as_chunks_mut::<4>().0.iter_mut().for_each(|p| p[3] = 255);
         Framebuffer { width, height, rgba, dirty: true }
     }
 
@@ -92,7 +92,7 @@ impl Framebuffer {
         let (w, stride) = (w as usize, self.width as usize);
         for row in 0..h as usize {
             let dst = ((y as usize + row) * stride + x as usize) * 4;
-            for (d, s) in self.rgba[dst..dst + w * 4].chunks_exact_mut(4).zip(px[row * w * bpp..].chunks_exact(bpp)) {
+            for (d, s) in self.rgba[dst..dst + w * 4].as_chunks_mut::<4>().0.iter_mut().zip(px[row * w * bpp..].chunks_exact(bpp)) {
                 d[..3].copy_from_slice(&s[..3]);
                 d[3] = 255;
             }
@@ -103,7 +103,7 @@ impl Framebuffer {
         let stride = self.width as usize;
         for row in 0..h as usize {
             let dst = ((y as usize + row) * stride + x as usize) * 4;
-            for d in self.rgba[dst..dst + w as usize * 4].chunks_exact_mut(4) {
+            for d in self.rgba[dst..dst + w as usize * 4].as_chunks_mut::<4>().0 {
                 d[..3].copy_from_slice(&rgb[..3]);
                 d[3] = 255;
             }
@@ -241,13 +241,13 @@ impl Client {
             st.connected = false;
             r
         };
-        if let Err(e) = result {
-            if !was_closing {
-                let msg = e.to_string();
-                (self.cfg.on_error)(msg.clone());
-                if let Some(ready) = ready {
-                    let _ = ready.send(Err(msg));
-                }
+        if let Err(e) = result
+            && !was_closing
+        {
+            let msg = e.to_string();
+            (self.cfg.on_error)(msg.clone());
+            if let Some(ready) = ready {
+                let _ = ready.send(Err(msg));
             }
         }
         if was_connected {
@@ -334,7 +334,13 @@ impl Client {
             None => return Err(format!("not a VNC server (got {:?})", ver.trim_end()).into()),
         };
         // 3.889 is Apple's 3.8; anything between 3.3 and 3.7 is treated as 3.3, as RFB specifies.
-        let minor = if minor >= 8 { 8 } else if minor == 7 { 7 } else { 3 };
+        let minor = if minor >= 8 {
+            8
+        } else if minor == 7 {
+            7
+        } else {
+            3
+        };
         r.get_mut().send(format!("RFB 003.00{minor}\n").as_bytes())?;
 
         let security = if minor == 3 {
@@ -368,15 +374,13 @@ impl Client {
             }
             t => return Err(unsupported_security(&[t as u8]).into()),
         }
-        if minor == 8 || security == 2 {
-            if read_u32(r)? != 0 {
-                let reason = if minor == 8 { read_string(r)? } else { String::new() };
-                return Err(if reason.is_empty() {
-                    "VNC authentication failed (wrong password?)".into()
-                } else {
-                    format!("VNC authentication failed: {reason}").into()
-                });
-            }
+        if (minor == 8 || security == 2) && read_u32(r)? != 0 {
+            let reason = if minor == 8 { read_string(r)? } else { String::new() };
+            return Err(if reason.is_empty() {
+                "VNC authentication failed (wrong password?)".into()
+            } else {
+                format!("VNC authentication failed: {reason}").into()
+            });
         }
 
         r.get_mut().send(&[self.cfg.shared as u8])?;
@@ -414,11 +418,11 @@ pub fn vnc_auth_response(password: &str, challenge: &[u8; 16]) -> [u8; 16] {
     }
     let cipher = des::Des::new(&key.into());
     let mut out = *challenge;
-    for chunk in out.chunks_exact_mut(8) {
-        let mut block: [u8; 8] = chunk.try_into().unwrap();
+    for chunk in out.as_chunks_mut::<8>().0 {
+        let mut block: [u8; 8] = *chunk;
         let b = (&mut block).into();
         cipher.encrypt_block(b);
-        chunk.copy_from_slice(&block);
+        *chunk = block;
     }
     out
 }
@@ -502,11 +506,7 @@ struct Decoders {
 
 impl Default for Decoders {
     fn default() -> Decoders {
-        Decoders {
-            zrle: Decompress::new(true),
-            tight: std::array::from_fn(|_| Decompress::new(true)),
-            buf: Vec::new(),
-        }
+        Decoders { zrle: Decompress::new(true), tight: std::array::from_fn(|_| Decompress::new(true)), buf: Vec::new() }
     }
 }
 
@@ -726,9 +726,7 @@ fn tight(r: &mut impl Read, fb: &mut Framebuffer, dec: &mut Decoders, x: u16, y:
         9 => {
             let len = compact_len(r)?;
             let jpeg = read_n(r, len)?;
-            let img = image::load_from_memory_with_format(&jpeg, image::ImageFormat::Jpeg)
-                .map_err(|e| format!("Tight JPEG: {e}"))?
-                .to_rgb8();
+            let img = image::load_from_memory_with_format(&jpeg, image::ImageFormat::Jpeg).map_err(|e| format!("Tight JPEG: {e}"))?.to_rgb8();
             if img.width() as usize != wu || img.height() as usize != hu {
                 return Err("Tight JPEG size doesn't match its rectangle".into());
             }

@@ -262,10 +262,7 @@ pub fn parse_escaped(s: &str) -> crate::Result<Vec<u8>> {
 /// "latin1" / "latin-1", otherwise UTF-8 with invalid bytes replaced by U+FFFD.
 pub fn to_display_encoding(data: &[u8], encoding: &str) -> String {
     match encoding.trim().to_ascii_lowercase().as_str() {
-        "ascii" => data
-            .iter()
-            .map(|&b| if (0x20..=0x7e).contains(&b) || matches!(b, b'\n' | b'\r' | b'\t') { b as char } else { '.' })
-            .collect(),
+        "ascii" => data.iter().map(|&b| if (0x20..=0x7e).contains(&b) || matches!(b, b'\n' | b'\r' | b'\t') { b as char } else { '.' }).collect(),
         e if super::is_latin1(e) => super::latin1_to_utf8(data),
         _ => String::from_utf8_lossy(data).into_owned(),
     }
@@ -285,13 +282,8 @@ mod tests {
 
     #[test]
     fn parse_hex_string_cases() {
-        let ok: [(&str, &[u8]); 5] = [
-            ("48656c6c6f", b"Hello"),
-            ("48 65 6c 6c 6f", b"Hello"),
-            ("0x48 0x65 0x6c 0x6c 0x6f", b"Hello"),
-            ("0000", &[0, 0]),
-            ("ff ff", &[0xff, 0xff]),
-        ];
+        let ok: [(&str, &[u8]); 5] =
+            [("48656c6c6f", b"Hello"), ("48 65 6c 6c 6f", b"Hello"), ("0x48 0x65 0x6c 0x6c 0x6f", b"Hello"), ("0000", &[0, 0]), ("ff ff", &[0xff, 0xff])];
         for (input, want) in ok {
             assert_eq!(parse_hex_string(input).unwrap(), want, "{input:?}");
         }

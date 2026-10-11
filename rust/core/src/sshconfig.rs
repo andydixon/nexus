@@ -29,11 +29,7 @@ pub fn parse_file(path: &Path) -> Result<Vec<HostBlock>> {
         return Err(format!("sshconfig: {p} is a directory").into());
     }
     if meta.len() > MAX_CONFIG_FILE_BYTES {
-        return Err(format!(
-            "sshconfig: config file is too large: {} bytes exceeds {MAX_CONFIG_FILE_BYTES} bytes",
-            meta.len()
-        )
-        .into());
+        return Err(format!("sshconfig: config file is too large: {} bytes exceeds {MAX_CONFIG_FILE_BYTES} bytes", meta.len()).into());
     }
     let raw = std::fs::read(path).map_err(|e| format!("sshconfig: failed to open {p}: {e}"))?;
     parse(&String::from_utf8_lossy(&raw))
@@ -138,8 +134,7 @@ fn parse_proxy_jump(value: &str) -> Option<JumpHost> {
     if value.is_empty() || value == "none" {
         return None;
     }
-    let mut jh =
-        JumpHost { port: 22, auth_method: "publickey".into(), secret_mode: SecretMode::AskEveryTime, ..Default::default() };
+    let mut jh = JumpHost { port: 22, auth_method: "publickey".into(), secret_mode: SecretMode::AskEveryTime, ..Default::default() };
     if let Some((user, rest)) = value.split_once('@') {
         jh.username = user.into();
         value = rest;

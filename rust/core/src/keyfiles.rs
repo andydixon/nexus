@@ -5,25 +5,11 @@ use crate::Result;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
-const PRIVATE_KEY_MARKERS: [&str; 6] = [
-    "BEGIN OPENSSH PRIVATE KEY",
-    "BEGIN RSA PRIVATE KEY",
-    "BEGIN DSA PRIVATE KEY",
-    "BEGIN EC PRIVATE KEY",
-    "BEGIN ED25519 PRIVATE KEY",
-    "BEGIN PRIVATE KEY",
-];
+const PRIVATE_KEY_MARKERS: [&str; 6] =
+    ["BEGIN OPENSSH PRIVATE KEY", "BEGIN RSA PRIVATE KEY", "BEGIN DSA PRIVATE KEY", "BEGIN EC PRIVATE KEY", "BEGIN ED25519 PRIVATE KEY", "BEGIN PRIVATE KEY"];
 
-const IGNORED: [&str; 8] = [
-    "authorized_keys",
-    "authorized_keys2",
-    "config",
-    "known_hosts",
-    "known_hosts.old",
-    "ssh_config",
-    "ssh_known_hosts",
-    "ssh_known_hosts2",
-];
+const IGNORED: [&str; 8] =
+    ["authorized_keys", "authorized_keys2", "config", "known_hosts", "known_hosts.old", "ssh_config", "ssh_known_hosts", "ssh_known_hosts2"];
 
 /// Whether the first 512 bytes look like a private key. Unreadable or empty paths are `false`
 /// (this is also Go's `FileIsPrivateKey`).
@@ -33,8 +19,7 @@ pub fn is_likely_private_key(path: &Path) -> bool {
     if f.take(512).read_to_end(&mut head).is_err() || head.is_empty() {
         return false;
     }
-    head.starts_with(b"openssh-key-v1")
-        || PRIVATE_KEY_MARKERS.iter().any(|m| head.windows(m.len()).any(|w| w == m.as_bytes()))
+    head.starts_with(b"openssh-key-v1") || PRIVATE_KEY_MARKERS.iter().any(|m| head.windows(m.len()).any(|w| w == m.as_bytes()))
 }
 
 /// Candidate private keys in `~/.ssh`, sorted. A missing home or `.ssh` gives an empty list.

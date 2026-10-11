@@ -194,7 +194,13 @@ pub fn title_bar(app: &mut App, ui: &mut Ui) {
     let resp = ui.interact(r, ui.id().with("palette-launch"), Sense::click());
     ui.painter().rect(r, 6.0, if resp.hovered() { t.hover } else { t.field }, Stroke::new(1.0, t.field_border), egui::StrokeKind::Inside);
     ui.painter().text(r.left_center() + vec2(9.0, 0.0), Align2::LEFT_CENTER, icon::MAGNIFYING_GLASS, egui::FontId::proportional(13.0), t.text_faint);
-    ui.painter().with_clip_rect(r.shrink(2.0)).text(r.left_center() + vec2(28.0, 0.0), Align2::LEFT_CENTER, "Search connections and commands", egui::FontId::proportional(12.0), t.text_faint);
+    ui.painter().with_clip_rect(r.shrink(2.0)).text(
+        r.left_center() + vec2(28.0, 0.0),
+        Align2::LEFT_CENTER,
+        "Search connections and commands",
+        egui::FontId::proportional(12.0),
+        t.text_faint,
+    );
     if w > 250.0 {
         ui.painter().text(r.right_center() - vec2(8.0, 0.0), Align2::RIGHT_CENTER, keys("Mod+K").replace('+', " "), theme::semibold(10.5), t.text_faint);
     }
@@ -257,7 +263,9 @@ pub fn resize_edges(ctx: &egui::Context) {
         (Rect::from_min_max(r.min, pos2(r.left() + e, r.bottom())), D::West, CursorIcon::ResizeHorizontal),
         (Rect::from_min_max(pos2(r.right() - e, r.top()), r.max), D::East, CursorIcon::ResizeHorizontal),
     ];
-    let Some(p) = ctx.input(|i| i.pointer.hover_pos()) else { return };
+    let Some(p) = ctx.input(|i| i.pointer.hover_pos()) else {
+        return;
+    };
     for (zone, dir, cursor) in zones {
         if zone.contains(p) {
             ctx.set_cursor_icon(cursor);
@@ -317,7 +325,13 @@ pub fn status_bar(app: &mut App, ui: &mut Ui) {
             && active.as_deref() == Some(sid)
             && let Ok(ms) = r
         {
-            let c = if *ms < 100 { t.success } else if *ms < 250 { t.warning } else { t.danger };
+            let c = if *ms < 100 {
+                t.success
+            } else if *ms < 250 {
+                t.warning
+            } else {
+                t.danger
+            };
             ui.label(RichText::new(format!("{ms} ms")).size(11.5).color(c));
         }
         if app.s.broadcast {
@@ -328,7 +342,15 @@ pub fn status_bar(app: &mut App, ui: &mut Ui) {
             let vault = app.s.svc.secrets.vault.is_unlocked();
             let keychain = app.s.svc.secrets.keychain_ok;
             let label = if vault { format!("{} Vault unlocked", icon::LOCK_OPEN) } else { format!("{} Vault locked", icon::LOCK) };
-            if ui.add(egui::Label::new(dim(label)).sense(Sense::click())).on_hover_text(if keychain { "Saved credentials use the OS keychain; the vault is the fallback." } else { "No OS keychain available: saved credentials use the encrypted vault." }).clicked() {
+            if ui
+                .add(egui::Label::new(dim(label)).sense(Sense::click()))
+                .on_hover_text(if keychain {
+                    "Saved credentials use the OS keychain; the vault is the fallback."
+                } else {
+                    "No OS keychain available: saved credentials use the encrypted vault."
+                })
+                .clicked()
+            {
                 app.settings.open(SettingsTab::Security);
             }
             let total = app.s.panes.len();
@@ -337,7 +359,11 @@ pub fn status_bar(app: &mut App, ui: &mut Ui) {
             if let Some(u) = &app.update
                 && u.available
             {
-                let txt = format!("{} Update available{}", icon::ARROW_CIRCLE_UP, if u.latest_version.is_empty() { String::new() } else { format!(" ({})", u.latest_version) });
+                let txt = format!(
+                    "{} Update available{}",
+                    icon::ARROW_CIRCLE_UP,
+                    if u.latest_version.is_empty() { String::new() } else { format!(" ({})", u.latest_version) }
+                );
                 if ui.add(egui::Label::new(RichText::new(txt).size(11.5).color(t.accent)).sense(Sense::click())).clicked() {
                     app.settings.open(SettingsTab::About);
                 }
@@ -397,6 +423,8 @@ enum Cmd {
     Settings,
     Import,
     Export,
+    ExportJson,
+    ImportJson,
     Lock,
     Unlock,
     Keys,
@@ -435,7 +463,12 @@ fn commands(app: &App) -> Vec<(Cmd, String, &'static str, &'static str, String)>
         let name = if p.display_name.is_empty() { &p.host } else { &p.display_name };
         v.push((Cmd::Connect(p.id.clone()), format!("Connect to {name}"), "Connections", icon::PLUGS_CONNECTED, String::new()));
     }
-    for (pr, label) in [(Protocol::Ssh, "New SSH Connection"), (Protocol::Telnet, "New Telnet Connection"), (Protocol::Raw, "New RAW Connection"), (Protocol::Serial, "New Serial Connection")] {
+    for (pr, label) in [
+        (Protocol::Ssh, "New SSH Connection"),
+        (Protocol::Telnet, "New Telnet Connection"),
+        (Protocol::Raw, "New RAW Connection"),
+        (Protocol::Serial, "New Serial Connection"),
+    ] {
         v.push((Cmd::NewProfile(pr), label.into(), "Actions", icon::PLUS_CIRCLE, if pr == Protocol::Ssh { keys("Mod+N") } else { String::new() }));
     }
     v.push((Cmd::Quick, "Quick Connect…".into(), "Actions", icon::LIGHTNING, keys("Mod+Shift+Q")));
@@ -456,6 +489,8 @@ fn commands(app: &App) -> Vec<(Cmd, String, &'static str, &'static str, String)>
     v.push((Cmd::Settings, "Settings".into(), "Application", icon::GEAR, keys("Mod+,")));
     v.push((Cmd::Import, "Import Profiles".into(), "Application", icon::DOWNLOAD_SIMPLE, String::new()));
     v.push((Cmd::Export, "Export Profiles".into(), "Application", icon::UPLOAD_SIMPLE, String::new()));
+    v.push((Cmd::ImportJson, "Import Profiles (JSON)".into(), "Application", icon::FILE_ARROW_DOWN, String::new()));
+    v.push((Cmd::ExportJson, "Export Profiles (JSON)".into(), "Application", icon::FILE_ARROW_UP, String::new()));
     for k in ThemeKind::ALL {
         v.push((Cmd::Theme(k), format!("Theme: {}", k.label()), "Application", icon::PALETTE, String::new()));
     }
@@ -501,6 +536,8 @@ fn run(app: &mut App, ctx: &egui::Context, c: Cmd) {
         Cmd::Settings => app.settings.open(SettingsTab::General),
         Cmd::Import => app.s.request(Request::ImportEncrypted),
         Cmd::Export => app.s.request(Request::ExportEncrypted(vec![])),
+        Cmd::ExportJson => app.transfer.export_json(),
+        Cmd::ImportJson => app.transfer.import_json(),
         Cmd::Lock => {
             app.s.svc.secrets.vault.lock();
             app.s.info("Secret store locked");
@@ -536,14 +573,13 @@ pub fn modal_backdrop(ctx: &egui::Context) {
 }
 
 pub fn palette(app: &mut App, ctx: &egui::Context) {
-    let Some(mut pal) = app.palette.take() else { return };
+    let Some(mut pal) = app.palette.take() else {
+        return;
+    };
     let t = Tokens::get(ctx);
-    let mut matches: Vec<_> = commands(app)
-        .into_iter()
-        .filter_map(|c| fuzzy_score(&format!("{} {}", c.1, c.2), pal.query.trim()).map(|s| (s, c)))
-        .collect();
+    let mut matches: Vec<_> = commands(app).into_iter().filter_map(|c| fuzzy_score(&format!("{} {}", c.1, c.2), pal.query.trim()).map(|s| (s, c))).collect();
     if !pal.query.trim().is_empty() {
-        matches.sort_by(|a, b| b.0.cmp(&a.0));
+        matches.sort_by_key(|m| std::cmp::Reverse(m.0));
     }
     let matches: Vec<_> = matches.into_iter().map(|(_, c)| c).collect();
     pal.sel = pal.sel.min(matches.len().saturating_sub(1));
@@ -564,7 +600,13 @@ pub fn palette(app: &mut App, ctx: &egui::Context) {
             ui.set_width(580.0);
             ui.horizontal(|ui| {
                 ui.label(RichText::new(icon::MAGNIFYING_GLASS).size(16.0).color(t.text_faint));
-                let r = ui.add(egui::TextEdit::singleline(&mut pal.query).hint_text("Connect, switch tab, or run a command…").frame(egui::Frame::NONE).desired_width(f32::INFINITY).font(egui::FontId::proportional(15.0)));
+                let r = ui.add(
+                    egui::TextEdit::singleline(&mut pal.query)
+                        .hint_text("Connect, switch tab, or run a command…")
+                        .frame(egui::Frame::NONE)
+                        .desired_width(f32::INFINITY)
+                        .font(egui::FontId::proportional(15.0)),
+                );
                 r.request_focus();
                 if r.changed() {
                     pal.sel = 0;
@@ -622,7 +664,9 @@ pub fn modal(ctx: &egui::Context, id: &str, width: f32, body: impl FnOnce(&mut U
 }
 
 pub fn prompts(app: &mut App, ctx: &egui::Context) {
-    let Some(p) = app.prompts.front_mut() else { return };
+    let Some(p) = app.prompts.front_mut() else {
+        return;
+    };
     let t = Tokens::get(ctx);
     let esc = ctx.input(|i| i.key_pressed(Key::Escape));
     let enter = ctx.input(|i| i.key_pressed(Key::Enter));
@@ -680,7 +724,9 @@ pub fn prompts(app: &mut App, ctx: &egui::Context) {
 // --- dialogs --------------------------------------------------------------------------------
 
 pub fn dialogs(app: &mut App, ctx: &egui::Context) {
-    let Some(mut d) = app.dialog.take() else { return };
+    let Some(mut d) = app.dialog.take() else {
+        return;
+    };
     let t = Tokens::get(ctx);
     let esc = ctx.input(|i| i.key_pressed(Key::Escape));
     let mut keep = !esc;
@@ -853,7 +899,11 @@ pub fn dialogs(app: &mut App, ctx: &egui::Context) {
             let names: Vec<String> = profiles.iter().filter_map(|id| app.s.profile(id)).map(|p| p.display_name.clone()).collect();
             modal(ctx, "delete", 380.0, |ui| {
                 ui.label(RichText::new("Delete connection?").font(theme::semibold(15.0)));
-                ui.label(if names.len() == 1 { format!("\"{}\" will be deleted, with its saved credentials.", names[0]) } else { format!("{} connections will be deleted.", names.len()) });
+                ui.label(if names.len() == 1 {
+                    format!("\"{}\" will be deleted, with its saved credentials.", names[0])
+                } else {
+                    format!("{} connections will be deleted.", names.len())
+                });
                 ui.add_space(8.0);
                 ui.horizontal(|ui| {
                     if ui.add(egui::Button::new(RichText::new(format!("{}  Delete", icon::TRASH)).color(Color32::WHITE)).fill(t.danger)).clicked() {

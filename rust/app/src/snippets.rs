@@ -71,7 +71,15 @@ pub struct Snippets {
 
 impl Default for Snippets {
     fn default() -> Self {
-        Snippets { open: false, list: vec![], search: String::new(), pane: Pane::Empty("Select a snippet or create a new one"), confirm_delete: None, vars: None, loaded: false }
+        Snippets {
+            open: false,
+            list: vec![],
+            search: String::new(),
+            pane: Pane::Empty("Select a snippet or create a new one"),
+            confirm_delete: None,
+            vars: None,
+            loaded: false,
+        }
     }
 }
 
@@ -263,7 +271,9 @@ impl Snippets {
 
     /// Resolves variables then types the command (plus newline) into the focused session.
     fn send(&mut self, s: &mut Shared, command: &str) {
-        let Some(id) = s.focused_session() else { return s.error("No active session") };
+        let Some(id) = s.focused_session() else {
+            return s.error("No active session");
+        };
         if s.session_state(&id) != Some(SessionState::Connected) {
             return s.error("Session is not connected");
         }
@@ -306,7 +316,9 @@ impl Snippets {
     }
 
     fn delete_dialog(&mut self, ctx: &egui::Context, s: &mut Shared) {
-        let Some(id) = self.confirm_delete.clone() else { return };
+        let Some(id) = self.confirm_delete.clone() else {
+            return;
+        };
         let name = self.list.iter().find(|x| x.id == id).map(|x| x.name.clone()).unwrap_or_default();
         let (mut yes, mut no) = (false, ctx.input(|i| i.key_pressed(Key::Escape)));
         crate::chrome::modal(ctx, "snippet-delete", 360.0, |ui| {
@@ -335,7 +347,16 @@ impl Snippets {
 
 fn blank() -> Snippet {
     let now = nexus_core::models::now();
-    Snippet { id: String::new(), name: String::new(), command: String::new(), description: String::new(), folder: String::new(), tags: vec![], created_at: now, updated_at: now }
+    Snippet {
+        id: String::new(),
+        name: String::new(),
+        command: String::new(),
+        description: String::new(),
+        folder: String::new(),
+        tags: vec![],
+        created_at: now,
+        updated_at: now,
+    }
 }
 
 fn send_text(s: &mut Shared, text: String) {

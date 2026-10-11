@@ -20,7 +20,14 @@ struct Form {
 
 impl Default for Form {
     fn default() -> Form {
-        Form { remote: false, bind_host: "127.0.0.1".into(), bind_port: String::new(), dest_host: "localhost".into(), dest_port: String::new(), label: String::new() }
+        Form {
+            remote: false,
+            bind_host: "127.0.0.1".into(),
+            bind_port: String::new(),
+            dest_host: "localhost".into(),
+            dest_port: String::new(),
+            label: String::new(),
+        }
     }
 }
 
@@ -52,7 +59,9 @@ impl Forwards {
                 s.info("Forward stopped");
             }
         }
-        let Some(sid) = self.session.clone() else { return };
+        let Some(sid) = self.session.clone() else {
+            return;
+        };
         // A lock and a clone in the client; no network.
         let list = match s.svc.sessions.forwards(&sid) {
             Ok(l) => l,
@@ -84,7 +93,9 @@ impl Forwards {
                 ui.horizontal(|ui| {
                     let local = fwd.direction == ForwardDirection::Local;
                     widgets::chip(ui, if local { "L" } else { "R" }, if local { t.accent } else { t.warning });
-                    let or = |s: &str, d: &str| if s.is_empty() { d.to_string() } else { s.to_string() };
+                    let or = |s: &str, d: &str| {
+                        if s.is_empty() { d.to_string() } else { s.to_string() }
+                    };
                     let text = format!("{}:{} → {}:{}", or(&fwd.bind_host, "127.0.0.1"), fwd.bind_port, or(&fwd.dest_host, "localhost"), fwd.dest_port);
                     ui.label(RichText::new(text).font(theme::mono(12.0)));
                     if !fwd.label.is_empty() {
@@ -126,7 +137,9 @@ impl Forwards {
             let f = &self.form;
             match (port(&f.bind_port), port(&f.dest_port)) {
                 (Some(bind_port), Some(dest_port)) => {
-                    let or = |s: &str, d: &str| if s.trim().is_empty() { d.to_string() } else { s.trim().to_string() };
+                    let or = |s: &str, d: &str| {
+                        if s.trim().is_empty() { d.to_string() } else { s.trim().to_string() }
+                    };
                     let rule = PortForward {
                         id: new_id(),
                         direction: if f.remote { ForwardDirection::Remote } else { ForwardDirection::Local },
@@ -138,7 +151,10 @@ impl Forwards {
                         label: f.label.trim().into(),
                     };
                     let (svc, done) = (s.svc.clone(), self.done.clone());
-                    s.spawn(move || svc.sessions.start_forward(&sid, rule).map_err(|e| format!("Failed to start forward: {e}").into()), move |_| done.lock().unwrap().push(true));
+                    s.spawn(
+                        move || svc.sessions.start_forward(&sid, rule).map_err(|e| format!("Failed to start forward: {e}").into()),
+                        move |_| done.lock().unwrap().push(true),
+                    );
                 }
                 _ => s.error("Bind port and destination port are required"),
             }

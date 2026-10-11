@@ -2,9 +2,9 @@
 //! over a JSON bundle, with the vault's Argon2id parameters. `.link` files from Alchementary
 //! Link are the same format.
 
+use crate::Result;
 use crate::models::Profile;
 use crate::secrets::{derive_key, random_bytes};
-use crate::Result;
 use aes_gcm::aead::{Aead, KeyInit};
 use aes_gcm::{Aes256Gcm, Nonce};
 use serde::{Deserialize, Serialize};

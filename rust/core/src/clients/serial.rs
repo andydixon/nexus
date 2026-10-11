@@ -38,12 +38,7 @@ pub fn list_ports() -> Vec<String> {
 impl SerialClient {
     pub fn new(profile: &Profile, cb: Callbacks) -> SerialClient {
         SerialClient {
-            inner: Arc::new(Inner {
-                path: profile.host.trim().to_string(),
-                cfg: profile.serial.clone().unwrap_or_default(),
-                cb,
-                port: Mutex::new(None),
-            }),
+            inner: Arc::new(Inner { path: profile.host.trim().to_string(), cfg: profile.serial.clone().unwrap_or_default(), cb, port: Mutex::new(None) }),
         }
     }
 
@@ -292,9 +287,15 @@ mod tests {
             let (etx, erx) = mpsc::channel();
             let (ctx, crx) = mpsc::channel();
             let cb = Callbacks {
-                on_data: Arc::new(move |d| { let _ = dtx.send(d.to_vec()); }),
-                on_error: Arc::new(move |e| { let _ = etx.send(e); }),
-                on_close: Arc::new(move || { let _ = ctx.send(()); }),
+                on_data: Arc::new(move |d| {
+                    let _ = dtx.send(d.to_vec());
+                }),
+                on_error: Arc::new(move |e| {
+                    let _ = etx.send(e);
+                }),
+                on_close: Arc::new(move || {
+                    let _ = ctx.send(());
+                }),
             };
             let profile = Profile { host: pty.path.clone(), serial: Some(cfg), ..Profile::new(models::Protocol::Serial) };
             (SerialClient::new(&profile, cb), drx, erx, crx)

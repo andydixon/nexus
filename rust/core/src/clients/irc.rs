@@ -478,14 +478,14 @@ impl Client {
             st.connected = false;
             r
         };
-        if let Err(e) = result {
-            if !was_closing {
-                let msg = e.to_string();
-                self.emit(Event { kind: "error".into(), text: msg.clone(), ..Default::default() });
-                (self.cfg.on_error)(msg.clone());
-                if let Some(ready) = ready {
-                    let _ = ready.send(Err(msg));
-                }
+        if let Err(e) = result
+            && !was_closing
+        {
+            let msg = e.to_string();
+            self.emit(Event { kind: "error".into(), text: msg.clone(), ..Default::default() });
+            (self.cfg.on_error)(msg.clone());
+            if let Some(ready) = ready {
+                let _ = ready.send(Err(msg));
             }
         }
         if was_connected {
@@ -498,8 +498,7 @@ impl Client {
             Some(connector) => connector()?,
             None => {
                 let addr = format!("{}:{}", self.cfg.server, self.cfg.port);
-                let tcp = dial(&self.cfg.server, self.cfg.port, self.cfg.connect_timeout)
-                    .map_err(|e| format!("dial tcp {addr}: {e}"))?;
+                let tcp = dial(&self.cfg.server, self.cfg.port, self.cfg.connect_timeout).map_err(|e| format!("dial tcp {addr}: {e}"))?;
                 tcp.set_read_timeout(Some(READ_POLL))?;
                 tcp.set_write_timeout(Some(self.cfg.connect_timeout))?;
                 let _ = tcp.set_nodelay(true);
@@ -571,10 +570,7 @@ impl Client {
                 if ping_sent && self.st().last_pong.elapsed() > PING_DELAY + PING_TIMEOUT {
                     return Err("timed out waiting for a requested PING response".into());
                 }
-                let id = std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap_or_default()
-                    .as_nanos();
+                let id = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_nanos();
                 write(&mut stream, &encode("PING", &[&id.to_string()]))?;
                 last_ping = Instant::now();
                 ping_sent = true;
@@ -637,11 +633,7 @@ impl Client {
             }
             "322" => {
                 if m.params.len() >= 4 {
-                    let room = RoomInfo {
-                        name: m.param(1).into(),
-                        users: m.param(2).parse().unwrap_or(0),
-                        topic: m.param(3).into(),
-                    };
+                    let room = RoomInfo { name: m.param(1).into(), users: m.param(2).parse().unwrap_or(0), topic: m.param(3).into() };
                     let mut st = self.st();
                     if st.list_rooms.len() < MAX_ROOM_LIST_ENTRIES {
                         st.list_rooms.push(room);
@@ -668,11 +660,7 @@ impl Client {
             st.ready.take()
         };
         let host = if self.cfg.server.contains(':') { format!("[{}]", self.cfg.server) } else { self.cfg.server.clone() };
-        self.emit(Event {
-            kind: "system".into(),
-            text: format!("Connected to {host}:{}", self.cfg.port),
-            ..Default::default()
-        });
+        self.emit(Event { kind: "system".into(), text: format!("Connected to {host}:{}", self.cfg.port), ..Default::default() });
         self.identify_with_nickserv();
         if !self.cfg.auto_join_rooms.is_empty() {
             let _ = self.send("JOIN", &[&self.cfg.auto_join_rooms.join(",")]);
@@ -747,11 +735,7 @@ impl Client {
         let from = m.source.clone();
         if !from.is_empty() {
             let mut st = self.st();
-            let ch = st.channels.entry(fold(&room)).or_insert_with(|| Channel {
-                name: room.clone(),
-                topic: String::new(),
-                users: Vec::new(),
-            });
+            let ch = st.channels.entry(fold(&room)).or_insert_with(|| Channel { name: room.clone(), topic: String::new(), users: Vec::new() });
             add_user(ch, &from);
         }
         if self.is_me(&from) {
@@ -856,14 +840,7 @@ impl Client {
         if let Some(ch) = self.st().channels.get_mut(&fold(room)) {
             ch.topic = topic.to_string();
         }
-        self.emit(Event {
-            kind: "topic".into(),
-            target: room.into(),
-            from: m.source.clone(),
-            text: topic.into(),
-            topic: topic.into(),
-            ..Default::default()
-        });
+        self.emit(Event { kind: "topic".into(), target: room.into(), from: m.source.clone(), text: topic.into(), topic: topic.into(), ..Default::default() });
         self.emit_rooms();
     }
 
@@ -1060,10 +1037,7 @@ mod tests {
     fn remember_room_membership_tracks_confirmed_channels() {
         let updates = Arc::new(Mutex::new(Vec::new()));
         let log = updates.clone();
-        let client = Client::new(Config {
-            on_rooms_changed: Arc::new(move |rooms| log.lock().unwrap().push(rooms.join(","))),
-            ..Default::default()
-        });
+        let client = Client::new(Config { on_rooms_changed: Arc::new(move |rooms| log.lock().unwrap().push(rooms.join(","))), ..Default::default() });
         client.remember_room_membership("#One", true);
         client.remember_room_membership("#two", true);
         client.remember_room_membership("#one", true);
@@ -1095,11 +1069,7 @@ mod tests {
     fn event_serialises_like_go() {
         let e = Event { kind: "users".into(), target: "#a".into(), timestamp: 5, ..Default::default() };
         assert_eq!(serde_json::to_string(&e).unwrap(), r##"{"type":"users","target":"#a","timestamp":5}"##);
-        let e = Event {
-            kind: "rooms".into(),
-            rooms: vec![RoomInfo { name: "#a".into(), topic: String::new(), users: 0 }],
-            ..Default::default()
-        };
+        let e = Event { kind: "rooms".into(), rooms: vec![RoomInfo { name: "#a".into(), topic: String::new(), users: 0 }], ..Default::default() };
         assert_eq!(serde_json::to_string(&e).unwrap(), r##"{"type":"rooms","timestamp":0,"rooms":[{"name":"#a"}]}"##);
     }
 
@@ -1236,10 +1206,7 @@ mod tests {
         srv.expect("NAMES #a");
         client.handle_input("#a", "/mode #a +i").unwrap();
         srv.expect("MODE #a +i");
-        assert_eq!(
-            client.handle_input(SERVER_TARGET, "hi").unwrap_err().to_string(),
-            "select a room or use /msg <nick> <message>"
-        );
+        assert_eq!(client.handle_input(SERVER_TARGET, "hi").unwrap_err().to_string(), "select a room or use /msg <nick> <message>");
         assert_eq!(client.handle_input("#a", "/msg bob").unwrap_err().to_string(), "/msg requires a target and message");
         client.handle_input("", "/help").unwrap();
         assert!(wait_for(&rx, |e| e.kind == "system").text.starts_with("Commands: /join"));
@@ -1269,10 +1236,7 @@ mod tests {
     fn remote_close_reports_error_and_close() {
         let errors = Arc::new(Mutex::new(Vec::new()));
         let log = errors.clone();
-        let (client, listener, rx, closes) = harness(Config {
-            on_error: Arc::new(move |e| log.lock().unwrap().push(e)),
-            ..Default::default()
-        });
+        let (client, listener, rx, closes) = harness(Config { on_error: Arc::new(move |e| log.lock().unwrap().push(e)), ..Default::default() });
         let c = client.clone();
         let connecting = std::thread::spawn(move || c.connect());
         let mut srv = accept(&listener);

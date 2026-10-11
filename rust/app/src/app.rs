@@ -41,17 +41,43 @@ pub enum Prompt {
 /// Modal dialogs owned by the main window.
 pub enum Dialog {
     /// A profile already has a live session.
-    Reuse { profile: String, existing: String },
+    Reuse {
+        profile: String,
+        existing: String,
+    },
     /// Unencrypted VNC without an SSH tunnel.
-    DirectVnc { profile: String },
-    ConfirmClose { session: String },
-    ConfirmDisconnectMany { sessions: Vec<String> },
-    Rename { session: String, name: String },
-    Broadcast { picks: Vec<(String, String, bool)> },
+    DirectVnc {
+        profile: String,
+    },
+    ConfirmClose {
+        session: String,
+    },
+    ConfirmDisconnectMany {
+        sessions: Vec<String>,
+    },
+    Rename {
+        session: String,
+        name: String,
+    },
+    Broadcast {
+        picks: Vec<(String, String, bool)>,
+    },
     /// Guided help for an auth or host-key failure.
-    Guided { session: String, title: String, body: String, known_hosts: bool },
-    Delete { profiles: Vec<String> },
-    Input { title: String, label: String, value: String, then: InputThen },
+    Guided {
+        session: String,
+        title: String,
+        body: String,
+        known_hosts: bool,
+    },
+    Delete {
+        profiles: Vec<String>,
+    },
+    Input {
+        title: String,
+        label: String,
+        value: String,
+        then: InputThen,
+    },
 }
 
 pub enum InputThen {
@@ -205,7 +231,9 @@ impl App {
 
     /// Registers a just-opened session as a pane (and a tab unless it's a split child).
     pub fn add_session(&mut self, id: &str, tab: bool) {
-        let Some(info) = self.s.svc.sessions.info(id) else { return };
+        let Some(info) = self.s.svc.sessions.info(id) else {
+            return;
+        };
         let profile = self.s.svc.sessions.profile(id);
         let view = self.view_for(&info, profile.as_ref());
         self.s.panes.insert(id.into(), Pane { info, view, recording: false, local_exited: false, connected_since: None, highlight_until: 0.0 });
@@ -224,7 +252,8 @@ impl App {
         };
         if !skip_checks {
             let live = self.s.panes.values().find(|pn| {
-                pn.info.profile_id == id && matches!(self.s.session_state(&pn.info.id), Some(SessionState::Connected | SessionState::Connecting | SessionState::Reconnecting))
+                pn.info.profile_id == id
+                    && matches!(self.s.session_state(&pn.info.id), Some(SessionState::Connected | SessionState::Connecting | SessionState::Reconnecting))
             });
             if let Some(pn) = live {
                 self.dialog = Some(Dialog::Reuse { profile: id.into(), existing: pn.info.id.clone() });
@@ -365,10 +394,10 @@ impl App {
 
     fn mark_activity(&mut self, session: &str) {
         let active = self.s.active.clone();
-        if let Some(t) = self.s.tabs.iter_mut().find(|t| t.id == session || t.split.as_ref().is_some_and(|sp| sp.sessions().iter().any(|x| x == session))) {
-            if active.as_deref() != Some(&t.id) {
-                t.activity = true;
-            }
+        if let Some(t) = self.s.tabs.iter_mut().find(|t| t.id == session || t.split.as_ref().is_some_and(|sp| sp.sessions().iter().any(|x| x == session)))
+            && active.as_deref() != Some(&t.id)
+        {
+            t.activity = true;
         }
     }
 
@@ -467,7 +496,9 @@ impl App {
                 p.info.error = error.into();
             }
         }
-        let Some(p) = self.s.pane_mut(session) else { return };
+        let Some(p) = self.s.pane_mut(session) else {
+            return;
+        };
         let local = p.info.protocol == Protocol::Local;
         match state {
             SessionState::Connected => {
@@ -477,7 +508,9 @@ impl App {
                     let _ = self.s.svc.sessions.write(session, format!("{cmd}\n").as_bytes());
                     self.run_local = None;
                 }
-                let Some(p) = self.s.pane_mut(session) else { return };
+                let Some(p) = self.s.pane_mut(session) else {
+                    return;
+                };
                 p.local_exited = false;
                 p.connected_since = Some(chrono::Local::now());
                 // The PTY was created before the view knew its size: send it now.
@@ -520,7 +553,6 @@ impl App {
                     self.add_session(&sid, true);
                     self.s.info(format!("Connecting to {name}…"));
                 }
-                Request::ConnectLocal => self.connect_local(),
                 Request::ReloadProfiles => self.s.reload_profiles(),
                 Request::ReloadPreferences => {
                     self.s.prefs = self.s.svc.preferences();
@@ -528,26 +560,14 @@ impl App {
                     self.theme = theme_for(&self.s.prefs.theme);
                     theme::apply(&self.s.ctx, self.theme);
                 }
-                Request::QuickConnect => self.quick.open(),
-                Request::Settings(t) => self.settings.open(t),
-                Request::SshKeys => self.keys.open(),
                 Request::ExportEncrypted(ids) => self.transfer.export_encrypted(ids),
                 Request::ImportEncrypted => self.transfer.import_encrypted(),
-                Request::ExportJson => self.transfer.export_json(),
-                Request::ImportJson => self.transfer.import_json(),
-                Request::Recordings => self.recordings.open(),
-                Request::Snippets => self.snippets.open(),
-                Request::Triggers => self.triggers.open(),
                 Request::Sftp(id) => self.sftp.toggle(&id),
-                Request::PortForwards(id) => self.forwards.open(&id),
                 Request::SendToActive(text) => match self.s.focused_session() {
                     Some(id) if self.s.session_state(&id) == Some(SessionState::Connected) => self.send_input(&id, text.as_bytes()),
                     _ => self.s.error("No active connected session"),
                 },
                 Request::Write(id, data) => self.send_input(&id, &data),
-                Request::Disconnect(id) => self.close_session(&id),
-                Request::CommandPalette => self.palette = Some(chrome::Palette::default()),
-                Request::About => self.settings.open(SettingsTab::About),
             }
         }
     }
@@ -754,7 +774,9 @@ impl App {
     // --- screenshot automation ---------------------------------------------------------
 
     fn screenshot(&mut self, ctx: &egui::Context) {
-        let Some((path, frames)) = &mut self.screenshot else { return };
+        let Some((path, frames)) = &mut self.screenshot else {
+            return;
+        };
         *frames += 1;
         if *frames < 40 {
             std::thread::sleep(std::time::Duration::from_millis(15));
@@ -824,26 +846,33 @@ impl eframe::App for App {
         if std::mem::take(&mut self.resize_sidebar) {
             panel = panel.exact_size(width);
         }
-        let side = panel
-            .min_size(180.0)
-            .max_size(500.0)
-            .resizable(true)
-            .frame(egui::Frame::NONE.fill(t.dock))
-            .show(ui, |ui| sidebar::ui(self, ui));
+        let side = panel.min_size(180.0).max_size(500.0).resizable(true).frame(egui::Frame::NONE.fill(t.dock)).show(ui, |ui| sidebar::ui(self, ui));
         let w = side.response.rect.width().round() as i64;
         if (w - self.s.prefs.sidebar_width).abs() > 2 && !ctx.input(|i| i.pointer.any_down()) {
             self.s.prefs.sidebar_width = w;
             let _ = self.s.svc.save_preferences(&self.s.prefs);
         }
         if self.editor.is_open() {
-            egui::Panel::right("editor").default_size(460.0).min_size(380.0).max_size(800.0).resizable(true).frame(egui::Frame::NONE.fill(t.dock).inner_margin(6)).show(ui, |ui| {
-                self.editor.ui(ui, &mut self.s);
-            });
+            egui::Panel::right("editor")
+                .default_size(460.0)
+                .min_size(380.0)
+                .max_size(800.0)
+                .resizable(true)
+                .frame(egui::Frame::NONE.fill(t.dock).inner_margin(6))
+                .show(ui, |ui| {
+                    self.editor.ui(ui, &mut self.s);
+                });
         } else if let Some(id) = self.sftp.open_for().map(String::from) {
             if self.s.pane(&id).is_some() {
-                egui::Panel::right("sftp").default_size(380.0).min_size(280.0).max_size(800.0).resizable(true).frame(egui::Frame::NONE.fill(t.dock).inner_margin(6)).show(ui, |ui| {
-                    self.sftp.ui(ui, &mut self.s);
-                });
+                egui::Panel::right("sftp")
+                    .default_size(380.0)
+                    .min_size(280.0)
+                    .max_size(800.0)
+                    .resizable(true)
+                    .frame(egui::Frame::NONE.fill(t.dock).inner_margin(6))
+                    .show(ui, |ui| {
+                        self.sftp.ui(ui, &mut self.s);
+                    });
             } else {
                 self.sftp.close(&id);
             }

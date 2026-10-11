@@ -17,9 +17,7 @@ use std::sync::{Arc, OnceLock};
 /// The shared tokio runtime for async protocol stacks (russh). Blocking clients use threads.
 pub fn rt() -> &'static tokio::runtime::Runtime {
     static RT: OnceLock<tokio::runtime::Runtime> = OnceLock::new();
-    RT.get_or_init(|| {
-        tokio::runtime::Builder::new_multi_thread().worker_threads(2).enable_all().thread_name("nexus-net").build().expect("tokio runtime")
-    })
+    RT.get_or_init(|| tokio::runtime::Builder::new_multi_thread().worker_threads(2).enable_all().thread_name("nexus-net").build().expect("tokio runtime"))
 }
 
 pub type DataFn = Arc<dyn Fn(&[u8]) + Send + Sync>;
@@ -81,11 +79,7 @@ impl TcpConn {
         TcpConn { stream: std::sync::Mutex::new(None), on_error, on_close }
     }
 
-    pub(crate) fn connect(
-        self: &Arc<Self>,
-        stream: std::net::TcpStream,
-        mut on_read: impl FnMut(&[u8]) + Send + 'static,
-    ) -> crate::Result<()> {
+    pub(crate) fn connect(self: &Arc<Self>, stream: std::net::TcpStream, mut on_read: impl FnMut(&[u8]) + Send + 'static) -> crate::Result<()> {
         let mut reader = stream.try_clone()?;
         {
             let mut guard = self.stream.lock().unwrap();
@@ -148,10 +142,7 @@ pub(crate) fn is_latin1(encoding: &str) -> bool {
 /// UTF-8 → ISO 8859-1. Like Go's charmap encoder, input that isn't valid UTF-8 or holds a
 /// character above U+00FF is returned unchanged.
 pub(crate) fn utf8_to_latin1(data: &[u8]) -> Vec<u8> {
-    std::str::from_utf8(data)
-        .ok()
-        .and_then(|s| s.chars().map(|c| u8::try_from(c).ok()).collect())
-        .unwrap_or_else(|| data.to_vec())
+    std::str::from_utf8(data).ok().and_then(|s| s.chars().map(|c| u8::try_from(c).ok()).collect()).unwrap_or_else(|| data.to_vec())
 }
 
 /// ISO 8859-1 → UTF-8 (every byte maps to the code point of the same value).

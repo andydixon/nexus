@@ -117,7 +117,10 @@ impl Triggers {
         }
         let lines = complete_lines(self.buffers.entry(session.to_owned()).or_default(), data);
         let mut highlight = false;
-        let label = s.pane(session).map(|p| if p.info.tab_name.is_empty() { p.info.profile_name.clone() } else { p.info.tab_name.clone() }).unwrap_or_else(|| session.to_owned());
+        let label = s
+            .pane(session)
+            .map(|p| if p.info.tab_name.is_empty() { p.info.profile_name.clone() } else { p.info.tab_name.clone() })
+            .unwrap_or_else(|| session.to_owned());
         let mut fired: Vec<(String, String)> = vec![];
         for line in &lines {
             let clean = strip_ansi(line);
@@ -191,7 +194,11 @@ impl Triggers {
                     ui.vertical(|ui| {
                         ui.label(RichText::new(if r.name.is_empty() { &r.pattern } else { &r.name }).font(theme::semibold(13.0)));
                         let action = ACTIONS.iter().find(|a| a.0 == r.action).map_or(r.action.as_str(), |a| a.1);
-                        let meta = format!("{} · {action} · {}", if r.is_regex { "Regex" } else { "Text" }, if r.case_sensitive { "Case-sensitive" } else { "Case-insensitive" });
+                        let meta = format!(
+                            "{} · {action} · {}",
+                            if r.is_regex { "Regex" } else { "Text" },
+                            if r.case_sensitive { "Case-sensitive" } else { "Case-insensitive" }
+                        );
                         ui.label(RichText::new(meta).size(11.5).color(t.text_dim));
                     });
                     ui.label(RichText::new(&r.pattern).font(theme::mono(12.0)).color(if r.is_regex && r.re.is_none() { t.danger } else { t.text }));
