@@ -159,6 +159,8 @@ impl Triggers {
         let mut open = self.open;
         egui::Window::new(format!("{}  Trigger Rules", icon::LIGHTNING))
             .id(egui::Id::new("triggers"))
+            .pivot(egui::Align2::CENTER_CENTER)
+            .default_pos(ctx.content_rect().center())
             .open(&mut open)
             .collapsible(false)
             .default_size([620.0, 380.0])

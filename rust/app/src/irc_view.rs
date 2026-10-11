@@ -191,7 +191,12 @@ impl IrcView {
     pub fn on_event(&mut self, event: irc::Event) {
         match route(&event) {
             Route::Rooms => {
+                // Show the first room once auto-join lands, rather than leaving the server log up.
+                let first = self.joined.is_empty() && self.active == SERVER;
                 self.joined = event.rooms;
+                if first && let Some(r) = self.joined.first().map(|r| r.name.clone()) {
+                    self.set_active(&r);
+                }
                 for r in self.joined.clone() {
                     self.target(&r.name);
                 }

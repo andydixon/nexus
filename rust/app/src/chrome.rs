@@ -436,6 +436,7 @@ enum Cmd {
     Theme(ThemeKind),
     About,
     Fullscreen,
+    Sftp(String),
 }
 
 /// Fuzzy subsequence match with bonuses for consecutive and leading hits (utils.js fuzzyMatch).
@@ -503,14 +504,29 @@ fn commands(app: &App) -> Vec<(Cmd, String, &'static str, &'static str, String)>
     if app.s.focused_session().and_then(|f| app.s.pane(&f)).is_some_and(|p| matches!(p.view, View::Terminal(_))) {
         v.push((Cmd::SplitRight, "Split Pane Right".into(), "Terminal", icon::SQUARE_SPLIT_HORIZONTAL, keys("Mod+Shift+D")));
         v.push((Cmd::SplitDown, "Split Pane Down".into(), "Terminal", icon::SQUARE_SPLIT_VERTICAL, keys("Mod+Shift+E")));
+        if let Some(id) = app.s.focused_session().filter(|f| app.s.pane(f).is_some_and(|p| p.info.protocol == Protocol::Ssh)) {
+            v.push((Cmd::Sftp(id), "SFTP Browser".into(), "Terminal", icon::FOLDER_OPEN, String::new()));
+        }
         v.push((Cmd::Clear, "Clear Terminal".into(), "Terminal", icon::ERASER, String::new()));
         v.push((Cmd::Reset, "Reset Terminal".into(), "Terminal", icon::ARROW_COUNTER_CLOCKWISE, String::new()));
     }
     v
 }
 
+/// Runs the palette command with this label (case-insensitive); false when there is none.
+pub fn run_labelled(app: &mut App, ctx: &egui::Context, label: &str) -> bool {
+    match commands(app).into_iter().find(|c| c.1.eq_ignore_ascii_case(label)) {
+        Some(c) => {
+            run(app, ctx, c.0);
+            true
+        }
+        None => false,
+    }
+}
+
 fn run(app: &mut App, ctx: &egui::Context, c: Cmd) {
     match c {
+        Cmd::Sftp(id) => app.s.request(Request::Sftp(id)),
         Cmd::Connect(id) => app.connect_profile(&id, false),
         Cmd::NewProfile(p) => app.s.request(Request::NewProfile { protocol: Some(p), folder: String::new() }),
         Cmd::Quick => app.quick.open(),

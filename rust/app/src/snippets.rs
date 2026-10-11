@@ -104,6 +104,8 @@ impl Snippets {
         let mut open = self.open;
         egui::Window::new(format!("{}  Snippets", icon::CODE))
             .id(egui::Id::new("snippets"))
+            .pivot(egui::Align2::CENTER_CENTER)
+            .default_pos(ctx.content_rect().center())
             .open(&mut open)
             .collapsible(false)
             .default_size([720.0, 440.0])

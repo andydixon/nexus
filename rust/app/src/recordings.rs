@@ -183,6 +183,8 @@ impl Recordings {
         let mut open = self.open;
         egui::Window::new(format!("{}  Session Recordings", icon::RECORD))
             .id(egui::Id::new("recordings"))
+            .pivot(egui::Align2::CENTER_CENTER)
+            .default_pos(ctx.content_rect().center())
             .open(&mut open)
             .collapsible(false)
             .default_size([640.0, 440.0])
@@ -298,6 +300,8 @@ impl Recordings {
         let mut open = true;
         egui::Window::new(format!("{}  {}", icon::PLAY_CIRCLE, p.title))
             .id(egui::Id::new("rec-playback"))
+            .pivot(egui::Align2::CENTER_CENTER)
+            .default_pos(ctx.content_rect().center())
             .open(&mut open)
             .collapsible(false)
             .default_size([820.0, 520.0])

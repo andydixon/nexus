@@ -23,8 +23,14 @@ pub struct Options {
     /// Open a window at startup: editor, quick, settings[:tab], keys, snippets, triggers,
     /// recordings, palette, export, import (screenshot checks).
     pub open: Option<String>,
-    /// Connect a saved profile (by name or id) at startup.
-    pub connect: Option<String>,
+    /// Connect saved profiles (by name or id) at startup.
+    pub connect: Vec<String>,
+    /// Command-palette actions (by label) to run once sessions have had time to connect.
+    pub actions: Vec<String>,
+    /// Replies to the first credential prompts, in order (screenshots of token-protected sessions).
+    pub answers: Vec<String>,
+    /// How long to wait before taking the screenshot.
+    pub shot_delay: std::time::Duration,
 }
 
 /// Errors from worker threads, drained into toasts each frame.
@@ -108,8 +114,10 @@ pub struct App {
     pub tabs_ui: tabs::TabsUi,
     pub latency: Option<(String, Result<i64, String>)>,
     pub update: Option<nexus_core::updater::UpdateInfo>,
-    screenshot: Option<(PathBuf, u32)>,
+    screenshot: Option<(PathBuf, std::time::Instant, std::time::Duration)>,
     shot_settle: u32,
+    actions: Vec<String>,
+    answers: Vec<String>,
     run_local: Option<(String, Option<String>)>,
     /// Apply `prefs.sidebar_width` to the panel on the next frame (after Settings changed it).
     resize_sidebar: bool,
@@ -155,13 +163,15 @@ impl App {
             tabs_ui: Default::default(),
             latency: None,
             update: None,
-            screenshot: opts.screenshot.map(|p| (p, 0)),
+            screenshot: opts.screenshot.map(|p| (p, std::time::Instant::now(), opts.shot_delay)),
             shot_settle: 0,
+            actions: opts.actions,
+            answers: opts.answers,
             run_local: opts.run_local.map(|c| (c, None)),
             resize_sidebar: false,
         };
-        if let Some(c) = opts.connect.as_deref() {
-            match app.s.profiles.iter().find(|p| p.id == c || p.display_name == c).map(|p| p.id.clone()) {
+        for c in &opts.connect {
+            match app.s.profiles.iter().find(|p| &p.id == c || &p.display_name == c).map(|p| p.id.clone()) {
                 Some(id) => app.connect_profile(&id, true),
                 None => eprintln!("--connect: no profile named {c:?}"),
             }
@@ -479,6 +489,9 @@ impl App {
                 self.s.success(format!("Recording saved ({:.0}s, {events} events)", duration));
             }
             Event::SftpProgress { session, progress } => self.sftp.on_progress(&session, progress),
+            Event::SecretPrompt { session, title, message, reply } if !self.answers.is_empty() => {
+                let _ = (session, title, message, reply.send(self.answers.remove(0)));
+            }
             Event::SecretPrompt { session, title, message, reply } => {
                 self.prompts.push_back(Prompt::Secret { session, title, message, value: String::new(), reply });
             }
@@ -807,11 +820,21 @@ impl App {
     // --- screenshot automation ---------------------------------------------------------
 
     fn screenshot(&mut self, ctx: &egui::Context) {
-        let Some((path, frames)) = &mut self.screenshot else {
+        let Some((path, started, delay)) = &mut self.screenshot else {
             return;
         };
-        *frames += 1;
-        if *frames < 40 {
+        let (elapsed, delay) = (started.elapsed(), *delay);
+        if !self.actions.is_empty() && elapsed >= delay / 2 {
+            for a in std::mem::take(&mut self.actions) {
+                if !chrome::run_labelled(self, ctx, &a) {
+                    eprintln!("--do: no palette command {a:?}");
+                }
+            }
+            ctx.request_repaint();
+            return;
+        }
+        let path = path.clone();
+        if elapsed < delay {
             std::thread::sleep(std::time::Duration::from_millis(15));
             ctx.request_repaint();
             return;
@@ -824,7 +847,7 @@ impl App {
         if let Some(img) = shot {
             let [w, h] = img.size;
             let raw: Vec<u8> = img.pixels.iter().flat_map(|p| p.to_array()).collect();
-            if let Err(e) = image::save_buffer(&*path, &raw, w as u32, h as u32, image::ExtendedColorType::Rgba8) {
+            if let Err(e) = image::save_buffer(&path, &raw, w as u32, h as u32, image::ExtendedColorType::Rgba8) {
                 eprintln!("screenshot: {e}");
             }
             ctx.send_viewport_cmd(egui::ViewportCommand::Close);

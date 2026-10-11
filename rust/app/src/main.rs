@@ -33,7 +33,16 @@ use nexus_core::service::Service;
 use std::sync::Arc;
 
 fn main() -> eframe::Result {
-    let mut opts = app::Options { screenshot: None, theme: None, run_local: None, open: None, connect: None };
+    let mut opts = app::Options {
+        screenshot: None,
+        theme: None,
+        run_local: None,
+        open: None,
+        connect: vec![],
+        actions: vec![],
+        answers: vec![],
+        shot_delay: std::time::Duration::from_millis(600),
+    };
     let mut size = [1360.0, 860.0];
     let mut data_dir = None;
     let mut args = std::env::args().skip(1);
@@ -42,7 +51,14 @@ fn main() -> eframe::Result {
             "--theme" => opts.theme = args.next(),
             "--run-local" => opts.run_local = args.next(),
             "--open" => opts.open = args.next(),
-            "--connect" => opts.connect = args.next(),
+            "--connect" => opts.connect.extend(args.next()),
+            "--do" => opts.actions.extend(args.next()),
+            "--answer" => opts.answers.extend(args.next()),
+            "--shot-delay" => {
+                if let Some(ms) = args.next().and_then(|s| s.parse().ok()) {
+                    opts.shot_delay = std::time::Duration::from_millis(ms);
+                }
+            }
             "--screenshot" => opts.screenshot = args.next().map(Into::into),
             // Use another data directory (testing, screenshots, portable installs).
             "--data-dir" => data_dir = args.next(),
@@ -57,7 +73,7 @@ fn main() -> eframe::Result {
             }
             _ => {
                 println!(
-                    "usage: nexus-terminal [--theme pro|midnight|light] [--data-dir DIR] [--connect NAME] [--open WINDOW] [--run-local CMD] [--screenshot out.png] [--size WxH] [--version]"
+                    "usage: nexus-terminal [--theme pro|midnight|light] [--data-dir DIR] [--connect NAME]... [--open WINDOW] [--do PALETTE-COMMAND]... [--answer SECRET]... [--shot-delay MS] [--run-local CMD] [--screenshot out.png] [--size WxH] [--version]"
                 );
                 return Ok(());
             }
