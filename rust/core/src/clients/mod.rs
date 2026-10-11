@@ -42,6 +42,7 @@ impl Callbacks {
 pub mod raw;
 pub mod serial;
 pub mod telnet;
+pub mod vnc;
 
 /// Called with protocol negotiation debug messages (Go's `onDebug`).
 pub type DebugFn = Arc<dyn Fn(String) + Send + Sync>;
