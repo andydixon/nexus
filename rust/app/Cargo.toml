@@ -2,6 +2,23 @@
 name = "nexus"
 version.workspace = true
 edition.workspace = true
+build = "build.rs"
+
+[[bin]]
+name = "nexus-terminal"
+path = "src/main.rs"
 
 [dependencies]
 nexus-core = { path = "../core" }
+eframe = { version = "0.36", default-features = false, features = ["default_fonts", "glow", "wayland", "x11", "accesskit", "persistence"] }
+egui = "0.36"
+egui-phosphor = "0.14"
+rfd = "0.17"
+image = { version = "0.25", default-features = false, features = ["png"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+regex = "1"
+alacritty_terminal = "0.26.0"
+
+[build-dependencies]
+winresource = "0.1"
