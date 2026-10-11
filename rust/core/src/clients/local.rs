@@ -17,34 +17,6 @@ pub fn default_shell() -> String {
     std::env::var("SHELL").ok().filter(|s| !s.is_empty()).unwrap_or_else(|| "/bin/sh".into())
 }
 
-fn is_utf8_locale(v: &str) -> bool {
-    let v = v.to_lowercase();
-    v.contains("utf-8") || v.contains("utf8")
-}
-
-/// TERM=xterm-256color and a UTF-8 character locale, keeping the user's environment otherwise.
-pub fn local_shell_env(env: &mut Vec<(String, String)>) {
-    let set = |env: &mut Vec<(String, String)>, k: &str, v: &str| {
-        env.retain(|(ek, _)| ek != k);
-        env.push((k.into(), v.into()));
-    };
-    set(env, "TERM", "xterm-256color");
-    let get = |k: &str| env.iter().find(|(ek, _)| ek == k).map(|(_, v)| v.clone());
-    let effective = get("LC_ALL").or_else(|| get("LC_CTYPE")).or_else(|| get("LANG"));
-    if effective.as_deref().is_some_and(is_utf8_locale) {
-        return;
-    }
-    let locale = if cfg!(target_os = "macos") { "en_US.UTF-8" } else { "C.UTF-8" };
-    let key = if get("LC_ALL").is_some() {
-        "LC_ALL"
-    } else if get("LC_CTYPE").is_some() || get("LANG").is_some() {
-        "LC_CTYPE"
-    } else {
-        "LANG"
-    };
-    set(env, key, locale);
-}
-
 struct Running {
     master: Box<dyn MasterPty + Send>,
     writer: Box<dyn Write + Send>,
@@ -77,11 +49,12 @@ impl LocalShell {
             .openpty(PtySize { rows: st.3, cols: st.2, pixel_width: 0, pixel_height: 0 })
             .map_err(|e| format!("failed to start shell {:?}: {e}", self.shell))?;
         let mut cmd = CommandBuilder::new(&self.shell);
-        let mut env: Vec<(String, String)> = std::env::vars().collect();
-        local_shell_env(&mut env);
         cmd.env_clear();
-        for (k, v) in env {
-            cmd.env(k, v);
+        let env = crate::terminalenv::local_shell_env(std::env::vars().map(|(k, v)| format!("{k}={v}")).collect());
+        for kv in env {
+            if let Some((k, v)) = kv.split_once('=') {
+                cmd.env(k, v);
+            }
         }
         cmd.cwd(&st.1);
         let mut child = pair.slave.spawn_command(cmd).map_err(|e| format!("failed to start shell {:?}: {e}", self.shell))?;
@@ -214,13 +187,5 @@ mod tests {
             std::thread::sleep(Duration::from_millis(20));
         }
         assert_eq!(sh.working_directory(), PathBuf::from("/"));
-    }
-
-    #[test]
-    fn env_gets_term_and_utf8() {
-        let mut e = vec![("LANG".to_string(), "C".to_string())];
-        local_shell_env(&mut e);
-        assert!(e.contains(&("TERM".into(), "xterm-256color".into())));
-        assert!(e.iter().any(|(k, v)| k == "LC_CTYPE" && v.ends_with("UTF-8")));
     }
 }

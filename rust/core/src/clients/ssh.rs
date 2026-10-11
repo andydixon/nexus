@@ -158,16 +158,6 @@ async fn connect_agent() -> Result<Agent> {
     }
 }
 
-/// Profile env vars plus a UTF-8 LC_CTYPE when the profile sets no locale (Go's SSHEnvVars).
-fn ssh_env_vars(env: &std::collections::BTreeMap<String, String>) -> std::collections::BTreeMap<String, String> {
-    let mut out: std::collections::BTreeMap<String, String> =
-        env.iter().filter(|(k, _)| !k.trim().is_empty()).map(|(k, v)| (k.trim().to_string(), v.clone())).collect();
-    if !["LC_ALL", "LC_CTYPE", "LANG"].iter().any(|k| out.contains_key(*k)) {
-        out.insert("LC_CTYPE".into(), if cfg!(target_os = "macos") { "en_US.UTF-8" } else { "C.UTF-8" }.into());
-    }
-    out
-}
-
 fn is_totp_prompt(q: &str) -> bool {
     let q = q.to_lowercase();
     [
@@ -496,7 +486,7 @@ impl SshClient {
         let handle = Arc::new(handle);
 
         let ch = handle.channel_open_session().await.map_err(|e| format!("failed to create SSH session: {e}"))?;
-        for (k, v) in ssh_env_vars(&sc.env_vars) {
+        for (k, v) in crate::terminalenv::ssh_env_vars(&sc.env_vars) {
             let _ = ch.set_env(false, k, v).await;
         }
         let term = if sc.terminal_type.is_empty() { "xterm-256color" } else { &sc.terminal_type };
