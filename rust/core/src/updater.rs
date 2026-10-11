@@ -8,7 +8,7 @@ use std::io::Read;
 use std::time::Duration;
 
 /// Manifest URL template; expand with [`expand_update_url`].
-pub const DEFAULT_UPDATE_URL: &str = "https://alchementary.co.uk/download/link/manifest-{platform}-{arch}.json";
+pub const DEFAULT_UPDATE_URL: &str = "https://dixon.cx/downloads/nexus/manifest-{platform}-{arch}.json";
 const GITHUB_OWNER: &str = "nexus-terminal";
 const GITHUB_REPO: &str = "nexus-terminal";
 const USER_AGENT: &str = "NexusTerminal-UpdateChecker";

@@ -13,9 +13,7 @@
 > - **Not verified:** macOS builds (need Apple's C toolchain), running on Windows or macOS, the OS
 >   keychain on a real desktop session (none was available, so the go-keyring compatibility in §3
 >   is untested), IRC, GitHub and VNC against real servers (tested against fakes), serial hardware.
-> - **Still open:** the update/release URLs still point at alchementary.co.uk (§7) — to move to
->   dixon.cx, change `DEFAULT_UPDATE_URL`/`DEFAULT_RELEASE_BASE_URL` in `rust/release.sh` and
->   `DEFAULT_UPDATE_URL` in `rust/core/src/updater.rs`.
+> - **Update URLs:** moved to `https://dixon.cx/downloads/nexus` (§7).
 
 Goal: rebuild Alchementary Link in Rust as **Nexus Terminal**, a single Rust application in the
 style of Leviathan Desktop (`../leviathan/rust`).
@@ -274,7 +272,7 @@ undoes it and migrates the data.
 | Keychain service | `AlchementaryLink` | `NexusTerminal` |
 | Export file | `.link`, "Link Export" | `.nexus`, "Nexus Export" (import accepts both) |
 | Updater User-Agent and GitHub fallback | `AlchementaryLink-UpdateChecker`, `alchementary-link` | `NexusTerminal-UpdateChecker`, `nexus-terminal` |
-| Update and release URLs | `alchementary.co.uk/download/link/…` | ⚠ **Decision needed:** the new URL for the manifest and downloads |
+| Update and release URLs | `alchementary.co.uk/download/link/…` | `dixon.cx/downloads/nexus/…` |
 | Icons and brand mark | `alchementary-link-*.png`, ">_ AlchementaryLink" | Restore the `nexus-terminal-*` icons from git history (pre-`1a380a0`), redrawn for the egui title bar |
 
 **First-run migration** (in `nexus-core`, before the database is opened):

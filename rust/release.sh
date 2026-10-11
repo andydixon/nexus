@@ -15,8 +15,8 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$HERE/.." && pwd)"
 cd "$HERE"
 
-DEFAULT_UPDATE_URL="https://alchementary.co.uk/download/link/manifest-{platform}-{arch}.json"
-DEFAULT_RELEASE_BASE_URL="https://alchementary.co.uk/download/link"
+DEFAULT_UPDATE_URL="https://dixon.cx/downloads/nexus/manifest-{platform}-{arch}.json"
+DEFAULT_RELEASE_BASE_URL="https://dixon.cx/downloads/nexus"
 
 log()  { echo -e "\033[0;32m[nexus]\033[0m $1"; }
 warn() { echo -e "\033[1;33m[nexus]\033[0m $1"; }
