@@ -2321,6 +2321,8 @@ dependencies = [
  "num-traits",
  "png",
  "tiff",
+ "zune-core",
+ "zune-jpeg",
 ]
 
 [[package]]
@@ -2817,7 +2819,10 @@ dependencies = [
  "argon2 0.5.3",
  "base64 0.22.1",
  "chrono",
+ "des",
+ "flate2",
  "hmac 0.13.0",
+ "image",
  "keyring",
  "libc",
  "portable-pty",
