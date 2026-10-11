@@ -6,6 +6,9 @@
 //! - `write`/`resize`/`close` are callable from any thread; `close` is idempotent and must not
 //!   fire `on_close` re-entrantly while holding locks.
 
+pub mod github;
+pub mod irc;
+
 use std::sync::Arc;
 
 pub type DataFn = Arc<dyn Fn(&[u8]) + Send + Sync>;

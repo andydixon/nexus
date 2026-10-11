@@ -14,3 +14,9 @@ aes-gcm = "0.10"
 rand = "0.8"
 base64 = "0.22"
 keyring = { version = "3", features = ["apple-native", "windows-native", "async-secret-service", "tokio", "crypto-rust"] }
+ureq = "3"
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+webpki-roots = "1"
+
+[dev-dependencies]
+tiny_http = "0.12"
