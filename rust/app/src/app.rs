@@ -18,6 +18,8 @@ use std::sync::{Arc, Mutex, mpsc};
 pub struct Options {
     pub screenshot: Option<PathBuf>,
     pub theme: Option<String>,
+    /// Open a local terminal at startup and type this command once connected (testing aid).
+    pub run_local: Option<String>,
 }
 
 /// Errors from worker threads, drained into toasts each frame.
@@ -77,6 +79,7 @@ pub struct App {
     pub update: Option<nexus_core::updater::UpdateInfo>,
     screenshot: Option<(PathBuf, u32)>,
     shot_settle: u32,
+    run_local: Option<(String, Option<String>)>,
 }
 
 const fn sc(m: Modifiers, k: Key) -> KeyboardShortcut {
@@ -121,7 +124,13 @@ impl App {
             update: None,
             screenshot: opts.screenshot.map(|p| (p, 0)),
             shot_settle: 0,
+            run_local: opts.run_local.map(|c| (c, None)),
         };
+        if let Some((_, sid)) = &mut app.run_local {
+            let id = app.s.svc.connect_local();
+            *sid = Some(id.clone());
+            app.add_session(&id, true);
+        }
         if let Some(from) = &svc.config.migrated_from {
             app.s.success(format!("Imported your Alchementary Link data from {}", from.display()));
         }
@@ -426,6 +435,13 @@ impl App {
         let local = p.info.protocol == Protocol::Local;
         match state {
             SessionState::Connected => {
+                if let Some((cmd, Some(sid))) = &self.run_local
+                    && sid == session
+                {
+                    let _ = self.s.svc.sessions.write(session, format!("{cmd}\n").as_bytes());
+                    self.run_local = None;
+                }
+                let Some(p) = self.s.pane_mut(session) else { return };
                 p.local_exited = false;
                 p.connected_since = Some(chrono::Local::now());
                 // The PTY was created before the view knew its size: send it now.

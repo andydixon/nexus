@@ -31,36 +31,34 @@ pub fn ui(app: &mut App, ui: &mut Ui) {
     });
     ui.add_space(4.0);
 
-    let footer_h = 36.0 + if app.sidebar.selected.is_empty() { 0.0 } else { 62.0 };
-    let list_h = (ui.available_height() - footer_h).max(60.0);
-    egui::ScrollArea::vertical().max_height(list_h).auto_shrink([false, false]).show(ui, |ui| list(app, ui));
-
-    if !app.sidebar.selected.is_empty() {
-        bulk_bar(app, ui);
-    }
-    // Footer actions.
-    ui.separator();
-    ui.horizontal(|ui| {
-        ui.add_space(6.0);
-        if widgets::icon_button(ui, icon::PLUS, "New connection (Ctrl/Cmd+N)").clicked() {
-            app.s.request(Request::NewProfile { protocol: None, folder: String::new() });
-        }
-        if widgets::icon_button(ui, icon::COMMAND, "Command palette (Ctrl/Cmd+K)").clicked() {
-            app.palette = Some(Default::default());
-        }
-        if widgets::icon_button(ui, icon::DOWNLOAD_SIMPLE, "Import profiles").clicked() {
-            app.s.request(Request::ImportEncrypted);
-        }
-        if widgets::icon_button(ui, icon::UPLOAD_SIMPLE, "Export profiles").clicked() {
-            app.s.request(Request::ExportEncrypted(vec![]));
-        }
-        if widgets::icon_button(ui, icon::FILM_STRIP, "Recordings").clicked() {
-            app.recordings.open();
-        }
-        if widgets::icon_button(ui, icon::GEAR, "Settings (Ctrl/Cmd+,)").clicked() {
-            app.settings.open(crate::state::SettingsTab::General);
-        }
+    // Footer actions, pinned to the bottom of the sidebar.
+    egui::Panel::bottom("sidebar-footer").exact_size(36.0).frame(egui::Frame::NONE.fill(t.dock)).show_inside(ui, |ui| {
+        ui.horizontal_centered(|ui| {
+            ui.add_space(6.0);
+            if widgets::icon_button(ui, icon::PLUS, "New connection (Ctrl/Cmd+N)").clicked() {
+                app.s.request(Request::NewProfile { protocol: None, folder: String::new() });
+            }
+            if widgets::icon_button(ui, icon::COMMAND, "Command palette (Ctrl/Cmd+K)").clicked() {
+                app.palette = Some(Default::default());
+            }
+            if widgets::icon_button(ui, icon::DOWNLOAD_SIMPLE, "Import profiles").clicked() {
+                app.s.request(Request::ImportEncrypted);
+            }
+            if widgets::icon_button(ui, icon::UPLOAD_SIMPLE, "Export profiles").clicked() {
+                app.s.request(Request::ExportEncrypted(vec![]));
+            }
+            if widgets::icon_button(ui, icon::FILM_SLATE, "Recordings").clicked() {
+                app.recordings.open();
+            }
+            if widgets::icon_button(ui, icon::GEAR, "Settings (Ctrl/Cmd+,)").clicked() {
+                app.settings.open(crate::state::SettingsTab::General);
+            }
+        });
     });
+    if !app.sidebar.selected.is_empty() {
+        egui::Panel::bottom("sidebar-bulk").frame(egui::Frame::NONE.fill(t.dock).inner_margin(6)).show_inside(ui, |ui| bulk_bar(app, ui));
+    }
+    egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| list(app, ui));
 }
 
 fn list(app: &mut App, ui: &mut Ui) {

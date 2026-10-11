@@ -196,10 +196,36 @@ pub fn install_fonts(ctx: &egui::Context) {
     // The bundled Inter has its private-use-area cmap stripped, so phosphor's icons win there.
     fonts.families.entry(FontFamily::Proportional).or_default().insert(0, "Inter".into());
     fonts.families.entry(FontFamily::Monospace).or_default().insert(0, "JetBrainsMono".into());
+    // CJK and other scripts the bundled fonts lack: borrow a system font if one is installed.
+    if let Some(bytes) = system_fallback_font() {
+        fonts.font_data.insert("system-fallback".into(), Arc::new(FontData::from_owned(bytes)));
+        for fam in [FontFamily::Proportional, FontFamily::Monospace] {
+            fonts.families.entry(fam).or_default().push("system-fallback".into());
+        }
+    }
     let mut semibold = vec!["Inter-SemiBold".to_owned()];
     semibold.extend(fonts.families[&FontFamily::Proportional].iter().cloned());
     fonts.families.insert(FontFamily::Name("semibold".into()), semibold);
     ctx.set_fonts(fonts);
+}
+
+/// The first wide-coverage (CJK) system font found on this machine.
+fn system_fallback_font() -> Option<Vec<u8>> {
+    let candidates: &[&str] = if cfg!(target_os = "macos") {
+        &["/System/Library/Fonts/PingFang.ttc", "/System/Library/Fonts/Hiragino Sans GB.ttc", "/Library/Fonts/Arial Unicode.ttf", "/System/Library/Fonts/Supplemental/Arial Unicode.ttf"]
+    } else if cfg!(windows) {
+        &["C:\\Windows\\Fonts\\msyh.ttc", "C:\\Windows\\Fonts\\YuGothM.ttc", "C:\\Windows\\Fonts\\msgothic.ttc", "C:\\Windows\\Fonts\\malgun.ttf"]
+    } else {
+        &[
+            "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+            "/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc",
+            "/usr/share/fonts/google-noto-cjk/NotoSansCJK-Regular.ttc",
+            "/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf",
+            "/usr/share/fonts/wenquanyi/wqy-microhei/wqy-microhei.ttc",
+            "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
+        ]
+    };
+    candidates.iter().find_map(|p| std::fs::read(p).ok())
 }
 
 pub fn semibold(size: f32) -> FontId {
