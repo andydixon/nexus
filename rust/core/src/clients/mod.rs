@@ -6,6 +6,7 @@
 //! - `write`/`resize`/`close` are callable from any thread; `close` is idempotent and must not
 //!   fire `on_close` re-entrantly while holding locks.
 
+pub mod local;
 pub mod sftp;
 pub mod ssh;
 
