@@ -13,4 +13,5 @@ argon2 = "0.5"
 aes-gcm = "0.10"
 rand = "0.8"
 base64 = "0.22"
+ureq = "3"
 keyring = { version = "3", features = ["apple-native", "windows-native", "async-secret-service", "tokio", "crypto-rust"] }
