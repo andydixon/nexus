@@ -2,7 +2,7 @@
 
 use nexus_core::models::{Profile, Protocol, SessionState};
 use nexus_core::secrets::{Keychain, Secrets, Vault};
-use nexus_core::sessions::{Event, Manager, Prompt};
+use nexus_core::sessions::{Event, Manager};
 use nexus_core::storage::Store;
 use std::io::{Read, Write};
 use std::net::TcpListener;
@@ -23,10 +23,6 @@ fn manager(name: &str) -> (Arc<Manager>, mpsc::Receiver<Event>, std::path::PathB
         let _ = tx.lock().unwrap().send(e);
     }));
     (m, rx, dir)
-}
-
-fn no_prompt() -> Prompt {
-    Arc::new(|_| Err("no prompt in tests".into()))
 }
 
 /// Waits for an event matching `f`, answering host-key prompts with `accept`.
@@ -101,7 +97,7 @@ fn raw_session_and_auto_reconnect() {
     p.host = "127.0.0.1".into();
     p.port = port as i64;
     p.raw.as_mut().unwrap().auto_reconnect = true;
-    let id = m.connect(p, no_prompt());
+    let id = m.connect(p);
     wait(&rx, |e| state(e, SessionState::Connected));
     m.raw_write_text(&id, "ping").unwrap();
     wait(&rx, |e| matches!(e, Event::RawData { direction, data, .. } if direction == "recv" && data.starts_with(b"ping")).then_some(()));
@@ -124,7 +120,7 @@ fn connect_failure_reports_error_state() {
     let mut p = Profile::new(Protocol::Telnet);
     p.host = "127.0.0.1".into();
     p.port = port as i64;
-    let id = m.connect(p, no_prompt());
+    let id = m.connect(p);
     let err = wait(&rx, |e| state(e, SessionState::Error));
     assert!(err.starts_with(&id) && err.len() > id.len() + 1, "{err}");
     let _ = std::fs::remove_dir_all(dir);

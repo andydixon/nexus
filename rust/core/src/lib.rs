@@ -9,6 +9,7 @@ pub mod keyfiles;
 pub mod models;
 pub mod recording;
 pub mod secrets;
+pub mod service;
 pub mod sessions;
 pub mod sshconfig;
 pub mod storage;

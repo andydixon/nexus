@@ -192,8 +192,9 @@ impl Manager {
 
     /// Opens a session for `profile` and connects it on a worker thread. Returns the session id
     /// immediately; progress arrives as `Event::State`.
-    pub fn connect(self: &Arc<Self>, profile: Profile, prompt: Prompt) -> String {
+    pub fn connect(self: &Arc<Self>, profile: Profile) -> String {
         let id = new_id();
+        let prompt = self.prompt_for(&id, "Credentials Required", Duration::from_secs(300));
         let info = SessionInfo {
             id: id.clone(),
             profile_id: profile.id.clone(),
@@ -740,13 +741,13 @@ impl Manager {
 
     /// Closes and re-opens a session from its profile, keeping the tab name and pin; returns the
     /// new session id.
-    pub fn reconnect(self: &Arc<Self>, id: &str, prompt: Prompt) -> Result<String> {
+    pub fn reconnect(self: &Arc<Self>, id: &str) -> Result<String> {
         let s = self.sessions.lock().unwrap().remove(id).ok_or_else(|| format!("sessions: session {id:?} not found"))?;
         let (profile, tab, pinned, proto, shell) = (s.profile.clone(), s.info.tab_name.clone(), s.info.pinned, s.info.protocol, s.local_shell.clone());
         self.close_session(s);
         let new = match (proto, profile) {
             (Protocol::Local, _) => self.connect_local(&shell),
-            (_, Some(p)) => self.connect(p, prompt),
+            (_, Some(p)) => self.connect(p),
             _ => return err("sessions: nothing to reconnect".into()),
         };
         let _ = self.with(&new, |s| {
