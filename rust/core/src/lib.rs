@@ -4,6 +4,7 @@
 pub mod clients;
 pub mod config;
 pub mod exportimport;
+pub mod ircformat;
 pub mod keyfiles;
 pub mod models;
 pub mod recording;
