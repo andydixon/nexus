@@ -1,0 +1,248 @@
+\guidepart{accent}{Get going}{Get going}
+  {From zero to connected before your tea goes cold.}
+  {\partitem{\iRocket}{Five-minute start}
+   \partitem{\iMap}{The grand tour}
+   \partitem{\iList}{Profiles: your address book}}
+
+% =========================================================================================
+\chapter{Five-minute start}\label{ch:start}
+\chapmeta{5 minutes}{You'll be connected to something and know the one shortcut that matters}
+
+\begin{tldr}
+Install it, open it, press \keys{\mod+N}, fill in a host, hit \ui{Create \& Connect}. Done.
+Lost? Press \keys{\mod+K} and type what you want.
+\end{tldr}
+
+\section{Install it}
+
+Grab the zip for your machine from \code{dixon.cx/downloads/nexus}. They're named
+\code{NexusTerminal-<os>-<arch>.zip}, so a modern Mac wants \code{darwin-arm64} and most PCs want \code{amd64}.
+
+\begin{description}
+  \item[\iDesktop\enspace Windows] Unzip it and run \code{NexusTerminal-windows-amd64.exe}. No installer, no admin rights,
+    nothing in the registry. Pop it somewhere sensible like \code{C:\textbackslash Tools} and pin it to the taskbar.
+  \item[\iDesktop\enspace macOS] Unzip it and drag \code{NexusTerminal-darwin-arm64.app} into \ui{Applications}. If macOS
+    grumbles that it can't check the developer, right-click the app, choose \ui{Open}, then \ui{Open} again. You only
+    have to do that once.
+  \item[\iDesktop\enspace Linux] Unzip it and run \code{./install.sh}. It copies \code{nexus-terminal} into
+    \code{~/.local/bin} and adds a launcher entry with the icon, so it turns up in your app menu.
+    (Make sure \code{~/.local/bin} is on your \code{PATH}.)
+\end{description}
+
+\begin{sidequest}[Build it yourself]
+It's a single Rust program. With Rust installed: \code{cd rust \&\& cargo run --release}. The finished binary lands in
+\code{rust/target/release/nexus-terminal}. The build guide in \code{docs/build-and-release.md} has the full story.
+\end{sidequest}
+
+\section{Open it}
+
+The first time you open Nexus Terminal you get a calm, empty welcome screen. Three buttons, four shortcuts. That's it.
+
+\shot{welcome.png}{The welcome screen. Your saved connections will live down the left; here there are a few already.}
+
+\begin{headsup}[Coming from Alchementary Link?]
+Nexus Terminal spots your old data on first run and copies your profiles, vault and recordings across
+automatically. You'll see a little toast saying so. Your old data is left exactly where it was.
+The details are in \hyperref[ch:move]{Moving house} on p.\,\pageref{ch:move}.
+\end{headsup}
+
+\section{Make your first connection}
+
+\begin{enumerate}
+  \item Click \ui{New Connection}, or press \keys{\mod+N}.
+  \item Pick the protocol along the top: \proto[teal]{SSH}, \proto[amber]{Telnet}, \proto[violet]{RAW TCP},
+        \proto[slate]{GitHub}, \proto[rose]{VNC}, \proto[amber]{IRC} or \proto[accent]{Serial}.
+  \item Fill in the \ui{General} bit: a \ui{Display Name} you'll recognise, the \ui{Host}, the \ui{Port}
+        and your \ui{Username}.
+  \item Click \ui{Create \& Connect}.
+\end{enumerate}
+
+That's genuinely it. A tab opens, you log in, and next time it's one click in the sidebar.
+
+\crop{editor-new.png}{1515}{40}{0}{70}{0.52\linewidth}{A brand-new SSH profile. Only the top few fields are needed to get going.}
+
+\begin{quickwin}
+Click \ui{Test} before you save. Nexus Terminal checks the host and port are reachable and tells you the
+round-trip time. If that fails, no amount of password-fiddling will help, so it's a great first check.
+\end{quickwin}
+
+\section{Two shortcuts for impatient people}
+
+\subsection{Quick Connect}
+Press \keys{\mod+Shift+Q}.
+For a one-off session you don't want to save. Pick SSH, Telnet, RAW, IRC or Serial, type the host (or serial
+device), hit \kbd{Enter}. Nothing gets saved.
+
+\crop{quick.png}{951}{620}{946}{481}{0.5\linewidth}{Quick Connect. In, out, nobody gets hurt.}
+
+\subsection{Local terminal}
+Click \ui{Local Machine} at the top of the sidebar (or \ui{Local} on the welcome screen) for a shell on
+\emph{this} computer. When you type \code{exit}, the tab says \code{[Exited - press enter to restart]}.
+Press \kbd{Enter} and you've got a fresh shell in the same tab.
+
+\section{The one shortcut to rule them all}
+
+\begin{center}
+\begin{tcolorbox}[enhanced, width=0.8\linewidth, arc=10pt, boxrule=0pt, colback=ink, fontupper=\color{white},
+  halign=center, top=10pt, bottom=10pt, drop fuzzy shadow]
+{\scalebox{2.4}{\keys{\mod+K}}}\par\vspace{6pt}\par\vspace{4pt}
+{\color{white!70!ink} The command palette. If you remember nothing else, remember this.}
+\end{tcolorbox}
+\end{center}
+
+Type a few letters of \emph{anything}: a connection name, a tab, ``theme'', ``split'', ``lock'', ``snippets''. Use
+\kbd{↑}\kbd{↓} to pick, \kbd{Enter} to go, \kbd{Esc} to bail. It's fuzzy, so ``atl'' finds \emph{atlas} and
+``sft'' finds the \emph{SFTP Browser}.
+
+\crop{palette.png}{755}{732}{733}{154}{0.72\linewidth}{The command palette: every connection, tab and action in one searchable list.}
+
+\begin{quickwin}[Your five-minute checklist]
+\begin{checklist}
+  \item Installed and opened Nexus Terminal
+  \item Opened a \ui{Local Machine} tab and typed \code{exit}, then \kbd{Enter} to get it back
+  \item Made a profile with \keys{\mod+N} and clicked \ui{Test}
+  \item Connected to it
+  \item Opened the palette with \keys{\mod+K} and found something by typing three letters
+\end{checklist}
+All ticked? You're officially more productive than you were five minutes ago. \iConfetti
+\end{quickwin}
+
+% =========================================================================================
+\chapter{The grand tour}\label{ch:tour}
+\chapmeta{4 minutes}{You'll know what every bit of the window is for}
+
+\begin{tldr}
+Connections on the left. Sessions in tabs across the top. The terminal in the middle. Status along the bottom.
+Everything else is one \keys{\mod+K} away.
+\end{tldr}
+
+\begin{annotated}{ssh.png}
+  \callout{1}{0.124}{0.022}
+  \callout{2}{0.66}{0.022}
+  \callout{3}{0.888}{0.022}
+  \callout{4}{0.22}{0.067}
+  \callout{5}{0.03}{0.152}
+  \callout{6}{0.53}{0.063}
+  \callout{7}{0.966}{0.063}
+  \callout{8}{0.62}{0.42}
+  \callout{9}{0.16}{0.945}
+  \callout{10}{0.26}{0.985}
+  \callout{11}{0.86}{0.985}
+\end{annotated}
+
+\begin{multicols}{2}\small
+\begin{description}[leftmargin=0pt, labelsep=0.4em]
+  \item[\num{1} Menus] \menu{File}, \menu{Session}, \menu{View} and \menu{Help}. Drag the title bar to move the
+        window; double-click it to maximise.
+  \item[\num{2} Palette] The search box is the command palette. Click it or press \keys{\mod+K}.
+  \item[\num{3} Light/dark] Flip between the dark and light themes in one click.
+  \item[\num{4} Search] Fuzzy-search your connections by name, host, tag or protocol.
+  \item[\num{5} Sections] \ui{Local Machine}, \ui{Favourites} \iStar, \ui{Recent} (your last five), then one section
+        per group. Click a header to fold it away.
+  \item[\num{6} Tabs] One per session, with a coloured state dot, protocol badge and close button. SSH tabs get a
+        little \iFolder{} for files. A blue dot means ``new output while you weren't looking''.
+  \item[\num{7} New \& broadcast] \ui{+} opens a new connection; \iBroadcast{} toggles broadcast mode.
+  \item[\num{8} Workspace] Your terminal (or IRC chat, VNC desktop, GitHub list…). Split it into panes, too.
+  \item[\num{9} Footer] New connection, palette, import, export, recordings and settings.
+  \item[\num{10} Status] State, protocol and live latency for SSH. Shows \ui{REC} while recording and
+        \ui{BROADCAST} when broadcasting.
+  \item[\num{11} Sessions \& vault] How many sessions are connected and whether the vault is locked. Click the vault to
+        open security settings.
+\end{description}
+\end{multicols}
+
+\begin{protip}
+Drag the right-hand edge of the sidebar to make it wider or narrower. Toasts (the little pop-up messages in the
+top-right) tidy themselves away after a few seconds; click \ui{×} if you're impatient.
+\end{protip}
+
+\section{Three looks}
+
+Nexus Terminal comes in \ui{Pro} (the default, a soft charcoal), \ui{Midnight} (darker, bluer, for 2\,a.m.
+deploys) and \ui{Light} (for sunny days and projectors). Switch with the \iBulb{} button in the title bar, the
+\menu{View} menu, or type ``theme'' into the palette.
+
+\shotpair{welcome-midnight.png}{Midnight}{ssh-light.png}{Light, with a session open}
+
+The \emph{terminal} has its own colour schemes too: eleven of them, including \ui{Dracula}, \ui{Nord},
+\ui{Tokyo Night}, \ui{Catppuccin Mocha} and \ui{Rosé Pine}. Those live in \menu{Settings\then Terminal} and the \menu{View} menu.
+
+% =========================================================================================
+\chapter{Profiles: your address book}\label{ch:profiles}
+\chapmeta{6 minutes}{You'll keep dozens of connections tidy without thinking about it}
+
+\begin{tldr}
+A \emph{profile} is a saved connection. Give it a name and a group, star the ones you use daily, and
+right-click for everything else. Ctrl-click to select lots at once.
+\end{tldr}
+
+\section{Create, edit, copy}
+
+\begin{itemize}
+  \item \textbf{New:} \ui{+} in the sidebar footer or tab strip, \keys{\mod+N}, or right-click a group header and choose
+        \ui{New connection in …} (it lands in that group automatically).
+  \item \textbf{Edit:} double-click a profile, or right-click\then\ui{Edit}. The editor slides in on the right.
+  \item \textbf{Copy:} right-click\then\ui{Duplicate}. Great for ``same as web-01 but web-02''.
+  \item \textbf{Delete:} right-click\then\ui{Delete}. This also deletes the saved passwords for that profile.
+\end{itemize}
+
+\crop{editor-ssh.png}{1515}{40}{0}{70}{0.52\linewidth}{Editing an existing SSH profile. The editor scrolls; sections are grouped so you can ignore most of them.}
+
+\subsection{What goes in a profile}
+
+Every profile has the same \ui{General} section, then sections specific to its protocol (Part 2 covers each
+one). The common bits are:
+
+\renewcommand\arraystretch{1.4}
+\begin{tabularx}{\linewidth}{@{}>{\leavevmode\heavy\color{ink}}p{32mm}X@{}}
+  \toprule
+  Display Name & What you'll see in the sidebar. Make it obvious: ``db-primary'', not ``server 3''.\\
+  Host / Port  & Where to connect. Serial profiles have a \ui{Device} instead.\\
+  Group        & Pick an existing group or type a new name to create one.\\
+  Description  & One line shown on hover.\\
+  Terminal     & Font, size (8–36), scrollback (0–100\,000 lines) and cursor style, just for this profile.\\
+  Tags \& Notes & Comma-separated tags (searchable!) and free-form notes for future-you.\\
+  \bottomrule
+\end{tabularx}
+
+Each protocol adds its own sections underneath. Here are four of them side by side; Part~2 goes through each one.
+
+\begin{center}
+\newcommand\mini[2]{\begin{minipage}[t]{0.24\linewidth}\centering\includegraphics[width=\linewidth, trim=1515 600 0 70, clip]{img/#1}\par\vspace{2pt}{\scriptsize\color{muted}#2}\end{minipage}}
+\mini{editor-telnet.png}{Telnet}\hfill\mini{editor-raw.png}{RAW TCP}\hfill\mini{editor-vnc.png}{VNC}\hfill\mini{editor-irc.png}{IRC}
+\end{center}
+
+\begin{protip}[Tags are secretly brilliant]
+Tag things by where they live and what they do (\code{eu-west}, \code{db}, \code{customer-x}). The sidebar search
+matches tags, so typing ``db'' instantly narrows hundreds of profiles to the database servers.
+\end{protip}
+
+\section{Favourites, groups and Recent}
+
+\begin{itemize}
+  \item Right-click\then\ui{Add to Favourites} pins a profile into the \ui{\iStar\ Favourites} section at the top.
+  \item \ui{Recent} always shows the last five things you connected to. You don't have to do anything.
+  \item Groups are just the \ui{Group} field. No group? It goes in \ui{Ungrouped}.
+\end{itemize}
+
+\section{Do lots at once}
+
+Hold \kbd{Ctrl} (\kbd{\ph{E1C4}} on a Mac) and click several profiles. A bar appears at the bottom of the sidebar:
+
+\begin{center}\small
+\begin{tabular}{@{}ll@{\qquad}ll@{}}
+  \ui{Connect all} & opens them all in tabs & \ui{Move group} & moves them (blank = Ungrouped)\\
+  \ui{Disconnect}  & closes their sessions & \ui{Delete} & deletes them (asks first)\\
+  \ui{Tags}        & add or replace tags & \ui{Clear} & forget the selection\\
+\end{tabular}
+\end{center}
+
+\begin{quickwin}
+Select every web server, choose \ui{Connect all}, then turn on broadcast (\keys{\mod+Shift+B}). You're now typing into
+all of them at once. Chapter~\ref{ch:repeat} has the details, and the safety advice.
+\end{quickwin}
+
+\section{``It's already open…''}
+
+Click a profile that already has a live session and Nexus Terminal asks whether to \ui{Use Existing} (jump to that
+tab), open a \ui{New Connection} alongside it, or \ui{Cancel}. No more accidental duplicate sessions.

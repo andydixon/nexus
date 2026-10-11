@@ -1,0 +1,234 @@
+\guidepart{violet}{Work faster}{Work faster}
+  {Fewer clicks, less typing, more getting on with it.}
+  {\partitem{\iSplit}{Tabs and split panes}
+   \partitem{\iKeyboard}{Terminal superpowers}
+   \partitem{\iWand}{Never type it twice}
+   \partitem{\iFolder}{Files: SFTP and drag-and-drop}
+   \partitem{\iArrows}{Port forwards}
+   \partitem{\iFilm}{Recordings}}
+
+% =========================================================================================
+\chapter{Tabs and split panes}\label{ch:tabs}
+\chapmeta{4 minutes}{You'll juggle a dozen sessions without losing any of them}
+
+\begin{tldr}
+Right-click a tab for everything. \keys{\mod+Shift+D} splits right, \keys{\mod+Shift+E} splits down.
+\keys{\mod+1} to \keys{\mod+9} jump straight to a tab.
+\end{tldr}
+
+\section{Tabs}
+
+\begin{description}
+  \item[Move] Drag tabs about, or right-click\then\ui{Move Left} / \ui{Move Right}.
+  \item[Pin] Right-click\then\ui{Pin}. Pinned tabs stay at the front.
+  \item[Rename] Right-click\then\ui{Rename}. ``prod DB, DON'T TOUCH'' is a perfectly valid tab name.
+  \item[Duplicate] Opens another session to the same profile.
+  \item[Reconnect] Does what it says.
+  \item[Peek] Hover a tab for its name, host, state and when it connected.
+  \item[Close] The \ui{×}, \keys{\mod+W}, or right-click\then\ui{Close}. Connected tabs ask first (you can turn that
+        off in Settings).
+  \item[Switch] \keys{\mod+Tab} and \keys{\mod+Shift+Tab}, or \keys{\mod+1} to \keys{\mod+9}.
+\end{description}
+
+Lots of tabs? Scroll the tab strip with your mouse wheel or trackpad.
+
+\section{Split panes}
+
+Want two sessions side by side? Split the focused pane right with \keys{\mod+Shift+D} or down with
+\keys{\mod+Shift+E} (also in the \menu{Session} menu, the right-click menu and the palette). The new pane asks
+what to open: \ui{Local Machine} or any of your terminal profiles.
+
+\shot{split.png}{A fresh split. Pick what goes in the new pane.}
+
+Drag a divider to resize. Click \ui{×} on a pane's header to close it and its neighbour takes the space. Closing
+the tab closes every pane in it.
+
+\begin{quickwin}
+Split right, open \code{htop} on one side and tail a log on the other. Now you look like a hacker in a film.
+\end{quickwin}
+
+% =========================================================================================
+\chapter{Terminal superpowers}\label{ch:terminal}
+\chapmeta{4 minutes}{You'll copy, search and scroll like you've used it for years}
+
+\begin{tldr}
+Select to copy, \keys{\mod+F} to search, Ctrl/\ph{E1C4}-click links. Right-click for the rest.
+\end{tldr}
+
+\section{Keyboard and mouse}
+
+\renewcommand\arraystretch{1.45}
+\begin{tabularx}{\linewidth}{@{}>{\leavevmode\heavy\color{ink}}p{24mm}X@{}}
+  \toprule
+  Copy   & Select text, then \keys{\mod+C}. Nothing selected? \keys{Ctrl+C} interrupts the program as usual.\\
+  Paste  & \keys{\mod+V}. Pastes are bracketed when the program asks for it, so editors won't auto-indent your paste
+           into a staircase.\\
+  Select & Drag for a range, double-click a word, triple-click a line, \kbd{Shift}-click to extend.\\
+  Links  & Hold \kbd{Ctrl} (\kbd{\ph{E1C4}}) and click a URL to open it in your browser.\\
+  Scroll & Mouse wheel, or \keys{Shift+PageUp}, \keys{Shift+PageDown}, \keys{Shift+Home}, \keys{Shift+End}.\\
+  \bottomrule
+\end{tabularx}
+
+\begin{sidequest}[Why does the scroll wheel move the cursor in less?]
+Full-screen programs (\code{less}, \code{vim}, \code{tmux}, \code{byobu}) use the terminal's ``alternate screen'', where the
+wheel sends arrow keys instead of scrolling. Programs with mouse support (\code{htop}, \code{vim} with
+\code{mouse=a}, \code{tmux} mouse mode) get your clicks directly. That's normal terminal behaviour, not a bug.
+\end{sidequest}
+
+\section{The right-click menu}
+
+\ui{Copy}, \ui{Paste}, \ui{Select All}, \ui{Find}, \ui{Send Snippet}, \ui{Port Forwards} (SSH), \ui{Split Right},
+\ui{Split Down}, \ui{Export Output} (saves the whole scrollback as a text file), \ui{Clear} and \ui{Reset}.
+
+\section{Find}
+
+\keys{\mod+F} opens the find bar. Toggle \ui{Aa} for case-sensitive and \ui{.*} for regular expressions.
+\kbd{Enter} for the next match, \keys{Shift+Enter} for the previous one, \kbd{Esc} to close. It shows
+``3 of 17'' so you know where you are.
+
+\section{When the connection drops}
+
+The pane dims and shows a \ui{Disconnected} card with \ui{Reconnect} and \ui{Close}. If auto-reconnect is on,
+it says \ui{Reconnecting…} with a \ui{Cancel} button, and a toast tells you which attempt it's on.
+
+If the problem was a password or host key, you get a friendly dialog explaining what happened, with
+\ui{Retry}, \ui{Edit Profile}, \ui{Known Hosts} (for host-key trouble) and \ui{Close}.
+
+% =========================================================================================
+\chapter{Never type it twice}\label{ch:repeat}
+\chapmeta{6 minutes}{You'll stop retyping the same commands, and let Nexus Terminal watch the logs for you}
+
+\begin{tldr}
+\textbf{Snippets} store commands. \textbf{Broadcast} types into many sessions at once. \textbf{Triggers} watch output and
+tap you on the shoulder.
+\end{tldr}
+
+\section{Snippets: \keys{\mod+Shift+S}}
+
+Save commands you use a lot, with a name, description and folder. Search them, click
+\ui{Send to Session}, and the command is typed into the active session followed by \kbd{Enter}.
+
+\crop{snippets.png}{633}{384}{611}{402}{0.8\linewidth}{The snippet library, organised into folders.}
+
+Snippets can have blanks to fill in:
+
+\begin{itemize}
+  \item \code{\{\{hostname\}\}}, \code{\{\{date\}\}}, \code{\{\{time\}\}} and \code{\{\{timestamp\}\}} are filled in for you.
+  \item Anything else, like \code{\{\{service\}\}}, is asked for when you send it.
+\end{itemize}
+
+So \code{journalctl -fu \{\{service\}\}} asks ``service?'' and tails whichever one you type.
+
+\section{Broadcast: \keys{\mod+Shift+B}}
+
+Turn broadcast on and everything you type goes to \emph{every} connected terminal. The status bar shows
+\ui{BROADCAST} so you can't forget it's on.
+
+\shot{broadcast.png}{Broadcast is on: the status bar says so in no uncertain terms.}
+
+To broadcast to only some sessions, right-click the \iBroadcast{} button (or \menu{Session\then Broadcast
+targets…}), tick the ones you want and click \ui{Apply \& Enable}.
+
+\begin{danger}[With great power…]
+Broadcast doesn't care which tab you \emph{meant}. Double-check the target list before you type anything
+destructive. \code{sudo reboot} into twenty servers is very efficient and very memorable.
+\end{danger}
+
+\section{Triggers: let it watch for you}
+
+\menu{Session\then Trigger Rules} (or the palette). Each rule has a pattern (plain text or a regular
+expression), a case-sensitivity switch, an on/off switch, and an action:
+
+\begin{center}\small
+\begin{tabular}{@{}ll@{}}
+  \ui{Notify} & shows a toast\\
+  \ui{Highlight tab} & briefly outlines the pane\\
+  \ui{Notify + Highlight} & both\\
+  \ui{Sound} & asks your OS for attention (a bouncing dock icon or flashing taskbar button) and shows a toast\\
+\end{tabular}
+\end{center}
+
+\crop{triggers.png}{725}{610}{725}{625}{0.75\linewidth}{Three rules: shout about errors, ping when a build finishes, and one switched off for now.}
+
+Rules check each complete line of output, with colours stripped out first.
+
+\begin{quickwin}
+Add a rule for \code{BUILD SUCCESSFUL} with the \ui{Sound} action, start a long build, and go and make a cup of tea.
+Nexus Terminal will tell you when it's done. (Or \code{(?i)error|fatal} for the opposite.)
+\end{quickwin}
+
+% =========================================================================================
+\chapter{Files: SFTP and drag-and-drop}\label{ch:files}
+\chapmeta{4 minutes}{You'll move files to and from servers without leaving the terminal}
+
+\begin{tldr}
+Click the \iFolder{} on an SSH tab. Or drop a file onto the terminal and choose \ui{Upload}.
+\end{tldr}
+
+\section{The SFTP browser}
+
+Click the \iFolder{} folder icon on an SSH tab, \menu{Session\then SFTP browser}, or type ``sftp'' in the palette.
+It opens in the side dock next to your terminal.
+
+\shot{sftp.png}{Browsing the server's files next to the terminal.}
+
+\begin{itemize}
+  \item Move around with the breadcrumb trail, the \code{..} entry or \ui{Go to path}.
+  \item Upload files; download one or many to a folder you choose.
+  \item Rename, delete (it asks first), make folders, refresh.
+  \item \iStar{} bookmarks the current folder, per profile.
+  \item Ctrl-click (\ph{E1C4}-click) or Shift-click to select several things. Transfers show progress as they go.
+\end{itemize}
+
+\section{Drag and drop}
+
+Drop files onto a terminal and choose:
+
+\begin{description}
+  \item[Upload to current directory] Pick the remote folder (SSH only).
+  \item[Paste contents] Types the file's contents into the terminal, as if you'd typed it.
+\end{description}
+
+The upload picker looks like the SFTP browser but shows folders only, labelled \proto[amber]{READ ONLY} if you can't
+write there and \proto[rose]{NO READ} if you can't look inside. Keyboard fans: \kbd{↑}\kbd{↓} to move, \kbd{Enter} to
+choose, \kbd{Backspace} to go up, \kbd{Esc} to cancel. If the SFTP browser is open, the picker starts in the same folder.
+
+% =========================================================================================
+\chapter{Port forwards}\label{ch:forwards}
+\chapmeta{3 minutes}{You'll reach a database or web app that only listens on the server}
+
+\begin{tldr}
+\emph{Local} forwards bring a remote port to your machine. \emph{Remote} forwards do the opposite.
+\end{tldr}
+
+Forwards saved in an SSH profile (under \ui{Port Forwarding}, with \ui{Active} ticked) start when you connect.
+To manage them on a live session, right-click the terminal\then\ui{Port Forwards}, or \menu{Session\then Port forwards}.
+
+\begin{description}
+  \item[Local \iArrow] Listen on your computer, forward to somewhere the server can reach.
+        Example: \code{127.0.0.1:15432}\then\code{127.0.0.1:5432} lets your desktop database app talk to Postgres on
+        the server as if it were local.
+  \item[Remote \ph{E058}] Ask the server to listen and send connections back to somewhere \emph{your} computer can reach.
+        Great for showing a colleague the dev server running on your laptop.
+\end{description}
+
+Active forwards are listed with an \proto[accent]{L} or \proto[violet]{R} badge and a stop button. Toasts tell you when one
+starts, stops or fails.
+
+% =========================================================================================
+\chapter{Recordings}\label{ch:recordings}
+\chapmeta{2 minutes}{You'll have a replayable record of exactly what happened}
+
+\keys{\mod+Shift+R} starts and stops recording the active session. A red dot appears on the tab and \ui{REC} in
+the status bar. Recordings are standard asciicast v2 files, so other tools (like \code{asciinema}) can play them too.
+
+\crop{recordings.png}{712}{392}{690}{415}{0.75\linewidth}{The recordings browser. Play, delete, or tidy up in bulk.}
+
+The browser (sidebar footer, \menu{Session} menu or palette) shows how many recordings you have and how much space
+they take. Play or delete each one, or use \ui{Clean up} to remove recordings older than 7, 30 or 90 days, or to keep
+the total under 1\,GB or 5\,GB. Playback has play/pause, restart, a seek bar and speed control.
+
+\begin{protip}
+Record the next time you do something fiddly and rare (a database failover, a certificate rotation). Six months
+later, ``how did we do that again?'' has an answer you can literally watch.
+\end{protip}

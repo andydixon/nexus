@@ -1,0 +1,107 @@
+\guidepart{pink}{Make it yours}{Make it yours}
+  {Settings, backups, and moving in from Alchementary Link.}
+  {\partitem{\iGear}{Settings}
+   \partitem{\iUpload}{Import and export}
+   \partitem{\iPlane}{Moving house}}
+
+% =========================================================================================
+\chapter{Settings}\label{ch:settings}
+\chapmeta{3 minutes}{You'll know where every setting lives}
+
+\keys{\mod+,} opens settings (also the \iGear{} in the sidebar footer and \menu{File\then Settings}). Change things,
+then click \ui{Save}.
+
+\begin{center}\begin{minipage}[t]{0.49\linewidth}\crop{settings-general.png}{581}{253}{576}{285}{\linewidth}{General}\end{minipage}\hfill\begin{minipage}[t]{0.49\linewidth}\crop{settings-terminal.png}{581}{253}{576}{285}{\linewidth}{Terminal}\end{minipage}\end{center}
+
+\begin{description}
+  \item[General] App theme (Pro, Midnight, Light), default protocol for new profiles, whether to ask before closing or
+        disconnecting, status bar on or off, sidebar width, and the local shell (leave it empty for the system default,
+        or \ui{Browse…} for one).
+  \item[Terminal] Colour scheme, font, size, scrollback and cursor style. These are the defaults for new profiles;
+        each profile can override them.
+  \item[Security] Keychain and vault status; set up, unlock or lock the vault.
+  \item[Known Hosts] Saved server fingerprints, with first-seen and last-seen times.
+  \item[Help] Built-in help: connection types, shortcuts and troubleshooting, when this guide isn't to hand.
+  \item[About] Version, \ui{Check for Updates} and \ui{Import \textasciitilde/.ssh/config}.
+\end{description}
+
+\crop{settings-help.png}{581}{253}{576}{285}{0.8\linewidth}{The built-in help, for when this guide isn't to hand.}
+
+\section{Updates}
+
+Nexus Terminal checks once at launch. If there's a newer version the status bar says \ui{Update available}; click it to
+see the release notes and a \ui{View release} button. Nothing downloads or installs behind your back.
+
+% =========================================================================================
+\chapter{Import and export}\label{ch:transfer}
+\chapmeta{3 minutes}{You'll back up your profiles, or copy them to another computer}
+
+\begin{tldr}
+\menu{File\then Export profiles…} makes a password-protected \code{.nexus} file. \menu{File\then Import profiles…}
+reads it back. Already have an \code{\textasciitilde/.ssh/config}? Import that too.
+\end{tldr}
+
+\begin{description}
+  \item[Encrypted export] Choose the profiles, set a password, save a \code{.nexus} file. Saved passwords aren't
+        included, so the file is safe to email to yourself.
+  \item[Encrypted import] Pick a \code{.nexus} (or an old \code{.link}) file, enter its password and decide what happens to
+        profiles that already exist: \ui{Skip existing}, \ui{Overwrite existing} or \ui{Create duplicates}.
+  \item[JSON] \ui{Export Profiles (JSON)} and \ui{Import Profiles (JSON)} are in the palette. Tick
+        \ui{Include secrets} to keep proxy passwords and TOTP secrets, which are otherwise left out.
+  \item[OpenSSH config] \menu{File\then Import \textasciitilde/.ssh/config} turns your \code{Host} blocks into profiles,
+        with host names, users, ports, identity files and jump hosts.
+\end{description}
+
+\crop{export.png}{894}{357}{872}{380}{0.55\linewidth}{Exporting profiles. Everything's ticked to start with; untick what you don't want.}
+
+\begin{danger}[JSON with secrets is not encrypted]
+A JSON export with \ui{Include secrets} ticked has those secrets in plain text. Use the encrypted \code{.nexus} export to
+move things between machines.
+\end{danger}
+
+% =========================================================================================
+\chapter{Moving house}\label{ch:move}
+\chapmeta{2 minutes}{You'll know what came over from Alchementary Link and what didn't}
+
+\begin{tldr}
+It's automatic. First run copies your Alchementary Link profiles, vault and recordings. Your old folder is left
+alone. Recreate trigger rules and SFTP bookmarks by hand.
+\end{tldr}
+
+When Nexus Terminal starts for the first time and finds an \code{AlchementaryLink} folder next to where its own data
+goes, it \emph{copies} \code{link.db} to \code{nexus.db}, along with the \code{vault/} and \code{recordings/} folders,
+and shows a toast saying where they came from.
+
+\begin{checklist}
+  \item[\color{green}\iCheck] Profiles, groups, favourites, known hosts, snippets and preferences
+  \item[\color{green}\iCheck] Vault (same master password as before)
+  \item[\color{green}\iCheck] Recordings
+  \item[\color{green}\iCheck] Keychain passwords: picked up the first time each one is needed, then copied across
+  \item[\color{green}\iCheck] Old \code{.link} export files still import
+  \item[\color{rose}\ph{E4F6}] Trigger rules and SFTP bookmarks (they lived in the old app's web storage)
+\end{checklist}
+
+\begin{headsup}
+If a \code{NexusTerminal/nexus.db} already exists (say, from before the Alchementary Link rebrand), it's used as it is
+and nothing is copied.
+\end{headsup}
+
+\section{Where everything lives}
+
+\renewcommand\arraystretch{1.45}
+\begin{tabularx}{\linewidth}{@{}>{\leavevmode\heavy\color{ink}}p{20mm}X@{}}
+  \toprule
+  macOS   & \code{\textasciitilde/Library/Application Support/NexusTerminal}\\
+  Windows & \code{\%APPDATA\%\textbackslash NexusTerminal}\\
+  Linux   & \code{\$XDG\_CONFIG\_HOME/NexusTerminal}, usually \code{\textasciitilde/.config/NexusTerminal}\\
+  \bottomrule
+\end{tabularx}
+
+Inside: \code{nexus.db} (profiles, known hosts, preferences, snippets, IRC state and the audit log),
+\code{vault/vault.json}, \code{recordings/}, \code{triggers.json} and \code{sftp-bookmarks.json}. Keychain entries are
+stored under the service name \code{NexusTerminal}.
+
+\begin{protip}[Try things without touching your real data]
+Start Nexus Terminal with \code{--data-dir /some/other/folder} and it uses that folder instead. Brilliant for
+experiments, demos and a portable install on a USB stick.
+\end{protip}

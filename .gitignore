@@ -32,3 +32,6 @@ vault.json
 
 # Agent worktrees
 .claude/worktrees/
+
+# User guide LaTeX output
+docs/guide/build/

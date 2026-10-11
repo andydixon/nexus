@@ -36,6 +36,7 @@ On first run, Nexus Terminal copies your Alchementary Link profiles, encrypted v
 - Product overview: [docs/overview.md](docs/overview.md)
 - Quick start (shareable): [docs/quick-start.md](docs/quick-start.md)
 - User manual: [docs/user-manual.md](docs/user-manual.md)
+- Illustrated user guide (PDF): [docs/guide/nexus-guide.pdf](docs/guide/nexus-guide.pdf), built from LaTeX in [docs/guide](docs/guide) (`make` there; `tools/screenshots.sh` regenerates the screenshots)
 - Build and release: [docs/build-and-release.md](docs/build-and-release.md)
 
 ## Keyboard shortcuts

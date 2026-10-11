@@ -1,0 +1,273 @@
+\guidepart{teal}{Connect}{Connect to all the things}
+  {Eight ways in. Pick the one you need; skip the rest.}
+  {\partitem{\iTerminal}{SSH: the big one}
+   \partitem{\iUsb}{Serial: cables and consoles}
+   \partitem{\iPlug}{Telnet and RAW TCP}
+   \partitem{\iDesktop}{VNC remote desktops}
+   \partitem{\iChat}{IRC}
+   \partitem{\iGithub}{GitHub}}
+
+% =========================================================================================
+\chapter{SSH: the big one}\label{ch:ssh}
+\chapmeta{10 minutes (or 2 for the basics)}{You'll log in with keys, hop through bastions and never type a 2FA code again}
+
+\begin{tldr}
+Host, username, key, done. Everything else (jump hosts, proxies, forwards, 2FA, login scripts) is optional and
+lives in its own fold-away section of the editor. Open only the ones you need.
+\end{tldr}
+
+\begin{glance}{teal}{SSH}
+  Default port & 22\\
+  Logs in with & Password, public key, keyboard-interactive, SSH agent\\
+  Extras       & SFTP file browser, port forwards, live latency, agent forwarding, TOTP 2FA\\
+  Good for     & Servers, VMs, Raspberry Pis, anything with \code{sshd}\\
+\end{glance}
+
+\section{The two-minute version}
+
+\begin{enumerate}
+  \item \keys{\mod+N}, leave the protocol on \proto[teal]{SSH}.
+  \item \ui{Host}, \ui{Username}. Leave the port on 22 unless you know otherwise.
+  \item Under \ui{Key \& Passphrase}, pick your key from the suggestions (Nexus Terminal lists the keys in your
+        \code{\textasciitilde/.ssh} folder) and check for a little green \ui{Key verified}.
+  \item \ui{Create \& Connect}. The first time, you'll be asked to trust the server's host key. Say yes if you
+        were expecting it.
+\end{enumerate}
+
+\crop{hostkey.png}{842}{720}{845}{589}{0.66\linewidth}{First time connecting? You'll be shown the server's fingerprint. \ui{Accept \& Save} if it's the server you meant.}
+
+\begin{headsup}
+Type the full path to a key if you're not using the suggestions. Nexus Terminal doesn't expand \code{\textasciitilde}
+in that box, so write \code{/home/you/.ssh/id\_ed25519} (or \code{C:\textbackslash Users\textbackslash you\textbackslash .ssh\textbackslash id\_ed25519}).
+\end{headsup}
+
+\section{How it logs in}
+
+Under \ui{Authentication}, tick which \ui{Auth Methods} to try: \ui{Public key}, \ui{Password} and
+\ui{Keyboard-interactive}. Under \ui{SSH Agent}, tick \ui{Use SSH Agent for Authentication} to use keys already
+loaded into \code{ssh-agent} (or Pageant, or the Windows OpenSSH agent).
+
+Every password and passphrase has a \emph{mode}: save it securely, remember it until you quit, or ask every time.
+That's all explained in \hyperref[ch:secrets]{Passwords \& the vault} (p.\,\pageref{ch:secrets}).
+
+\begin{protip}[Agent forwarding]
+Tick \ui{Forward Agent to Remote} (it's \code{ssh -A}) and you can \code{git pull} or hop onwards from the server using
+the keys on \emph{your} machine. Only do it on servers you trust: anyone with root there can use your agent while
+you're connected.
+\end{protip}
+
+\section{Jump hosts: getting through the bastion}
+
+Lots of servers hide behind a bastion. Add one or more hops under \ui{Jump Hosts}, each with its own user, host,
+port and optional key. Nexus Terminal tunnels through them in order, so the chain
+\textit{you\then bastion\then internal-box\then db-primary} is just three rows.
+
+\section{Proxies}
+
+Stuck behind a corporate proxy? Under \ui{Proxy}, choose \ui{SOCKS5} or \ui{HTTP CONNECT} and fill in the host,
+port and (optional) username and password. The proxy is used to reach the SSH server, or the first jump host if
+you have some.
+
+\section{2FA without the phone faff}\label{sec:totp}
+
+If your server asks for a one-time code, paste the Base32 TOTP secret (the text version of the QR code) into
+\ui{TOTP Secret} and hit \ui{Save}. From then on, Nexus Terminal answers the ``Verification code:'' prompt itself.
+\ui{Test} shows today's code so you can check it matches your phone.
+
+\begin{headsup}
+Save the profile first, then save the TOTP secret. And make sure your computer's clock is right: TOTP codes are
+time-based, so a clock that's a minute out will produce wrong codes.
+\end{headsup}
+
+\section{Do things automatically on login}
+
+\begin{description}
+  \item[Startup] A \ui{Startup Command} to run once you're in (say, \code{tmux attach}), plus
+        \ui{Environment Variables} as \code{KEY=VALUE}, one per line.
+  \item[Login Script] For old-school boxes that ask questions. Add steps: \ui{Wait for} some text, then
+        \ui{Send} a reply. Repeat as needed.
+\end{description}
+
+\section{Keeping it alive}
+
+Under \ui{Advanced}: the \ui{Terminal Type}, the \ui{Keepalive Interval} and \ui{Max Missed Keepalives}, compression,
+and \ui{Auto-Reconnect} with a maximum number of attempts (1–20). Reconnection backs off politely: 1\,s, 2\,s,
+4\,s… up to 30\,s.
+
+\begin{sidequest}[What's that number in the status bar?]
+For SSH sessions the status bar shows live latency, the round trip to the server. Green is snappy. If it's
+in the hundreds and your typing feels sticky, it's the network, not you.
+\end{sidequest}
+
+% =========================================================================================
+\chapter{Serial: cables and consoles}\label{ch:serial}
+\chapmeta{4 minutes}{You'll be talking to a switch, router or microcontroller over USB}
+
+\begin{tldr}
+Plug in the adapter, pick the device, match the baud rate. 115200 8N1 is the default and usually right.
+Right-click the tab to send a break or wiggle DTR/RTS.
+\end{tldr}
+
+\begin{glance}{accent}{Serial}
+  Device       & \code{/dev/ttyUSB0}, \code{/dev/cu.usbserial-…} or \code{COM3}\\
+  Defaults     & 115200 baud, 8 data bits, no parity, 1 stop bit, no flow control, CR line endings, DTR and RTS on\\
+  Extras       & Send Break, toggle DTR/RTS, auto-reconnect when the cable comes back\\
+  Good for     & Network gear consoles, Arduinos, ESP32s, Raspberry Pi UARTs, 3D printers\\
+\end{glance}
+
+\crop{editor-serial.png}{1515}{40}{0}{70}{0.52\linewidth}{A serial profile for a switch console at 9600 baud. Click refresh after plugging in an adapter.}
+
+\section{Setting it up}
+
+\begin{description}
+  \item[Device] Pick it from the list (hit refresh after plugging in) or type the path.
+  \item[Line Settings] \ui{Baud Rate} (a preset from 300 to 1\,000\,000, or \ui{Custom}), \ui{Data Bits} (5–8),
+        \ui{Parity} (none, odd, even), \ui{Stop Bits} (1 or 2) and \ui{Flow Control} (none, XON/XOFF, RTS/CTS).
+  \item[Behaviour] \ui{Line Ending}, \ui{Encoding}, \ui{Local Echo} (for devices that don't echo what you type),
+        \ui{Assert DTR on connect}, \ui{Assert RTS on connect} and \ui{Auto-reconnect}.
+\end{description}
+
+\section{While you're connected}
+
+Right-click the tab for \ui{Send Break} (handy for getting into a router's ROMMON) and to toggle \ui{DTR} and
+\ui{RTS} (handy for resetting boards that wire those to reset). Pull the cable out and the session disconnects; with
+auto-reconnect on, it picks up again when you plug it back in.
+
+Serial tabs are proper terminals, so recording, triggers, broadcast, snippets, find and split panes all work.
+
+\begin{headsup}[Gibberish on screen?]
+Garbled characters nearly always mean the baud rate, parity or stop bits don't match the device. Check the
+device's manual. 9600 and 115200 are the usual suspects.
+\end{headsup}
+
+\begin{protip}[Linux and macOS quirks]
+On Linux, add yourself to the \code{dialout} group (\code{uucp} on some distributions) and log out and in again.
+On a Mac, use the \code{/dev/cu.*} device, not \code{/dev/tty.*}.
+\end{protip}
+
+% =========================================================================================
+\chapter{Telnet and RAW TCP}\label{ch:raw}
+\chapmeta{4 minutes}{You'll poke at old kit and raw sockets without reaching for netcat}
+
+\begin{tldr}
+Telnet is a terminal for old devices. RAW is a packet-level conversation with any TCP port, with a hex view.
+\end{tldr}
+
+\section{Telnet}
+
+\begin{glance}{amber}{Telnet}
+  Default port & 23\\
+  Options      & Local echo, line mode, terminal type, encoding (UTF-8, ASCII, ISO 8859-1), line endings, login script\\
+  Extras       & Send Break from the tab menu, \ui{Debug Negotiation} for when options go wrong\\
+\end{glance}
+
+\begin{danger}[Telnet is plain text]
+Everything, including your password, crosses the network unencrypted. Fine on a lab bench, not fine over the
+internet or café Wi-Fi.
+\end{danger}
+
+\section{RAW TCP}
+
+RAW connects to any TCP port and shows you exactly what goes back and forth. Instead of a terminal you get a
+traffic log with \ui{Text}, \ui{Hex} and \ui{Split} views.
+
+\shot{raw.png}{A RAW session to a chatty sensor, with timestamps and direction markers turned on.}
+
+\begin{itemize}
+  \item \textbf{Send bar:} pick \ui{Text}, \ui{Hex} or \ui{Escaped} (\code{\textbackslash r\textbackslash n} and friends),
+        type, press \kbd{Enter}. One-click buttons send \ui{NUL}, \ui{CR}, \ui{LF}, \ui{ETX} and \ui{EOT}.
+  \item \textbf{Presets:} save payloads you send often in the profile under \ui{Payload Presets}, then pick them from
+        \ui{Presets…}.
+  \item \textbf{Capture:} \ui{Pause}, \ui{Clear}, and \ui{Save} (writes the whole conversation as JSON).
+  \item \textbf{Profile options:} encoding (UTF-8, ASCII, Hex), line ending, timestamps, direction, timeouts and
+        auto-reconnect.
+\end{itemize}
+
+\begin{quickwin}
+Point a RAW profile at a web server on port 80 and send \code{HEAD / HTTP/1.0\textbackslash r\textbackslash n\textbackslash r\textbackslash n}
+in \ui{Escaped} mode. Instant HTTP headers, no browser required.
+\end{quickwin}
+
+% =========================================================================================
+\chapter{VNC remote desktops}\label{ch:vnc}
+\chapmeta{4 minutes}{You'll see and drive a remote desktop, safely}
+
+\begin{tldr}
+VNC shows you another computer's screen. Tunnel it through SSH (tick a box), because plain VNC isn't encrypted.
+\end{tldr}
+
+\begin{glance}{rose}{VNC}
+  Default port & 5900 (plus the display number: display \code{:1} is 5901)\\
+  Display      & \ui{View Only}, \ui{Scale to Fit}, \ui{Shared Session}, \ui{Quality (0-9)}\\
+  Security     & Optional SSH tunnel with password, key or agent login\\
+\end{glance}
+
+\shot{vnc.png}{A remote desktop, scaled to fit the tab.}
+
+\section{The toolbar}
+
+Connection state and desktop size on the left. On the right: switch between scaled and 1:1, refresh,
+\ui{Paste Clipboard} (sends your clipboard to the remote machine) and \ui{Ctrl+Alt+Del}. Click the desktop to give
+it your keyboard. Anything the remote machine copies lands on your clipboard automatically.
+
+\section{Tunnel it}
+
+Tick \ui{Enable SSH Tunnel} and fill in the SSH host, port, username and login method. The VNC traffic then
+travels inside an encrypted SSH connection. If you connect to a VNC profile \emph{without} a tunnel, Nexus Terminal
+warns you and offers \ui{Connect Anyway}, \ui{Edit Profile} or \ui{Cancel}.
+
+\begin{headsup}[Connecting to a Mac?]
+Turn on \ui{VNC viewers may control screen with password} in macOS Screen Sharing settings. Nexus Terminal uses
+standard VNC password authentication, not Apple's own login method.
+\end{headsup}
+
+% =========================================================================================
+\chapter{IRC}\label{ch:irc}
+\chapmeta{3 minutes}{You'll be chatting in your project's channels from the same window as your servers}
+
+\begin{tldr}
+Nick, server, rooms to join. Tabs for each room, \code{/commands} as you'd expect, \kbd{Tab} completes nicks.
+\end{tldr}
+
+\begin{glance}{amber}{IRC}
+  Default port & 6667, or 6697 with \ui{Use TLS} (use TLS!)\\
+  Extras       & NickServ identify on connect, auto-join rooms, room browser, SSH tunnel\\
+\end{glance}
+
+\shot{irc.png}{Chatting in \#nexus. Rooms down the right, users in the room below them.}
+
+\begin{itemize}
+  \item A \ui{Server} tab plus one per room or private conversation. A dot means unread messages.
+  \item Commands: \code{/join}, \code{/part}, \code{/msg}, \code{/me}, \code{/notice}, \code{/nick}, \code{/topic},
+        \code{/list}, \code{/names}, \code{/whois}, \code{/who}, \code{/raw}, \code{/quit} and \code{/help}.
+  \item \kbd{Tab} completes a nick; click a nick to mention them.
+  \item The side panel lists your rooms, a room browser with a filter (click to join) and who's in the current room.
+\end{itemize}
+
+% =========================================================================================
+\chapter{GitHub}\label{ch:github}
+\chapmeta{2 minutes}{You'll see all your repositories, freshest first}
+
+\crop{editor-github.png}{1515}{780}{0}{70}{0.5\linewidth}{A GitHub profile: just the API address and a token.}
+
+\begin{tldr}
+Paste a personal access token with the \code{repo} scope. Get a tidy, filterable list of every repository you can see.
+\end{tldr}
+
+\shot{github.png}{Repositories grouped by owner, with the latest commit and who made it.}
+
+\begin{itemize}
+  \item Grouped by owner or organisation, sorted by most recent activity.
+  \item Badges for \proto[rose]{Private}, \proto[violet]{Fork} and \proto[amber]{Archived}, plus language and stars.
+  \item Filter box, \ui{Refresh now}, \ui{Visit} (opens in your browser) and \ui{ZIP} (downloads an archive).
+  \item Works with GitHub Enterprise: set \ui{API Base URL} to your server's API address. Refreshes every 60–3600 seconds.
+\end{itemize}
+
+% =========================================================================================
+\chapter{Your own computer}\label{ch:local}
+\chapmeta{1 minute}{You'll stop alt-tabbing to a separate terminal app}
+
+Click \ui{Local Machine} for a shell on this computer. It uses your system's default shell unless you choose
+another in \menu{Settings\then General\then Local shell} (\code{pwsh}, \code{zsh}, \code{fish}, whatever you fancy).
+
+\shot[0.86\linewidth]{local.png}{A local shell, with all the same terminal powers as SSH.}

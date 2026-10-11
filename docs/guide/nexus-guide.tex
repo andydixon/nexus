@@ -1,0 +1,100 @@
+% Nexus Terminal — User Guide. Build: make (in docs/guide), or: lualatex nexus-guide && lualatex nexus-guide
+\documentclass[10pt,twoside,openany]{book}
+\usepackage{nexus-guide}
+
+\hypersetup{pdftitle={Nexus Terminal: The User Guide}, pdfauthor={Andy Dixon},
+  pdfsubject={SSH, Telnet, RAW, Serial, VNC, IRC and GitHub in one native app}}
+
+\begin{document}
+\frontmatter
+\pagestyle{empty}
+
+% --- Cover ------------------------------------------------------------------------------
+\pagecanvas{
+  \fill[ink] (pg.south west) rectangle (pg.north east);
+  \shade[left color=accent, right color=violet, opacity=0.55]
+    ([yshift=-60mm]pg.north west) -- ([yshift=-20mm]pg.north east) --
+    ([yshift=-130mm]pg.north east) -- ([yshift=-170mm]pg.north west) -- cycle;
+  \shade[left color=teal, right color=accent, opacity=0.35]
+    ([yshift=-150mm]pg.north west) -- ([yshift=-120mm]pg.north east) --
+    ([yshift=-150mm]pg.north east) -- ([yshift=-185mm]pg.north west) -- cycle;
+  \node[anchor=north east, inner sep=0pt] at ([xshift=-22mm, yshift=-24mm]pg.north east)
+    {\includegraphics[width=34mm]{img/logo.pdf}};
+  \node[anchor=north west, text=white!70!ink, font=\heavy\small] at ([xshift=22mm, yshift=-30mm]pg.north west)
+    {THE USER GUIDE};
+  \node[anchor=north west, text=white, font=\heavy\fontsize{58}{60}\selectfont, text width=170mm]
+    at ([xshift=22mm, yshift=-36mm]pg.north west) {Nexus\\[-2pt]Terminal};
+  \node[anchor=north west, text=white, font=\Large, text width=150mm]
+    at ([xshift=22mm, yshift=-88mm]pg.north west)
+    {Every terminal you need. One window.\\Zero faff.};
+  \node[anchor=north west, text=white!65!ink, font=\normalsize, text width=150mm]
+    at ([xshift=22mm, yshift=-110mm]pg.north west)
+    {SSH\enspace·\enspace Telnet\enspace·\enspace RAW TCP\enspace·\enspace Serial\enspace·\enspace VNC\enspace·\enspace IRC\enspace·\enspace GitHub\enspace·\enspace Local shells};
+  \node[anchor=south west, inner sep=0pt] at ([xshift=22mm, yshift=22mm]pg.south west)
+    {\begin{tikzpicture}
+      \node[inner sep=0pt, draw=white!25!ink, line width=0.6pt, rounded corners=4pt] {\includegraphics[width=166mm]{img/ssh.png}};
+    \end{tikzpicture}};
+  \node[anchor=south east, text=white!55!ink, font=\footnotesize, align=right]
+    at ([xshift=-22mm, yshift=24mm]pg.south east) {Version 0.1\\October 2026\\dixon.cx};
+}\null
+\cleardoublepage
+
+% --- How to use this guide ----------------------------------------------------------------
+\colorlet{partcol}{accent}
+{\heavy\fontsize{30}{34}\selectfont\color{ink} Start here.\par}
+\vspace{2pt}{\large\color{muted} (Yes, even if you never read manuals. \emph{Especially} then.)\par}
+\vspace{10pt}
+
+This guide is built for skimming. You do \textbf{not} have to read it in order, cover to cover, like it's
+homework. Find the bit you need, grab it, get back to work. Every chapter opens with the time it takes and
+what you'll be able to do afterwards, and a \textbf{TL;DR} if you only want the gist.
+
+\vspace{4pt}
+{\heavy\large\color{ink}\iMap\enspace I just want to…}\par\vspace{2pt}
+\renewcommand\arraystretch{1.5}
+\begin{tabularx}{\linewidth}{@{}X>{\raggedleft\arraybackslash}p{52mm}@{}}
+  \toprule
+  …get connected to something \emph{right now} & \hyperref[ch:start]{Five-minute start}, p.\,\pageref{ch:start}\\
+  …work out what all the buttons do & \hyperref[ch:tour]{The grand tour}, p.\,\pageref{ch:tour}\\
+  …SSH into a server (keys, jump hosts, 2FA) & \hyperref[ch:ssh]{SSH}, p.\,\pageref{ch:ssh}\\
+  …talk to a router or Arduino over a USB cable & \hyperref[ch:serial]{Serial}, p.\,\pageref{ch:serial}\\
+  …copy files to and from a server & \hyperref[ch:files]{Files}, p.\,\pageref{ch:files}\\
+  …type the same thing into ten servers at once & \hyperref[ch:repeat]{Never type it twice}, p.\,\pageref{ch:repeat}\\
+  …keep my passwords safe & \hyperref[ch:secrets]{Passwords \& the vault}, p.\,\pageref{ch:secrets}\\
+  …move over from Alchementary Link & \hyperref[ch:move]{Moving house}, p.\,\pageref{ch:move}\\
+  …fix something that's broken & \hyperref[part:fix]{When things go wrong}, p.\,\pageref{ch:trouble}\\
+  …just see the keyboard shortcuts & \hyperref[app:keys]{The cheat sheet}, p.\,\pageref{app:keys}\\
+  \bottomrule
+\end{tabularx}
+
+\vspace{8pt}
+{\heavy\large\color{ink}\iSparkle\enspace The little boxes}\par\vspace{-2pt}
+\begin{multicols}{2}\small
+\begin{tldr}The whole chapter in three lines.\end{tldr}
+\begin{quickwin}Something you can try in under a minute.\end{quickwin}
+\begin{protip}A trick that saves you time later.\end{protip}
+\columnbreak
+\begin{headsup}A thing that might trip you up.\end{headsup}
+\begin{danger}Could lose data or weaken security. Read it.\end{danger}
+\begin{sidequest}Interesting, but not needed to get the job done.\end{sidequest}
+\end{multicols}
+
+\vspace{-6pt}
+{\small\color{muted}\textbf{Shortcuts:} \mod{} means \kbd{Ctrl} on Windows and Linux, \kbd{\ph{E1C4}} (Command) on a Mac. So
+\keys{\mod+K} is \kbd{Ctrl}+\kbd{K} or \kbd{\ph{E1C4}}+\kbd{K} depending on your machine.}
+
+\clearpage
+\pagestyle{plain}
+{\hypersetup{linkcolor=body}\tableofcontents}
+\clearpage
+
+\mainmatter
+\pagestyle{fancy}
+\input{chapters/part1-start}
+\input{chapters/part2-connect}
+\input{chapters/part3-faster}
+\input{chapters/part4-safe}
+\input{chapters/part5-yours}
+\input{chapters/part6-fix}
+\input{chapters/appendix}
+\end{document}
