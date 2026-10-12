@@ -122,6 +122,23 @@ impl Service {
         self.secrets.set_checked(SYNC_PASSWORD, password)
     }
 
+    /// Every profile's stored credentials: (profile id, profile name, kind, "keychain"/"vault").
+    /// Slow-ish (keychain probes); run off the UI thread.
+    pub fn credential_inventory(&self) -> Vec<(String, String, crate::secrets::SecretKind, &'static str)> {
+        let mut out = vec![];
+        for p in self.profiles() {
+            for (kind, at) in self.secrets.stored_for(&p.id) {
+                out.push((p.id.clone(), p.display_name.clone(), kind, at));
+            }
+        }
+        out
+    }
+
+    pub fn forget_credential(&self, profile_id: &str, kind: crate::secrets::SecretKind) {
+        self.secrets.delete(&kind.key(profile_id));
+        self.store.add_audit("secret.delete", profile_id, "", &format!("Forgot {} credential", kind.as_str()));
+    }
+
     pub fn has_sync_password(&self) -> bool {
         self.secrets.get(SYNC_PASSWORD).is_some()
     }

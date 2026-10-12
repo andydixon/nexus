@@ -252,6 +252,7 @@ impl App {
                 "terminal" => SettingsTab::Terminal,
                 "security" => SettingsTab::Security,
                 "knownhosts" => SettingsTab::KnownHosts,
+                "diagnostics" => SettingsTab::Diagnostics,
                 "help" => SettingsTab::Help,
                 "about" => SettingsTab::About,
                 _ => SettingsTab::General,

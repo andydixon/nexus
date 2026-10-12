@@ -203,6 +203,34 @@ impl Vault {
         *self.state.lock() = None;
     }
 
+    /// Re-encrypts every entry under `new` (fresh salt, key and verifier) after checking `old`.
+    /// One atomic write: a crash leaves either the old vault or the new one.
+    pub fn change_password(&self, old: &str, new: &str) -> Result<()> {
+        if new.is_empty() {
+            return Err("secrets: the new master password can't be empty".into());
+        }
+        self.unlock(old)?;
+        let mut st = self.state.lock();
+        let u = st.as_mut().ok_or("secrets: vault is locked")?;
+        let mut plain = Vec::with_capacity(u.vault.secrets.len());
+        for (k, v) in &u.vault.secrets {
+            let data = B64.decode(v).map_err(|e| format!("secrets: corrupt entry {k:?}: {e}"))?;
+            plain.push((k.clone(), Zeroizing::new(open(&u.key, &data)?)));
+        }
+        let salt = random_bytes::<32>();
+        let key = derive_key(new, &salt)?;
+        let secrets = plain.iter().map(|(k, v)| (k.clone(), B64.encode(seal(&key, v)))).collect();
+        let next = Unlocked { vault: VaultFile { version: 1, salt: B64.encode(salt), secrets, verifier: verifier(&key) }, key };
+        self.save(&next)?;
+        *u = next;
+        Ok(())
+    }
+
+    /// Stored keys (not values); empty while locked.
+    pub fn keys(&self) -> Vec<String> {
+        self.state.lock().as_ref().map(|u| u.vault.secrets.keys().cloned().collect()).unwrap_or_default()
+    }
+
     fn save(&self, u: &Unlocked) -> Result<()> {
         let data = serde_json::to_vec_pretty(&u.vault)?;
         write_private(&self.path(), &data)
@@ -352,6 +380,25 @@ impl Secrets {
     }
 
     /// Removes every credential saved for a profile from both stores.
+    /// Which credentials a profile has stored, and where. Probes the keychain once per kind
+    /// (it can't be listed), so call it off the UI thread.
+    pub fn stored_for(&self, profile_id: &str) -> Vec<(SecretKind, &'static str)> {
+        let vault: std::collections::HashSet<String> = self.vault.keys().into_iter().collect();
+        SecretKind::ALL
+            .iter()
+            .filter_map(|&k| {
+                let key = k.key(profile_id);
+                if self.keychain_ok && self.keychain.get(&key).is_some() {
+                    Some((k, "keychain"))
+                } else if vault.contains(&key) {
+                    Some((k, "vault"))
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
     pub fn delete_profile(&self, profile_id: &str) {
         if self.keychain_ok {
             for kind in SecretKind::ALL {
@@ -396,6 +443,24 @@ mod tests {
         f.as_object_mut().unwrap().remove("verifier");
         std::fs::write(&path, f.to_string()).unwrap();
         assert!(v.unlock("pw").unwrap_err().to_string().contains("older version"));
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn changing_the_master_password_keeps_every_secret() {
+        let dir = std::env::temp_dir().join(format!("nexus-vault-rekey-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let v = Vault::new(dir.clone());
+        v.initialise("old").unwrap();
+        v.set("a", "1").unwrap();
+        v.set("profile:p:password", "hunter2").unwrap();
+        assert!(v.change_password("wrong", "new").is_err());
+        v.change_password("old", "new").unwrap();
+        v.lock();
+        assert!(v.unlock("old").is_err(), "the old password no longer opens it");
+        v.unlock("new").unwrap();
+        assert_eq!((v.get("a").unwrap(), v.get("profile:p:password").unwrap()), ("1".to_string(), "hunter2".to_string()));
+        assert_eq!(v.keys(), ["a", "profile:p:password"]);
         std::fs::remove_dir_all(dir).unwrap();
     }
 

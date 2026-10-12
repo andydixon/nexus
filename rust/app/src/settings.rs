@@ -88,10 +88,15 @@ pub fn strength_meter(ui: &mut Ui, pw: &str) {
 /// Create or unlock the vault.
 struct MasterPrompt {
     new: bool,
+    /// Changing the password: the current one (re-encrypts the vault under `pw`).
+    change: Option<String>,
     pw: String,
     confirm: String,
     error: String,
 }
+
+/// (profile id, profile name, kind, "keychain"/"vault") per stored credential.
+type Credentials = Vec<(String, String, nexus_core::secrets::SecretKind, &'static str)>;
 
 #[derive(Default)]
 pub struct Settings {
@@ -105,6 +110,8 @@ pub struct Settings {
     /// Add-CA form: (host pattern, public key), shown when Some.
     new_ca: Option<(String, String)>,
     sync_password: String,
+    creds: Option<Credentials>,
+    creds_job: Option<Job<Credentials>>,
     default_shell: String,
     help_topic: usize,
     master: Option<MasterPrompt>,
@@ -117,6 +124,7 @@ impl Settings {
     pub fn open(&mut self, tab: SettingsTab) {
         self.open = true;
         self.fresh = true;
+        self.creds = None;
         self.tab = tab;
     }
 
@@ -155,6 +163,7 @@ impl Settings {
                         SettingsTab::Terminal => self.terminal(ui),
                         SettingsTab::Security => self.security(ui, s),
                         SettingsTab::KnownHosts => self.known_hosts(ui, s),
+                        SettingsTab::Diagnostics => self.diagnostics(ui, s),
                         SettingsTab::Help => self.help(ui),
                         SettingsTab::About => self.about(ui, s),
                     }
@@ -210,6 +219,7 @@ impl Settings {
                 (SettingsTab::Terminal, icon::TERMINAL_WINDOW, "Terminal"),
                 (SettingsTab::Security, icon::SHIELD_CHECK, "Security"),
                 (SettingsTab::KnownHosts, icon::FINGERPRINT, "Known Hosts"),
+                (SettingsTab::Diagnostics, icon::STETHOSCOPE, "Diagnostics"),
                 (SettingsTab::Help, icon::BOOK_OPEN, "Help"),
                 (SettingsTab::About, icon::INFO, "About"),
             ] {
@@ -371,18 +381,69 @@ impl Settings {
                 ui.label("Working…");
             } else if !init {
                 if widgets::primary(ui, icon::SHIELD_PLUS, "Initialise Secret Store").clicked() {
-                    self.master = Some(MasterPrompt { new: true, pw: String::new(), confirm: String::new(), error: String::new() });
+                    self.master = Some(MasterPrompt { new: true, change: None, pw: String::new(), confirm: String::new(), error: String::new() });
                 }
             } else if !unlocked {
                 if widgets::primary(ui, icon::LOCK_OPEN, "Unlock").clicked() {
-                    self.master = Some(MasterPrompt { new: false, pw: String::new(), confirm: String::new(), error: String::new() });
+                    self.master = Some(MasterPrompt { new: false, change: None, pw: String::new(), confirm: String::new(), error: String::new() });
                 }
-            } else if widgets::button(ui, icon::LOCK, "Lock").clicked() {
-                s.svc.secrets.vault.lock();
-                s.info("Secret store locked");
+            } else {
+                ui.horizontal(|ui| {
+                    if widgets::button(ui, icon::LOCK, "Lock").clicked() {
+                        s.svc.secrets.vault.lock();
+                        s.info("Secret store locked");
+                    }
+                    if widgets::button(ui, icon::KEY, "Change Master Password…").clicked() {
+                        self.master =
+                            Some(MasterPrompt { new: true, change: Some(String::new()), pw: String::new(), confirm: String::new(), error: String::new() });
+                    }
+                });
             }
         });
+        self.credentials_section(ui, s);
         self.sync_section(ui, s);
+    }
+
+    /// Stored credentials per profile, with Forget. Loaded in the background (keychain probes).
+    fn credentials_section(&mut self, ui: &mut Ui, s: &mut Shared) {
+        let t = Tokens::get(ui.ctx());
+        ui.add_space(12.0);
+        widgets::section(ui, "Stored credentials");
+        if let Some(list) = poll(&mut self.creds_job) {
+            self.creds = Some(list);
+        }
+        if self.creds.is_none() && self.creds_job.is_none() {
+            let svc = s.svc.clone();
+            self.creds_job = Some(Job::spawn(ui.ctx(), move || svc.credential_inventory()));
+        }
+        let Some(list) = &self.creds else {
+            ui.horizontal(|ui| {
+                ui.spinner();
+                ui.label("Checking the keychain and vault…");
+            });
+            return;
+        };
+        if list.is_empty() {
+            widgets::hint(ui, "No saved credentials (the vault must be unlocked to see what it holds).");
+            return;
+        }
+        let mut forget = None;
+        egui::Grid::new("stored-creds").num_columns(4).striped(true).spacing(vec2(14.0, 5.0)).show(ui, |ui| {
+            for (id, name, kind, at) in list {
+                ui.label(name);
+                ui.label(RichText::new(kind.as_str()).font(theme::mono(11.5)));
+                ui.label(RichText::new(*at).color(t.text_dim));
+                if ui.button(RichText::new(format!("{}  Forget", icon::TRASH)).color(t.danger)).clicked() {
+                    forget = Some((id.clone(), *kind));
+                }
+                ui.end_row();
+            }
+        });
+        if let Some((id, kind)) = forget {
+            s.svc.forget_credential(&id, kind);
+            s.success(format!("Forgot the {} credential", kind.as_str()));
+            self.creds = None;
+        }
     }
 
     fn sync_section(&mut self, ui: &mut Ui, s: &mut Shared) {
@@ -453,17 +514,29 @@ impl Settings {
         let mut cancel = false;
         let r = egui::Modal::new(egui::Id::new("master-password")).show(ctx, |ui| {
             ui.set_width(380.0);
-            let title = if m.new { "Create Master Password" } else { "Unlock Secret Store" };
+            let title = if m.change.is_some() {
+                "Change Master Password"
+            } else if m.new {
+                "Create Master Password"
+            } else {
+                "Unlock Secret Store"
+            };
             ui.label(RichText::new(format!("{}  {title}", icon::KEY)).font(theme::semibold(15.0)));
-            ui.label(if m.new {
+            ui.label(if m.change.is_some() {
+                "Every saved credential is re-encrypted under the new password."
+            } else if m.new {
                 "Choose a strong master password. This protects all saved credentials."
             } else {
                 "Enter your master password to unlock the secret store."
             });
             ui.add_space(4.0);
-            ui.label("Master password");
+            if let Some(old) = &mut m.change {
+                ui.label("Current password");
+                ui.add(egui::TextEdit::singleline(old).password(true).desired_width(f32::INFINITY));
+            }
+            ui.label(if m.change.is_some() { "New password" } else { "Master password" });
             let r = ui.add(egui::TextEdit::singleline(&mut m.pw).password(true).hint_text("Password…").desired_width(f32::INFINITY));
-            if !r.has_focus() && m.pw.is_empty() && m.confirm.is_empty() {
+            if m.change.is_none() && !r.has_focus() && m.pw.is_empty() && m.confirm.is_empty() {
                 r.request_focus();
             }
             let mut enter = r.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
@@ -478,7 +551,14 @@ impl Settings {
             }
             ui.add_space(6.0);
             ui.horizontal(|ui| {
-                submit = widgets::primary(ui, icon::CHECK, if m.new { "Create" } else { "Unlock" }).clicked() || enter;
+                let label = if m.change.is_some() {
+                    "Change"
+                } else if m.new {
+                    "Create"
+                } else {
+                    "Unlock"
+                };
+                submit = widgets::primary(ui, icon::CHECK, label).clicked() || enter;
                 cancel = ui.button("Cancel").clicked();
             });
         });
@@ -488,11 +568,13 @@ impl Settings {
             } else if m.new && m.pw != m.confirm {
                 m.error = "Passwords do not match.".into();
             } else {
-                let (new, pw) = (m.new, std::mem::take(&mut m.pw));
+                let (new, pw, change) = (m.new, std::mem::take(&mut m.pw), m.change.take());
                 let svc = s.svc.clone();
                 self.vault_job = Some(Job::spawn(ctx, move || {
                     let v = &svc.secrets.vault;
-                    if new {
+                    if let Some(old) = change {
+                        v.change_password(&old, &pw).map(|_| "Master password changed").map_err(|e| format!("Couldn't change the master password: {e}"))
+                    } else if new {
                         v.initialise(&pw).map(|_| "Secret store created").map_err(|e| format!("Failed to initialise: {e}"))
                     } else {
                         v.unlock(&pw).map(|_| "Secret store unlocked").map_err(|e| format!("Unlock failed: {e}"))
@@ -604,6 +686,68 @@ impl Settings {
                 }
                 Err(e) => s.error(format!("Failed to remove: {e}")),
             }
+        }
+    }
+
+    // --- Diagnostics ----------------------------------------------------------------------
+
+    /// What a bug report needs, without secrets: versions, paths, storage and sync status.
+    fn diagnostics_report(s: &Shared) -> Vec<(&'static str, String)> {
+        let cfg = &s.svc.config;
+        let size = |p: &std::path::Path| std::fs::metadata(p).map_or("—".to_string(), |m| widgets::human_size(m.len()));
+        let sec = &s.svc.secrets;
+        let known = s.svc.known_hosts();
+        let cas = known.iter().filter(|k| k.key_type == nexus_core::known_hosts::CA_KEY_TYPE).count();
+        let yes = |b: bool| if b { "yes" } else { "no" }.to_string();
+        vec![
+            ("Version", nexus_core::service::VERSION.to_string()),
+            ("Platform", format!("{} {}", std::env::consts::OS, std::env::consts::ARCH)),
+            ("Data folder", cfg.data_dir.display().to_string()),
+            ("Database", format!("{} ({})", cfg.db_path.display(), size(&cfg.db_path))),
+            ("Log", format!("{} ({})", cfg.data_dir.join("nexus.log").display(), size(&cfg.data_dir.join("nexus.log")))),
+            ("Recordings", cfg.recordings_dir.display().to_string()),
+            ("OS keychain", if sec.keychain_ok { "available".into() } else { "unavailable — credentials go to the vault".into() }),
+            (
+                "Vault",
+                match (sec.vault.is_initialised(), sec.vault.is_unlocked()) {
+                    (false, _) => "not set up".into(),
+                    (true, false) => "locked".into(),
+                    (true, true) => format!("unlocked, {} entr{}", sec.vault.keys().len(), if sec.vault.keys().len() == 1 { "y" } else { "ies" }),
+                },
+            ),
+            ("Profiles", s.profiles.len().to_string()),
+            ("Known hosts", format!("{} ({cas} SSH certificate authorit{})", known.len() - cas, if cas == 1 { "y" } else { "ies" })),
+            ("Open sessions", s.panes.len().to_string()),
+            (
+                "Profile sync",
+                if s.prefs.sync_folder.is_empty() {
+                    "off".into()
+                } else {
+                    format!("{} (password stored: {})", s.prefs.sync_folder, yes(s.svc.has_sync_password()))
+                },
+            ),
+            ("Update check at launch", yes(s.prefs.check_for_updates)),
+            ("Restore tabs", yes(s.prefs.restore_sessions)),
+        ]
+    }
+
+    fn diagnostics(&mut self, ui: &mut Ui, s: &mut Shared) {
+        let t = Tokens::get(ui.ctx());
+        let report = Self::diagnostics_report(s);
+        widgets::hint(ui, "Useful when reporting a problem. It contains paths and counts, never credentials.");
+        ui.add_space(4.0);
+        egui::Grid::new("diagnostics").num_columns(2).striped(true).spacing(vec2(16.0, 6.0)).show(ui, |ui| {
+            for (k, v) in &report {
+                ui.label(RichText::new(*k).color(t.text_dim));
+                ui.add(egui::Label::new(RichText::new(v).font(theme::mono(12.0))).wrap());
+                ui.end_row();
+            }
+        });
+        ui.add_space(8.0);
+        if widgets::button(ui, icon::COPY, "Copy Diagnostics").clicked() {
+            let text: String = report.iter().map(|(k, v)| format!("{k}: {v}\n")).collect();
+            ui.ctx().copy_text(text);
+            s.success("Diagnostics copied");
         }
     }
 

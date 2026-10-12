@@ -450,8 +450,9 @@ Open settings with **Cmd+,** (macOS) or **Ctrl+,** (Windows/Linux), the sidebar 
 
 - **General**: app theme (Pro, Midnight or Light), default protocol, restore tabs at launch (reopens the last session's tabs and split panes: saved connections reconnect, local shells start in the directory they were in; Quick Connect tabs aren't restored), confirm on close, confirm on disconnect, remote clipboard writes (OSC 52 and VNC; a toast shows what was copied), multi-line paste confirmation, the launch-time update check, status bar, sidebar width, and local shell (leave empty for the system default; **Browse…** to pick one).
 - **Terminal**: colour scheme, font family, font size, scrollback lines and cursor style. These are the defaults for new profiles; profiles can override them.
-- **Security**: keychain and vault status; initialise, unlock or lock the secret store.
-- **Known Hosts**: saved host keys with first-seen and last-seen times, and **Remove**.
+- **Security**: keychain and vault status; initialise, unlock or lock the secret store; **Change Master Password…** (re-encrypts every saved credential under the new password in one step); **Stored credentials**, listing each profile's saved passwords, passphrases and tokens and whether they're in the keychain or the vault, with **Forget**; and profile sync.
+- **Known Hosts**: saved host keys with first-seen and last-seen times, and **Remove**; import/export `~/.ssh/known_hosts` and trusted SSH certificate authorities.
+- **Diagnostics**: version, platform, data, database and log locations, keychain and vault state, counts and sync status, with **Copy Diagnostics** for bug reports (no credentials are included).
 - **Help**: built-in help topics, including connection types, shortcuts and troubleshooting.
 - **About**: version, **Check for Updates**, and **Import ~/.ssh/config**.
 

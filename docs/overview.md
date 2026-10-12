@@ -78,6 +78,7 @@ Use Nexus Terminal when you need to:
 - Inline images in the iTerm2 format (`imgcat`, `wezterm imgcat`, `chafa -f iterm`…): PNG, JPEG and GIF, sized in cells, pixels or percent, scrolling with the text.
 - Shell integration (OSC 133): jump between prompts, copy the last command's output, and see each command's exit status and duration beside its prompt.
 - Status-bar latency for the active SSH session.
+- Settings → Diagnostics summarises versions, paths, credential storage and sync status for bug reports; Settings → Security lists stored credentials per profile and changes the vault master password.
 
 ### SSH capabilities
 

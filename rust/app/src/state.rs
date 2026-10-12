@@ -40,6 +40,7 @@ pub enum SettingsTab {
     Terminal,
     Security,
     KnownHosts,
+    Diagnostics,
     Help,
     About,
 }
