@@ -1,6 +1,5 @@
 //! Password-encrypted profile exports: `[version 1][salt 32][nonce 12][AES-256-GCM ciphertext]`
-//! over a JSON bundle, with the vault's Argon2id parameters. `.link` files from Alchementary
-//! Link are the same format.
+//! over a JSON bundle, with the vault's Argon2id parameters.
 
 use crate::Result;
 use crate::models::Profile;
@@ -76,14 +75,13 @@ mod tests {
     use super::*;
 
     #[test]
-    fn reads_go_export_and_round_trips() {
-        let fx = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/profiles.link");
-        assert!(decrypt_and_import(&fx, "nope").is_err());
-        let ps = decrypt_and_import(&fx, "export-pass").unwrap();
-        assert_eq!(ps.len(), 6);
-        assert_eq!(ps[0].ssh.as_ref().unwrap().jump_hosts[0].port, 2222);
+    fn round_trips() {
+        let mut p = Profile::new(crate::models::Protocol::Ssh);
+        p.host = "box".into();
+        let ps = vec![p];
         let out = std::env::temp_dir().join(format!("nexus-export-{}.nexus", std::process::id()));
         encrypt_and_export(&ps, "pw", &out).unwrap();
+        assert!(decrypt_and_import(&out, "nope").is_err());
         assert_eq!(decrypt_and_import(&out, "pw").unwrap(), ps);
         std::fs::remove_file(out).unwrap();
     }

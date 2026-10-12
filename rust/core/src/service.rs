@@ -274,7 +274,7 @@ impl Service {
         Ok(path)
     }
 
-    /// Imports a `.nexus` (or legacy `.link`) export.
+    /// Imports a `.nexus` export.
     pub fn import_encrypted(&self, path: &Path, password: &str, strategy: &str) -> Result<usize> {
         let ps = exportimport::decrypt_and_import(path, password)?;
         self.import(ps, strategy)

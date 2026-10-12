@@ -864,7 +864,7 @@ When exporting profiles, encrypted export (a `.nexus` file) protects the file wi
         "## Exporting Profiles
 Use **Export (Encrypted)** from the sidebar menu or command palette. Choose which profiles to include and set a password to encrypt the file. Exported files use the `.nexus` extension. Plain **JSON** export is also available, optionally including secrets.
 ## Importing Profiles
-Use **Import (Encrypted)**, select a `.nexus` file (older `.link` exports from Alchementary Link work too) and enter the password used when exporting. Choose whether existing profiles are skipped, overwritten or duplicated. Imported profiles appear in your sidebar immediately.
+Use **Import (Encrypted)**, select a `.nexus` file and enter the password used when exporting. Choose whether existing profiles are skipped, overwritten or duplicated. Imported profiles appear in your sidebar immediately.
 ## Importing from OpenSSH
 If you have an existing `~/.ssh/config` file, go to **Settings → About** and click **Import ~/.ssh/config**. Nexus Terminal creates profiles from your SSH Host blocks, including hostnames, usernames, ports, identity files, and jump hosts.",
     ),

@@ -41,7 +41,7 @@ Use Nexus Terminal when you need to:
 - Multi-select profiles with Ctrl/Cmd-click for bulk connect, disconnect, tagging, moving between groups and deleting.
 - Test basic host and port reachability before connecting.
 - Import existing OpenSSH config entries from `~/.ssh/config`, including hostnames, usernames, ports, identity files and jump hosts.
-- Export and import profiles using encrypted `.nexus` bundles; older `.link` bundles from Alchementary Link import too.
+- Export and import profiles using encrypted `.nexus` bundles.
 - Plain JSON export and import, with secrets redacted unless you choose to include them.
 - Choose import behaviour for duplicates: skip, overwrite or duplicate.
 

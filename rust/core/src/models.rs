@@ -1,5 +1,5 @@
-//! Data model shared by storage, the session manager and the UI. Field names serialise exactly as
-//! the Go structs did, so database JSON columns and `.link`/`.nexus` exports round-trip unchanged.
+//! Data model shared by storage, the session manager and the UI. Field names are the JSON keys
+//! used in the database's config columns and in `.nexus` exports.
 
 use chrono::{DateTime, FixedOffset, Local};
 use serde::{Deserialize, Deserializer, Serialize};

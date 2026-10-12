@@ -381,21 +381,6 @@ mod tests {
     }
 
     #[test]
-    fn reads_go_fixture() {
-        let store = Store::new(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/recordings"));
-        let (hdr, events) = store.get("rec1").unwrap();
-        assert_eq!((hdr.version, hdr.width, hdr.height, hdr.timestamp), (2, 80, 24, 1791633486));
-        assert_eq!(hdr.title, "Fixture — host");
-        assert_eq!(hdr.env["TERM"], "xterm-256color");
-        assert_eq!(events.len(), 2);
-        assert_eq!((events[0].kind.as_str(), events[0].data.as_str()), ("o", "hello \x1b[1mworld\x1b[0m\r\n"));
-        assert_eq!((events[1].kind.as_str(), events[1].data.as_str()), ("i", "ls\r"));
-        let metas = store.list().unwrap();
-        assert_eq!(metas.len(), 1);
-        assert_eq!(metas[0].duration, 0.000212149);
-    }
-
-    #[test]
     fn write_and_close() {
         let dir = tmp("write");
         let rec = Recorder::new(&dir, "test-session-001", "Test Recording", 80, 24).unwrap();

@@ -379,7 +379,7 @@ Connections, disconnections, profile changes, credential access, imports and exp
 ## 13. Import and export
 
 - **Encrypted export**: **File → Export profiles…**, the sidebar footer, the command palette, or **Export…** on a profile's right-click menu. Choose the profiles, set a password and save a `.nexus` file. Credentials saved in the keychain or vault are not included.
-- **Encrypted import**: **File → Import profiles…** or the sidebar footer. Choose a `.nexus` file (or a `.link` file from Alchementary Link), enter its password, and choose what happens when a profile already exists: **Skip existing**, **Overwrite existing** or **Create duplicates**.
+- **Encrypted import**: **File → Import profiles…** or the sidebar footer. Choose a `.nexus` file, enter its password, and choose what happens when a profile already exists: **Skip existing**, **Overwrite existing** or **Create duplicates**.
 - **JSON export and import**: **Export Profiles (JSON)** and **Import Profiles (JSON)** in the command palette. JSON export includes every profile; passwords in login-script `send` steps that answer a password prompt are blanked unless you tick **Include secrets**. Proxy passwords and TOTP secrets live in the keychain or vault, never in the profile, so no export carries them.
 - **OpenSSH config**: **File → Import ~/.ssh/config** or **Settings → About → Import ~/.ssh/config** creates profiles from your `Host` blocks, including hostnames, usernames, ports, identity files and jump hosts.
 

@@ -464,43 +464,69 @@ mod tests {
     }
 
     #[test]
-    fn opens_go_database_and_migrates() {
-        let fx = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/link.db");
+    fn profiles_and_app_state_round_trip() {
         let tmp = std::env::temp_dir().join(format!("nexus-store-{}.db", std::process::id()));
-        std::fs::copy(fx, &tmp).unwrap();
         let s = Store::open(&tmp).unwrap();
-        let ps = s.list_profiles().unwrap();
-        assert_eq!(ps.len(), 6);
-        let ssh = ps.iter().find(|p| p.protocol == Protocol::Ssh).unwrap();
-        assert!(ssh.favourite);
-        assert_eq!(ssh.tags, ["fixture", "ssh"]);
-        assert_eq!(ssh.last_connected.map(|t| fmt_time(&t)).as_deref(), Some("2026-01-02T03:04:05Z"));
-        let c = ssh.ssh.as_ref().unwrap();
-        assert_eq!(c.env_vars["LANG"], "en_GB.UTF-8");
-        assert_eq!(c.login_scripts.len(), 2);
-        assert_eq!(c.port_forwards[0].bind_port, 8080);
-        let irc = ps.iter().find(|p| p.protocol == Protocol::Irc).unwrap();
-        assert_eq!(s.irc_last_rooms(&irc.id).unwrap(), ["#rust", "#nexus"]);
-        assert_eq!(s.list_known_hosts().unwrap()[0].fingerprint, "SHA256:abc");
-        // Known hosts written by the Go app can be removed by id; unknown ids are an error.
+        let mut ssh = Profile::new(Protocol::Ssh);
+        ssh.host = "box".into();
+        ssh.username = "me".into();
+        ssh.favourite = true;
+        ssh.tags = vec!["a".into(), "b".into()];
+        let c = ssh.ssh.as_mut().unwrap();
+        c.env_vars.insert("LANG".into(), "en_GB.UTF-8".into());
+        c.login_scripts = vec![LoginScriptStep { kind: "wait".into(), value: "$".into(), timeout: 5 }];
+        c.port_forwards = vec![PortForward { id: "f1".into(), bind_port: 8080, dest_host: "db".into(), dest_port: 5432, enabled: true, ..Default::default() }];
+        ssh.normalize();
+        s.create_profile(&ssh).unwrap();
+        let ssh = ssh.with_secs();
+        assert_eq!(s.get_profile(&ssh.id).unwrap(), ssh);
+        s.update_profile(&ssh).unwrap();
+        assert_eq!(s.get_profile(&ssh.id).unwrap(), ssh, "updates are lossless");
+        let mut serial = Profile::new(Protocol::Serial);
+        serial.host = "/dev/ttyUSB0".into();
+        serial.normalize();
+        s.create_profile(&serial).unwrap();
+        assert_eq!(s.list_profiles().unwrap().len(), 2);
+
+        s.save_irc_last_rooms(&ssh.id, &["#rust".into(), "#nexus".into()]).unwrap();
+        assert_eq!(s.irc_last_rooms(&ssh.id).unwrap(), ["#rust", "#nexus"]);
+        let t = parse_time("2026-01-02T03:04:05Z");
+        let kh = KnownHost {
+            id: "k1".into(),
+            host: "box".into(),
+            port: 22,
+            key_type: "ssh-ed25519".into(),
+            fingerprint: "SHA256:abc".into(),
+            public_key: String::new(),
+            first_seen: t,
+            last_seen: t,
+            trusted: true,
+        };
+        s.save_known_host(&kh).unwrap();
         let kh = s.list_known_hosts().unwrap().remove(0);
+        assert_eq!(kh.fingerprint, "SHA256:abc");
         s.delete_known_host(&kh.id).unwrap();
         assert!(s.list_known_hosts().unwrap().is_empty());
-        assert!(s.delete_known_host(&kh.id).is_err());
-        s.save_known_host(&kh).unwrap();
+        assert!(s.delete_known_host(&kh.id).is_err(), "unknown ids are an error");
+        s.create_snippet(&Snippet {
+            id: "s1".into(),
+            name: "up".into(),
+            command: "uptime".into(),
+            description: String::new(),
+            folder: String::new(),
+            tags: vec![],
+            created_at: t,
+            updated_at: t,
+        })
+        .unwrap();
         assert_eq!(s.list_snippets().unwrap()[0].command, "uptime");
+        let prefs = AppPreferences { terminal_theme: "dracula".into(), ..Default::default() };
+        s.save_preferences(&prefs).unwrap();
         assert_eq!(s.preferences().terminal_theme, "dracula");
-        // Migration 007 lets serial profiles in.
-        let mut p = Profile::new(Protocol::Serial);
-        p.host = "/dev/ttyUSB0".into();
-        p.normalize();
-        s.create_profile(&p).unwrap();
-        assert_eq!(s.get_profile(&p.id).unwrap(), p.clone().with_secs());
-        // Round trip of an existing row is lossless.
-        s.update_profile(ssh).unwrap();
-        assert_eq!(&s.get_profile(&ssh.id).unwrap(), ssh);
         drop(s);
-        let _ = std::fs::remove_file(&tmp);
+        for ext in ["", "-wal", "-shm"] {
+            let _ = std::fs::remove_file(format!("{}{ext}", tmp.display()));
+        }
     }
 
     impl Profile {

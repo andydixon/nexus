@@ -1,3 +1,0 @@
-{"version":2,"width":80,"height":24,"timestamp":1791633486,"title":"Fixture — host","env":{"TERM":"xterm-256color"}}
-[0.000139144,"o","hello \u001b[1mworld\u001b[0m\r\n"]
-[0.000212149,"i","ls\r"]

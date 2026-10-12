@@ -1,4 +1,4 @@
-//! Profile export/import: encrypted `.nexus` (also reads `.link`) and plain JSON.
+//! Profile export/import: encrypted `.nexus` and plain JSON.
 
 use crate::settings::{Job, poll};
 use crate::state::{Request, Shared};
@@ -54,7 +54,7 @@ impl Transfer {
 
     pub fn import_encrypted(&mut self) {
         if let Some(path) =
-            rfd::FileDialog::new().set_title("Import Profiles").add_filter("Nexus Export", &[EXTENSION, "link"]).add_filter("All files", &["*"]).pick_file()
+            rfd::FileDialog::new().set_title("Import Profiles").add_filter("Nexus Export", &[EXTENSION]).add_filter("All files", &["*"]).pick_file()
         {
             self.mode = Some(Mode::Import { path, pw: String::new(), strategy: "skip", status: String::new() });
         }
