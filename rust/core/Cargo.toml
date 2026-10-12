@@ -31,6 +31,9 @@ image = { version = "0.25", default-features = false, features = ["jpeg"] }
 
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
 webpki-roots = "1"
+ironrdp = { version = "0.17", features = ["connector", "session", "graphics", "pdu", "svc", "dvc", "displaycontrol", "input"] }
+ironrdp-blocking = "0.10"
+x509-cert = { version = "0.2", default-features = false, features = ["std"] }
 
 [dev-dependencies]
 tiny_http = "0.12"

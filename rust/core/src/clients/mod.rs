@@ -39,6 +39,7 @@ impl Callbacks {
 
 pub mod proxy;
 pub mod raw;
+pub mod rdp;
 pub mod serial;
 pub mod telnet;
 pub mod vnc;

@@ -15,3 +15,9 @@ opt-level = 2
 
 [profile.release]
 lto = "thin"
+
+# IronRDP compatibility patches; see vendor/README.md for what each changes and when to drop it.
+[patch.crates-io]
+picky = { path = "vendor/picky" }
+sspi = { path = "vendor/sspi" }
+ironrdp-session = { path = "vendor/ironrdp-session" }

@@ -86,7 +86,7 @@ impl Framebuffer {
     }
 
     /// A framebuffer of a server-announced size, refusing sizes that would exhaust memory.
-    fn new_checked(width: u16, height: u16) -> crate::Result<Framebuffer> {
+    pub(crate) fn new_checked(width: u16, height: u16) -> crate::Result<Framebuffer> {
         if width == 0 || height == 0 || width as usize * height as usize > MAX_FB_PIXELS {
             return Err(format!("unsupported desktop size {width}x{height}").into());
         }
