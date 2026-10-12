@@ -6,6 +6,11 @@ impl Manager {
     // --- local shell --------------------------------------------------------------------
 
     pub fn connect_local(self: &Arc<Self>, shell: &str) -> String {
+        self.connect_local_in(shell, None)
+    }
+
+    /// A local shell starting in `cwd` (when it still exists), e.g. a restored tab.
+    pub fn connect_local_in(self: &Arc<Self>, shell: &str, cwd: Option<PathBuf>) -> String {
         let id = new_id();
         let info = SessionInfo {
             id: id.clone(),
@@ -21,11 +26,26 @@ impl Manager {
             error: String::new(),
         };
         let epoch = self.new_session(info, None, shell.into(), SessionSecrets::default());
+        if let Some(dir) = cwd.filter(|d| d.is_dir()) {
+            let _ = self.with(&id, |s| s.local_cwd = Some(dir));
+        }
         self.emit_state(&id, SessionState::Connecting, "");
         let me = self.clone();
         let id2 = id.clone();
         std::thread::spawn(move || me.start_local(&id2, epoch, 80, 24));
         id
+    }
+
+    /// A local session's shell and its current directory.
+    pub fn local_state(&self, id: &str) -> Option<(String, Option<PathBuf>)> {
+        self.with(id, |s| {
+            let cwd = match &s.client {
+                Client::Local(c) => Some(c.working_directory()),
+                _ => s.local_cwd.clone(),
+            };
+            (s.local_shell.clone(), cwd)
+        })
+        .ok()
     }
 
     /// Starts a fresh shell in an exited local tab, keeping its scrollback and last directory.

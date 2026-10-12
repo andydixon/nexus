@@ -621,6 +621,8 @@ pub struct AppPreferences {
     pub allow_remote_clipboard: bool,
     /// Ask before pasting multi-line text into a terminal that isn't in bracketed-paste mode.
     pub confirm_multiline_paste: bool,
+    /// Reopen the previous session's tabs and splits at launch.
+    pub restore_sessions: bool,
 }
 
 impl Default for AppPreferences {
@@ -642,6 +644,7 @@ impl Default for AppPreferences {
             check_for_updates: true,
             allow_remote_clipboard: true,
             confirm_multiline_paste: true,
+            restore_sessions: true,
         }
     }
 }

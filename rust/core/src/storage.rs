@@ -395,6 +395,16 @@ impl Store {
         Ok(())
     }
 
+    /// A value saved under `key` (app state such as the restorable tab layout).
+    pub fn setting(&self, key: &str) -> Option<String> {
+        self.db.lock().query_row("SELECT value FROM preferences WHERE key = ?", [key], |r| r.get(0)).optional().ok().flatten()
+    }
+
+    pub fn set_setting(&self, key: &str, value: &str) -> Result<()> {
+        self.db.lock().execute("INSERT INTO preferences (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value", [key, value])?;
+        Ok(())
+    }
+
     pub fn list_snippets(&self) -> Result<Vec<Snippet>> {
         let db = self.db.lock();
         let mut st = db.prepare("SELECT id, name, command, description, folder, tags, created_at, updated_at FROM snippets ORDER BY name ASC")?;

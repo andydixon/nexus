@@ -147,6 +147,12 @@ impl LocalShell {
 
     /// The last directory the shell was seen in (used to restart in the same place).
     pub fn working_directory(&self) -> PathBuf {
+        // On Linux the live directory is a cheap readlink; elsewhere the last capture.
+        if cfg!(target_os = "linux")
+            && let Some(dir) = self.state.lock().0.as_ref().and_then(|r| r.pid).and_then(process_cwd).filter(|d| d.is_dir())
+        {
+            return dir;
+        }
         self.state.lock().1.clone()
     }
 

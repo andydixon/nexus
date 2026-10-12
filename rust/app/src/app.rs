@@ -121,6 +121,9 @@ pub enum InputThen {
 
 pub struct App {
     pub s: Shared,
+    /// The tab layout as last saved for restoring (see restore.rs), and when it was last checked.
+    pub saved_layout: Option<String>,
+    layout_checked: f64,
     rx: mpsc::Receiver<Event>,
     pub theme: ThemeKind,
     pub editor: profile_editor::ProfileEditor,
@@ -195,7 +198,13 @@ impl App {
             answers: opts.answers,
             run_local: opts.run_local.map(|c| (c, None)),
             resize_sidebar: false,
+            saved_layout: None,
+            layout_checked: 0.0,
         };
+        let restore = opts.connect.is_empty() && app.run_local.is_none() && opts.open.is_none() && app.s.prefs.restore_sessions;
+        if restore {
+            crate::restore::restore(&mut app);
+        }
         for c in &opts.connect {
             match app.s.profiles.iter().find(|p| &p.id == c || &p.display_name == c).map(|p| p.id.clone()) {
                 Some(id) => app.connect_profile(&id, true),
@@ -1003,6 +1012,10 @@ impl eframe::App for App {
         chrome::palette(self, &ctx);
         chrome::toasts(self, &ctx);
         self.screenshot(&ctx);
+        if self.screenshot.is_none() && self.s.prefs.restore_sessions && self.s.now - self.layout_checked > 1.0 {
+            self.layout_checked = self.s.now;
+            crate::restore::save_if_changed(self);
+        }
         chrome::resize_edges(&ctx);
         // Requests raised while drawing are handled on the next frame.
         if !self.s.requests.is_empty() {

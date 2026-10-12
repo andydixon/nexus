@@ -127,6 +127,11 @@ impl Service {
         self.sessions.connect_local(&shell)
     }
 
+    /// A local shell with an explicit shell and start directory (restored tabs).
+    pub fn connect_local_in(&self, shell: &str, cwd: Option<PathBuf>) -> String {
+        self.sessions.connect_local_in(shell, cwd)
+    }
+
     pub fn reconnect(&self, id: &str) -> Result<String> {
         self.sessions.reconnect(id)
     }

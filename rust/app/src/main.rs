@@ -13,6 +13,7 @@ mod profile_editor;
 mod quick_connect;
 mod raw_view;
 mod recordings;
+mod restore;
 mod settings;
 mod sftp;
 mod sidebar;

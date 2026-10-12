@@ -434,7 +434,7 @@ Connections, disconnections, profile changes, credential access, imports and exp
 
 Open settings with **Cmd+,** (macOS) or **Ctrl+,** (Windows/Linux), the sidebar footer, or **File → Settings**. Click **Save** to apply changes.
 
-- **General**: app theme (Pro, Midnight or Light), default protocol, confirm on close, confirm on disconnect, remote clipboard writes (OSC 52 and VNC; a toast shows what was copied), multi-line paste confirmation, the launch-time update check, status bar, sidebar width, and local shell (leave empty for the system default; **Browse…** to pick one).
+- **General**: app theme (Pro, Midnight or Light), default protocol, restore tabs at launch (reopens the last session's tabs and split panes: saved connections reconnect, local shells start in the directory they were in; Quick Connect tabs aren't restored), confirm on close, confirm on disconnect, remote clipboard writes (OSC 52 and VNC; a toast shows what was copied), multi-line paste confirmation, the launch-time update check, status bar, sidebar width, and local shell (leave empty for the system default; **Browse…** to pick one).
 - **Terminal**: colour scheme, font family, font size, scrollback lines and cursor style. These are the defaults for new profiles; profiles can override them.
 - **Security**: keychain and vault status; initialise, unlock or lock the secret store.
 - **Known Hosts**: saved host keys with first-seen and last-seen times, and **Remove**.

@@ -249,6 +249,9 @@ impl Settings {
             field(ui, "Confirm on disconnect");
             ui.checkbox(&mut p.confirm_on_disconnect, "Ask before disconnecting sessions");
             ui.end_row();
+            field(ui, "Restore tabs");
+            ui.checkbox(&mut p.restore_sessions, "Reopen last session's tabs and splits at launch");
+            ui.end_row();
             field(ui, "Remote clipboard");
             ui.checkbox(&mut p.allow_remote_clipboard, "Let remote hosts set the clipboard (OSC 52, VNC)");
             ui.end_row();
