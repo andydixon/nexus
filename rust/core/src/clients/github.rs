@@ -16,11 +16,17 @@ const MAX_ERROR_BODY_BYTES: u64 = 64 << 10;
 const MAX_ARCHIVE_BYTES: u64 = 2 << 30;
 const USER_AGENT: &str = "NexusTerminal/1.0";
 const COMMIT_LOOKUP_WORKERS: usize = 5;
+/// Commit lookups per refresh, most recently pushed first; the rest keep cached (or no) commit
+/// info until they're pushed to. One lookup per repo per refresh would exhaust the API's hourly
+/// rate limit for accounts with thousands of repos.
+const MAX_COMMIT_LOOKUPS: usize = 100;
 
 pub struct Client {
     base_url: String,
     token: String,
     agent: ureq::Agent,
+    /// full_name → (pushed_at it was looked up for, committer, commit time).
+    commits: parking_lot::Mutex<std::collections::HashMap<String, (String, String, String)>>,
 }
 
 #[derive(Deserialize)]
@@ -71,7 +77,7 @@ impl Client {
     /// `base_url` is the API root, e.g. `https://api.github.com` or `https://ghe.example.com/api/v3`.
     pub fn new(base_url: &str, token: &str) -> Client {
         let agent = ureq::Agent::config_builder().timeout_global(Some(Duration::from_secs(30))).http_status_as_error(false).build().into();
-        Client { base_url: base_url.trim_end_matches('/').to_string(), token: token.to_string(), agent }
+        Client { base_url: base_url.trim_end_matches('/').to_string(), token: token.to_string(), agent, commits: Default::default() }
     }
 
     fn get(&self, url: &str) -> Result<ureq::http::Response<ureq::Body>, ureq::Error> {
@@ -162,20 +168,26 @@ impl Client {
             })
             .collect();
 
-        let total = result.len();
+        // Enrich with latest commit metadata (best-effort), five lookups at a time. A repo not
+        // pushed to since its last lookup reuses the cached answer.
+        let mut lookups: Vec<(usize, String, String)> = Vec::new();
+        {
+            let cache = self.commits.lock();
+            for (i, r) in result.iter_mut().enumerate() {
+                match cache.get(&r.full_name) {
+                    Some((pushed, who, when)) if *pushed == r.pushed_at => (r.latest_committer, r.latest_commit_at) = (who.clone(), when.clone()),
+                    _ if lookups.len() < MAX_COMMIT_LOOKUPS => {
+                        let reference = if r.default_branch.is_empty() { "HEAD" } else { &r.default_branch };
+                        lookups.push((i, r.full_name.clone(), reference.to_string()));
+                    }
+                    _ => {}
+                }
+            }
+        }
+        let total = lookups.len();
         progress(0, total);
-
-        // Enrich with latest commit metadata (best-effort), five lookups at a time.
         let next = AtomicUsize::new(0);
         let done = AtomicUsize::new(0);
-        let lookups: Vec<(usize, String, String)> = result
-            .iter()
-            .enumerate()
-            .map(|(i, r)| {
-                let reference = if r.default_branch.is_empty() { "HEAD" } else { &r.default_branch };
-                (i, r.full_name.clone(), reference.to_string())
-            })
-            .collect();
         let found: Vec<(usize, String, String)> = std::thread::scope(|s| {
             let workers: Vec<_> = (0..COMMIT_LOOKUP_WORKERS.min(total))
                 .map(|_| {
@@ -184,8 +196,12 @@ impl Client {
                         loop {
                             let i = next.fetch_add(1, Ordering::SeqCst);
                             let Some((idx, name, reference)) = lookups.get(i) else { break };
-                            if let Ok((who, when)) = self.fetch_latest_commit(name, reference) {
-                                out.push((*idx, who, when));
+                            match self.fetch_latest_commit(name, reference) {
+                                Ok((who, when)) => out.push((*idx, who, when)),
+                                // No such ref / empty repository: a definite answer, cache it. Auth
+                                // and rate-limit failures are retried next refresh.
+                                Err(e) if ["HTTP 404", "HTTP 409"].iter().any(|c| e.to_string().contains(c)) => out.push((*idx, String::new(), String::new())),
+                                Err(_) => {}
                             }
                             progress(done.fetch_add(1, Ordering::SeqCst) + 1, total);
                         }
@@ -195,9 +211,12 @@ impl Client {
                 .collect();
             workers.into_iter().flat_map(|w| w.join().unwrap_or_default()).collect()
         });
+        let mut cache = self.commits.lock();
         for (idx, who, when) in found {
-            result[idx].latest_committer = who;
-            result[idx].latest_commit_at = when;
+            let r = &mut result[idx];
+            cache.insert(r.full_name.clone(), (r.pushed_at.clone(), who.clone(), when.clone()));
+            r.latest_committer = who;
+            r.latest_commit_at = when;
         }
         Ok(result)
     }
@@ -460,7 +479,8 @@ mod tests {
             }
         });
         let calls = Mutex::new(Vec::new());
-        let repos = Client::new(&base, "t").fetch_repos_with_progress(|done, total| calls.lock().push((done, total))).unwrap();
+        let client = Client::new(&base, "t");
+        let repos = client.fetch_repos_with_progress(|done, total| calls.lock().push((done, total))).unwrap();
         assert_eq!(repos.len(), 101);
         assert_eq!(repos[0].full_name, "me/r100");
         assert_eq!(repos[0].pushed_at, "2025-06-01T12:00:00Z");
@@ -474,11 +494,22 @@ mod tests {
         assert!(repos.iter().filter(|r| r.latest_committer.is_empty()).count() == 99);
 
         let mut calls = calls.into_inner();
-        assert_eq!(calls[0], (0, 101));
+        // At most MAX_COMMIT_LOOKUPS lookups per refresh, most recently pushed first.
+        assert_eq!(calls[0], (0, MAX_COMMIT_LOOKUPS));
         calls.sort();
-        assert_eq!(calls.last(), Some(&(101, 101)));
-        assert_eq!(calls.len(), 102);
+        assert_eq!(calls.last(), Some(&(MAX_COMMIT_LOOKUPS, MAX_COMMIT_LOOKUPS)));
+        assert_eq!(calls.len(), MAX_COMMIT_LOOKUPS + 1);
         assert_eq!(seen.lock().iter().filter(|s| s.0.starts_with("/user/repos")).count(), 2);
+
+        // A refresh with nothing newly pushed reuses the answers it got (found or not).
+        let commit_calls = || seen.lock().iter().filter(|s| s.0.contains("/commits/")).count();
+        let before = commit_calls();
+        let again = client.fetch_repos_with_progress(|_, _| {}).unwrap();
+        assert_eq!(again[0].latest_committer, "Ann");
+        assert_eq!(commit_calls() - before, 101 - MAX_COMMIT_LOOKUPS, "only repos not looked up yet are fetched");
+        let third = commit_calls();
+        client.fetch_repos_with_progress(|_, _| {}).unwrap();
+        assert_eq!(commit_calls(), third, "everything is cached now");
     }
 
     #[test]
