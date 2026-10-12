@@ -1,0 +1,286 @@
+% Nexus Terminal user guide — look and feel. Build with lualatex (see Makefile).
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{nexus-guide}
+
+\RequirePackage[a4paper,top=24mm,bottom=26mm,inner=22mm,outer=26mm,headsep=8mm,footskip=12mm]{geometry}
+% Latin Modern OpenType isn't always installed, and the kernel selects it once before the guide's own
+% fonts take over. Point that one use at Inter so the build only needs fonts from the repo.
+\DeclareFontShape{TU}{lmr}{m}{n}{<->"[../../rust/app/assets/fonts/Inter-Regular.ttf]:mode=node;"}{}
+\RequirePackage{fontspec}
+\RequirePackage[dvipsnames]{xcolor}
+\RequirePackage{graphicx}
+\RequirePackage[most]{tcolorbox}
+\RequirePackage{tikz}
+\usetikzlibrary{calc,positioning,shadows.blur,fadings}
+\RequirePackage{titlesec}
+\RequirePackage{fancyhdr}
+\RequirePackage{enumitem}
+\RequirePackage{tabularx}
+\RequirePackage{booktabs}
+\RequirePackage{multicol}
+\RequirePackage{eso-pic}
+\RequirePackage{etoolbox}
+\RequirePackage{needspace}
+\RequirePackage{microtype}
+\RequirePackage[hidelinks]{hyperref}
+\RequirePackage{bookmark}
+
+% --- Fonts: the app's own Inter + JetBrains Mono, and its Phosphor icons ----------------
+\defaultfontfeatures{Ligatures=TeX}
+\setmainfont{Inter-Regular.ttf}[
+  Path=../../rust/app/assets/fonts/,
+  BoldFont=Inter-SemiBold.ttf,
+  ItalicFont=Inter-Regular.ttf, ItalicFeatures={FakeSlant=0.18},
+  BoldItalicFont=Inter-SemiBold.ttf, BoldItalicFeatures={FakeSlant=0.18}]
+\setsansfont{Inter-Regular.ttf}[Path=../../rust/app/assets/fonts/, BoldFont=Inter-SemiBold.ttf]
+\setmonofont{JetBrainsMono-Regular.ttf}[Path=../../rust/app/assets/fonts/, Scale=0.92]
+\newfontfamily\heavy{Inter-SemiBold.ttf}[Path=../../rust/app/assets/fonts/]
+\newfontfamily\phfont{Phosphor.ttf}[Path=fonts/]
+\newfontfamily\phfill{Phosphor-Fill.ttf}[Path=fonts/]
+\linespread{1.18}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.62em}
+\raggedbottom
+\sloppy
+
+% --- Palette (mirrors the app's Pro theme) ---------------------------------------------
+\definecolor{ink}{HTML}{1B1B1F}
+\definecolor{ink2}{HTML}{26262C}
+\definecolor{body}{HTML}{2A2A33}
+\definecolor{muted}{HTML}{6B6B78}
+\definecolor{rule}{HTML}{E4E4EA}
+\definecolor{paper}{HTML}{F7F7FA}
+\definecolor{accent}{HTML}{3B82F6}
+\definecolor{teal}{HTML}{14B8A6}
+\definecolor{violet}{HTML}{8B5CF6}
+\definecolor{amber}{HTML}{F59E0B}
+\definecolor{rose}{HTML}{F43F5E}
+\definecolor{pink}{HTML}{EC4899}
+\definecolor{green}{HTML}{22C55E}
+\definecolor{slate}{HTML}{64748B}
+\color{body}
+
+% Page-level drawing. Everything that paints relative to the page goes through here, drawn at shipout
+% from the page's lower-left corner, so it never depends on remember-picture positions settling.
+% Inside, the node (pg) is the whole page: use pg.north west, pg.south east and so on.
+\newcommand\pgnode{\node[inner sep=0pt, minimum width=\paperwidth, minimum height=\paperheight, anchor=south west] (pg) at (0,0) {};}
+\newcommand\pagecanvas[1]{\AddToShipoutPictureBG*{\AtPageLowerLeft{\begin{tikzpicture}[overlay]\pgnode#1\end{tikzpicture}}}}
+
+% Current part colour (set by \guidepart).
+\colorlet{partcol}{accent}
+\newcounter{guidepart}
+\newcommand\partshort{}
+
+% --- Icons ------------------------------------------------------------------------------
+\newcommand\ph[1]{{\phfont\symbol{"#1}}}
+\newcommand\phf[1]{{\phfill\symbol{"#1}}}
+\newcommand\iTerminal{\ph{EAE8}}  \newcommand\iBolt{\ph{E2DE}}     \newcommand\iBrain{\ph{E74E}}
+\newcommand\iWarn{\ph{E4E0}}      \newcommand\iBulb{\ph{E2DC}}     \newcommand\iCoffee{\ph{E1C2}}
+\newcommand\iRocket{\ph{E3FE}}    \newcommand\iCheck{\ph{E184}}    \newcommand\iTimer{\ph{E492}}
+\newcommand\iKeyboard{\ph{E2D8}}  \newcommand\iSparkle{\ph{E6A2}}  \newcommand\iShield{\ph{E40C}}
+\newcommand\iWand{\ph{E6B6}}      \newcommand\iBug{\ph{E5F4}}      \newcommand\iStar{\phf{E46A}}
+\newcommand\iSiren{\ph{E9B8}}     \newcommand\iWave{\ph{E580}}     \newcommand\iTarget{\ph{E47C}}
+\newcommand\iMap{\ph{E31A}}       \newcommand\iList{\ph{EADC}}     \newcommand\iBox{\ph{E45E}}
+\newcommand\iKey{\ph{E2D6}}       \newcommand\iPlugs{\ph{EB5A}}    \newcommand\iFolder{\ph{E256}}
+\newcommand\iBroadcast{\ph{E0F2}} \newcommand\iFilm{\ph{E792}}     \newcommand\iCode{\ph{E1BC}}
+\newcommand\iGear{\ph{E270}}      \newcommand\iLock{\ph{E2FA}}     \newcommand\iGithub{\ph{E576}}
+\newcommand\iChat{\ph{E16C}}      \newcommand\iDesktop{\ph{E560}}  \newcommand\iUsb{\ph{E956}}
+\newcommand\iTree{\ph{E67C}}      \newcommand\iArrows{\ph{E0A0}}   \newcommand\iCmd{\ph{E1C4}}
+\newcommand\iSearch{\ph{E30C}}    \newcommand\iSplit{\ph{E870}}    \newcommand\iLifebuoy{\ph{E63A}}
+\newcommand\iInfo{\ph{E2CE}}      \newcommand\iPin{\ph{E3E2}}      \newcommand\iConfetti{\ph{E81A}}
+\newcommand\iDetective{\ph{E83E}} \newcommand\iCompass{\ph{E1C8}}  \newcommand\iBinary{\ph{EE60}}
+\newcommand\iPalette{\ph{E6C8}}   \newcommand\iRecord{\ph{E3EE}}   \newcommand\iArrow{\ph{E06C}}
+\newcommand\iClock{\ph{E19A}}     \newcommand\iFlag{\ph{EA38}}     \newcommand\iPlug{\ph{E946}}
+\newcommand\iGhost{\ph{E62A}}     \newcommand\iBell{\ph{E5E8}}     \newcommand\iHourglass{\ph{E2B2}}
+\newcommand\iDownload{\ph{E20C}}  \newcommand\iUpload{\ph{E4C0}}   \newcommand\iPlane{\ph{E398}}
+
+% --- Inline bits --------------------------------------------------------------------------
+% \kbd{Ctrl} — a keycap. \keys{Ctrl+Shift+K} — keycaps joined with thin pluses.
+\newtcbox{\kbd}{on line, boxrule=0.4pt, arc=2.2pt, colback=paper, colframe=rule!70!slate,
+  boxsep=0pt, left=3.2pt, right=3.2pt, top=1.6pt, bottom=1.2pt, fontupper=\ttfamily\footnotesize\color{ink}}
+% \mod is "Ctrl, or ⌘ on a Mac": every shortcut in the guide is written \keys{\mod+K}.
+\renewcommand\mod{\kbd{Ctrl\,/\,\ph{E1C4}}}
+\def\keystop{\relax}\def\modtok{\mod}
+\DeclareRobustCommand\keys[1]{\keysplit#1+\relax+}
+\def\keysplit#1+{\def\kk{#1}\ifx\kk\keystop\else\keycap{#1}\expandafter\keysplitnext\fi}
+\def\keysplitnext#1+{\def\kk{#1}\ifx\kk\keystop\else{\kern0.15em\scriptsize\color{muted}+\kern0.15em}\keycap{#1}\expandafter\keysplitnext\fi}
+\newcommand\keycap[1]{\def\kc{#1}\ifx\kc\modtok\mod\else\kbd{#1}\fi}
+
+\newcommand\ui[1]{{\heavy\color{ink}#1}}               % on-screen labels
+\newcommand\code[1]{{\ttfamily\color{ink}#1}}           % file paths and commands
+\newcommand\menu[1]{{\heavy\color{ink}#1}}              % File → Thing
+\newcommand\then{\,{\color{muted}\iArrow}\,}
+\newcommand\proto[2][accent]{\tcbox[on line, arc=6pt, boxrule=0pt, colback=#1!14, boxsep=0pt,
+  left=4pt, right=4pt, top=1.2pt, bottom=1.2pt]{\scriptsize\heavy\color{#1!80!black}#2}}
+
+% --- Callout boxes ----------------------------------------------------------------------
+\tcbset{guidebox/.style={enhanced, breakable, arc=7pt, boxrule=0pt, left=12pt, right=12pt,
+  top=8pt, bottom=8pt, before skip=10pt, after skip=12pt, fontupper=\small,
+  parbox=false, before upper={\setlength{\parskip}{0.5em}}}}
+\newcommand\boxhead[3]{{\heavy\color{#1}\large#2\enspace\normalsize#3}\par\vspace{2pt}}
+
+\newtcolorbox{tldr}{guidebox, colback=partcol!8, borderline west={3pt}{0pt}{partcol},
+  before upper={\boxhead{partcol}{\iBolt}{TL;DR}\setlength{\parskip}{0.4em}}}
+\newtcolorbox{quickwin}[1][Quick win]{guidebox, colback=green!8, borderline west={3pt}{0pt}{green},
+  before upper={\boxhead{green!65!black}{\iTarget}{#1}}}
+\newtcolorbox{headsup}[1][Heads up]{guidebox, colback=amber!10, borderline west={3pt}{0pt}{amber},
+  before upper={\boxhead{amber!75!black}{\iWarn}{#1}}}
+\newtcolorbox{protip}[1][Pro tip]{guidebox, colback=accent!7, borderline west={3pt}{0pt}{accent},
+  before upper={\boxhead{accent!80!black}{\iBulb}{#1}}}
+\newtcolorbox{sidequest}[1][Side quest]{guidebox, colback=violet!7,
+  borderline west={3pt}{0pt}{violet}, borderline={0.5pt}{0pt}{violet!35,dashed},
+  before upper={\boxhead{violet}{\iCompass}{#1 {\normalfont\footnotesize\color{muted}\enspace·\enspace optional, skip it if you're in a hurry}}}}
+\newtcolorbox{danger}[1][Careful]{guidebox, colback=rose!8, borderline west={3pt}{0pt}{rose},
+  before upper={\boxhead{rose!85!black}{\iSiren}{#1}}}
+
+% "You are here": a one-line chapter header strip with reading time.
+\newcommand\chapmeta[2]{%
+  \begin{tcolorbox}[enhanced, arc=6pt, boxrule=0pt, colback=paper, left=10pt, right=10pt,
+    top=5pt, bottom=5pt, before skip=0pt, after skip=10pt, fontupper=\small\color{muted}]
+  {\color{partcol}\iTimer}\enspace about \textbf{#1}\hfill{\color{partcol}\iTarget}\enspace #2
+  \end{tcolorbox}}
+
+% Checklists.
+\newlist{checklist}{itemize}{1}
+\setlist[checklist]{label={\color{partcol}\large\iBox}, leftmargin=1.9em, itemsep=2pt, topsep=4pt}
+\setlist[itemize]{label={\color{partcol}\small\textbullet}, leftmargin=1.4em, itemsep=1pt, topsep=3pt}
+\setlist[enumerate]{label={\heavy\color{partcol}\arabic*}, leftmargin=1.6em, itemsep=2pt, topsep=4pt}
+\setlist[description]{font=\heavy\color{ink}, leftmargin=1.2em, itemsep=2pt}
+
+% --- Screenshots --------------------------------------------------------------------------
+% \shot[width]{file}{caption}
+\newcommand\shot[3][\linewidth]{%
+  \par\needspace{0.3\textheight}\begin{center}
+  \begin{tikzpicture}
+    \node[inner sep=0pt, rounded corners=6pt, blur shadow={shadow blur steps=8, shadow xshift=0pt,
+      shadow yshift=-2pt, shadow opacity=25}] (img) {\includegraphics[width=#1]{img/#2}};
+    \draw[rule!60!slate, line width=0.4pt, rounded corners=3pt] (img.south west) rectangle (img.north east);
+  \end{tikzpicture}\par\vspace{4pt}
+  {\footnotesize\color{muted}#3}\end{center}\vspace{-4pt}}
+
+% Two screenshots side by side.
+\newcommand\shotpair[4]{%
+  \par\needspace{0.22\textheight}\begin{center}
+  \begin{minipage}[t]{0.485\linewidth}\centering\includegraphics[width=\linewidth]{img/#1}\par\vspace{3pt}{\footnotesize\color{muted}#2}\end{minipage}\hfill
+  \begin{minipage}[t]{0.485\linewidth}\centering\includegraphics[width=\linewidth]{img/#3}\par\vspace{3pt}{\footnotesize\color{muted}#4}\end{minipage}
+  \end{center}}
+
+% A crop of a screenshot: \crop{file}{left}{bottom}{right}{top}{width}{caption}, trims in px of the 2720x1720 image.
+\newcommand\crop[7]{%
+  \par\needspace{0.2\textheight}\begin{center}
+  \begin{tikzpicture}
+    \node[inner sep=0pt, blur shadow={shadow blur steps=8, shadow yshift=-2pt, shadow opacity=25}] (img)
+      {\includegraphics[width=#6, trim=#2 #3 #4 #5, clip]{img/#1}};
+    \draw[rule!60!slate, line width=0.4pt] (img.south west) rectangle (img.north east);
+  \end{tikzpicture}\par\vspace{4pt}{\footnotesize\color{muted}#7}\end{center}\vspace{-4pt}}
+
+% Annotated screenshot: \begin{annotated}{file} \callout{1}{x}{y} … \end{annotated}, x/y in 0–1 from top left.
+\newenvironment{annotated}[1]{%
+  \par\begin{center}\begin{tikzpicture}
+  \node[anchor=north west, inner sep=0pt, blur shadow={shadow blur steps=8, shadow yshift=-2pt, shadow opacity=25}] (img)
+    {\includegraphics[width=\linewidth]{img/#1}};
+  \draw[rule!60!slate, line width=0.4pt] (img.south west) rectangle (img.north east);
+  \begin{scope}[x={(img.north east)}, y={($(img.north west)-(img.south west)$)}, shift={(img.north west)}]}
+  {\end{scope}\end{tikzpicture}\end{center}}
+\newcommand\callout[3]{%
+  \node[circle, fill=partcol, text=white, font=\heavy\footnotesize, inner sep=0pt, minimum size=15pt,
+    draw=white, line width=1.4pt, blur shadow={shadow blur steps=5, shadow opacity=40}] at (#2,-#3) {#1};}
+\newcommand\num[1]{\tikz[baseline=(n.base)]\node[circle, fill=partcol, text=white, font=\heavy\scriptsize,
+  inner sep=0pt, minimum size=13pt] (n) {#1};}
+
+% "At a glance" fact card for each connection type.
+\newenvironment{glance}[2]{%
+  \begin{tcolorbox}[enhanced, arc=8pt, boxrule=0pt, colback=#1!7, left=12pt, right=12pt, top=9pt, bottom=9pt,
+    before skip=6pt, after skip=12pt, fontupper=\small,
+    overlay={\node[anchor=north east, font=\heavy\tiny, text=#1!80!black, inner sep=8pt] at (frame.north east) {AT A GLANCE};}]
+  {\heavy\Large\color{#1!85!black}#2}\par\vspace{4pt}
+  \renewcommand\arraystretch{1.35}\begin{tabular}{@{}>{\leavevmode\color{muted}}p{0.24\linewidth}p{0.72\linewidth}@{}}}
+  {\end{tabular}\end{tcolorbox}}
+
+% --- Headings --------------------------------------------------------------------------
+\titleformat{\chapter}[display]{\normalfont}{%
+  \pagecanvas{\fill[partcol] (pg.north west) rectangle ([yshift=-9mm]pg.north east);
+    \fill[partcol!12] ([yshift=-9mm]pg.north west) rectangle ([yshift=-11mm]pg.north east);}%
+  {\heavy\small\color{partcol}\MakeUppercase{\partshort}\enspace·\enspace CHAPTER \thechapter}}{2pt}
+  {\heavy\fontsize{30}{34}\selectfont\color{ink}}
+\titlespacing*{\chapter}{0pt}{0pt}{14pt}
+\titleformat{\section}{\heavy\Large\color{ink}}{%
+  \tikz[baseline=(n.base)]\node[fill=partcol, rounded corners=3pt, text=white, font=\heavy\small, inner sep=3pt, minimum width=18pt] (n) {\thesection};}{8pt}{}
+\titlespacing*{\section}{0pt}{18pt}{4pt}
+\titleformat{\subsection}{\heavy\large\color{ink}}{}{0pt}{{\color{partcol}\iArrow}\enspace}
+\titlespacing*{\subsection}{0pt}{12pt}{2pt}
+\renewcommand\thesection{\arabic{chapter}.\arabic{section}}
+\setcounter{secnumdepth}{1}
+\setcounter{tocdepth}{1}
+
+% --- Running heads + thumb tabs ---------------------------------------------------------
+\pagestyle{fancy}
+\fancyhf{}
+\renewcommand{\headrulewidth}{0pt}
+\renewcommand\chaptermark[1]{\markboth{#1}{}}
+\fancyhead[LE]{\footnotesize\color{muted}\heavy Nexus Terminal\enspace\normalfont·\enspace User Guide}
+\fancyhead[RO]{\footnotesize\color{muted}\leftmark}
+\fancyfoot[LE,RO]{\tikz[baseline=(n.base)]\node[fill=partcol, rounded corners=3pt, text=white,
+  font=\heavy\footnotesize, inner sep=3pt, minimum width=20pt] (n) {\thepage};}
+\fancyfoot[RE,LO]{\footnotesize\color{muted}\partshort}
+\fancypagestyle{plain}{\fancyhf{}\fancyfoot[LE,RO]{\tikz[baseline=(n.base)]\node[fill=partcol, rounded corners=3pt,
+  text=white, font=\heavy\footnotesize, inner sep=3pt, minimum width=20pt] (n) {\thepage};}}
+
+% Thumb tabs on the page edge, one slot per part, so you can flick to a part in print.
+\newif\ifthumbs
+\AddToShipoutPictureBG{%
+  \ifthumbs\ifnum\value{guidepart}>0
+  \AtPageLowerLeft{\begin{tikzpicture}[overlay]\pgnode
+    \pgfmathsetmacro\slot{28 + (\value{guidepart}-1)*30}
+    \ifodd\value{page}
+      \fill[partcol, rounded corners=4pt] ([xshift=-7mm, yshift=-\slot mm]pg.north east) rectangle ++(9mm,-26mm);
+      \node[rotate=-90, text=white, font=\heavy\tiny] at ([xshift=-3.6mm, yshift=-\slot mm - 13mm]pg.north east) {\MakeUppercase{\partshort}};
+    \else
+      \fill[partcol, rounded corners=4pt] ([xshift=7mm, yshift=-\slot mm]pg.north west) rectangle ++(-9mm,-26mm);
+      \node[rotate=90, text=white, font=\heavy\tiny] at ([xshift=3.6mm, yshift=-\slot mm - 13mm]pg.north west) {\MakeUppercase{\partshort}};
+    \fi
+  \end{tikzpicture}}\fi\fi}
+
+% \guidepart{colour}{short name}{Title}{tagline}{list of chapters}
+\newcommand\guidepart[5]{%
+  \clearpage
+  \stepcounter{guidepart}\colorlet{partcol}{#1}\renewcommand\partshort{#2}
+  \phantomsection\addcontentsline{toc}{part}{\protect\textcolor{#1}{\arabic{guidepart}}\quad #3}
+  \thispagestyle{empty}\thumbsfalse
+  \pagecanvas{
+    \fill[ink] (pg.south west) rectangle (pg.north east);
+    \fill[#1, opacity=0.9] (pg.north west) rectangle ([yshift=-95mm]pg.north east);
+    \fill[#1!70!black, opacity=0.35] ([yshift=-95mm]pg.north west) -- ++(0,-18mm) -- ([yshift=-95mm]pg.north east) -- cycle;
+    \node[anchor=north west, text=white, font=\heavy\fontsize{150}{150}\selectfont, opacity=0.25]
+      at ([xshift=14mm, yshift=-4mm]pg.north west) {\arabic{guidepart}};
+    \node[anchor=south west, text=white, font=\heavy\small] at ([xshift=24mm, yshift=-72mm]pg.north west) {PART \arabic{guidepart}};
+    \node[anchor=north west, text=white, font=\heavy\fontsize{38}{42}\selectfont, text width=160mm]
+      at ([xshift=24mm, yshift=-73mm]pg.north west) {#3};
+    \node[anchor=north west, text=white!80!#1, font=\large, text width=150mm]
+      at ([xshift=24mm, yshift=-125mm]pg.north west) {#4};
+    \node[anchor=north west, text=white, font=\normalsize, text width=150mm]
+      at ([xshift=24mm, yshift=-145mm]pg.north west) {#5};
+  }\null\clearpage\thumbstrue}
+\newcommand\partitem[2]{{\color{partcol}\large#1}\enspace #2\par\vspace{5pt}}
+
+% Table of contents.
+\RequirePackage{tocloft}
+\renewcommand\cftpartfont{\heavy\large\color{ink}}
+\renewcommand\cftpartpagefont{\heavy\color{ink}}
+\renewcommand\cftchapfont{\color{body}}
+\renewcommand\cftchappagefont{\color{muted}}
+\renewcommand\cftchapleader{\cftdotfill{\cftdotsep}}
+\setlength\cftbeforepartskip{14pt}
+\setlength\cftbeforechapskip{3pt}
+\renewcommand\cfttoctitlefont{\heavy\fontsize{30}{34}\selectfont\color{ink}}
+
+% Symptom → fix cards for troubleshooting.
+\newcommand\fix[2]{%
+  \begin{tcolorbox}[enhanced, breakable, arc=7pt, boxrule=0.5pt, colframe=rule, colback=white, left=11pt, right=11pt,
+    top=8pt, bottom=8pt, before skip=6pt, after skip=8pt, fontupper=\small, parbox=false,
+    title={\heavy\color{ink}\normalsize{\color{partcol}\iBug}\enspace #1}, coltitle=ink, colbacktitle=paper,
+    titlerule=0pt, toptitle=5pt, bottomtitle=5pt, attach title to upper={}, detach title, before upper={\tcbtitle\par\vspace{4pt}}]
+  #2\end{tcolorbox}}
+
+% Big pull-quote line used to break up long stretches.
+\newcommand\breather[1]{\par\vspace{6pt}{\centering\heavy\large\color{partcol}#1\par}\vspace{6pt}}

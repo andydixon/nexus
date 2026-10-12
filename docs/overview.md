@@ -1,19 +1,21 @@
-# Alchementary Link Overview
+# Nexus Terminal Overview
 
-Alchementary Link is a desktop connection and analysis workspace for people who manage servers, network services, remote desktops, repositories, and binary artefacts every day. It brings SSH, Telnet, RAW TCP, VNC, GitHub, local shell, and Leviathan binary-analysis workflows into one focused app with secure credential handling, multi-session organisation, file transfer, automation, recording, and inspection tooling built in.
+Nexus Terminal is a native desktop connection workspace for people who manage servers, network services, serial devices, remote desktops, chat networks and repositories every day. It brings SSH, Telnet, RAW TCP, Serial, VNC, IRC, GitHub and local shell sessions into one focused app with secure credential handling, multi-session organisation, file transfer, automation and recording built in.
+
+It is a single Rust application drawn with egui: there is no webview, no bundled browser engine and no runtime to install. Terminal output goes straight from the network into the terminal emulator, so large outputs stay responsive.
 
 ## Product positioning
 
-Link is more than an SSH client. It is a single command centre for remote access, terminal operations, file movement, raw socket inspection, GitHub repository visibility, binary triage, and repeatable operational workflows.
+Nexus Terminal is more than an SSH client. It is a single command centre for remote access, terminal operations, file movement, raw socket inspection, serial consoles, IRC, GitHub repository visibility and repeatable operational workflows.
 
-Use Link when you need to:
+Use Nexus Terminal when you need to:
 
 - Connect quickly to many systems without re-entering credentials.
-- Keep multiple live sessions organised with tabs, pinned tabs, split panes, and status indicators.
+- Keep multiple live sessions organised with tabs, pinned tabs, split panes and status indicators.
 - Move files over SSH without leaving the terminal workspace.
-- Work safely with host key verification, encrypted secrets, TOTP support, and audit logging.
-- Reuse commands, automate login flows, record sessions, and react to terminal output.
-- Support mixed estates that include SSH servers, Telnet devices, raw TCP services, VNC desktops, GitHub repositories, local shells, firmware images, binaries, archives, and other artefacts.
+- Work safely with host key verification, encrypted secrets, TOTP support and audit logging.
+- Reuse commands, automate login flows, record sessions and react to terminal output.
+- Support mixed estates that include SSH servers, Telnet devices, raw TCP services, serial consoles, VNC desktops, IRC networks, GitHub repositories and local shells.
 
 ## Main feature groups
 
@@ -21,287 +23,238 @@ Use Link when you need to:
 
 - **SSH** for secure remote terminal access.
 - **Telnet** for legacy devices and services.
-- **RAW TCP** for direct socket interaction, protocol testing, and device troubleshooting.
-- **VNC** for remote desktop access.
+- **RAW TCP** for direct socket interaction, protocol testing and device troubleshooting.
+- **Serial** for USB-serial adapters, console cables, development boards and network gear.
+- **VNC** for remote desktop access, with a native viewer.
+- **IRC** for chat networks, with rooms, users and an optional SSH tunnel.
 - **GitHub** for repository browsing and download workflows.
 - **Local terminal** for opening a shell on the local machine.
-- **Leviathan** for binary inspection, editing, carving, transforms, and spectrogram workflows.
-- **Quick connect** for one-off sessions without saving a profile.
+- **Quick connect** for one-off SSH, Telnet, RAW, IRC or Serial sessions without saving a profile.
 - **Saved profiles** for repeat connections.
 
 ### Profile management
 
-- Create, edit, duplicate, and delete connection profiles.
-- Store display names, descriptions, notes, groups, tags, environment labels, and favourites.
-- Search profiles by name, host, or tag.
-- Filter profiles by protocol, group, tag, and favourite status.
+- Create, edit, duplicate and delete connection profiles.
+- Store display names, descriptions, notes, groups, tags and favourites.
+- Fuzzy search across name, host, tags and protocol.
+- Sidebar sections for Local Machine, Favourites, Recent (last five), groups and Ungrouped.
+- Multi-select profiles with Ctrl/Cmd-click for bulk connect, disconnect, tagging, moving between groups and deleting.
 - Test basic host and port reachability before connecting.
-- Import existing OpenSSH config entries from `~/.ssh/config`, including hostnames, usernames, ports, identity files, and jump hosts.
-- Export and import profiles using encrypted `.link` bundles.
-- Choose import behaviour for duplicates: skip, overwrite, or duplicate.
+- Import existing OpenSSH config entries from `~/.ssh/config`, including hostnames, usernames, ports, identity files and jump hosts.
+- Export and import profiles using encrypted `.nexus` bundles; older `.link` bundles from Alchementary Link import too.
+- Plain JSON export and import, with secrets redacted unless you choose to include them.
+- Choose import behaviour for duplicates: skip, overwrite or duplicate.
 
 ### Multi-session workspace
 
-- Tabbed sessions with connection state indicators.
-- Pin tabs to keep important systems visible.
-- Rename sessions.
-- Reorder tabs.
-- Scroll overflowing tabs and hover them to see full names and connection start times.
-- Close one session or all sessions.
-- Split panes vertically or horizontally.
-- Resize split panes.
+- Custom title bar with File, Session, View and Help menus, a command palette launcher and a light/dark toggle.
+- Tabbed sessions with protocol badges, connection state dots and activity markers.
+- Pin tabs to keep important systems at the front.
+- Rename, duplicate, reconnect and reorder tabs (drag, or Move Left/Right).
+- Scroll overflowing tabs and hover them to see the host, state and connection start time.
+- Split the active tab right or down, as many times as you like, with draggable dividers.
 - Switch tabs by keyboard shortcut.
-- Broadcast input to multiple connected sessions.
-- Show disconnected overlays with a one-click reconnect action.
-- Auto-reconnect support for SSH, Telnet, and RAW TCP profiles.
-- Command palette for fast access to connections, settings, terminal actions, security tools, import/export, snippets, triggers, and local terminal.
+- Broadcast input to all connected terminal sessions, or to a chosen set.
+- Disconnected and error overlays with one-click reconnect.
+- Auto-reconnect with exponential backoff for SSH, Telnet, RAW TCP, Serial and IRC profiles.
+- Guided error dialogs for authentication and host-key failures, with shortcuts to edit the profile or open Known Hosts.
+- Command palette for connections, tabs, new profiles, settings, import/export, themes, the secret store, SSH keys, snippets, triggers, recordings and terminal actions.
+- Status bar with session state, protocol, recording indicator, SSH latency, broadcast state, vault state, session count and update notices.
 
 ### Terminal experience
 
-- xterm.js-powered terminal rendering.
-- Configurable terminal font family, font size, scrollback, cursor style, and colour theme.
-- Search within terminal output.
-- Search options for case sensitivity, regular expressions, and whole-word matching.
-- Copy, paste, select all, clear, and reset from the terminal context menu.
-- Clipboard-aware paste behaviour.
-- Clickable web links where supported.
-- Alternate-screen scroll handling for tools such as `tmux`, `screen`, and `byobu`.
-- Export terminal scrollback as plain text.
-- Send break signals where supported.
-- Ping active sessions to check responsiveness.
+- Native terminal emulation (alacritty_terminal) with full colour, mouse reporting, bracketed paste and IME input.
+- Eleven terminal colour schemes, applied to every open terminal at once.
+- Configurable font family, font size, scrollback and cursor style, per profile or as defaults.
+- Find in terminal output, with case-sensitive and regular-expression options and a match counter.
+- Copy with Ctrl/Cmd+C when text is selected (otherwise it sends an interrupt), paste with Ctrl/Cmd+V.
+- Double-click selects a word, triple-click selects a line, Shift-click extends a selection.
+- Ctrl/Cmd-click a web link to open it in your browser.
+- Shift+PageUp/PageDown/Home/End and the mouse wheel scroll the scrollback; on the alternate screen the wheel sends arrow keys, so `tmux`, `screen` and `byobu` scroll naturally.
+- Context menu with Copy, Paste, Select All, Find, Send Snippet, Port Forwards, Split Right, Split Down, Export Output, Clear and Reset.
+- Export the whole scrollback as plain text.
+- Status-bar latency for the active SSH session.
 
 ### SSH capabilities
 
-- Password authentication.
-- Public key authentication.
-- Keyboard-interactive authentication.
-- SSH agent authentication.
+- Password, public key, keyboard-interactive and SSH agent authentication.
 - SSH agent forwarding.
-- Private key path discovery from `~/.ssh`.
-- SSH key manager for listing, generating, copying, and deleting key pairs.
-- Ed25519, RSA, and ECDSA key generation.
-- Optional private key passphrase handling.
-- TOTP / 2FA secret storage and code generation for keyboard-interactive login flows.
-- Host key verification policies per profile: Strict, Ask, Accept new, and Insecure.
+- Private key suggestions from `~/.ssh`, with a key file check.
+- SSH key manager for listing, generating, copying and deleting key pairs (Ed25519, RSA 2048/4096 and ECDSA, optional passphrase).
+- TOTP / 2FA secret storage and automatic code entry for keyboard-interactive logins.
+- Host key verification policies per profile: Strict, Ask, Accept new and Insecure.
 - Known hosts storage and management.
-- Jump host support for bastion and multi-hop access.
-- SOCKS5 proxy support.
-- HTTP CONNECT proxy support.
-- Local and remote port forwarding.
-- Runtime port forward management for active SSH sessions.
-- Startup commands.
-- Custom environment variables.
-- Terminal type configuration.
-- Keepalive interval and missed-keepalive settings.
-- Compression option.
+- Jump hosts for bastion and multi-hop access.
+- SOCKS5 and HTTP CONNECT proxies.
+- Local and remote port forwarding, started on connect or managed at runtime.
+- Startup commands, custom environment variables and terminal type.
+- Keepalive interval and missed-keepalive settings, and compression.
 - Expect-style login scripts with wait and send steps.
 - Built-in SFTP browser for file transfer.
 
 ### SFTP file browser
 
-- Open a side panel for SSH file browsing.
-- Navigate remote folders with breadcrumbs.
-- Go directly to a remote path.
-- Bookmark remote locations.
-- Refresh remote listings.
-- Create folders.
-- Upload files.
-- Download single files or multiple selected files.
-- Rename files and folders.
-- Delete files and folders.
-- Multi-select support for batch actions.
-- Resizable SFTP panel alongside the terminal.
-- Drag and drop files into an SSH terminal.
-- Choose whether dropped files are uploaded or pasted into the terminal as text.
-- Upload directory picker with folder filtering, breadcrumbs, keyboard navigation, and permission badges.
-- Permission labels for read-only and inaccessible folders.
+- Opens in a resizable dock beside the terminal.
+- Navigate remote folders with breadcrumbs, or go directly to a path.
+- Bookmark remote locations (kept per profile).
+- Refresh listings and create folders.
+- Upload files, and download single or multiple selected files.
+- Rename and delete files and folders.
+- Multi-select for batch actions.
+- Transfer queue with progress.
+- Drag and drop files onto an SSH terminal, then upload them or paste their contents.
+- Upload directory picker with folder filtering, breadcrumbs, keyboard navigation and READ ONLY / NO READ badges.
 
 ### Telnet capabilities
 
-- Telnet option negotiation.
-- Terminal type negotiation.
-- NAWS window-size updates.
-- Local echo option.
-- Line mode option.
-- Configurable line endings: LF, CR, CRLF, or none.
-- Configurable encoding: UTF-8, ASCII, and ISO 8859-1.
+- Telnet option negotiation, including echo, terminal type and NAWS window-size updates.
+- Local echo and line mode options.
+- Configurable line endings: LF, CR, CRLF or none.
+- Configurable encoding: UTF-8, ASCII and ISO 8859-1.
 - Negotiation debug mode.
 - Expect-style login scripts.
-- Auto-reconnect with configurable retry count.
-- Break signal support.
+- Auto-reconnect with a configurable retry count.
 
 ### RAW TCP capabilities
 
 - Direct TCP socket sessions.
-- Text, hex, and split data views.
-- Send data as text, hex, or escaped bytes.
-- Quick insert controls for common bytes such as NUL, CR, LF, ETX, and EOT.
+- Text, hex and split data views.
+- Send data as text, hex or escaped bytes.
+- Quick insert buttons for NUL, CR, LF, ETX and EOT.
 - Payload presets for reusable test messages.
-- Optional timestamps.
-- Optional send/receive direction labels.
-- Pause and resume display updates.
-- Clear the capture buffer.
-- Save RAW session captures.
+- Optional timestamps and send/receive direction labels.
+- Pause and resume display updates, and clear the capture buffer.
+- Save RAW session captures as JSON.
 - Configurable encoding and line endings.
 - Connect and read timeouts.
 - Auto-reconnect option.
 
+### Serial capabilities
+
+- Pick a device from the detected port list, or type a path such as `/dev/ttyUSB0`, `/dev/cu.usbserial-…` or `COM3`.
+- Baud rate from common presets or any custom value, 5–8 data bits, none/odd/even parity, 1 or 2 stop bits.
+- Flow control: none, XON/XOFF (software) or RTS/CTS (hardware).
+- Line ending, encoding and local echo.
+- Assert DTR and RTS on connect (both on by default).
+- Auto-reconnect: unplugging the adapter disconnects the session, and the port is reopened when it comes back.
+- Clear hints for permission-denied and busy ports.
+- Works with everything a terminal session supports: recording, triggers, broadcast, snippets, find and split panes.
+
 ### VNC capabilities
 
-- VNC remote desktop sessions.
-- noVNC-based viewer inside the Link workspace.
+- Native VNC viewer inside the Nexus Terminal workspace (RFB 3.3–3.8; Raw, CopyRect, Hextile, ZRLE and Tight encodings).
 - Password prompt and password storage modes.
 - View-only mode.
-- Scale-to-fit display.
-- Shared-session option.
-- Quality setting.
-- SSH tunnel option for VNC traffic.
-- SSH tunnel authentication by password, public key, or SSH agent.
+- Scale-to-fit or 1:1 display, switchable from the toolbar.
+- Shared-session option and a quality setting.
+- Send the local clipboard to the remote desktop, send Ctrl+Alt+Del, and request a full refresh.
+- SSH tunnel option for VNC traffic, with password, public key or SSH agent authentication.
+- A warning before connecting without a tunnel, because classic VNC traffic is not encrypted.
+
+### IRC capabilities
+
+- Nick, real name, TLS and an optional server password.
+- NickServ identification on connect.
+- Auto-join rooms.
+- A Server tab plus one tab per room or private conversation, with unread markers.
+- Slash commands such as `/join`, `/part`, `/msg`, `/me`, `/nick`, `/topic`, `/list`, `/names`, `/whois` and `/raw`.
+- Tab nick completion, and click a nick to mention it.
+- Room browser with a filter, and a users list for the current room.
+- mIRC colour and formatting codes rendered in the conversation.
+- Optional SSH tunnel and auto-reconnect.
 
 ### GitHub capabilities
 
 - GitHub profile type using a personal access token.
 - GitHub.com and GitHub Enterprise API base URL support.
 - Repository viewer grouped by owner or organisation.
-- Repository filtering by name, description, or language.
+- Repository filtering.
 - Repositories sorted by latest commit activity.
-- Shows repository metadata such as language, stars, private/fork/archived state, latest committer, and latest commit time.
-- Manual refresh.
-- Configurable refresh interval.
+- Repository metadata such as language, stars, private/fork/archived state, latest committer and latest commit time.
+- Manual refresh and a configurable refresh interval.
 - Open repositories in the browser.
 - Download repository ZIP archives.
 
-### Leviathan binary workbench
-
-- Switch from **Alchementary Link** to **Leviathan** from the sidebar header.
-- Load a local file into a working document, inspect it with multiple tools, then save the patched working copy.
-- Tools open as normal tabs beside connection sessions.
-- Leviathan tabs close immediately without connection-disconnect confirmation.
-- Shared undo, redo, and revert actions for byte-level edits.
-- File-backed document model for large local files, with chunked save/export where supported.
-- Clear limits for tools that require bounded in-memory buffers, such as image/audio spectrogram conversion and some parsers.
-
-### Leviathan editor and triage tools
-
-- **Hex Editor** with editable byte cells, live ASCII preview, 16-byte and 32-byte rows, byte search, string/hex search, previous/next match navigation, and range opening from analysis views.
-- **Overview** for first-pass summary across hashes, entropy, strings, indicators, and carve candidates.
-- **Hashes** for CRC32, MD5, SHA-1, SHA-256, and SHA-512.
-- **Entropy** graph over the whole file, with selectable ranges that can open a new hex editor tab.
-- **Strings** extraction for ASCII and UTF-16 text.
-- **IOCs** for URLs, domains, paths, hashes, and other indicators.
-- **Search** and **Multi-search** for text, hex, and regular-expression matching.
-- Exportable results from tools that find files, ranges, or structured artefacts.
-
-### Leviathan structure, recovery, and transform tools
-
-- **Structures** parser for common binary formats such as PE, ELF, Mach-O, ZIP, images, RIFF, ASN.1, and certificates.
-- **Disasm** heuristic disassembly for common CPU families, with raw byte fallback for unsupported architectures.
-- **PDF** object, stream, xref, and suspicious-surface inspection.
-- **SquashFS** superblock and filesystem metadata inspection with human-readable bad-magic errors.
-- **Carve**, **Keys**, **Timestamps**, **Stego**, and **Metadata** tools for embedded artefacts and recovery workflows.
-- **BinSnoop** deep signature scanning across the whole file, with export for discovered files and ranges.
-- **Rules** for YARA-like rule scans.
-- **Patch Plan** and **Patch Apply** for validating and applying patch scripts.
-- **Transforms** for hex, Base64, URL, XOR, inflate, and cipher pipelines.
-- **Case Export** for bundling useful artefacts from a working investigation.
-
-### Leviathan spectrogram tools
-
-- Convert an image into WAV audio so the image appears in a spectrogram.
-- Insert an encoded image into an existing WAV or MP3 carrier.
-- Visualise WAV or MP3 audio as a spectrogram image.
-- Control FFT size, height, maximum width, aspect ratio, frequency range, brightness, and contrast.
-
 ### Automation and reusable workflows
 
-- Snippet library for saved commands.
-- Snippet folders, descriptions, and tags.
-- Send snippets to active sessions.
-- Snippet variables before sending commands.
+- Snippet library for saved commands, with names, descriptions and folders.
+- Send snippets to the active session.
+- Built-in snippet variables (`{{hostname}}`, `{{date}}`, `{{time}}`, `{{timestamp}}`) and prompted custom variables.
 - Broadcast input mode for running the same command across connected sessions.
-- Trigger rules that watch terminal output.
-- Trigger matching by text or regular expression.
-- Trigger actions for notifications, tab highlighting, sound, or combined notify/highlight behaviour.
+- Trigger rules that watch terminal output, matching plain text or regular expressions.
+- Trigger actions for notifications, tab highlighting, both, or a sound (attention request).
 - Expect-style login scripts for SSH and Telnet.
 - Startup commands for SSH sessions.
 
 ### Session recording
 
 - Start and stop terminal recording per session.
-- Recording indicator on active tabs.
-- Recordings saved in asciicast v2-compatible format.
-- Recording browser for listing saved recordings.
-- Playback controls.
+- Recording indicator on the tab and in the status bar.
+- Recordings saved in asciicast v2 format.
+- Recording browser with storage usage and clean-up by age or total size.
+- Playback with play/pause, restart, a seek bar and speed control.
 - Delete saved recordings.
-- Recording metadata includes title, dimensions, duration, size, creation time, and file path.
 
 ### Security and credential handling
 
-- OS keychain first where available, including macOS Keychain, Linux Secret Service, and Windows Credential Manager.
-- Encrypted vault fallback.
-- Vault encryption with AES-256-GCM and Argon2id-derived keys.
-- Secret store lock and unlock workflow.
-- Per-profile secret modes: Saved, Session only, and Ask every time.
+- OS keychain first where available: macOS Keychain, Linux Secret Service and Windows Credential Manager.
+- Encrypted vault fallback, using AES-256-GCM with an Argon2id-derived key.
+- Secret store lock and unlock workflow, with a master-password strength meter.
+- Per-credential secret modes: Save securely, Remember for this session, and Ask every time.
 - Encrypted storage for TOTP secrets.
 - Known host verification and known host management.
-- Audit log for security-relevant operations.
-- Audit entries for connections, disconnections, profile changes, secret access, imports, and exports.
-- Secrets are not written into audit entries.
+- Audit log of connections, disconnections, profile changes, credential access, imports and exports. Secrets are never written to it.
 - Encrypted profile exports with password-based AES-256-GCM encryption and Argon2id key derivation.
-- Plain profile export can redact inline secrets.
 
 ### Settings and maintenance
 
-- Application theme setting.
-- Terminal theme selection.
+- App theme (Pro, Midnight or Light) and terminal colour scheme.
 - Default protocol preference.
-- Default terminal font, size, scrollback, and cursor settings.
+- Default terminal font, size, scrollback and cursor settings.
 - Confirm-on-close and confirm-on-disconnect preferences.
-- Status bar visibility setting.
-- Sidebar width preference.
-- Native paste preference.
+- Status bar visibility and sidebar width.
 - Local shell selection.
 - Secret store settings.
 - Known hosts management.
-- Help and troubleshooting content inside settings.
-- Background and manual update checks.
-- Update checks report availability, current version, latest version, release notes, release URL, and publish date.
+- Help topics and troubleshooting inside Settings.
+- A background update check at launch, and a manual check in Settings → About.
 
 ## Website-ready summary
 
 ### Suggested headline
 
-Alchementary Link: one desktop workspace for SSH, files, sockets, remote desktops, repositories, and binary artefacts.
+Nexus Terminal: one native desktop workspace for SSH, files, sockets, serial consoles, remote desktops, chat and repositories.
 
 ### Suggested subheadline
 
-Manage SSH, Telnet, RAW TCP, VNC, GitHub, local shell, and Leviathan binary-analysis sessions from a fast tabbed interface with secure credentials, SFTP file transfer, split panes, snippets, recordings, automation, and artefact-inspection tools built in.
+Manage SSH, Telnet, RAW TCP, Serial, VNC, IRC, GitHub and local shell sessions from a fast tabbed interface with secure credentials, SFTP file transfer, split panes, snippets, recordings and automation built in.
 
 ### Short product description
 
-Alchementary Link helps developers, operators, support engineers, reverse engineers, firmware analysts, and homelab users manage many connections and artefacts without juggling separate tools. Save profiles, organise them with groups and tags, connect in tabs or split panes, move files over SFTP, inspect raw TCP traffic, open VNC desktops, browse GitHub repositories, triage binaries with Leviathan, and keep credentials protected with keychain and encrypted-vault storage.
+Nexus Terminal helps developers, operators, support engineers, network and hardware engineers, and homelab users manage many connections without juggling separate tools. Save profiles, organise them with groups and tags, connect in tabs or split panes, move files over SFTP, inspect raw TCP traffic, talk to serial devices, open VNC desktops, join IRC networks, browse GitHub repositories, and keep credentials protected with keychain and encrypted-vault storage.
 
 ### Product page feature bullets
 
-- All-in-one connection and analysis workspace for SSH, Telnet, RAW TCP, VNC, GitHub, local shells, and Leviathan tools.
-- Fast multi-session interface with tabs, pinned sessions, split panes, reconnect, and broadcast input.
-- Rich SSH support including agent auth, TOTP, jump hosts, proxies, port forwarding, startup commands, login scripts, and host key policies.
-- Built-in SFTP browser with upload, download, rename, delete, folders, bookmarks, drag-and-drop upload, and permission-aware directory picking.
-- RAW TCP tooling with text, hex, split views, payload presets, captures, timestamps, and byte-level sending.
-- VNC viewer with scale-to-fit, view-only mode, quality controls, shared sessions, and optional SSH tunnelling.
-- GitHub repository browser with organisation grouping, filtering, activity sorting, metadata, ZIP downloads, and GitHub Enterprise support.
-- Leviathan binary workbench with hex editing, hashes, entropy, strings, IOCs, carving, BinSnoop, structures, PDF/SquashFS inspection, transforms, rules, patching, case export, and spectrogram image/audio tools.
-- Secure credential model using OS keychain first, encrypted vault fallback, per-profile secret modes, known hosts, encrypted exports, and audit logging.
-- Productivity tools including command palette, snippets, trigger rules, session recording, terminal search, scrollback export, and local terminal.
+- All-in-one connection workspace for SSH, Telnet, RAW TCP, Serial, VNC, IRC, GitHub and local shells.
+- Native and fast: no webview, with a terminal that stays responsive under heavy output.
+- Multi-session interface with tabs, pinned sessions, split panes, reconnect and broadcast input.
+- Rich SSH support including agent auth and forwarding, TOTP, jump hosts, proxies, port forwarding, startup commands, login scripts and host key policies.
+- Built-in SFTP browser with upload, download, rename, delete, folders, bookmarks, drag-and-drop upload and permission-aware directory picking.
+- RAW TCP tooling with text, hex and split views, payload presets, captures, timestamps and byte-level sending.
+- Serial consoles with full line settings, flow control, DTR/RTS control and auto-reconnect on replug.
+- Native VNC viewer with scale-to-fit, view-only mode, quality controls, shared sessions and optional SSH tunnelling.
+- IRC client with rooms, nick completion, NickServ and mIRC formatting.
+- GitHub repository browser with organisation grouping, filtering, activity sorting, ZIP downloads and GitHub Enterprise support.
+- Secure credential model using the OS keychain first, encrypted vault fallback, per-credential secret modes, known hosts, encrypted exports and audit logging.
+- Productivity tools including command palette, snippets, trigger rules, session recording, terminal search, scrollback export and local terminal.
 
 ## Who it is for
 
-- Developers who connect to many application servers, staging environments, and production hosts.
+- Developers who connect to many application servers, staging environments and production hosts.
 - Platform and DevOps teams who need organised, secure access across infrastructure.
-- Support teams who troubleshoot customer systems, network appliances, and legacy Telnet devices.
-- Network and hardware engineers who need RAW TCP and Telnet tools beside normal SSH workflows.
-- Homelab users who want SSH, VNC, file transfer, and repo access in one desktop app.
-- Reverse engineers, firmware analysts, and security researchers who want binary triage beside their live operational sessions.
+- Support teams who troubleshoot customer systems, network appliances and legacy Telnet devices.
+- Network and hardware engineers who need RAW TCP, Telnet and serial tools beside normal SSH workflows.
+- Homelab users who want SSH, VNC, file transfer, serial consoles and repo access in one desktop app.
 
 ## Learn more
 

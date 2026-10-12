@@ -1,0 +1,123 @@
+\guidepart{amber}{Stay safe}{Stay safe}
+  {Passwords, keys and host checks, minus the jargon headache.}
+  {\partitem{\iLock}{Passwords and the vault}
+   \partitem{\iShield}{Host keys: is it really that server?}
+   \partitem{\iKey}{SSH keys}}
+
+% =========================================================================================
+\chapter{Passwords and the vault}\label{ch:secrets}
+\chapmeta{5 minutes}{You'll know exactly where your passwords live and who can read them}
+
+\begin{tldr}
+Passwords go in your OS keychain. If there isn't one, they go in an encrypted vault protected by a master password.
+For each password you choose: save it, remember it until you quit, or ask every time.
+\end{tldr}
+
+\section{Where secrets live}
+
+\begin{center}
+\begin{tikzpicture}[
+  box/.style={rounded corners=6pt, fill=#1!12, draw=#1!60, line width=0.6pt, minimum height=13mm, text width=40mm,
+    align=center, font=\small},
+  arr/.style={-latex, line width=0.8pt, color=muted}]
+  \node[box=accent] (need) {\heavy A session needs\\a password};
+  \node[box=green, right=12mm of need] (kc) {\heavy OS keychain\\{\footnotesize Keychain · Credential Manager · Secret Service}};
+  \node[box=amber, right=12mm of kc] (vault) {\heavy Encrypted vault\\{\footnotesize AES-256-GCM, Argon2id}};
+  \node[box=rose, below=9mm of kc] (ask) {\heavy Ask you\\{\footnotesize then carry on}};
+  \draw[arr] (need) -- (kc);
+  \draw[arr] (kc) -- node[above, font=\scriptsize]{not there?} (vault);
+  \draw[arr] (vault) |- node[pos=0.25, right, font=\scriptsize]{still not there?} (ask);
+\end{tikzpicture}
+\end{center}
+
+\begin{description}
+  \item[OS keychain first] macOS Keychain, Windows Credential Manager, or the Linux Secret Service (GNOME Keyring,
+        KWallet and friends).
+  \item[Encrypted vault as backup] If there's no keychain, or it refuses, secrets go into Nexus Terminal's own
+        vault: AES-256-GCM with a key derived from your master password by Argon2id using 128\,MiB of memory. In
+        plain English: very, very expensive to brute-force.
+\end{description}
+
+\section{Setting up the vault}
+
+\menu{Settings\then Security\then Initialise Secret Store}. Choose a master password; the strength meter goes from
+\proto[rose]{Weak} through \proto[amber]{Fair} and \proto[accent]{Good} to \proto[green]{Strong}. Unlock and lock it
+from the same page, from the palette, or by clicking the vault badge in the status bar. It locks itself when you quit.
+
+\crop{settings-security.png}{581}{253}{576}{285}{0.8\linewidth}{Security settings on a machine without an OS keychain: the vault does the job instead.}
+
+\begin{danger}[There's no ``forgot password'' link]
+Lose the master password and the secrets in the vault are gone for good. That's the point of encryption. Put it in
+your password manager.
+\end{danger}
+
+\section{Three ways to handle each password}
+
+Every password, passphrase, token or TOTP secret has its own setting:
+
+\begin{center}
+\begin{tabular}{@{}p{0.3\linewidth}p{0.3\linewidth}p{0.3\linewidth}@{}}
+  \begin{tcolorbox}[colback=green!8, boxrule=0pt, arc=6pt, fontupper=\small, height=33mm]
+    {\heavy\color{green!60!black}\iLock\ Save securely}\par\smallskip Stored in the keychain or vault and used automatically. Most convenient.
+  \end{tcolorbox} &
+  \begin{tcolorbox}[colback=accent!8, boxrule=0pt, arc=6pt, fontupper=\small, height=33mm]
+    {\heavy\color{accent!80!black}\iClock\ Remember for this session}\par\smallskip Asked once, kept in memory, never written to disk.
+  \end{tcolorbox} &
+  \begin{tcolorbox}[colback=amber!10, boxrule=0pt, arc=6pt, fontupper=\small, height=33mm]
+    {\heavy\color{amber!75!black}\iDetective\ Ask every time}\par\smallskip Asked on every single connection. Most paranoid.
+  \end{tcolorbox}
+\end{tabular}
+\end{center}
+
+When Nexus Terminal needs a secret it doesn't have, it asks. Press \kbd{Esc} or \ui{Cancel} to give up on that
+connection.
+
+\begin{sidequest}[What gets written down?]
+Connections, disconnections, profile changes, credential access, imports and exports go into an audit log in the
+database. Secrets themselves never do. TOTP secrets live in the keychain or vault too, never in the profile.
+\end{sidequest}
+
+% =========================================================================================
+\chapter{Host keys: is it really that server?}\label{ch:hostkeys}
+\chapmeta{3 minutes}{You'll understand the scary fingerprint dialog and what to do about it}
+
+\begin{tldr}
+Every SSH server has a fingerprint. Nexus Terminal remembers it the first time and shouts if it ever changes.
+A changed fingerprint means a reinstalled server, or someone in the middle. Find out which before carrying on.
+\end{tldr}
+
+Pick a policy per SSH profile under \ui{Host Verification}:
+
+\renewcommand\arraystretch{1.5}
+\begin{tabularx}{\linewidth}{@{}>{\leavevmode\heavy\color{ink}}p{48mm}X@{}}
+  \toprule
+  Strict (known hosts only)   & Only connects to servers you've already trusted.\\
+  Ask on new or changed keys  & Shows the fingerprint and asks. \ui{Accept \& Save} or \ui{Reject}. The default.\\
+  Accept new, reject changed  & Trusts first-time servers silently, still refuses changed keys.\\
+  Insecure (accept anything)  & Exactly what it says. Lab use only.\\
+  \bottomrule
+\end{tabularx}
+
+Under every policy except \emph{Insecure}, a key that differs from the saved one is rejected.
+
+\crop{settings-knownhosts.png}{581}{253}{576}{285}{0.8\linewidth}{Known hosts. Click a fingerprint to copy it; \ui{Remove} to forget a server.}
+
+\begin{headsup}
+Nexus Terminal keeps its own list of known hosts. It doesn't read \code{\textasciitilde/.ssh/known\_hosts}, so the
+first connection to each server asks once, even if your command-line \code{ssh} already knows it.
+\end{headsup}
+
+% =========================================================================================
+\chapter{SSH keys}\label{ch:keys}
+\chapmeta{2 minutes}{You'll have a key pair without memorising ssh-keygen flags}
+
+\menu{Session\then SSH key manager} (or the palette) lists the key pairs in \code{\textasciitilde/.ssh} with their type. Copy a
+public key to the clipboard (ready to paste into GitHub or \code{authorized\_keys}), delete a pair, or generate a new
+\proto[teal]{Ed25519}, \proto[accent]{RSA} (2048 or 4096 bits) or \proto[violet]{ECDSA} key with an optional passphrase.
+
+\crop{keys.png}{725}{523}{725}{546}{0.75\linewidth}{The SSH key manager.}
+
+\begin{protip}
+Not sure which type? Pick Ed25519. It's small, fast and secure. Key generation uses your system's
+\code{ssh-keygen}, which comes with macOS, Linux and Windows 10 and later.
+\end{protip}

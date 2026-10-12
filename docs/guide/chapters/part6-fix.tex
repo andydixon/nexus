@@ -1,0 +1,88 @@
+\guidepart{rose}{Fix it}{When things go wrong}
+  {Symptom first, fix second. No essays.}
+  {\partitem{\iLifebuoy}{Troubleshooting, by symptom}}
+\label{part:fix}
+
+% =========================================================================================
+\chapter{Troubleshooting, by symptom}\label{ch:trouble}
+\chapmeta{as long as it takes}{You'll find your symptom and the fix in one place}
+
+\begin{tldr}
+Find the heading that matches what you're seeing. Try the fixes in order. Most problems are the network, the
+password, or the baud rate.
+\end{tldr}
+
+\section{Connecting}
+
+\fix{``Authentication failed''}{%
+\begin{itemize}
+  \item Check the username, password, key path and the ticked \ui{Auth Methods}.
+  \item If the key has a passphrase, check how the passphrase is stored (\ui{Passphrase Mode}).
+  \item Two-factor server? Click \ui{Test} next to the TOTP secret and compare with your phone. Check your clock.
+  \item Saved password not being used? The vault might be locked: click \ui{Vault locked} in the status bar.
+\end{itemize}}
+
+\fix{``Host key verification failed''}{%
+The server's fingerprint changed since you last connected. That happens when a server is rebuilt, but it's also exactly
+what an attack looks like. \textbf{Check with whoever runs the server.} If it's legitimate:
+\menu{Settings\then Known Hosts}, \ui{Remove} the entry, reconnect and accept the new key.}
+
+\fix{It just says ``Connecting…'' forever}{%
+\begin{itemize}
+  \item Click \ui{Test} in the profile editor. If that fails too, it's the network, a firewall or the wrong port.
+  \item Behind a corporate proxy? Set one up under \ui{Proxy} (SSH profiles).
+  \item Going through a bastion? Check each jump host on its own first.
+\end{itemize}}
+
+\fix{The session keeps reconnecting}{%
+Check the network and the credentials, then the profile's auto-reconnect settings. Reconnection backs off (1\,s, 2\,s,
+4\,s… up to 30\,s) and stops after the maximum number of attempts.}
+
+\section{Serial}
+
+\fix{The port won't open}{%
+\begin{itemize}
+  \item Is the adapter plugged in? Hit refresh in the device list.
+  \item \textbf{Permission denied} on Linux: add yourself to \code{dialout} (or \code{uucp}), then log out and back in.
+  \item On a Mac, use \code{/dev/cu.*}, not \code{/dev/tty.*}.
+  \item \textbf{Port is in use by another program}: close \code{screen}, \code{minicom}, the Arduino IDE serial monitor or
+        whatever else has it open.
+\end{itemize}}
+
+\fix{Gibberish on screen}{The baud rate, parity or stop bits don't match the device. Check its manual.}
+
+\section{Remote desktops}
+
+\fix{VNC won't connect}{%
+\begin{itemize}
+  \item VNC ports are 5900 plus the display number: \code{:0} is 5900, \code{:1} is 5901.
+  \item Check the password and how it's stored.
+  \item Using an SSH tunnel? Check the tunnel's host, user, login method and key, and the host key policy.
+  \item Connecting to a Mac? Turn on password access in macOS Screen Sharing settings (see p.\,\pageref{ch:vnc}).
+\end{itemize}}
+
+\section{Files}
+
+\fix{Upload is greyed out or fails}{%
+The folder is probably \proto[amber]{READ ONLY} for your user. Pick another, or check permissions on the server. Uploads
+need an SSH session; other protocols can't do it.}
+
+\fix{``NO READ'' on a folder}{You don't have permission to look inside. Try the parent folder, or ask the server's admin.}
+
+\section{The terminal itself}
+
+\fix{The terminal is the wrong size}{%
+Resize the window or nudge a split divider; the terminal re-fits itself. Still wrong? Reconnect. Very old servers may
+prefer a different \ui{Terminal Type} in the profile (try \code{vt100}).}
+
+\fix{The scroll wheel moves the cursor instead of scrolling}{%
+You're in a full-screen program (\code{less}, \code{vim}, \code{tmux}). That's how terminals work: the wheel sends arrow keys
+there. Quit the program, or use its own scrolling (in \code{tmux}: \keys{Ctrl+B} then \kbd{[}).}
+
+\fix{Emoji are in black and white}{Known limitation: colour emoji show as monochrome glyphs. Everything else renders
+normally.}
+
+\begin{quickwin}[Still stuck?]
+Start Nexus Terminal with \code{--data-dir} pointing at an empty folder and try the same connection there. If it
+works, something in your profile is off; duplicate the working one and compare.
+\end{quickwin}

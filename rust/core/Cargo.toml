@@ -1,0 +1,38 @@
+[package]
+name = "nexus-core"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+rusqlite = { version = "0.37", features = ["bundled"] }
+uuid = { version = "1", features = ["v4"] }
+chrono = { version = "0.4", features = ["serde"] }
+argon2 = "0.5"
+aes-gcm = "0.10"
+rand = "0.8"
+base64 = "0.22"
+ureq = "3"
+keyring = { version = "3", features = ["apple-native", "windows-native", "async-secret-service", "tokio", "crypto-rust"] }
+russh = { version = "0.64.1", default-features = false, features = ["flate2", "ring", "rsa"] }
+russh-sftp = "3.0.1"
+tokio = { version = "1.53.2", features = ["full"] }
+sha2 = "0.11.0"
+hmac = "0.13.0"
+sha1 = "0.11.0"
+zeroize = "1"
+portable-pty = "0.9.0"
+serialport = { version = "4", default-features = false }
+des = "0.9"
+flate2 = "1"
+image = { version = "0.25", default-features = false, features = ["jpeg"] }
+
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+webpki-roots = "1"
+
+[dev-dependencies]
+tiny_http = "0.12"
+
+[target.'cfg(target_os = "linux")'.dev-dependencies]
+libc = "0.2"

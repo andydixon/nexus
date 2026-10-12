@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "salt": "uiC19v2mCz7XglOtlQwJgDe80p37X5XueedOqm2Av+w=",
+  "secrets": {
+    "profile:00000000-0000-0000-0000-000000000001:password": "MknPyD86GxFdJZipFyhRL8YiqkywXMP7JxD5PuVjgblss2zuloQ=",
+    "profile:00000000-0000-0000-0000-000000000001:totp": "DDeIJ7scepaK9ctzh46JDRuB9XRfMG7BMfDnqkwsMEuGdW6blJTddiJVVi4="
+  }
+}

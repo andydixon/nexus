@@ -1,42 +1,10 @@
 # ==========================================================================
-# Alchementary Link — .gitignore
+# Nexus Terminal — .gitignore
 # ==========================================================================
 
 # ── Build output ──────────────────────────────────────────────────────────
-build/bin/
-dist/
-
-# ── VSCode extensions: platform-specific build artifacts (never commit) ────
-# The Go bridge is compiled per-host by vscode/build.sh and staged into each
-# extension's bin/ — committing it ships a binary for the wrong OS/arch.
-vscode/bin/
-vscode/dist/
-vscode/*/bin/
-
-# ── Build platform resources (tracked — icons, plists, manifests) ─────────
-# build/darwin/, build/windows/, build/linux/ are tracked for icons & metadata
-
-# ── Go ────────────────────────────────────────────────────────────────────
-vendor/
-.tools/
-.cache/
-*.exe
-*.exe~
-*.dll
-*.so
-*.dylib
-*.test
-*.out
-__debug_bin*
-coverage.out
-coverage.html
-
-# ── Frontend ──────────────────────────────────────────────────────────────
-frontend/node_modules/
-frontend/src/js/lib/
-
-# ── Wails auto-generated bindings (recreated on every build) ──────────────
-frontend/wailsjs/
+rust/target/
+build/releases/
 
 # ── IDE / editor ──────────────────────────────────────────────────────────
 .idea/
@@ -44,20 +12,12 @@ frontend/wailsjs/
 *.swp
 *.swo
 *~
-*.sublime-project
-*.sublime-workspace
-.project
-.classpath
-.settings/
 
 # ── OS metadata ───────────────────────────────────────────────────────────
 .DS_Store
-.DS_Store?
 ._*
 Thumbs.db
-ehthumbs.db
 Desktop.ini
-$RECYCLE.BIN/
 
 # ── Application data (never commit user data or secrets) ──────────────────
 *.db
@@ -66,9 +26,12 @@ $RECYCLE.BIN/
 vault.json
 *.pem
 *.key
-!build/appicon.png
 
+# Compatibility fixtures generated from the last Go build are deliberate test data.
+!rust/core/tests/fixtures/**
 
-# Builds
-build/releases/v*
-build/releases/manifest*
+# Agent worktrees
+.claude/worktrees/
+
+# User guide LaTeX output
+docs/guide/build/

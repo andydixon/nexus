@@ -1,0 +1,483 @@
+//! SQLite persistence: profiles, known hosts, preferences, audit log, snippets and IRC channel
+//! state. The schema and migration files are the Go app's, so existing databases open unchanged.
+
+use crate::Result;
+use crate::models::*;
+use chrono::{DateTime, SecondsFormat};
+use rusqlite::{Connection, OptionalExtension, Row, params};
+use std::path::Path;
+use std::sync::Mutex;
+
+const MIGRATIONS: &[(i64, &str)] = &[
+    (1, include_str!("../migrations/001_initial.sql")),
+    (2, include_str!("../migrations/002_github_protocol.sql")),
+    (3, include_str!("../migrations/003_snippets.sql")),
+    (4, include_str!("../migrations/004_vnc_protocol.sql")),
+    (5, include_str!("../migrations/005_irc_protocol.sql")),
+    (6, include_str!("../migrations/006_irc_channel_state.sql")),
+    (7, include_str!("../migrations/007_serial_protocol.sql")),
+];
+
+const PROFILE_COLS: &str = "id, display_name, description, protocol, host, port, username,
+    tags, folder, environment, notes, favourite, last_connected,
+    connect_timeout, read_timeout,
+    terminal_font_family, terminal_font_size, terminal_scrollback, terminal_cursor_style,
+    ssh_config, telnet_config, raw_config, github_config, vnc_config, irc_config, serial_config,
+    created_at, updated_at";
+
+/// Formats like Go's `time.RFC3339` (whole seconds, `Z` for UTC).
+pub fn fmt_time(t: &Time) -> String {
+    t.to_rfc3339_opts(SecondsFormat::Secs, true)
+}
+
+pub fn parse_time(s: &str) -> Time {
+    DateTime::parse_from_rfc3339(s).unwrap_or_else(|_| zero_time())
+}
+
+pub struct Store {
+    db: Mutex<Connection>,
+}
+
+fn json_col<T: serde::Serialize>(v: &Option<T>) -> Option<String> {
+    v.as_ref().and_then(|v| serde_json::to_string(v).ok())
+}
+
+fn parse_col<T: serde::de::DeserializeOwned>(s: Option<String>) -> Option<T> {
+    s.filter(|s| !s.is_empty() && s != "null").and_then(|s| serde_json::from_str(&s).ok())
+}
+
+fn scan_profile(r: &Row) -> rusqlite::Result<Profile> {
+    let protocol: String = r.get(3)?;
+    let tags: String = r.get::<_, Option<String>>(7)?.unwrap_or_default();
+    let last: Option<String> = r.get(12)?;
+    Ok(Profile {
+        id: r.get(0)?,
+        display_name: r.get(1)?,
+        description: r.get::<_, Option<String>>(2)?.unwrap_or_default(),
+        protocol: Protocol::from_id(&protocol).unwrap_or_default(),
+        host: r.get(4)?,
+        port: r.get(5)?,
+        username: r.get::<_, Option<String>>(6)?.unwrap_or_default(),
+        tags: serde_json::from_str::<Option<Vec<String>>>(&tags).ok().flatten().unwrap_or_default(),
+        folder: r.get::<_, Option<String>>(8)?.unwrap_or_default(),
+        environment: r.get::<_, Option<String>>(9)?.unwrap_or_default(),
+        notes: r.get::<_, Option<String>>(10)?.unwrap_or_default(),
+        favourite: r.get::<_, Option<i64>>(11)?.unwrap_or(0) == 1,
+        last_connected: last.filter(|s| !s.is_empty()).and_then(|s| DateTime::parse_from_rfc3339(&s).ok()),
+        connect_timeout: r.get::<_, Option<i64>>(13)?.unwrap_or(0),
+        read_timeout: r.get::<_, Option<i64>>(14)?.unwrap_or(0),
+        terminal_font_family: r.get::<_, Option<String>>(15)?.unwrap_or_default(),
+        terminal_font_size: r.get::<_, Option<i64>>(16)?.unwrap_or(0),
+        terminal_scrollback: r.get::<_, Option<i64>>(17)?.unwrap_or(0),
+        terminal_cursor_style: r.get::<_, Option<String>>(18)?.unwrap_or_default(),
+        ssh: parse_col(r.get(19)?),
+        telnet: parse_col(r.get(20)?),
+        raw: parse_col(r.get(21)?),
+        github: parse_col(r.get(22)?),
+        vnc: parse_col(r.get(23)?),
+        irc: parse_col(r.get(24)?),
+        serial: parse_col(r.get(25)?),
+        created_at: parse_time(&r.get::<_, String>(26)?),
+        updated_at: parse_time(&r.get::<_, String>(27)?),
+    })
+}
+
+fn scan_known_host(r: &Row) -> rusqlite::Result<KnownHost> {
+    Ok(KnownHost {
+        id: r.get(0)?,
+        host: r.get(1)?,
+        port: r.get(2)?,
+        key_type: r.get(3)?,
+        fingerprint: r.get(4)?,
+        public_key: r.get(5)?,
+        first_seen: parse_time(&r.get::<_, String>(6)?),
+        last_seen: parse_time(&r.get::<_, String>(7)?),
+        trusted: r.get::<_, Option<i64>>(8)?.unwrap_or(1) == 1,
+    })
+}
+
+fn scan_snippet(r: &Row) -> rusqlite::Result<Snippet> {
+    let tags: String = r.get(5)?;
+    Ok(Snippet {
+        id: r.get(0)?,
+        name: r.get(1)?,
+        command: r.get(2)?,
+        description: r.get(3)?,
+        folder: r.get(4)?,
+        tags: serde_json::from_str::<Option<Vec<String>>>(&tags).ok().flatten().unwrap_or_default(),
+        created_at: parse_time(&r.get::<_, String>(6)?),
+        updated_at: parse_time(&r.get::<_, String>(7)?),
+    })
+}
+
+impl Store {
+    pub fn open(path: &Path) -> Result<Store> {
+        let db = Connection::open(path).map_err(|e| format!("storage: failed to open database: {e}"))?;
+        db.busy_timeout(std::time::Duration::from_secs(5))?;
+        db.pragma_update(None, "journal_mode", "WAL")?;
+        let s = Store { db: Mutex::new(db) };
+        s.migrate().map_err(|e| format!("storage: migration failed: {e}"))?;
+        Ok(s)
+    }
+
+    fn migrate(&self) -> Result<()> {
+        let db = self.db.lock().unwrap();
+        db.execute_batch("CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)")?;
+        let current: i64 = db.query_row("SELECT COALESCE(MAX(version), 0) FROM schema_version", [], |r| r.get(0))?;
+        for (ver, sql) in MIGRATIONS {
+            if *ver > current {
+                db.execute_batch(sql).map_err(|e| format!("failed to apply migration {ver:03}: {e}"))?;
+            }
+        }
+        Ok(())
+    }
+
+    fn profile_params(p: &Profile) -> [Box<dyn rusqlite::ToSql>; 25] {
+        [
+            Box::new(p.display_name.clone()),
+            Box::new(p.description.clone()),
+            Box::new(p.protocol.id()),
+            Box::new(p.host.clone()),
+            Box::new(p.port),
+            Box::new(p.username.clone()),
+            Box::new(serde_json::to_string(&p.tags).unwrap_or_else(|_| "[]".into())),
+            Box::new(p.folder.clone()),
+            Box::new(p.environment.clone()),
+            Box::new(p.notes.clone()),
+            Box::new(p.favourite as i64),
+            Box::new(p.last_connected.as_ref().map(fmt_time)),
+            Box::new(p.connect_timeout),
+            Box::new(p.read_timeout),
+            Box::new(p.terminal_font_family.clone()),
+            Box::new(p.terminal_font_size),
+            Box::new(p.terminal_scrollback),
+            Box::new(p.terminal_cursor_style.clone()),
+            Box::new(json_col(&p.ssh)),
+            Box::new(json_col(&p.telnet)),
+            Box::new(json_col(&p.raw)),
+            Box::new(json_col(&p.github)),
+            Box::new(json_col(&p.vnc)),
+            Box::new(json_col(&p.irc)),
+            Box::new(json_col(&p.serial)),
+        ]
+    }
+
+    pub fn create_profile(&self, p: &Profile) -> Result<()> {
+        let mut args: Vec<Box<dyn rusqlite::ToSql>> = vec![Box::new(p.id.clone())];
+        args.extend(Self::profile_params(p));
+        args.push(Box::new(fmt_time(&p.created_at)));
+        args.push(Box::new(fmt_time(&p.updated_at)));
+        let sql = format!("INSERT INTO profiles ({PROFILE_COLS}) VALUES ({})", vec!["?"; 28].join(","));
+        self.db
+            .lock()
+            .unwrap()
+            .execute(&sql, rusqlite::params_from_iter(args.iter().map(|b| b.as_ref())))
+            .map_err(|e| format!("storage: failed to create profile: {e}"))?;
+        Ok(())
+    }
+
+    pub fn update_profile(&self, p: &Profile) -> Result<()> {
+        let mut args: Vec<Box<dyn rusqlite::ToSql>> = Self::profile_params(p).into_iter().collect();
+        args.push(Box::new(fmt_time(&p.updated_at)));
+        args.push(Box::new(p.id.clone()));
+        let n = self
+            .db
+            .lock()
+            .unwrap()
+            .execute(
+                "UPDATE profiles SET display_name=?, description=?, protocol=?, host=?, port=?, username=?,
+                 tags=?, folder=?, environment=?, notes=?, favourite=?, last_connected=?,
+                 connect_timeout=?, read_timeout=?,
+                 terminal_font_family=?, terminal_font_size=?, terminal_scrollback=?, terminal_cursor_style=?,
+                 ssh_config=?, telnet_config=?, raw_config=?, github_config=?, vnc_config=?, irc_config=?, serial_config=?,
+                 updated_at=? WHERE id=?",
+                rusqlite::params_from_iter(args.iter().map(|b| b.as_ref())),
+            )
+            .map_err(|e| format!("storage: failed to update profile: {e}"))?;
+        if n == 0 {
+            return Err(format!("storage: profile {:?} not found", p.id).into());
+        }
+        Ok(())
+    }
+
+    pub fn get_profile(&self, id: &str) -> Result<Profile> {
+        self.db
+            .lock()
+            .unwrap()
+            .query_row(&format!("SELECT {PROFILE_COLS} FROM profiles WHERE id = ?"), [id], scan_profile)
+            .optional()?
+            .ok_or_else(|| format!("storage: profile {id:?} not found").into())
+    }
+
+    pub fn delete_profile(&self, id: &str) -> Result<()> {
+        let mut db = self.db.lock().unwrap();
+        let tx = db.transaction()?;
+        tx.execute("DELETE FROM irc_channel_state WHERE profile_id = ?", [id])?;
+        if tx.execute("DELETE FROM profiles WHERE id = ?", [id])? == 0 {
+            return Err(format!("storage: profile {id:?} not found").into());
+        }
+        tx.commit()?;
+        Ok(())
+    }
+
+    pub fn list_profiles(&self) -> Result<Vec<Profile>> {
+        let db = self.db.lock().unwrap();
+        let mut st = db.prepare(&format!("SELECT {PROFILE_COLS} FROM profiles ORDER BY display_name"))?;
+        let rows = st.query_map([], scan_profile)?.collect::<rusqlite::Result<Vec<_>>>()?;
+        Ok(rows)
+    }
+
+    pub fn set_favourite(&self, id: &str, fav: bool) -> Result<()> {
+        let n = self.db.lock().unwrap().execute("UPDATE profiles SET favourite = ?, updated_at = ? WHERE id = ?", params![fav as i64, fmt_time(&now()), id])?;
+        if n == 0 {
+            return Err(format!("storage: profile {id:?} not found").into());
+        }
+        Ok(())
+    }
+
+    pub fn update_last_connected(&self, id: &str) -> Result<()> {
+        let now = fmt_time(&now());
+        self.db.lock().unwrap().execute("UPDATE profiles SET last_connected = ?, updated_at = ? WHERE id = ?", params![now, now, id])?;
+        Ok(())
+    }
+
+    /// Imports profiles with a skip/overwrite/duplicate strategy; returns how many were written.
+    pub fn import_profiles(&self, profiles: Vec<Profile>, strategy: &str) -> Result<usize> {
+        if !matches!(strategy, "skip" | "overwrite" | "duplicate") {
+            return Err(format!("storage: unknown import strategy {strategy:?}").into());
+        }
+        let mut n = 0;
+        for mut p in profiles {
+            let exists = self.get_profile(&p.id).is_ok();
+            match (strategy, exists) {
+                ("skip", true) => continue,
+                ("overwrite", true) => {
+                    self.update_profile(&p)?;
+                    n += 1;
+                    continue;
+                }
+                ("duplicate", true) => {
+                    p.id = new_id();
+                    p.created_at = now();
+                    p.updated_at = p.created_at;
+                }
+                _ => {}
+            }
+            self.create_profile(&p)?;
+            n += 1;
+        }
+        Ok(n)
+    }
+
+    pub fn get_known_host(&self, host: &str, port: i64) -> Result<Option<KnownHost>> {
+        Ok(self
+            .db
+            .lock()
+            .unwrap()
+            .query_row(
+                "SELECT id, host, port, key_type, fingerprint, public_key, first_seen, last_seen, trusted
+                 FROM known_hosts WHERE host = ? AND port = ?",
+                params![host, port],
+                scan_known_host,
+            )
+            .optional()?)
+    }
+
+    pub fn save_known_host(&self, kh: &KnownHost) -> Result<()> {
+        self.db.lock().unwrap().execute(
+            "INSERT INTO known_hosts (id, host, port, key_type, fingerprint, public_key, first_seen, last_seen, trusted)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+             ON CONFLICT(host, port, key_type) DO UPDATE SET
+               fingerprint=excluded.fingerprint, public_key=excluded.public_key,
+               last_seen=excluded.last_seen, trusted=excluded.trusted",
+            params![
+                if kh.id.is_empty() { new_id() } else { kh.id.clone() },
+                kh.host,
+                kh.port,
+                kh.key_type,
+                kh.fingerprint,
+                kh.public_key,
+                fmt_time(&kh.first_seen),
+                fmt_time(&kh.last_seen),
+                kh.trusted as i64
+            ],
+        )?;
+        Ok(())
+    }
+
+    pub fn list_known_hosts(&self) -> Result<Vec<KnownHost>> {
+        let db = self.db.lock().unwrap();
+        let mut st = db.prepare(
+            "SELECT id, host, port, key_type, fingerprint, public_key, first_seen, last_seen, trusted
+             FROM known_hosts ORDER BY host, port",
+        )?;
+        let rows = st.query_map([], scan_known_host)?.collect::<rusqlite::Result<Vec<_>>>()?;
+        Ok(rows)
+    }
+
+    pub fn delete_known_host(&self, id: &str) -> Result<()> {
+        if self.db.lock().unwrap().execute("DELETE FROM known_hosts WHERE id = ?", [id])? == 0 {
+            return Err(format!("storage: known host {id:?} not found").into());
+        }
+        Ok(())
+    }
+
+    pub fn add_audit(&self, action: &str, profile_id: &str, session_id: &str, details: &str) {
+        let _ = self.db.lock().unwrap().execute(
+            "INSERT INTO audit_log (id, timestamp, action, profile_id, session_id, details) VALUES (?, ?, ?, ?, ?, ?)",
+            params![new_id(), fmt_time(&now()), action, profile_id, session_id, details],
+        );
+    }
+
+    pub fn list_audit(&self, limit: i64) -> Result<Vec<AuditEntry>> {
+        let db = self.db.lock().unwrap();
+        let mut st = db.prepare("SELECT id, timestamp, action, profile_id, session_id, details FROM audit_log ORDER BY timestamp DESC LIMIT ?")?;
+        let rows = st
+            .query_map([limit], |r| {
+                Ok(AuditEntry {
+                    id: r.get(0)?,
+                    timestamp: parse_time(&r.get::<_, String>(1)?),
+                    action: r.get(2)?,
+                    profile_id: r.get::<_, Option<String>>(3)?.unwrap_or_default(),
+                    session_id: r.get::<_, Option<String>>(4)?.unwrap_or_default(),
+                    details: r.get::<_, Option<String>>(5)?.unwrap_or_default(),
+                })
+            })?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        Ok(rows)
+    }
+
+    pub fn irc_last_rooms(&self, profile_id: &str) -> Result<Vec<String>> {
+        let db = self.db.lock().unwrap();
+        let mut st = db.prepare("SELECT room_name FROM irc_channel_state WHERE profile_id = ? ORDER BY position, room_name")?;
+        let rows = st.query_map([profile_id], |r| r.get(0))?.collect::<rusqlite::Result<Vec<String>>>()?;
+        Ok(rows)
+    }
+
+    pub fn save_irc_last_rooms(&self, profile_id: &str, rooms: &[String]) -> Result<()> {
+        let profile_id = profile_id.trim();
+        if profile_id.is_empty() {
+            return Err("storage: IRC channel state requires a profile ID".into());
+        }
+        let rooms = dedup_rooms(&[rooms]);
+        let mut db = self.db.lock().unwrap();
+        let tx = db.transaction()?;
+        tx.execute("DELETE FROM irc_channel_state WHERE profile_id = ?", [profile_id])?;
+        let now = fmt_time(&now());
+        for (i, room) in rooms.iter().enumerate() {
+            tx.execute(
+                "INSERT INTO irc_channel_state (profile_id, room_name, position, updated_at) VALUES (?, ?, ?, ?)",
+                params![profile_id, room, i as i64, now],
+            )?;
+        }
+        tx.commit()?;
+        Ok(())
+    }
+
+    pub fn preferences(&self) -> AppPreferences {
+        let v: Option<String> =
+            self.db.lock().unwrap().query_row("SELECT value FROM preferences WHERE key = '_all'", [], |r| r.get(0)).optional().ok().flatten();
+        let mut p = v.and_then(|v| serde_json::from_str::<AppPreferences>(&v).ok()).unwrap_or_default();
+        p.apply_defaults();
+        p
+    }
+
+    pub fn save_preferences(&self, p: &AppPreferences) -> Result<()> {
+        self.db.lock().unwrap().execute(
+            "INSERT INTO preferences (key, value) VALUES ('_all', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            [serde_json::to_string(p)?],
+        )?;
+        Ok(())
+    }
+
+    pub fn list_snippets(&self) -> Result<Vec<Snippet>> {
+        let db = self.db.lock().unwrap();
+        let mut st = db.prepare("SELECT id, name, command, description, folder, tags, created_at, updated_at FROM snippets ORDER BY name ASC")?;
+        let rows = st.query_map([], scan_snippet)?.collect::<rusqlite::Result<Vec<_>>>()?;
+        Ok(rows)
+    }
+
+    pub fn create_snippet(&self, s: &Snippet) -> Result<()> {
+        self.db.lock().unwrap().execute(
+            "INSERT INTO snippets (id, name, command, description, folder, tags, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            params![s.id, s.name, s.command, s.description, s.folder, serde_json::to_string(&s.tags)?, fmt_time(&s.created_at), fmt_time(&s.updated_at)],
+        )?;
+        Ok(())
+    }
+
+    pub fn update_snippet(&self, s: &Snippet) -> Result<()> {
+        self.db.lock().unwrap().execute(
+            "UPDATE snippets SET name=?, command=?, description=?, folder=?, tags=?, updated_at=? WHERE id=?",
+            params![s.name, s.command, s.description, s.folder, serde_json::to_string(&s.tags)?, fmt_time(&s.updated_at), s.id],
+        )?;
+        Ok(())
+    }
+
+    pub fn delete_snippet(&self, id: &str) -> Result<()> {
+        self.db.lock().unwrap().execute("DELETE FROM snippets WHERE id = ?", [id])?;
+        Ok(())
+    }
+}
+
+/// Trims, drops blanks and removes case-insensitive duplicates, keeping first-seen order.
+pub fn dedup_rooms(groups: &[&[String]]) -> Vec<String> {
+    let mut seen = std::collections::HashSet::new();
+    let mut out = vec![];
+    for g in groups {
+        for r in g.iter() {
+            let r = r.trim();
+            if !r.is_empty() && seen.insert(r.to_lowercase()) {
+                out.push(r.to_string());
+            }
+        }
+    }
+    out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn opens_go_database_and_migrates() {
+        let fx = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/link.db");
+        let tmp = std::env::temp_dir().join(format!("nexus-store-{}.db", std::process::id()));
+        std::fs::copy(fx, &tmp).unwrap();
+        let s = Store::open(&tmp).unwrap();
+        let ps = s.list_profiles().unwrap();
+        assert_eq!(ps.len(), 6);
+        let ssh = ps.iter().find(|p| p.protocol == Protocol::Ssh).unwrap();
+        assert!(ssh.favourite);
+        assert_eq!(ssh.tags, ["fixture", "ssh"]);
+        assert_eq!(ssh.last_connected.map(|t| fmt_time(&t)).as_deref(), Some("2026-01-02T03:04:05Z"));
+        let c = ssh.ssh.as_ref().unwrap();
+        assert_eq!(c.env_vars["LANG"], "en_GB.UTF-8");
+        assert_eq!(c.login_scripts.len(), 2);
+        assert_eq!(c.port_forwards[0].bind_port, 8080);
+        let irc = ps.iter().find(|p| p.protocol == Protocol::Irc).unwrap();
+        assert_eq!(s.irc_last_rooms(&irc.id).unwrap(), ["#rust", "#nexus"]);
+        assert_eq!(s.list_known_hosts().unwrap()[0].fingerprint, "SHA256:abc");
+        assert_eq!(s.list_snippets().unwrap()[0].command, "uptime");
+        assert_eq!(s.preferences().terminal_theme, "dracula");
+        // Migration 007 lets serial profiles in.
+        let mut p = Profile::new(Protocol::Serial);
+        p.host = "/dev/ttyUSB0".into();
+        p.normalize();
+        s.create_profile(&p).unwrap();
+        assert_eq!(s.get_profile(&p.id).unwrap(), p.clone().with_secs());
+        // Round trip of an existing row is lossless.
+        s.update_profile(ssh).unwrap();
+        assert_eq!(&s.get_profile(&ssh.id).unwrap(), ssh);
+        drop(s);
+        let _ = std::fs::remove_file(&tmp);
+    }
+
+    impl Profile {
+        /// Storage keeps whole seconds.
+        fn with_secs(mut self) -> Self {
+            self.created_at = parse_time(&fmt_time(&self.created_at));
+            self.updated_at = parse_time(&fmt_time(&self.updated_at));
+            self
+        }
+    }
+}
