@@ -90,9 +90,10 @@ shot editor-serial    --open editor:serial
 shot editor-telnet    --open editor:telnet
 shot editor-raw       --open editor:raw
 shot editor-vnc       --open editor:vnc
+shot editor-rdp       --open editor:rdp
 shot editor-irc       --open editor:irc
 shot editor-github    --open editor:github
-for t in general terminal security knownhosts help about; do shot "settings-$t" --open "settings:$t"; done
+for t in general terminal security knownhosts diagnostics help about; do shot "settings-$t" --open "settings:$t"; done
 shot keys             --open keys
 shot snippets         --open snippets
 shot triggers         --open triggers

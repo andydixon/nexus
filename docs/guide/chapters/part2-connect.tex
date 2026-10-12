@@ -1,9 +1,10 @@
 \guidepart{teal}{Connect}{Connect to all the things}
-  {Eight ways in. Pick the one you need; skip the rest.}
+  {Nine ways in. Pick the one you need; skip the rest.}
   {\partitem{\iTerminal}{SSH: the big one}
    \partitem{\iUsb}{Serial: cables and consoles}
    \partitem{\iPlug}{Telnet and RAW TCP}
    \partitem{\iDesktop}{VNC remote desktops}
+   \partitem{\iDesktop}{RDP: Windows desktops}
    \partitem{\iChat}{IRC}
    \partitem{\iGithub}{GitHub}}
 
@@ -46,6 +47,10 @@ in that box, so write \code{/home/you/.ssh/id\_ed25519} (or \code{C:\textbacksla
 Under \ui{Authentication}, tick which \ui{Auth Methods} to try: \ui{Public key}, \ui{Password} and
 \ui{Keyboard-interactive}. Under \ui{SSH Agent}, tick \ui{Use SSH Agent for Authentication} to use keys already
 loaded into \code{ssh-agent} (or Pageant, or the Windows OpenSSH agent).
+
+Got an SSH \emph{user certificate}? Put it next to the key with the usual name (\code{id\_ed25519-cert.pub} beside
+\code{id\_ed25519}) and Nexus Terminal presents it automatically. Servers that hand out \emph{host} certificates are
+covered in \hyperref[ch:hostkeys]{Host keys} (p.\,\pageref{ch:hostkeys}).
 
 Every password and passphrase has a \emph{mode}: save it securely, remember it until you quit, or ask every time.
 That's all explained in \hyperref[ch:secrets]{Passwords \& the vault} (p.\,\pageref{ch:secrets}).
@@ -222,6 +227,60 @@ standard VNC password authentication, not Apple's own login method.
 \end{headsup}
 
 % =========================================================================================
+\chapter{RDP: Windows desktops}\label{ch:rdp}
+\chapmeta{4 minutes}{You'll be on a Windows (or xrdp) desktop without leaving Nexus Terminal}
+
+\begin{tldr}
+Host, username, password. Nexus Terminal logs on with NLA, pins the server's certificate like an SSH host key, and
+can go through a proxy, an SSH tunnel or an RD Gateway.
+\end{tldr}
+
+\begin{glance}{rose}{RDP}
+  Default port & 3389\\
+  Logs in with & NLA (NTLM, or Kerberos with a KDC); \ui{Allow servers without NLA} for xrdp\\
+  Display      & \ui{Scale to Fit}, fixed size, \ui{Resize With Tab}\\
+  Extras       & Clipboard both ways, remote audio, printer, shared folder\\
+  Getting there & SOCKS5 or HTTP proxy, SSH tunnel, RD Gateway (experimental)\\
+\end{glance}
+
+\shot{rdp.png}{An xrdp desktop in a tab. Ctrl+Alt+Del and Paste Clipboard sit on the toolbar.}
+
+\section{Setting it up}
+
+\begin{enumerate}
+  \item \keys{\mod+N}, protocol \proto[rose]{RDP}.
+  \item \ui{Host} and \ui{Username}; add a \ui{Domain} if your account has one.
+  \item Pick how the password is kept (save it, remember it until you quit, or ask every time).
+  \item \ui{Create \& Connect}. The first time, you're shown the server's certificate fingerprint. Accept it if
+        it's the machine you meant.
+\end{enumerate}
+
+Windows checks your password \emph{before} it builds a desktop (Network Level Authentication), so a typo fails fast.
+Linux machines running xrdp don't speak NLA: tick \ui{Allow servers without NLA} for those. In an Active Directory
+shop, set a \ui{Kerberos KDC} (\code{host} or \code{host:port}) and use your realm as the domain.
+
+\begin{headsup}[A changed certificate]
+RDP servers mostly use self-signed certificates, so Nexus Terminal remembers the fingerprint in
+\ui{Known Hosts}. If it changes you get \ui{Reject}, \ui{Accept Once} or \ui{Accept \& Update}, and nothing (not even your
+password) is sent until you choose.
+\end{headsup}
+
+\section{While you're connected}
+
+It works like the VNC viewer: click the desktop to give it your keyboard, \ui{Ctrl+Alt+Del} sends exactly that, and
+text you copy on either side turns up on the other. With \ui{Resize With Tab} the remote desktop follows the tab's
+size (Windows does this; other servers are scaled).
+
+Under \ui{Devices}: \ui{Play Remote Audio}; \ui{Redirect Printer}, which adds a \emph{Nexus Terminal} printer whose jobs
+land as PostScript files in your Downloads folder; and (Linux and macOS) a \ui{Shared Folder} that shows up remotely as
+a drive called Nexus. The server can read and change that folder, and nothing outside it.
+
+\section{Getting through}
+
+Pick \emph{one} of: a \ui{Proxy} (SOCKS5 or HTTP CONNECT), an \ui{SSH Tunnel} (same as VNC), or an \ui{RD Gateway}
+(experimental: the gateway needs a proper public certificate and Basic authentication over HTTPS).
+
+% =========================================================================================
 \chapter{IRC}\label{ch:irc}
 \chapmeta{3 minutes}{You'll be chatting in your project's channels from the same window as your servers}
 
@@ -231,7 +290,8 @@ Nick, server, rooms to join. Tabs for each room, \code{/commands} as you'd expec
 
 \begin{glance}{amber}{IRC}
   Default port & 6667, or 6697 with \ui{Use TLS} (use TLS!)\\
-  Extras       & NickServ identify on connect, auto-join rooms, room browser, SSH tunnel\\
+  Logs in with & SASL PLAIN (most networks want this now), or NickServ identify\\
+  Extras       & Auto-join rooms, room browser, real message times (IRCv3 server-time), SSH tunnel\\
 \end{glance}
 
 \shot{irc.png}{Chatting in \#nexus. Rooms down the right, users in the room below them.}

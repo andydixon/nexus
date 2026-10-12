@@ -25,7 +25,8 @@ password, or the baud rate.
 \fix{``Host key verification failed''}{%
 The server's fingerprint changed since you last connected. That happens when a server is rebuilt, but it's also exactly
 what an attack looks like. \textbf{Check with whoever runs the server.} If it's legitimate:
-\menu{Settings\then Known Hosts}, \ui{Remove} the entry, reconnect and accept the new key.}
+choose \ui{Accept \& Update} in the warning (or \ui{Accept Once} to defer the decision). Under a Strict or Accept-new
+policy there's no prompt: \menu{Settings\then Known Hosts}, \ui{Remove} the entry and reconnect.}
 
 \fix{It just says ``Connecting…'' forever}{%
 \begin{itemize}
@@ -61,6 +62,15 @@ Check the network and the credentials, then the profile's auto-reconnect setting
   \item Connecting to a Mac? Turn on password access in macOS Screen Sharing settings (see p.\,\pageref{ch:vnc}).
 \end{itemize}}
 
+\fix{RDP won't connect}{%
+\begin{itemize}
+  \item Linux box running xrdp? Tick \ui{Allow servers without NLA}.
+  \item ``Logon failed''? Check the domain. Kerberos users: the KDC must be reachable directly, not through the proxy.
+  \item Certificate warning after a server rebuild? That's expected once; compare the fingerprint, then
+        \ui{Accept \& Update}.
+  \item Going through an RD Gateway? It needs a certificate from a public CA and Basic authentication over HTTPS.
+\end{itemize}}
+
 \section{Files}
 
 \fix{Upload is greyed out or fails}{%
@@ -86,3 +96,11 @@ normally.}
 Start Nexus Terminal with \code{--data-dir} pointing at an empty folder and try the same connection there. If it
 works, something in your profile is off; duplicate the working one and compare.
 \end{quickwin}
+
+\section{Still stuck?}
+
+\fix{Something odd that isn't on this list}{%
+Look at \code{nexus.log} in your data folder (\menu{Settings\then Diagnostics} shows where): connections, reconnects,
+host-key checks and errors, never passwords or what's on screen. Start Nexus Terminal with \code{RUST\_LOG=debug} for
+more detail. Reporting a bug? \ui{Copy Diagnostics} and paste it in.}
+

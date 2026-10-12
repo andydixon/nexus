@@ -105,6 +105,10 @@ fn main() {
     vnc.vnc.as_mut().unwrap().vnc_port = 42900;
     vnc.vnc.as_mut().unwrap().scale_to_fit = true;
     profiles.push(vnc);
+    let mut rdp = mk(Protocol::Rdp, "Design workstation", "192.0.2.60", 0, "Home", false);
+    rdp.username = "andy".into();
+    rdp.rdp.as_mut().unwrap().domain = "STUDIO".into();
+    profiles.push(rdp);
 
     for p in profiles {
         svc.create_profile(p).unwrap();

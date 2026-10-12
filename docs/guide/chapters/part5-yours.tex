@@ -1,5 +1,5 @@
 \guidepart{pink}{Make it yours}{Make it yours}
-  {Settings, backups, and moving in from Alchementary Link.}
+  {Settings, backups, and keeping several computers in step.}
   {\partitem{\iGear}{Settings}
    \partitem{\iUpload}{Import and export}
    \partitem{\iPlane}{Moving house}}
@@ -14,18 +14,24 @@ then click \ui{Save}.
 \begin{center}\begin{minipage}[t]{0.49\linewidth}\crop{settings-general.png}{581}{253}{576}{285}{\linewidth}{General}\end{minipage}\hfill\begin{minipage}[t]{0.49\linewidth}\crop{settings-terminal.png}{581}{253}{576}{285}{\linewidth}{Terminal}\end{minipage}\end{center}
 
 \begin{description}
-  \item[General] App theme (Pro, Midnight, Light), default protocol for new profiles, whether to ask before closing or
-        disconnecting, status bar on or off, sidebar width, and the local shell (leave it empty for the system default,
-        or \ui{Browse…} for one).
+  \item[General] App theme (Pro, Midnight, Light), default protocol for new profiles, \ui{Restore tabs at launch}
+        (saved connections reconnect, local shells reopen in the folder they were in), whether to ask before closing or
+        disconnecting, whether remote programs may write to your clipboard, a confirmation before pasting several lines,
+        the update check, status bar, sidebar width, and the local shell (empty for the system default, or
+        \ui{Browse…}).
   \item[Terminal] Colour scheme, font, size, scrollback and cursor style. These are the defaults for new profiles;
         each profile can override them.
-  \item[Security] Keychain and vault status; set up, unlock or lock the vault.
-  \item[Known Hosts] Saved server fingerprints, with first-seen and last-seen times.
+  \item[Security] Keychain and vault status; set up, unlock or lock the vault; change the master password; your
+        stored credentials; profile sync.
+  \item[Known Hosts] Saved server fingerprints, with first-seen and last-seen times; import and export
+        \code{known\_hosts}; trusted SSH certificate authorities.
+  \item[Diagnostics] Version, platform, where your data and log live, and the state of the keychain, vault and sync.
+        \ui{Copy Diagnostics} for bug reports (never includes credentials).
   \item[Help] Built-in help: connection types, shortcuts and troubleshooting, when this guide isn't to hand.
   \item[About] Version, \ui{Check for Updates} and \ui{Import \textasciitilde/.ssh/config}.
 \end{description}
 
-\crop{settings-help.png}{581}{253}{576}{285}{0.8\linewidth}{The built-in help, for when this guide isn't to hand.}
+\crop{settings-diagnostics.png}{604}{600}{604}{20}{0.8\linewidth}{Diagnostics: everything a bug report needs, nothing secret.}
 
 \section{Updates}
 
@@ -44,47 +50,56 @@ reads it back. Already have an \code{\textasciitilde/.ssh/config}? Import that t
 \begin{description}
   \item[Encrypted export] Choose the profiles, set a password, save a \code{.nexus} file. Saved passwords aren't
         included, so the file is safe to email to yourself.
-  \item[Encrypted import] Pick a \code{.nexus} (or an old \code{.link}) file, enter its password and decide what happens to
+  \item[Encrypted import] Pick a \code{.nexus} file, enter its password and decide what happens to
         profiles that already exist: \ui{Skip existing}, \ui{Overwrite existing} or \ui{Create duplicates}.
   \item[JSON] \ui{Export Profiles (JSON)} and \ui{Import Profiles (JSON)} are in the palette. Tick
-        \ui{Include secrets} to keep proxy passwords and TOTP secrets, which are otherwise left out.
+        \ui{Include secrets} to keep passwords typed by login scripts, which are otherwise blanked. Proxy passwords and
+        TOTP secrets live in the keychain or vault, so no export carries them.
   \item[OpenSSH config] \menu{File\then Import \textasciitilde/.ssh/config} turns your \code{Host} blocks into profiles,
         with host names, users, ports, identity files and jump hosts.
 \end{description}
 
-\crop{export.png}{894}{357}{872}{380}{0.55\linewidth}{Exporting profiles. Everything's ticked to start with; untick what you don't want.}
+\crop{export.png}{906}{388}{904}{390}{0.55\linewidth}{Exporting profiles. Everything's ticked to start with; untick what you don't want.}
 
 \begin{danger}[JSON with secrets is not encrypted]
-A JSON export with \ui{Include secrets} ticked has those secrets in plain text. Use the encrypted \code{.nexus} export to
+A JSON export with \ui{Include secrets} ticked has those login-script passwords in plain text. Use the encrypted \code{.nexus} export to
 move things between machines.
 \end{danger}
 
 % =========================================================================================
 \chapter{Moving house}\label{ch:move}
-\chapmeta{2 minutes}{You'll know what came over from Alchementary Link and what didn't}
+\chapmeta{3 minutes}{Your connections will follow you from laptop to desktop to work machine}
 
 \begin{tldr}
-It's automatic. First run copies your Alchementary Link profiles, vault and recordings. Your old folder is left
-alone. Recreate trigger rules and SFTP bookmarks by hand.
+Pick a folder every machine can see, set the same sync password on each, done. Profiles stay in step; passwords
+stay put on each machine.
 \end{tldr}
 
-When Nexus Terminal starts for the first time and finds an \code{AlchementaryLink} folder next to where its own data
-goes, it \emph{copies} \code{link.db} to \code{nexus.db}, along with the \code{vault/} and \code{recordings/} folders,
-and shows a toast saying where they came from.
+\section{Profile sync}
+
+\menu{Settings\then Security\then Profile sync}. \ui{Choose…} a folder your machines share (Dropbox, iCloud Drive,
+OneDrive, Nextcloud, a network share, or a git checkout you commit) and set the same \ui{Sync password} everywhere.
+Nexus Terminal keeps one encrypted file there, \code{nexus-profiles.nexus}, and merges it at launch, a few seconds
+after you change a profile, every ten minutes and whenever you click \ui{Sync Now}.
 
 \begin{checklist}
-  \item[\color{green}\iCheck] Profiles, groups, favourites, known hosts, snippets and preferences
-  \item[\color{green}\iCheck] Vault (same master password as before)
-  \item[\color{green}\iCheck] Recordings
-  \item[\color{green}\iCheck] Keychain passwords: picked up the first time each one is needed, then copied across
-  \item[\color{green}\iCheck] Old \code{.link} export files still import
-  \item[\color{rose}\ph{E4F6}] Trigger rules and SFTP bookmarks (they lived in the old app's web storage)
+  \item[\color{green}\iCheck] Edited on two machines? The newer change wins, profile by profile.
+  \item[\color{green}\iCheck] Deleted on one machine? It goes from the others too (unless someone edited it afterwards).
+  \item[\color{rose}\ph{E4F6}] Passwords, keys and tokens never sync. Each machine keeps its own in its keychain or vault.
 \end{checklist}
 
+\crop{settings-security.png}{581}{253}{576}{285}{0.8\linewidth}{Profile sync lives on the Security page, under your stored credentials.}
+
 \begin{headsup}
-If a \code{NexusTerminal/nexus.db} already exists (say, from before the Alchementary Link rebrand), it's used as it is
-and nothing is copied.
+Lose the sync password and the sync file can't be read, just like an encrypted export. Your local profiles are
+fine.
 \end{headsup}
+
+\section{One-off moves}
+
+Not worth setting up sync? \menu{File\then Export profiles…} on the old machine, \menu{File\then Import profiles…}
+on the new one (see \hyperref[ch:transfer]{Import and export}). Known hosts travel the same way through
+\ui{Export…} and \ui{Import} on the Known Hosts page.
 
 \section{Where everything lives}
 
@@ -98,7 +113,8 @@ and nothing is copied.
 \end{tabularx}
 
 Inside: \code{nexus.db} (profiles, known hosts, preferences, snippets, IRC state and the audit log),
-\code{vault/vault.json}, \code{recordings/}, \code{triggers.json} and \code{sftp-bookmarks.json}. Keychain entries are
+\code{vault/vault.json}, \code{recordings/}, \code{triggers.json}, \code{sftp-bookmarks.json} and \code{nexus.log}, the
+diagnostic log. Keychain entries are
 stored under the service name \code{NexusTerminal}.
 
 \begin{protip}[Try things without touching your real data]

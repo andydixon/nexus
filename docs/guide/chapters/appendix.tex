@@ -44,6 +44,7 @@
   \shortcut{Next / previous match}{\kbd{Enter} / \keys{Shift+Enter}}
   \shortcut{Scroll a page}{\keys{Shift+PageUp}}
   \shortcut{Top / bottom}{\keys{Shift+Home} / \kbd{End}}
+  \shortcut{Previous / next prompt}{\keys{\mod+Shift+Up} / \kbd{Down}}
   \shortcut{Open link}{\kbd{Ctrl}/\kbd{\ph{E1C4}} + click}}
 
 \sheet{pink}{\iMap\enspace Mouse moves}{%
@@ -63,8 +64,11 @@
   --data-dir DIR        & Use another data folder (portable installs, demos, testing).\\
   --theme pro|midnight|light & Start with this theme.\\
   --connect NAME        & Connect to a saved profile by name at startup. Repeat it for several.\\
-  --open WINDOW         & Open a window at startup: \code{settings}, \code{settings:security}, \code{snippets},
-                          \code{keys}, \code{recordings}, \code{palette}, \code{quick}…\\
+  --open WINDOW         & Open a window at startup: \code{settings}, \code{settings:security},
+                          \code{settings:diagnostics}, \code{snippets}, \code{keys}, \code{recordings}, \code{palette},
+                          \code{quick}…\\
+  --run-local CMD       & Open a local shell and run a command in it.\\
+  RUST\_LOG=debug        & (environment) More detail in \code{nexus.log}, and on the terminal you started from.\\
   --version             & Print the version and exit.\\
   \bottomrule
 \end{tabularx}
@@ -87,13 +91,18 @@ rerun the script, rebuild the guide.
   \item[Bastion / jump host] A server you go \emph{through} to reach the ones behind it.
   \item[Baud rate] How fast a serial line talks. Both ends must agree.
   \item[Broadcast] Typing into several sessions at once.
+  \item[Certificate authority] A key that vouches for other keys, so servers signed by it are trusted without a prompt.
   \item[DTR / RTS] Serial control lines. Some boards use them for reset or flashing.
   \item[Fingerprint] A short summary of a server's host key, used to spot imposters.
   \item[Host key] A server's identity. Changes when it's rebuilt, or when someone's pretending.
   \item[Keychain] Your operating system's password store.
+  \item[NLA] Network Level Authentication: Windows checks your password before building a desktop.
+  \item[OSC 133] The escape codes a shell uses to mark its prompts, which powers shell integration.
   \item[Port forward] A tunnel carrying one TCP port through SSH.
   \item[Profile] A saved connection.
   \item[RAW TCP] A plain socket: bytes in, bytes out, no terminal rules.
+  \item[RDP] Microsoft's Remote Desktop Protocol, for Windows (and xrdp) desktops.
+  \item[SASL] How IRC networks log you in while you connect, instead of messaging NickServ afterwards.
   \item[SFTP] File transfer over SSH.
   \item[Snippet] A saved command, optionally with blanks to fill in.
   \item[TOTP] Time-based one-time passwords: the six digits from your authenticator app.

@@ -51,7 +51,7 @@ fn empty_state(app: &mut App, ui: &mut Ui) {
         ui.vertical_centered(|ui| {
             ui.add(egui::Image::new(&crate::chrome::logo(ui.ctx())).fit_to_exact_size(vec2(84.0, 84.0)));
             ui.label(RichText::new("Nexus Terminal").font(theme::semibold(28.0)));
-            ui.label(RichText::new("SSH · Telnet · RAW · Serial · VNC · IRC · GitHub").color(t.text_dim));
+            ui.label(RichText::new("SSH · Telnet · RAW · Serial · VNC · RDP · IRC · GitHub").color(t.text_dim));
             ui.add_space(18.0);
             ui.horizontal(|ui| {
                 ui.add_space((ui.available_width() - 330.0).max(0.0) / 2.0);

@@ -30,7 +30,9 @@ Right-click a tab for everything. \keys{\mod+Shift+D} splits right, \keys{\mod+S
   \item[Switch] \keys{\mod+Tab} and \keys{\mod+Shift+Tab}, or \keys{\mod+1} to \keys{\mod+9}.
 \end{description}
 
-Lots of tabs? Scroll the tab strip with your mouse wheel or trackpad.
+Lots of tabs? Scroll the tab strip with your mouse wheel or trackpad. Quit with a dozen open and they're all back next
+time: \ui{Restore tabs at launch} (on by default) reconnects saved profiles and reopens local shells, splits and all,
+in the folder they were in.
 
 \section{Split panes}
 
@@ -62,9 +64,10 @@ Select to copy, \keys{\mod+F} to search, Ctrl/\ph{E1C4}-click links. Right-click
   \toprule
   Copy   & Select text, then \keys{\mod+C}. Nothing selected? \keys{Ctrl+C} interrupts the program as usual.\\
   Paste  & \keys{\mod+V}. Pastes are bracketed when the program asks for it, so editors won't auto-indent your paste
-           into a staircase.\\
+           into a staircase. Pasting several lines into a shell asks first (turn that off in Settings).\\
   Select & Drag for a range, double-click a word, triple-click a line, \kbd{Shift}-click to extend.\\
-  Links  & Hold \kbd{Ctrl} (\kbd{\ph{E1C4}}) and click a URL to open it in your browser.\\
+  Links  & Hold \kbd{Ctrl} (\kbd{\ph{E1C4}}) and click a URL to open it in your browser. Real hyperlinks that
+           programs print (\code{ls --hyperlink}, compilers) get a dotted underline; hover to see where they really go.\\
   Scroll & Mouse wheel, or \keys{Shift+PageUp}, \keys{Shift+PageDown}, \keys{Shift+Home}, \keys{Shift+End}.\\
   \bottomrule
 \end{tabularx}
@@ -77,8 +80,34 @@ wheel sends arrow keys instead of scrolling. Programs with mouse support (\code{
 
 \section{The right-click menu}
 
-\ui{Copy}, \ui{Paste}, \ui{Select All}, \ui{Find}, \ui{Send Snippet}, \ui{Port Forwards} (SSH), \ui{Split Right},
-\ui{Split Down}, \ui{Export Output} (saves the whole scrollback as a text file), \ui{Clear} and \ui{Reset}.
+\ui{Copy}, \ui{Paste}, \ui{Select All}, \ui{Find}, \ui{Previous Prompt} / \ui{Next Prompt}, \ui{Copy Last Command
+Output}, \ui{Send Snippet}, \ui{Port Forwards} (SSH), \ui{Split Right}, \ui{Split Down}, \ui{Export Output} (saves the
+whole scrollback as a text file), \ui{Clear} and \ui{Reset}.
+
+\section{Shell integration}
+
+If your shell marks its prompts (fish 4, Starship and Powerlevel10k do already), Nexus Terminal knows where every
+command starts and stops. \keys{\mod+Shift+Up} and \keys{\mod+Shift+Down} jump from prompt to prompt,
+\ui{Copy Last Command Output} grabs just what the last command printed, and a thin bar beside each prompt shows how it
+went: green for success, red for failure. Hover the bar for the exit code and how long it took.
+
+\shot{shell-integration.png}{\code{make test} failed (red bar), \code{ls} worked (green bar).}
+
+For bash, add this to \code{\textasciitilde/.bashrc} on the machine the shell runs on (the user manual has the zsh
+version):
+
+\begin{verbatim}
+PS0='\[\e]133;C\a\]'
+PROMPT_COMMAND='printf "\033]133;D;%s\007" "$?"; '"${PROMPT_COMMAND}"
+PS1='\[\e]133;A\a\]'"$PS1"'\[\e]133;B\a\]'
+\end{verbatim}
+
+\section{Pictures in the terminal}
+
+Programs that print images the iTerm2 way (\code{imgcat}, \code{wezterm imgcat}, \code{chafa -f iterm}) show PNG,
+JPEG and GIF images right in the scrollback. They scroll with the text and never spill past the edge.
+
+\shot{inline-image.png}{An image printed by a script, with the text carrying on underneath.}
 
 \section{Find}
 
@@ -168,7 +197,8 @@ Click the \iFolder{} on an SSH tab. Or drop a file onto the terminal and choose 
 \section{The SFTP browser}
 
 Click the \iFolder{} folder icon on an SSH tab, \menu{Session\then SFTP browser}, or type ``sftp'' in the palette.
-It opens in the side dock next to your terminal.
+It opens in the side dock next to your terminal, in the folder your shell is in if the shell reports it
+(fish does; bash and zsh need a one-line hook, see the user manual).
 
 \shot{sftp.png}{Browsing the server's files next to the terminal.}
 

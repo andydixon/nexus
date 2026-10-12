@@ -3710,7 +3710,7 @@ dependencies = [
 
 [[package]]
 name = "nexus"
-version = "0.1.0"
+version = "3.0.1"
 dependencies = [
  "alacritty_terminal",
  "arboard",
@@ -3735,7 +3735,7 @@ dependencies = [
 
 [[package]]
 name = "nexus-core"
-version = "0.1.0"
+version = "3.0.1"
 dependencies = [
  "aes-gcm 0.10.3",
  "argon2 0.5.3",

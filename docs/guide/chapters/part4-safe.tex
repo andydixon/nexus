@@ -72,6 +72,12 @@ Every password, passphrase, token or TOTP secret has its own setting:
 When Nexus Terminal needs a secret it doesn't have, it asks. Press \kbd{Esc} or \ui{Cancel} to give up on that
 connection.
 
+\section{Seeing and changing what's saved}
+
+\ui{Stored credentials} on the Security page lists every saved password, passphrase and token by profile, and whether
+it's in the keychain or the vault. \ui{Forget} deletes one. \ui{Change Master Password…} re-encrypts the whole vault
+under a new password in one go.
+
 \begin{sidequest}[What gets written down?]
 Connections, disconnections, profile changes, credential access, imports and exports go into an audit log in the
 database. Secrets themselves never do. TOTP secrets live in the keychain or vault too, never in the profile.
@@ -82,7 +88,7 @@ database. Secrets themselves never do. TOTP secrets live in the keychain or vaul
 \chapmeta{3 minutes}{You'll understand the scary fingerprint dialog and what to do about it}
 
 \begin{tldr}
-Every SSH server has a fingerprint. Nexus Terminal remembers it the first time and shouts if it ever changes.
+Every SSH server (and every RDP server, via its certificate) has a fingerprint. Nexus Terminal remembers it the first time and shouts if it ever changes.
 A changed fingerprint means a reinstalled server, or someone in the middle. Find out which before carrying on.
 \end{tldr}
 
@@ -92,20 +98,30 @@ Pick a policy per SSH profile under \ui{Host Verification}:
 \begin{tabularx}{\linewidth}{@{}>{\leavevmode\heavy\color{ink}}p{48mm}X@{}}
   \toprule
   Strict (known hosts only)   & Only connects to servers you've already trusted.\\
-  Ask on new or changed keys  & Shows the fingerprint and asks. \ui{Accept \& Save} or \ui{Reject}. The default.\\
+  Ask on new or changed keys  & Shows the fingerprint and asks. New: \ui{Accept \& Save} or \ui{Reject}. Changed:
+                                \ui{Reject}, \ui{Accept Once} or \ui{Accept \& Update}. The default.\\
   Accept new, reject changed  & Trusts first-time servers silently, still refuses changed keys.\\
   Insecure (accept anything)  & Exactly what it says. Lab use only.\\
   \bottomrule
 \end{tabularx}
 
-Under every policy except \emph{Insecure}, a key that differs from the saved one is rejected.
+Under \emph{Strict} and \emph{Accept new}, a key that differs from the saved one is rejected outright.
 
 \crop{settings-knownhosts.png}{581}{253}{576}{285}{0.8\linewidth}{Known hosts. Click a fingerprint to copy it; \ui{Remove} to forget a server.}
 
-\begin{headsup}
-Nexus Terminal keeps its own list of known hosts. It doesn't read \code{\textasciitilde/.ssh/known\_hosts}, so the
-first connection to each server asks once, even if your command-line \code{ssh} already knows it.
-\end{headsup}
+\begin{quickwin}
+Nexus Terminal keeps its own list, but \ui{Import \textasciitilde/.ssh/known\_hosts} brings in everything your
+command-line \code{ssh} already trusts (hashed names can't be read back, so those are skipped). \ui{Export…} goes the
+other way, in OpenSSH format.
+\end{quickwin}
+
+\section{Certificate authorities}
+
+Big estates sign host keys with an SSH certificate authority instead of handing out fingerprints. \ui{Trust a CA…}
+adds the CA's public key for a host pattern in OpenSSH style (\code{*.corp.example}, \code{[jump.example]:2222},
+\code{!old.corp.example}); \code{@cert-authority} lines in an imported \code{known\_hosts} do the same. A server the CA
+covers must then show a certificate the CA signed, naming that host and in date. It's trusted without a prompt, and
+anything else is refused.
 
 % =========================================================================================
 \chapter{SSH keys}\label{ch:keys}
@@ -118,6 +134,6 @@ public key to the clipboard (ready to paste into GitHub or \code{authorized\_key
 \crop{keys.png}{725}{523}{725}{546}{0.75\linewidth}{The SSH key manager.}
 
 \begin{protip}
-Not sure which type? Pick Ed25519. It's small, fast and secure. Key generation uses your system's
-\code{ssh-keygen}, which comes with macOS, Linux and Windows 10 and later.
+Not sure which type? Pick Ed25519. It's small, fast and secure. Keys are generated inside Nexus Terminal and
+saved in the usual OpenSSH format, so \code{ssh} and \code{git} can use them too.
 \end{protip}

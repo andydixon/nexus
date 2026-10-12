@@ -4,7 +4,7 @@ members = ["core", "app"]
 exclude = ["fuzz"]
 
 [workspace.package]
-version = "0.1.0"
+version = "3.0.1"
 edition = "2024"
 
 [profile.dev.package."*"]
