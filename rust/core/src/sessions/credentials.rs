@@ -149,6 +149,7 @@ impl Manager {
                     Err(_) => Err("host key prompt failed: host key prompt timed out waiting for user response".into()),
                 }
             };
+            tracing::info!(host = %k.host, port = k.port, key_type = %k.key_type, fingerprint = %k.fingerprint, ?policy, known = stored.is_some(), "checking host key");
             match (policy, stored) {
                 (HostKeyPolicy::Insecure, None) | (HostKeyPolicy::AcceptNew, None) => save(),
                 (HostKeyPolicy::Insecure, Some(s)) => touch(s),

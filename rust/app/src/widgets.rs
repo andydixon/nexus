@@ -136,7 +136,7 @@ pub fn is_web_url(url: &str) -> bool {
 /// Opens `url` in the browser if it is a web link; returns false (and opens nothing) otherwise.
 pub fn open_web_url(ctx: &egui::Context, url: &str) -> bool {
     if !is_web_url(url) {
-        eprintln!("refusing to open non-web URL {url:?}");
+        tracing::warn!(url, "refusing to open a non-web URL");
         return false;
     }
     ctx.open_url(egui::OpenUrl::new_tab(url.trim()));

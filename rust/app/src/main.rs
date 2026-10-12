@@ -114,6 +114,8 @@ fn main() -> eframe::Result {
             std::process::exit(1);
         }
     };
+    init_logging(&svc.config.data_dir);
+    tracing::info!(version = nexus_core::service::VERSION, "starting");
     let headless = opts.screenshot.is_some();
     let native = eframe::NativeOptions {
         persist_window: !headless,
@@ -138,4 +140,24 @@ fn main() -> eframe::Result {
 fn window_icon() -> egui::IconData {
     let img = image::load_from_memory(chrome::LOGO_PNG).map(|i| i.to_rgba8()).unwrap_or_default();
     egui::IconData { width: img.width(), height: img.height(), rgba: img.into_raw() }
+}
+
+/// Diagnostics go to `nexus.log` in the data directory (rotated at 5 MiB), and to stderr too when
+/// RUST_LOG is set. RUST_LOG also sets the level (default: info for Nexus, warn for libraries).
+/// Connection lifecycle, host-key checks and errors are logged; credentials and terminal data never.
+fn init_logging(data_dir: &std::path::Path) {
+    use tracing_subscriber::prelude::*;
+    let path = data_dir.join("nexus.log");
+    if std::fs::metadata(&path).is_ok_and(|m| m.len() > 5 << 20) {
+        let _ = std::fs::rename(&path, data_dir.join("nexus.log.1"));
+    }
+    let mut opts = std::fs::OpenOptions::new();
+    opts.create(true).append(true);
+    #[cfg(unix)]
+    std::os::unix::fs::OpenOptionsExt::mode(&mut opts, 0o600);
+    let file = opts.open(&path).ok().map(|f| tracing_subscriber::fmt::layer().with_ansi(false).with_writer(std::sync::Mutex::new(f)));
+    let stderr = std::env::var_os("RUST_LOG").map(|_| tracing_subscriber::fmt::layer().with_writer(std::io::stderr));
+    let filter = tracing_subscriber::EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("warn,nexus_terminal=info,nexus_core=info"));
+    let _ = tracing_subscriber::registry().with(filter).with(file).with(stderr).try_init();
 }

@@ -434,6 +434,7 @@ The directory holds:
 - `recordings/` — session recordings
 - `triggers.json` — trigger rules
 - `sftp-bookmarks.json` — SFTP bookmarks
+- `nexus.log` — the diagnostic log (owner-only, rotated to `nexus.log.1` at 5 MiB): connections, reconnects, host-key and certificate checks and errors. Credentials and terminal contents are never logged. Set `RUST_LOG` (for example `RUST_LOG=debug`) for more detail; it then also goes to the terminal you started Nexus Terminal from.
 
 Credentials saved in the OS keychain are stored under the service name `NexusTerminal`.
 

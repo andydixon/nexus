@@ -346,6 +346,7 @@ impl Manager {
             }
             (Err(_), None) => {}
             (Err(e), Some(s)) => {
+                tracing::warn!(session = id, error = %e, "connection failed");
                 s.info.state = SessionState::Error;
                 s.info.error = e.to_string();
                 attempt_failed(&s.session_secrets, &e.to_string());
@@ -353,6 +354,7 @@ impl Manager {
                 self.emit_state(id, SessionState::Error, &e.to_string());
             }
             (Ok(client), Some(s)) => {
+                tracing::info!(session = id, "connected");
                 let typed = std::mem::take(&mut s.session_secrets.lock().pending);
                 s.client = client.clone();
                 s.info.state = SessionState::Connected;
@@ -365,6 +367,7 @@ impl Manager {
                 }
                 for (key, value) in typed {
                     if let Err(e) = self.secrets.set_checked(&key, &value) {
+                        tracing::warn!(session = id, credential = key.rsplit(':').next().unwrap_or(""), error = %e, "credential not saved");
                         self.emit(Event::Warning { session: id.into(), message: format!("Credential not saved: {e}") });
                     }
                 }
@@ -375,6 +378,7 @@ impl Manager {
     }
 
     fn connect_protocol(self: &Arc<Self>, id: &str, epoch: u64, p: &Profile, prompt: Prompt) -> Result<Client> {
+        tracing::info!(session = id, protocol = p.protocol.id(), host = %p.host, port = p.port, "connecting");
         let _ = self.with(id, |s| {
             let mut st = s.session_secrets.lock();
             st.pending.clear();
@@ -510,6 +514,7 @@ impl Manager {
             s.profile.clone()
         };
         self.store.add_audit("disconnect", "", id, "Session disconnected");
+        tracing::info!(session = id, "remote closed the session");
         if let Some(p) = profile.filter(|p| p.auto_reconnect()) {
             self.schedule_reconnect(id, epoch, p);
             return;
@@ -525,9 +530,11 @@ impl Manager {
         let attempt = self.with(id, |s| {
             s.reconnect_count += 1;
             if s.reconnect_count > max {
+                tracing::warn!(session = id, tries = max, "giving up reconnecting");
                 s.info.state = SessionState::Disconnected;
                 return None;
             }
+            tracing::info!(session = id, attempt = s.reconnect_count, of = max, "scheduling reconnect");
             s.info.state = SessionState::Reconnecting;
             s.info.error.clear();
             if let Some(c) = s.cancel_reconnect.replace(cancel.clone()) {
