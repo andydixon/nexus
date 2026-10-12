@@ -10,7 +10,7 @@ use crate::{chrome, forwards, profile_editor, quick_connect, recordings, setting
 use egui::{Key, KeyboardShortcut, Modifiers, Ui};
 use nexus_core::models::{Profile, Protocol, SessionInfo, SessionState};
 use nexus_core::service::Service;
-use nexus_core::sessions::Event;
+use nexus_core::sessions::{Event, HostKeyDecision};
 use std::collections::VecDeque;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, mpsc};
@@ -43,7 +43,7 @@ pub fn post_error(e: String) {
 /// A credential or host-key question from a connecting session.
 pub enum Prompt {
     Secret { session: String, title: String, message: String, value: String, reply: mpsc::Sender<String> },
-    HostKey { host: String, key_type: String, fingerprint: String, reply: mpsc::Sender<bool> },
+    HostKey { host: String, key_type: String, fingerprint: String, stored: Option<String>, reply: mpsc::Sender<HostKeyDecision> },
 }
 
 /// Modal dialogs owned by the main window.
@@ -495,8 +495,8 @@ impl App {
             Event::SecretPrompt { session, title, message, reply } => {
                 self.prompts.push_back(Prompt::Secret { session, title, message, value: String::new(), reply });
             }
-            Event::HostKeyVerify { host, key_type, fingerprint, reply, .. } => {
-                self.prompts.push_back(Prompt::HostKey { host, key_type, fingerprint, reply });
+            Event::HostKeyVerify { host, key_type, fingerprint, stored, reply, .. } => {
+                self.prompts.push_back(Prompt::HostKey { host, key_type, fingerprint, stored, reply });
             }
             Event::VncReady { session } => {
                 if let Some(View::Vnc(v)) = self.s.panes.get_mut(&session).map(|p| &mut p.view) {

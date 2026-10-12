@@ -457,6 +457,12 @@ mod tests {
         let irc = ps.iter().find(|p| p.protocol == Protocol::Irc).unwrap();
         assert_eq!(s.irc_last_rooms(&irc.id).unwrap(), ["#rust", "#nexus"]);
         assert_eq!(s.list_known_hosts().unwrap()[0].fingerprint, "SHA256:abc");
+        // Known hosts written by the Go app can be removed by id; unknown ids are an error.
+        let kh = s.list_known_hosts().unwrap().remove(0);
+        s.delete_known_host(&kh.id).unwrap();
+        assert!(s.list_known_hosts().unwrap().is_empty());
+        assert!(s.delete_known_host(&kh.id).is_err());
+        s.save_known_host(&kh).unwrap();
         assert_eq!(s.list_snippets().unwrap()[0].command, "uptime");
         assert_eq!(s.preferences().terminal_theme, "dracula");
         // Migration 007 lets serial profiles in.

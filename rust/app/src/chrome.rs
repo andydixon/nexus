@@ -9,6 +9,7 @@ use crate::widgets;
 use egui::{Align2, Color32, Key, Rect, RichText, Sense, Stroke, Ui, ViewportCommand, pos2, vec2};
 use egui_phosphor::regular as icon;
 use nexus_core::models::{Protocol, SessionState};
+use nexus_core::sessions::HostKeyDecision;
 
 pub const LOGO_PNG: &[u8] = include_bytes!("../assets/icon/icon-256.png");
 
@@ -708,24 +709,63 @@ pub fn prompts(app: &mut App, ctx: &egui::Context) {
                 });
             });
         }
-        Prompt::HostKey { host, key_type, fingerprint, reply } => {
-            modal(ctx, "hostkey-prompt", 460.0, |ui| {
-                ui.label(RichText::new(format!("{}  Verify host key", icon::SHIELD_WARNING)).font(theme::semibold(15.0)));
-                ui.label(format!("The authenticity of {host} can't be established."));
-                ui.add_space(4.0);
-                widgets::kv(ui, "hk", &[("Key type", key_type.clone()), ("Fingerprint", fingerprint.clone())]);
-                widgets::hint(ui, "Accept only if this matches the fingerprint the server's administrator gave you.");
-                ui.add_space(6.0);
-                ui.horizontal(|ui| {
-                    if widgets::primary(ui, icon::CHECK, "Accept & Save").clicked() {
-                        let _ = reply.send(true);
-                        done = true;
+        Prompt::HostKey { host, key_type, fingerprint, stored, reply } => {
+            modal(ctx, "hostkey-prompt", 480.0, |ui| {
+                let mut decide = |d: HostKeyDecision| {
+                    let _ = reply.send(d);
+                    done = true;
+                };
+                match stored {
+                    Some(old) => {
+                        ui.label(RichText::new(format!("{}  Host key changed", icon::SHIELD_WARNING)).font(theme::semibold(15.0)).color(t.danger));
+                        ui.add(
+                            egui::Label::new(format!(
+                                "The key {host} presented does not match the one on record. This happens when a server is reinstalled, but it is also what an interception attack looks like. Only continue if you can confirm the new fingerprint with the server's administrator."
+                            ))
+                            .wrap(),
+                        );
+                        ui.add_space(4.0);
+                        widgets::kv(ui, "hk", &[("Key type", key_type.clone()), ("Stored", old.clone()), ("Received", fingerprint.clone())]);
+                        ui.add_space(6.0);
+                        ui.horizontal(|ui| {
+                            if widgets::primary(ui, icon::X, "Reject").clicked() || esc {
+                                decide(HostKeyDecision::Reject);
+                            }
+                            if ui.button(format!("{}  Accept Once", icon::CHECK)).on_hover_text("Connect this time; keep the stored key unchanged").clicked() {
+                                decide(HostKeyDecision::AcceptOnce);
+                            }
+                            if ui
+                                .add(
+                                    egui::Button::new(RichText::new(format!("{}  Accept & Update", icon::ARROWS_CLOCKWISE)).color(t.accent_text))
+                                        .fill(t.danger),
+                                )
+                                .on_hover_text("Connect and replace the stored key with this one")
+                                .clicked()
+                            {
+                                decide(HostKeyDecision::AcceptAndSave);
+                            }
+                        });
                     }
-                    if ui.button("Reject").clicked() || esc {
-                        let _ = reply.send(false);
-                        done = true;
+                    None => {
+                        ui.label(RichText::new(format!("{}  Verify host key", icon::SHIELD_WARNING)).font(theme::semibold(15.0)));
+                        ui.label(format!("The authenticity of {host} can't be established."));
+                        ui.add_space(4.0);
+                        widgets::kv(ui, "hk", &[("Key type", key_type.clone()), ("Fingerprint", fingerprint.clone())]);
+                        widgets::hint(ui, "Accept only if this matches the fingerprint the server's administrator gave you.");
+                        ui.add_space(6.0);
+                        ui.horizontal(|ui| {
+                            if widgets::primary(ui, icon::CHECK, "Accept & Save").clicked() {
+                                decide(HostKeyDecision::AcceptAndSave);
+                            }
+                            if ui.button(format!("{}  Accept Once", icon::CHECK)).on_hover_text("Connect without recording the key").clicked() {
+                                decide(HostKeyDecision::AcceptOnce);
+                            }
+                            if ui.button("Reject").clicked() || esc {
+                                decide(HostKeyDecision::Reject);
+                            }
+                        });
                     }
-                });
+                }
             });
         }
     }

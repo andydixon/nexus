@@ -2,7 +2,7 @@
 
 use nexus_core::models::{Profile, Protocol, SessionState};
 use nexus_core::secrets::{Keychain, Secrets, Vault};
-use nexus_core::sessions::{Event, Manager};
+use nexus_core::sessions::{Event, HostKeyDecision, Manager};
 use nexus_core::storage::Store;
 use std::io::{Read, Write};
 use std::net::TcpListener;
@@ -34,7 +34,7 @@ fn wait<T>(rx: &mpsc::Receiver<Event>, mut f: impl FnMut(&Event) -> Option<T>) -
             return t;
         }
         if let Event::HostKeyVerify { reply, .. } = e {
-            let _ = reply.send(true);
+            let _ = reply.send(HostKeyDecision::AcceptAndSave);
         }
     }
 }

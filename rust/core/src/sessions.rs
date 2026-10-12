@@ -91,12 +91,15 @@ pub enum Event {
         message: String,
         reply: mpsc::Sender<String>,
     },
+    /// A host key needs the user's decision: unknown (`stored` is None) or changed (`stored` is
+    /// the fingerprint on record).
     HostKeyVerify {
         session: String,
         host: String,
         key_type: String,
         fingerprint: String,
-        reply: mpsc::Sender<bool>,
+        stored: Option<String>,
+        reply: mpsc::Sender<HostKeyDecision>,
     },
     VncReady {
         session: String,
@@ -109,6 +112,16 @@ pub enum Event {
         session: String,
         text: String,
     },
+}
+
+/// The user's answer to a host-key prompt.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum HostKeyDecision {
+    Reject,
+    /// Connect, leaving the known-hosts record as it is.
+    AcceptOnce,
+    /// Connect and record this key (replacing a changed one).
+    AcceptAndSave,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -463,7 +476,9 @@ impl Manager {
         Arc::new(move |msg| me.prompt(&sid, &title, msg, timeout))
     }
 
-    /// Host-key policy check against the known-hosts table (Go's HostKeyVerifier).
+    /// Host-key policy check against the known-hosts table (Go's HostKeyVerifier). Under the
+    /// `ask` policy both unknown and changed keys go to the user, who can reject, accept once
+    /// (connect without touching the record) or accept and save/update the record.
     pub fn host_key_check(self: &Arc<Self>, session: &str, policy: HostKeyPolicy) -> HostKeyCheck {
         let (me, sid) = (self.clone(), session.to_string());
         Arc::new(move |k: &HostKeyInfo| {
@@ -484,41 +499,64 @@ impl Manager {
                     })
                     .map_err(|e| e.to_string())
             };
-            let verify = |mut s: KnownHost| {
-                if s.fingerprint != k.fingerprint {
-                    return Err(format!(
-                        "host key for {} has changed! stored fingerprint: {}, received: {} — possible MITM attack",
-                        k.host, s.fingerprint, k.fingerprint
-                    ));
-                }
+            let touch = |mut s: KnownHost| {
                 s.last_seen = now();
                 let _ = me.store.save_known_host(&s);
                 Ok(())
             };
+            let changed = |s: &KnownHost| {
+                format!("host key for {} has changed! stored fingerprint: {}, received: {} — possible MITM attack", k.host, s.fingerprint, k.fingerprint)
+            };
+            let ask = |stored: Option<&KnownHost>| -> std::result::Result<HostKeyDecision, String> {
+                let (tx, rx) = mpsc::channel();
+                me.emit(Event::HostKeyVerify {
+                    session: sid.clone(),
+                    host: k.host.clone(),
+                    key_type: k.key_type.clone(),
+                    fingerprint: k.fingerprint.clone(),
+                    stored: stored.map(|s| s.fingerprint.clone()),
+                    reply: tx,
+                });
+                match rx.recv_timeout(Duration::from_secs(60)) {
+                    Ok(d) => Ok(d),
+                    Err(mpsc::RecvTimeoutError::Disconnected) => Ok(HostKeyDecision::Reject),
+                    Err(_) => Err("host key prompt failed: host key prompt timed out waiting for user response".into()),
+                }
+            };
             match (policy, stored) {
                 (HostKeyPolicy::Insecure, None) | (HostKeyPolicy::AcceptNew, None) => save(),
-                (HostKeyPolicy::Insecure, Some(mut s)) => {
-                    s.last_seen = now();
-                    let _ = me.store.save_known_host(&s);
-                    Ok(())
-                }
+                (HostKeyPolicy::Insecure, Some(s)) => touch(s),
                 (HostKeyPolicy::Strict, None) => Err(format!("host key for {}:{} is not known (policy: strict)", k.host, k.port)),
-                (HostKeyPolicy::Ask, None) => {
-                    let (tx, rx) = mpsc::channel();
-                    me.emit(Event::HostKeyVerify {
-                        session: sid.clone(),
-                        host: k.host.clone(),
-                        key_type: k.key_type.clone(),
-                        fingerprint: k.fingerprint.clone(),
-                        reply: tx,
-                    });
-                    match rx.recv_timeout(Duration::from_secs(60)) {
-                        Ok(true) => save(),
-                        Ok(false) | Err(mpsc::RecvTimeoutError::Disconnected) => Err(format!("host key for {}:{} rejected by user", k.host, k.port)),
-                        Err(_) => Err("host key prompt failed: host key prompt timed out waiting for user response".into()),
+                (HostKeyPolicy::Ask, None) => match ask(None)? {
+                    HostKeyDecision::AcceptAndSave => save(),
+                    HostKeyDecision::AcceptOnce => Ok(()),
+                    HostKeyDecision::Reject => Err(format!("host key for {}:{} rejected by user", k.host, k.port)),
+                },
+                (_, Some(s)) if s.fingerprint == k.fingerprint => touch(s),
+                (HostKeyPolicy::Ask, Some(s)) => match ask(Some(&s))? {
+                    HostKeyDecision::AcceptAndSave => {
+                        me.store.delete_known_host(&s.id).map_err(|e| e.to_string())?;
+                        save()?;
+                        me.store.add_audit(
+                            "hostkey.update",
+                            "",
+                            &sid,
+                            &format!("Replaced host key for {}:{} ({} -> {})", k.host, k.port, s.fingerprint, k.fingerprint),
+                        );
+                        Ok(())
                     }
-                }
-                (_, Some(s)) => verify(s),
+                    HostKeyDecision::AcceptOnce => {
+                        me.store.add_audit(
+                            "hostkey.accept-once",
+                            "",
+                            &sid,
+                            &format!("Accepted changed host key for {}:{} once ({})", k.host, k.port, k.fingerprint),
+                        );
+                        Ok(())
+                    }
+                    HostKeyDecision::Reject => Err(format!("{} (rejected by user)", changed(&s))),
+                },
+                (_, Some(s)) => Err(changed(&s)),
             }
         })
     }
@@ -1397,6 +1435,52 @@ mod tests {
         assert_eq!(f().unwrap(), "hunter2");
         assert_eq!(asked.load(Ordering::SeqCst), 2);
         m.close_all();
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn changed_host_keys_can_be_rejected_accepted_once_or_updated() {
+        use crate::clients::ssh::HostKeyInfo;
+        let (m, dir) = manager("hostkey");
+        let answers: Arc<Mutex<Vec<HostKeyDecision>>> = Arc::default();
+        let prompts: Arc<Mutex<Vec<Option<String>>>> = Arc::default();
+        let (a, pr) = (answers.clone(), prompts.clone());
+        m.set_sink(Arc::new(move |e| {
+            if let Event::HostKeyVerify { stored, reply, .. } = e {
+                pr.lock().unwrap().push(stored);
+                let _ = reply.send(a.lock().unwrap().remove(0));
+            }
+        }));
+        let info = |fp: &str| HostKeyInfo { host: "h".into(), port: 22, key_type: "ssh-ed25519".into(), fingerprint: fp.into(), public_key_b64: "AAAA".into() };
+        let stored = |m: &Manager| m.store.get_known_host("h", 22).unwrap().map(|k| k.fingerprint);
+        // Unknown key: accept once records nothing; accept & save records it.
+        let check = m.host_key_check("s", HostKeyPolicy::Ask);
+        answers.lock().unwrap().push(HostKeyDecision::AcceptOnce);
+        check(&info("A")).unwrap();
+        assert_eq!(stored(&m), None);
+        answers.lock().unwrap().push(HostKeyDecision::AcceptAndSave);
+        check(&info("A")).unwrap();
+        assert_eq!(stored(&m).as_deref(), Some("A"));
+        assert_eq!(prompts.lock().unwrap().as_slice(), [None, None]);
+        // Same key again: no prompt.
+        check(&info("A")).unwrap();
+        assert_eq!(prompts.lock().unwrap().len(), 2);
+        // Changed key: reject, accept once (record untouched), accept & update (record replaced).
+        answers.lock().unwrap().push(HostKeyDecision::Reject);
+        assert!(check(&info("B")).unwrap_err().contains("has changed"));
+        answers.lock().unwrap().push(HostKeyDecision::AcceptOnce);
+        check(&info("B")).unwrap();
+        assert_eq!(stored(&m).as_deref(), Some("A"));
+        answers.lock().unwrap().push(HostKeyDecision::AcceptAndSave);
+        check(&info("B")).unwrap();
+        assert_eq!(stored(&m).as_deref(), Some("B"));
+        assert_eq!(prompts.lock().unwrap()[2..], [Some("A".to_string()), Some("A".into()), Some("A".into())]);
+        assert_eq!(m.store.list_known_hosts().unwrap().len(), 1);
+        // Strict and accept-new never prompt on a changed key.
+        for policy in [HostKeyPolicy::Strict, HostKeyPolicy::AcceptNew] {
+            assert!(m.host_key_check("s", policy)(&info("C")).unwrap_err().contains("has changed"));
+        }
+        assert_eq!(prompts.lock().unwrap().len(), 5);
         let _ = std::fs::remove_dir_all(dir);
     }
 }
