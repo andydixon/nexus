@@ -76,7 +76,8 @@ impl LocalShell {
         drop(st);
 
         let me = self.clone();
-        std::thread::Builder::new().name("nexus-local-read".into()).spawn(move || {
+        let (on_error, on_close) = (self.cb.on_error.clone(), self.cb.on_close.clone());
+        std::thread::Builder::new().name("nexus-local-read".into()).spawn(super::guarded(on_error, on_close, move || {
             let mut buf = vec![0u8; 32 * 1024];
             loop {
                 match reader.read(&mut buf) {
@@ -89,7 +90,7 @@ impl LocalShell {
                     }
                 }
             }
-        })?;
+        }))?;
         let me = self.clone();
         std::thread::Builder::new().name("nexus-local-wait".into()).spawn(move || {
             let _ = child.wait();

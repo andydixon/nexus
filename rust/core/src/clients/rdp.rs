@@ -82,7 +82,8 @@ impl Client {
         let (tx, rx) = mpsc::channel();
         *self.tx.lock() = Some(tx);
         let me = self.clone();
-        std::thread::Builder::new().name("nexus-rdp".into()).spawn(move || {
+        let (on_error, on_close) = (self.cfg.on_error.clone(), self.cfg.on_close.clone());
+        std::thread::Builder::new().name("nexus-rdp".into()).spawn(super::guarded(on_error, on_close, move || {
             let r = me.run(framed, result, rx);
             let closing = me.tx.lock().take().is_none();
             if let Err(e) = r
@@ -91,7 +92,7 @@ impl Client {
                 (me.cfg.on_error)(e.to_string());
             }
             (me.cfg.on_close)();
-        })?;
+        }))?;
         Ok(())
     }
 

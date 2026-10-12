@@ -44,6 +44,38 @@ pub mod serial;
 pub mod telnet;
 pub mod vnc;
 
+/// Wraps a client's I/O loop so a panic in it (a decoder bug, say) ends only that session —
+/// reported through `on_error`, then `on_close` — instead of leaving it looking connected with
+/// nothing reading.
+pub(crate) fn guarded(on_error: ErrorFn, on_close: CloseFn, f: impl FnOnce() + Send + 'static) -> impl FnOnce() + Send + 'static {
+    move || {
+        if let Err(p) = std::panic::catch_unwind(std::panic::AssertUnwindSafe(f)) {
+            on_error(format!("internal error: {}", panic_message(&*p)));
+            on_close();
+        }
+    }
+}
+
+/// `guarded` for a tokio task: the panic surfaces when the task's handle is awaited.
+pub(crate) fn guarded_task<F>(on_error: ErrorFn, on_close: CloseFn, fut: F)
+where
+    F: std::future::Future<Output = ()> + Send + 'static,
+{
+    let h = tokio::spawn(fut);
+    tokio::spawn(async move {
+        if let Err(e) = h.await
+            && e.is_panic()
+        {
+            on_error(format!("internal error: {}", panic_message(&*e.into_panic())));
+            on_close();
+        }
+    });
+}
+
+pub(crate) fn panic_message(p: &(dyn std::any::Any + Send)) -> String {
+    p.downcast_ref::<&str>().map(|s| s.to_string()).or_else(|| p.downcast_ref::<String>().cloned()).unwrap_or_else(|| "unknown panic".into())
+}
+
 /// Called with protocol negotiation debug messages (Go's `onDebug`).
 pub type DebugFn = Arc<dyn Fn(String) + Send + Sync>;
 
@@ -91,7 +123,7 @@ impl TcpConn {
             *guard = Some(stream);
         }
         let me = self.clone();
-        std::thread::spawn(move || {
+        std::thread::spawn(guarded(self.on_error.clone(), self.on_close.clone(), move || {
             use std::io::Read;
             let mut buf = [0u8; 4096];
             loop {
@@ -111,7 +143,7 @@ impl TcpConn {
                 }
                 return;
             }
-        });
+        }));
         Ok(())
     }
 
@@ -150,4 +182,34 @@ pub(crate) fn utf8_to_latin1(data: &[u8]) -> Vec<u8> {
 /// ISO 8859-1 → UTF-8 (every byte maps to the code point of the same value).
 pub(crate) fn latin1_to_utf8(data: &[u8]) -> String {
     data.iter().map(|&b| b as char).collect()
+}
+
+#[cfg(test)]
+mod guard_tests {
+    use super::*;
+    use parking_lot::Mutex;
+
+    #[test]
+    fn a_panicking_io_loop_reports_and_closes_once() {
+        let log: Arc<Mutex<Vec<String>>> = Arc::default();
+        let (l1, l2) = (log.clone(), log.clone());
+        let on_error: ErrorFn = Arc::new(move |e| l1.lock().push(e));
+        let on_close: CloseFn = Arc::new(move || l2.lock().push("closed".into()));
+        std::thread::spawn(guarded(on_error.clone(), on_close.clone(), || panic!("bad tile"))).join().unwrap();
+        assert_eq!(*log.lock(), ["internal error: bad tile", "closed"]);
+        // A loop that ends normally is left to report its own close.
+        std::thread::spawn(guarded(on_error.clone(), on_close.clone(), || {})).join().unwrap();
+        assert_eq!(log.lock().len(), 2);
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(async {
+            guarded_task(on_error, on_close, async { panic!("{}", "task boom") });
+            for _ in 0..50 {
+                if log.lock().len() == 4 {
+                    break;
+                }
+                tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+            }
+        });
+        assert_eq!(log.lock()[2..], ["internal error: task boom", "closed"]);
+    }
 }

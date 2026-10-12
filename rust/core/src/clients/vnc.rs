@@ -164,7 +164,7 @@ impl Client {
         *self.out.lock() = Some(out_tx);
 
         let client = self.clone();
-        std::thread::spawn(move || client.io_thread(out_rx));
+        std::thread::spawn(super::guarded(self.cfg.on_error.clone(), self.cfg.on_close.clone(), move || client.io_thread(out_rx)));
 
         let timeout = self.cfg.connect_timeout;
         match ready_rx.recv_timeout(timeout) {

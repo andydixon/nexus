@@ -502,7 +502,7 @@ impl SshClient {
             }
         });
         let me = self.clone();
-        tokio::spawn(async move {
+        super::guarded_task(self.cb.on_error.clone(), self.cb.on_close.clone(), async move {
             while let Some(msg) = read.wait().await {
                 match msg {
                     ChannelMsg::Data { data } | ChannelMsg::ExtendedData { data, .. } => (me.cb.on_data)(&data),

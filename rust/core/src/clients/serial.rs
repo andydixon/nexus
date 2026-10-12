@@ -90,7 +90,7 @@ impl SerialClient {
             *guard = Some((port, stop.clone()));
         }
         let me = inner.clone();
-        std::thread::spawn(move || me.read_loop(reader, stop));
+        std::thread::spawn(super::guarded(inner.cb.on_error.clone(), inner.cb.on_close.clone(), move || me.read_loop(reader, stop)));
         Ok(())
     }
 
