@@ -846,7 +846,8 @@ impl App {
                     t.reset();
                 }
             }
-            MenuAction::Copy | MenuAction::SelectAll => {}
+            // Handled inside the terminal view.
+            MenuAction::Copy | MenuAction::SelectAll | MenuAction::PrevPrompt | MenuAction::NextPrompt | MenuAction::CopyOutput => {}
         }
     }
 

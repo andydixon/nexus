@@ -40,6 +40,9 @@ pub enum MenuAction {
     Export,
     Clear,
     Reset,
+    PrevPrompt,
+    NextPrompt,
+    CopyOutput,
 }
 
 #[derive(Default)]
@@ -107,7 +110,29 @@ pub struct TermView {
     focus_requested: bool,
     /// Hold back multi-line pastes that would run unbracketed (set from preferences each frame).
     pub confirm_paste: bool,
+    osc: crate::osc::OscScanner,
+    /// Shell-integration prompts (OSC 133), oldest first.
+    prompts: Vec<PromptMark>,
+    /// Lines rotated out of a full scrollback since start, so marks keep pointing at their text.
+    rotated: i64,
+    max_history: usize,
+    /// The working directory the shell last reported (OSC 7): (host, path).
+    pub reported_cwd: Option<(String, String)>,
 }
+
+/// One command as shell integration reported it. Lines are stable indexes (see `stable`).
+#[derive(Clone, Debug)]
+struct PromptMark {
+    prompt: i64,
+    output: Option<i64>,
+    end: Option<i64>,
+    exit: Option<i32>,
+    started: Option<std::time::Instant>,
+    duration: Option<std::time::Duration>,
+}
+
+/// Marks kept per terminal; older ones are dropped.
+const MAX_PROMPTS: usize = 5000;
 
 const URL_RE: &str = r#"(?:https?|ftp)://[^\s<>"'`]+[^\s<>"'`.,;:!?)\]]"#;
 
@@ -135,12 +160,120 @@ impl TermView {
             find: None,
             focus_requested: true,
             confirm_paste: false,
+            osc: Default::default(),
+            prompts: Vec::new(),
+            rotated: 0,
+            max_history: scrollback.min(100_000),
+            reported_cwd: None,
         }
     }
 
     pub fn feed(&mut self, bytes: &[u8]) {
-        self.parser.advance(&mut self.term, bytes);
+        let mut start = 0;
+        for (end, osc) in self.osc.scan(bytes) {
+            self.advance(&bytes[start..end]);
+            start = end;
+            self.apply_osc(osc);
+        }
+        self.advance(&bytes[start..]);
         self.generation += 1;
+    }
+
+    /// Feeds the VT parser, counting lines a full scrollback rotates out (one per line feed at the
+    /// bottom of the screen) so shell-integration marks stay on their lines.
+    fn advance(&mut self, bytes: &[u8]) {
+        if self.prompts.is_empty() || self.term.mode().contains(TermMode::ALT_SCREEN) {
+            self.parser.advance(&mut self.term, bytes);
+            return;
+        }
+        let h0 = self.term.grid().history_size();
+        if h0 < self.max_history {
+            self.parser.advance(&mut self.term, bytes);
+        } else {
+            // ponytail: counts LF at the bottom row only; scroll-region and CSI S scrolling while
+            // the history is full can leave marks a few lines off.
+            let bottom = self.rows as i32 - 1;
+            for piece in bytes.split_inclusive(|&b| b == b'\n') {
+                let at_bottom = self.term.grid().cursor.point.line.0 == bottom;
+                self.parser.advance(&mut self.term, piece);
+                if at_bottom && piece.ends_with(b"\n") && self.term.grid().history_size() == self.max_history {
+                    self.rotated += 1;
+                }
+            }
+        }
+        if self.term.grid().history_size() < h0 {
+            // The scrollback was cleared: earlier marks point at nothing.
+            self.prompts.clear();
+        }
+    }
+
+    /// Stable index of a grid line: unchanged as lines scroll into (and out of) the history.
+    fn stable(&self, line: Line) -> i64 {
+        self.term.grid().history_size() as i64 + line.0 as i64 + self.rotated
+    }
+
+    fn line_of(&self, stable: i64) -> Line {
+        Line((stable - self.rotated - self.term.grid().history_size() as i64) as i32)
+    }
+
+    fn cursor_stable(&self) -> i64 {
+        self.stable(self.term.grid().cursor.point.line)
+    }
+
+    fn apply_osc(&mut self, osc: crate::osc::Osc) {
+        use crate::osc::Osc;
+        match osc {
+            Osc::Prompt => {
+                let line = self.cursor_stable();
+                if self.prompts.last().is_some_and(|p| p.prompt == line) {
+                    return;
+                }
+                if self.prompts.len() >= MAX_PROMPTS {
+                    self.prompts.remove(0);
+                }
+                self.prompts.push(PromptMark { prompt: line, output: None, end: None, exit: None, started: None, duration: None });
+            }
+            Osc::Output => {
+                let line = self.cursor_stable();
+                if let Some(p) = self.prompts.last_mut() {
+                    p.output = Some(line);
+                    p.started = Some(std::time::Instant::now());
+                }
+            }
+            Osc::Finished(code) => {
+                let line = self.cursor_stable();
+                if let Some(p) = self.prompts.last_mut().filter(|p| p.output.is_some() && p.end.is_none()) {
+                    p.end = Some(line);
+                    p.exit = code;
+                    p.duration = p.started.map(|t| t.elapsed());
+                }
+            }
+            Osc::Cwd { host, path } => self.reported_cwd = Some((host, path)),
+        }
+    }
+
+    /// Scrolls so the previous (or next) prompt is at the top. False when there is none.
+    pub fn jump_prompt(&mut self, forward: bool) -> bool {
+        let top = Line(-(self.term.grid().display_offset() as i32));
+        let lines: Vec<i32> = self.prompts.iter().map(|p| self.line_of(p.prompt).0).filter(|&l| l >= self.term.grid().topmost_line().0).collect();
+        let target = if forward { lines.iter().copied().find(|&l| l > top.0) } else { lines.iter().rev().copied().find(|&l| l < top.0) };
+        let Some(line) = target else { return false };
+        let want_offset = (-line).clamp(0, self.term.grid().history_size() as i32);
+        self.term.scroll_display(Scroll::Delta(want_offset - self.term.grid().display_offset() as i32));
+        true
+    }
+
+    /// The output of the most recent command that finished (shell integration).
+    pub fn last_output(&self) -> Option<String> {
+        let p = self.prompts.iter().rev().find(|p| p.output.is_some() && p.end.is_some())?;
+        let (from, to) = (self.line_of(p.output?).0.max(self.term.grid().topmost_line().0), self.line_of(p.end?).0);
+        let text: Vec<String> = (from..to).map(|l| self.line_text(Line(l)).0.trim_end().to_string()).collect();
+        Some(text.join("\n").trim_end_matches('\n').to_string())
+    }
+
+    /// Whether the shell reports prompts (OSC 133), which enables the commands above.
+    pub fn has_shell_integration(&self) -> bool {
+        !self.prompts.is_empty()
     }
 
     pub fn size(&self) -> (u16, u16) {
@@ -306,6 +439,22 @@ impl TermView {
         }
 
         self.paint(ui, rect, origin, &font, cw, ch, theme, focused);
+        // Exit status of each finished command, as a bar beside its prompt (shell integration).
+        let hover = ui.input(|i| i.pointer.hover_pos());
+        for (bar, exit, took) in self.status_bars(rect, origin, ch) {
+            let color = match exit {
+                Some(0) => Color32::from_rgb(0x4c, 0xaf, 0x50),
+                Some(_) => Color32::from_rgb(0xe5, 0x39, 0x35),
+                None => Color32::GRAY,
+            };
+            ui.painter_at(rect).rect_filled(bar, 1.0, color);
+            if hover.is_some_and(|p| bar.expand2(vec2(3.0, 0.0)).contains(p)) {
+                let exit = exit.map_or("finished".to_string(), |c| format!("exit {c}"));
+                let took = took.map_or(String::new(), |d| format!(" · {:.1?}", d));
+                egui::Tooltip::always_open(ui.ctx().clone(), ui.layer_id(), egui::Id::new(("cmd-status", bar.min.y as i32)), egui::PopupAnchor::Pointer)
+                    .show(|ui| ui.label(format!("{exit}{took}")));
+            }
+        }
 
         resp.context_menu(|ui| {
             let m = if cfg!(target_os = "macos") { "⌘" } else { "Ctrl+" };
@@ -322,6 +471,19 @@ impl TermView {
                 (MenuAction::Clear, "Clear", String::new()),
                 (MenuAction::Reset, "Reset", String::new()),
             ];
+            if self.has_shell_integration() {
+                for (a, label, keys) in [
+                    (MenuAction::PrevPrompt, "Previous Prompt", format!("{m}Shift+↑")),
+                    (MenuAction::NextPrompt, "Next Prompt", format!("{m}Shift+↓")),
+                    (MenuAction::CopyOutput, "Copy Last Command Output", String::new()),
+                ] {
+                    if ui.add(egui::Button::new(label).shortcut_text(keys).min_size(vec2(200.0, 0.0))).clicked() {
+                        out.menu = Some(a);
+                        ui.close();
+                    }
+                }
+                ui.separator();
+            }
             for (i, (a, label, keys)) in items.into_iter().enumerate() {
                 if matches!(i, 3 | 5 | 6 | 8) {
                     ui.separator();
@@ -342,7 +504,36 @@ impl TermView {
             self.select_all();
             out.menu = None;
         }
+        match out.menu {
+            Some(a @ (MenuAction::PrevPrompt | MenuAction::NextPrompt)) => {
+                self.jump_prompt(a == MenuAction::NextPrompt);
+                out.menu = None;
+            }
+            Some(MenuAction::CopyOutput) => {
+                if let Some(text) = self.last_output() {
+                    ui.ctx().copy_text(text);
+                }
+                out.menu = None;
+            }
+            _ => {}
+        }
         out
+    }
+
+    /// Where to draw each visible finished command's status bar, with its exit code and duration.
+    fn status_bars(&self, rect: Rect, origin: Pos2, ch: f32) -> Vec<(Rect, Option<i32>, Option<std::time::Duration>)> {
+        let offset = self.term.grid().display_offset() as i32;
+        self.prompts
+            .iter()
+            .filter(|p| p.end.is_some())
+            .filter_map(|p| {
+                let vr = self.line_of(p.prompt).0 + offset;
+                (0..self.rows as i32).contains(&vr).then(|| {
+                    let y = origin.y + vr as f32 * ch;
+                    (Rect::from_min_max(pos2(rect.left(), y + 1.0), pos2(rect.left() + 3.0, y + ch - 1.0)), p.exit, p.duration)
+                })
+            })
+            .collect()
     }
 
     fn keyboard(&mut self, ui: &mut Ui, out: &mut TermResponse) {
@@ -377,6 +568,11 @@ impl TermView {
                     typed = true;
                 }
                 Event::Key { key, pressed: true, modifiers, .. } => {
+                    // Ctrl/Cmd+Shift+Up/Down jump between prompts (shell integration).
+                    if modifiers.command && modifiers.shift && matches!(key, Key::ArrowUp | Key::ArrowDown) && self.has_shell_integration() {
+                        self.jump_prompt(key == Key::ArrowDown);
+                        continue;
+                    }
                     // Shift+PageUp/PageDown/Home/End scroll the local scrollback.
                     if modifiers.shift && !modifiers.ctrl && !mode.contains(TermMode::ALT_SCREEN) {
                         let page = self.rows as i32 - 1;
@@ -900,6 +1096,44 @@ mod tests {
         let mut out = TermResponse::default();
         t.paste("a\nb", &mut out);
         assert!(out.confirm_paste.is_none() && out.input.starts_with(b"\x1b[200~"), "bracketed paste needs no prompt");
+    }
+
+    #[test]
+    fn shell_integration_marks_survive_a_full_scrollback() {
+        // Scrollback of 30 lines, so the history fills and rotates during the test.
+        let mut t = TermView::new(30, 14.0, CursorStyle::Block);
+        let prompt = |t: &mut TermView| t.feed(b"\x1b]133;A\x07$ \x1b]133;B\x07");
+        let run = |t: &mut TermView, cmd: &str, out: &[String], code: i32| {
+            t.feed(format!("{cmd}\r\n\x1b]133;C\x07").as_bytes());
+            for l in out {
+                t.feed(format!("{l}\r\n").as_bytes());
+            }
+            t.feed(format!("\x1b]133;D;{code}\x07").as_bytes());
+        };
+        prompt(&mut t);
+        run(&mut t, "seq 3", &["1".into(), "2".into(), "3".into()], 0);
+        prompt(&mut t);
+        assert_eq!(t.last_output().as_deref(), Some("1\n2\n3"));
+        let many: Vec<String> = (0..80).map(|i| format!("line {i}")).collect();
+        run(&mut t, "big", &many, 3);
+        prompt(&mut t);
+        run(&mut t, "tail", &["a".into(), "b".into()], 1);
+        prompt(&mut t);
+        assert_eq!(t.last_output().as_deref(), Some("a\nb"), "rotation must not shift the marks");
+        let last = t.prompts.iter().rev().nth(1).unwrap();
+        assert_eq!(last.exit, Some(1));
+        assert_eq!(t.line_text(t.line_of(last.prompt)).0.trim_end(), "$ tail");
+        // Jumping back lands an earlier prompt (still in the scrollback) at the top of the view.
+        let more: Vec<String> = (0..20).map(|i| format!("more {i}")).collect();
+        run(&mut t, "more", &more, 0);
+        prompt(&mut t);
+        assert!(t.jump_prompt(false));
+        let top = Line(-(t.term.grid().display_offset() as i32));
+        assert!(t.line_text(top).0.starts_with("$ "), "{:?}", t.line_text(top).0);
+        // A cleared scrollback drops the marks with it.
+        t.feed(b"\x1b[3J\x1b[2J");
+        t.feed(b"x\r\n");
+        assert!(t.prompts.len() <= 1);
     }
 
     #[test]

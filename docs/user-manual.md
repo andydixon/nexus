@@ -218,6 +218,32 @@ A new pane offers **Local Machine** and your terminal profiles (SSH, Telnet and 
 
 ## 6. Terminal actions and search
 
+### Shell integration
+
+When the shell marks its prompts and commands (the OSC 133 sequences), Nexus Terminal knows where each command starts and ends:
+
+- **Ctrl+Shift+Up / Ctrl+Shift+Down** (**Cmd+Shift** on macOS), or **Previous Prompt** / **Next Prompt** in the right-click menu, jump between prompts in the scrollback.
+- **Copy Last Command Output** in the right-click menu copies what the last finished command printed.
+- A thin bar beside each finished command's prompt shows how it ended: green for success, red for a non-zero exit. Hover it for the exit code and how long the command took.
+
+fish 4 and several prompt themes (Starship, Powerlevel10k with its shell integration option) send the marks already. For bash, add this to `~/.bashrc` on the machine the shell runs on:
+
+```bash
+PS0='\[\e]133;C\a\]'
+PROMPT_COMMAND='printf "\033]133;D;%s\007" "$?"; '"${PROMPT_COMMAND}"
+PS1='\[\e]133;A\a\]'"$PS1"'\[\e]133;B\a\]'
+```
+
+For zsh, add to `~/.zshrc`:
+
+```zsh
+precmd() { print -Pn "\e]133;D;$?\a\e]133;A\a" }
+preexec() { print -n "\e]133;C\a" }
+PS1="$PS1%{\e]133;B\a%}"
+```
+
+Shells that also report their working directory (OSC 7; fish, and zsh/bash with the usual `printf '\e]7;file://%s%s\a' "$HOSTNAME" "$PWD"` hook) let **SFTP Browser** open in that directory.
+
 ### Keyboard and mouse
 
 - **Copy**: select text and press **Cmd+C** / **Ctrl+C**. With nothing selected, **Ctrl+C** sends an interrupt as usual.

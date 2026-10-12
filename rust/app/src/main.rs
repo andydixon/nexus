@@ -8,6 +8,7 @@ mod desktop_view;
 mod forwards;
 mod github_view;
 mod irc_view;
+mod osc;
 mod profile_editor;
 mod quick_connect;
 mod raw_view;
