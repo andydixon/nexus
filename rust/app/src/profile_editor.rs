@@ -691,6 +691,7 @@ impl ProfileEditor {
             if c.secret_mode == SecretMode::Saved {
                 secret(ui, "Password", secrets, SecretKind::RdpPassword, "Leave blank to keep the saved password");
             }
+            text(ui, "Kerberos KDC", &mut c.kerberos_kdc, "kdc.corp.example (empty: NTLM)");
             let opts: Vec<_> = HostKeyPolicy::ALL.iter().map(|k| (*k, k.label())).collect();
             combo(ui, "Certificate Policy", &mut c.host_key_policy, &opts);
             check(

@@ -411,6 +411,8 @@ pub struct RdpConfig {
     pub allow_tls_only: bool,
     /// Play remote audio locally.
     pub audio: bool,
+    /// Log on with Kerberos through this KDC (`host` or `host:port`, TCP); empty uses NTLM.
+    pub kerberos_kdc: String,
     /// Local folder shared with the remote desktop as a drive (empty: none). Linux and macOS.
     pub shared_folder: String,
     /// Offer a printer; print jobs are saved as PostScript files in Downloads.

@@ -147,7 +147,7 @@ Use Nexus Terminal when you need to:
 - Direct, SOCKS5, HTTP CONNECT, SSH-tunnelled or (experimental) RD Gateway connections.
 - Scale-to-fit or 1:1, a fixed resolution or one that follows the tab (Display Control).
 - Keyboard (scancodes for keys and shortcuts, Unicode for text), mouse and wheel; Ctrl+Alt+Del; text clipboard sharing in both directions.
-- Password storage modes and domain logon.
+- Password storage modes, domain logon, and Kerberos through a configured KDC.
 - Remote audio playback, a printer whose jobs are saved as PostScript files, and a shared folder redirected as a drive (Linux and macOS), confined to that folder.
 
 ### VNC capabilities

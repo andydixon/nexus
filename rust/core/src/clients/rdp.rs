@@ -50,6 +50,8 @@ pub struct Config {
     pub allow_tls_only: bool,
     /// Play the remote desktop's sound locally.
     pub audio: bool,
+    /// Kerberos instead of NTLM: the KDC as `host` or `host:port` (TCP).
+    pub kerberos_kdc: Option<String>,
     /// A local folder to share as a drive (Unix only), and the name it appears under.
     pub shared_folder: Option<(std::path::PathBuf, String)>,
     /// Offer a printer; jobs are saved as PostScript in this folder.
@@ -233,14 +235,22 @@ impl Client {
         (self.cfg.check_cert)(&fingerprint(&cert))?;
         let upgraded = ironrdp_blocking::mark_as_upgraded(should_upgrade, &mut connector);
         let mut framed = Framed::new(tls);
+        let kerberos = match &self.cfg.kerberos_kdc {
+            Some(kdc) => {
+                let kdc = if kdc.contains(':') { kdc.clone() } else { format!("{kdc}:88") };
+                let hostname = std::env::var("HOSTNAME").or_else(|_| std::env::var("COMPUTERNAME")).unwrap_or_else(|_| "nexus".into());
+                Some(connector::credssp::KerberosConfig::new(Some(format!("tcp://{kdc}")), hostname).map_err(|e| format!("Kerberos: {e}"))?)
+            }
+            None => None,
+        };
         let result = ironrdp_blocking::connect_finalize(
             upgraded,
             connector,
             &mut framed,
-            &mut NoNetwork,
+            &mut KdcClient,
             ServerName::new(self.cfg.host.clone()),
             server_public_key(&cert)?,
-            None,
+            kerberos,
         )
         .map_err(|e| format!("RDP logon failed: {}", describe(&e)))?;
         Ok((framed, result))
@@ -563,12 +573,36 @@ impl rustls::client::danger::ServerCertVerifier for Pinned {
     }
 }
 
-/// CredSSP asks for this only for Kerberos (talking to a KDC); NTLM never uses it.
-struct NoNetwork;
+/// CredSSP's channel to the Kerberos KDC (NTLM never uses it). TCP only, which every KDC serves;
+/// replies are capped so a hostile KDC can't force a huge allocation.
+struct KdcClient;
 
-impl connector::sspi::network_client::NetworkClient for NoNetwork {
-    fn send(&self, _: &connector::sspi::NetworkRequest) -> connector::sspi::Result<Vec<u8>> {
-        Err(connector::sspi::Error::new(connector::sspi::ErrorKind::NoAuthenticatingAuthority, "Kerberos is not supported; use NTLM"))
+const MAX_KDC_REPLY: u32 = 1 << 20;
+
+impl connector::sspi::network_client::NetworkClient for KdcClient {
+    fn send(&self, req: &connector::sspi::NetworkRequest) -> connector::sspi::Result<Vec<u8>> {
+        use connector::sspi::{Error, ErrorKind, network_client::NetworkProtocol};
+        use std::io::{Read, Write};
+        let fail = |e: String| Error::new(ErrorKind::NoAuthenticatingAuthority, e);
+        if req.protocol != NetworkProtocol::Tcp {
+            return Err(fail(format!("KDC over {:?} is not supported; use a tcp:// KDC", req.protocol)));
+        }
+        let host = req.url.host_str().ok_or_else(|| fail("KDC URL has no host".into()))?;
+        let port = req.url.port().unwrap_or(88);
+        let mut s = super::proxy::Proxy::default().connect(host, port, Duration::from_secs(5)).map_err(|e| fail(format!("KDC {host}:{port}: {e}")))?;
+        s.set_read_timeout(Some(Duration::from_secs(10))).map_err(|e| fail(e.to_string()))?;
+        // The request is already length-prefixed (RFC 4120 7.2.2); so is the reply.
+        s.write_all(&req.data).map_err(|e| fail(e.to_string()))?;
+        let mut len = [0u8; 4];
+        s.read_exact(&mut len).map_err(|e| fail(e.to_string()))?;
+        let n = u32::from_be_bytes(len);
+        if n > MAX_KDC_REPLY {
+            return Err(fail(format!("KDC reply of {n} bytes is too large")));
+        }
+        let mut buf = len.to_vec();
+        buf.resize(4 + n as usize, 0);
+        s.read_exact(&mut buf[4..]).map_err(|e| fail(e.to_string()))?;
+        Ok(buf)
     }
 }
 
@@ -590,6 +624,33 @@ fn error_chain(e: &dyn std::error::Error) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn kdc_client_speaks_length_prefixed_tcp_and_caps_replies() {
+        use connector::sspi::network_client::{NetworkClient, NetworkProtocol};
+        use std::io::{Read, Write};
+        let kdc = |reply: Vec<u8>| {
+            let l = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+            let port = l.local_addr().unwrap().port();
+            std::thread::spawn(move || {
+                let (mut s, _) = l.accept().unwrap();
+                let mut req = [0u8; 7];
+                s.read_exact(&mut req).unwrap();
+                assert_eq!(req, [0, 0, 0, 3, b'a', b's', b'k']);
+                s.write_all(&reply).unwrap();
+            });
+            connector::sspi::NetworkRequest {
+                protocol: NetworkProtocol::Tcp,
+                url: format!("tcp://127.0.0.1:{port}").parse().unwrap(),
+                data: b"\0\0\0\x03ask".to_vec(),
+            }
+        };
+        assert_eq!(KdcClient.send(&kdc(b"\0\0\0\x02ok".to_vec())).unwrap(), b"\0\0\0\x02ok");
+        let err = KdcClient.send(&kdc(vec![0xff, 0xff, 0xff, 0xff])).unwrap_err();
+        assert!(err.to_string().contains("too large"), "{err}");
+        let udp = connector::sspi::NetworkRequest { protocol: NetworkProtocol::Udp, url: "udp://127.0.0.1:88".parse().unwrap(), data: vec![] };
+        assert!(KdcClient.send(&udp).is_err());
+    }
 
     #[test]
     fn fingerprints_like_ssh() {
@@ -632,6 +693,7 @@ mod tests {
             height: 768,
             allow_tls_only: true,
             audio: std::env::var("NEXUS_RDP_AUDIO").is_ok(),
+            kerberos_kdc: None,
             shared_folder: std::env::var("NEXUS_RDP_SHARE").ok().map(|p| (p.into(), "nexus".into())),
             printer: std::env::var("NEXUS_RDP_PRINT").ok().map(|p| (p.into(), Arc::new(|f: std::path::PathBuf| eprintln!("printed {}", f.display())) as _)),
             dial: Arc::new(move || Ok(TcpStream::connect((h2.as_str(), port))?)),

@@ -360,6 +360,7 @@ impl Manager {
             height,
             allow_tls_only: rc.allow_tls_only,
             audio: rc.audio,
+            kerberos_kdc: (!rc.kerberos_kdc.trim().is_empty()).then(|| rc.kerberos_kdc.trim().to_string()),
             shared_folder: (!rc.shared_folder.trim().is_empty()).then(|| (rc.shared_folder.trim().into(), "Nexus".into())),
             printer: rc.redirect_printer.then(|| {
                 let (me, sid) = (self.clone(), id.to_string());
