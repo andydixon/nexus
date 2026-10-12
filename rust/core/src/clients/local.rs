@@ -7,6 +7,7 @@ use portable_pty::{CommandBuilder, MasterPty, PtySize, native_pty_system};
 use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 pub fn default_shell() -> String {
     if cfg!(windows) {
@@ -27,13 +28,23 @@ pub struct LocalShell {
     shell: String,
     cb: Callbacks,
     state: Mutex<(Option<Running>, PathBuf, u16, u16, bool)>, // running, cwd, cols, rows, closed
+    /// A line was entered since the last cwd lookup. On macOS the lookup shells out to lsof, too
+    /// slow for the write path, so it runs off-thread once the shell next prints something.
+    cwd_stale: AtomicBool,
+    capturing: AtomicBool,
 }
 
 impl LocalShell {
     pub fn new(shell: &str, start_dir: Option<PathBuf>, cols: u16, rows: u16, cb: Callbacks) -> Arc<LocalShell> {
         let shell = if shell.is_empty() { default_shell() } else { shell.to_string() };
         let dir = start_dir.filter(|d| d.is_dir()).or_else(home_dir).unwrap_or_else(|| PathBuf::from("/"));
-        Arc::new(LocalShell { shell, cb, state: Mutex::new((None, dir, cols.max(1), rows.max(1), false)) })
+        Arc::new(LocalShell {
+            shell,
+            cb,
+            state: Mutex::new((None, dir, cols.max(1), rows.max(1), false)),
+            cwd_stale: Default::default(),
+            capturing: Default::default(),
+        })
     }
 
     pub fn start(self: &Arc<Self>) -> Result<()> {
@@ -70,7 +81,12 @@ impl LocalShell {
             loop {
                 match reader.read(&mut buf) {
                     Ok(0) | Err(_) => break,
-                    Ok(n) => (me.cb.on_data)(&buf[..n]),
+                    Ok(n) => {
+                        (me.cb.on_data)(&buf[..n]);
+                        if me.cwd_stale.swap(false, Ordering::SeqCst) {
+                            me.capture_cwd_in_background();
+                        }
+                    }
                 }
             }
         })?;
@@ -134,10 +150,29 @@ impl LocalShell {
     }
 
     fn capture_cwd(&self) {
+        if cfg!(target_os = "macos") {
+            self.cwd_stale.store(true, Ordering::SeqCst);
+            return;
+        }
         let pid = self.state.lock().0.as_ref().and_then(|r| r.pid);
         if let Some(dir) = pid.and_then(process_cwd).filter(|d| d.is_dir()) {
             self.state.lock().1 = dir;
         }
+    }
+
+    fn capture_cwd_in_background(self: &Arc<Self>) {
+        let Some(pid) = self.state.lock().0.as_ref().and_then(|r| r.pid) else { return };
+        if self.capturing.swap(true, Ordering::SeqCst) {
+            return;
+        }
+        let me = self.clone();
+        std::thread::spawn(move || {
+            // A failed lookup (the shell already exited) keeps the last known directory.
+            if let Some(dir) = process_cwd(pid).filter(|d| d.is_dir()) {
+                me.state.lock().1 = dir;
+            }
+            me.capturing.store(false, Ordering::SeqCst);
+        });
     }
 }
 
