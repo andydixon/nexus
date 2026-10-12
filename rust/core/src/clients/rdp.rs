@@ -209,6 +209,8 @@ impl Client {
         }
         .build();
         let mut input = Database::new();
+        // A resize waits here until the Display Control channel is open (it opens after logon).
+        let mut want_size: Option<(u16, u16)> = None;
         loop {
             let mut outputs = Vec::new();
             loop {
@@ -219,12 +221,7 @@ impl Client {
                             outputs.extend(stage.process_fastpath_input(&mut image, &events)?);
                         }
                     }
-                    Ok(Input::Resize(w, h)) => {
-                        let (w, h) = ironrdp::displaycontrol::pdu::MonitorLayoutEntry::adjust_display_size(w.into(), h.into());
-                        if let Some(frame) = stage.encode_resize(w, h, None, None) {
-                            outputs.push(ActiveStageOutput::ResponseFrame(frame?));
-                        }
-                    }
+                    Ok(Input::Resize(w, h)) => want_size = Some((w, h)).filter(|&s| s != (image.width(), image.height())),
                     Ok(Input::Close) | Err(mpsc::TryRecvError::Disconnected) => {
                         for o in stage.graceful_shutdown()? {
                             if let ActiveStageOutput::ResponseFrame(f) = o {
@@ -234,6 +231,13 @@ impl Client {
                         return Ok(());
                     }
                     Err(mpsc::TryRecvError::Empty) => break,
+                }
+            }
+            if let Some((w, h)) = want_size {
+                let (w, h) = ironrdp::displaycontrol::pdu::MonitorLayoutEntry::adjust_display_size(w.into(), h.into());
+                if let Some(frame) = stage.encode_resize(w, h, None, None) {
+                    outputs.push(ActiveStageOutput::ResponseFrame(frame?));
+                    want_size = None;
                 }
             }
             match framed.read_pdu() {

@@ -2,7 +2,7 @@
 //! host-key policy, line endings, forward direction, protocol) can't hold invalid values in Rust,
 //! so the Go checks for those are enforced by the types instead.
 
-use crate::models::{GitHubConfig, IrcConfig, Profile, Protocol, RawConfig, SerialConfig, SshConfig, TelnetConfig, VncConfig};
+use crate::models::{GitHubConfig, IrcConfig, Profile, Protocol, RawConfig, RdpConfig, SerialConfig, SshConfig, TelnetConfig, VncConfig};
 use serde::Serialize;
 use std::fmt;
 
@@ -100,6 +100,13 @@ pub fn validate_profile(p: &Profile) -> Result<(), ValidationErrors> {
             None => errs.add("vnc", "VNC configuration is required for VNC protocol"),
             Some(c) => errs.merge(validate_vnc_config(&p.host, c)),
         },
+        Protocol::Rdp => {
+            host_port(&mut errs, &p.host, p.port);
+            match &p.rdp {
+                None => errs.add("rdp", "RDP configuration is required for RDP protocol"),
+                Some(c) => errs.merge(validate_rdp_config(c)),
+            }
+        }
         Protocol::Irc => {
             host_port(&mut errs, &p.host, p.port);
             match &p.irc {
@@ -310,6 +317,32 @@ pub fn validate_vnc_config(profile_host: &str, cfg: &VncConfig) -> Result<(), Va
     errs.into_result()
 }
 
+pub fn validate_rdp_config(cfg: &RdpConfig) -> Result<(), ValidationErrors> {
+    let mut errs = ValidationErrors::default();
+    for (field, v) in [("rdp.width", cfg.width), ("rdp.height", cfg.height)] {
+        if v != 0 && !(200..=8192).contains(&v) {
+            errs.add(field, "desktop size must be 0 (fit the tab) or 200–8192 pixels");
+        }
+    }
+    match cfg.proxy_type.as_str() {
+        "" | "none" => {}
+        "socks5" | "http" => {
+            errs.check("rdp.proxyHost", validate_host(&cfg.proxy_host));
+            if cfg.proxy_port != 0 {
+                errs.check("rdp.proxyPort", validate_port(cfg.proxy_port));
+            }
+        }
+        t => errs.add("rdp.proxyType", format!("unsupported proxy type {t:?}")),
+    }
+    if cfg.ssh_tunnel {
+        if !matches!(cfg.proxy_type.as_str(), "" | "none") {
+            errs.add("rdp.proxyType", "use either a proxy or an SSH tunnel, not both");
+        }
+        ssh_tunnel(&mut errs, "rdp", &cfg.ssh_host, cfg.ssh_port, &cfg.ssh_username, &cfg.ssh_auth_method);
+    }
+    errs.into_result()
+}
+
 fn ssh_tunnel(errs: &mut ValidationErrors, p: &str, host: &str, port: i64, user: &str, auth: &str) {
     errs.check(&format!("{p}.sshHost"), validate_host(host));
     errs.check(&format!("{p}.sshPort"), validate_port(port));
@@ -399,6 +432,22 @@ fn is_valid_channel(ch: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn rdp_profiles() {
+        let mut p = Profile::new(Protocol::Rdp);
+        p.host = "win.example".into();
+        p.normalize();
+        assert!(validate_profile(&p).is_ok(), "{:?}", validate_profile(&p).err().map(|e| e.to_string()));
+        let c = p.rdp.as_mut().unwrap();
+        c.width = 100;
+        c.proxy_type = "socks5".into();
+        c.ssh_tunnel = true;
+        let msg = validate_profile(&p).unwrap_err().to_string();
+        for want in ["rdp.width", "rdp.proxyHost", "rdp.sshHost", "not both"] {
+            assert!(msg.contains(want), "{want}: {msg}");
+        }
+    }
     use crate::models::{JumpHost, PayloadPreset};
 
     #[test]

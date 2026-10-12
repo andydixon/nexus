@@ -1,6 +1,6 @@
 # Nexus Terminal Overview
 
-Nexus Terminal is a native desktop connection workspace for people who manage servers, network services, serial devices, remote desktops, chat networks and repositories every day. It brings SSH, Telnet, RAW TCP, Serial, VNC, IRC, GitHub and local shell sessions into one focused app with secure credential handling, multi-session organisation, file transfer, automation and recording built in.
+Nexus Terminal is a native desktop connection workspace for people who manage servers, network services, serial devices, remote desktops, chat networks and repositories every day. It brings SSH, Telnet, RAW TCP, Serial, VNC, RDP, IRC, GitHub and local shell sessions into one focused app with secure credential handling, multi-session organisation, file transfer, automation and recording built in.
 
 It is a single Rust application drawn with egui: there is no webview, no bundled browser engine and no runtime to install. Terminal output goes straight from the network into the terminal emulator, so large outputs stay responsive.
 
@@ -25,7 +25,7 @@ Use Nexus Terminal when you need to:
 - **Telnet** for legacy devices and services.
 - **RAW TCP** for direct socket interaction, protocol testing and device troubleshooting.
 - **Serial** for USB-serial adapters, console cables, development boards and network gear.
-- **VNC** for remote desktop access, with a native viewer.
+- **VNC** and **RDP** for remote desktop access, with native viewers.
 - **IRC** for chat networks, with rooms, users and an optional SSH tunnel.
 - **GitHub** for repository browsing and download workflows.
 - **Local terminal** for opening a shell on the local machine.
@@ -140,6 +140,15 @@ Use Nexus Terminal when you need to:
 - Clear hints for permission-denied and busy ports.
 - Works with everything a terminal session supports: recording, triggers, broadcast, snippets, find and split panes.
 
+### RDP capabilities
+
+- Native RDP viewer (IronRDP) with Network Level Authentication (CredSSP/NTLM) and optional TLS-only logon for servers such as xrdp.
+- Server certificate pinned by fingerprint in Known Hosts, checked before credentials are sent.
+- Direct, SOCKS5, HTTP CONNECT or SSH-tunnelled connections.
+- Scale-to-fit or 1:1, a fixed resolution or one that follows the tab (Display Control).
+- Keyboard (scancodes for keys and shortcuts, Unicode for text), mouse and wheel; Ctrl+Alt+Del; type the clipboard into the session.
+- Password storage modes and domain logon.
+
 ### VNC capabilities
 
 - Native VNC viewer inside the Nexus Terminal workspace (RFB 3.3–3.8; Raw, CopyRect, Hextile, ZRLE and Tight encodings).
@@ -227,7 +236,7 @@ Nexus Terminal: one native desktop workspace for SSH, files, sockets, serial con
 
 ### Suggested subheadline
 
-Manage SSH, Telnet, RAW TCP, Serial, VNC, IRC, GitHub and local shell sessions from a fast tabbed interface with secure credentials, SFTP file transfer, split panes, snippets, recordings and automation built in.
+Manage SSH, Telnet, RAW TCP, Serial, VNC, RDP, IRC, GitHub and local shell sessions from a fast tabbed interface with secure credentials, SFTP file transfer, split panes, snippets, recordings and automation built in.
 
 ### Short product description
 
@@ -235,7 +244,7 @@ Nexus Terminal helps developers, operators, support engineers, network and hardw
 
 ### Product page feature bullets
 
-- All-in-one connection workspace for SSH, Telnet, RAW TCP, Serial, VNC, IRC, GitHub and local shells.
+- All-in-one connection workspace for SSH, Telnet, RAW TCP, Serial, VNC, RDP, IRC, GitHub and local shells.
 - Native and fast: no webview, with a terminal that stays responsive under heavy output.
 - Multi-session interface with tabs, pinned sessions, split panes, reconnect and broadcast input.
 - Rich SSH support including agent auth and forwarding, TOTP, jump hosts, proxies, port forwarding, startup commands, login scripts and host key policies.

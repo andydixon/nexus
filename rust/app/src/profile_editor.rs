@@ -156,6 +156,9 @@ impl ProfileEditor {
         if proto != Protocol::Vnc {
             p.vnc = None;
         }
+        if proto != Protocol::Rdp {
+            p.rdp = None;
+        }
         if proto != Protocol::Irc {
             p.irc = None;
         }
@@ -223,6 +226,7 @@ impl ProfileEditor {
                 Protocol::Raw => self.raw(ui, &errs),
                 Protocol::Github => self.github(ui, &errs),
                 Protocol::Vnc => self.vnc(ui, &errs),
+                Protocol::Rdp => self.rdp(ui, &errs),
                 Protocol::Irc => self.irc(ui, &errs),
                 Protocol::Serial => self.serial(ui, &errs),
                 Protocol::Local => {}
@@ -660,6 +664,67 @@ impl ProfileEditor {
             tunnel(
                 ui,
                 "vnc",
+                Tunnel {
+                    on: &mut c.ssh_tunnel,
+                    host: &mut c.ssh_host,
+                    port: &mut c.ssh_port,
+                    user: &mut c.ssh_username,
+                    auth: &mut c.ssh_auth_method,
+                    key: &mut c.ssh_private_key,
+                    agent: &mut c.ssh_agent_auth,
+                    mode: &mut c.ssh_secret_mode,
+                },
+                keys,
+                key_checks,
+                secrets,
+                errs,
+            );
+        });
+    }
+
+    fn rdp(&mut self, ui: &mut Ui, errs: &[ValidationError]) {
+        let Self { p, keys, key_checks, secrets, .. } = self;
+        let c = p.rdp.get_or_insert_with(RdpConfig::defaults);
+        section(ui, "RDP", |ui| {
+            text(ui, "Domain", &mut c.domain, "Optional (e.g. CORP)");
+            mode(ui, "Password Storage", &mut c.secret_mode);
+            if c.secret_mode == SecretMode::Saved {
+                secret(ui, "Password", secrets, SecretKind::RdpPassword, "Leave blank to keep the saved password");
+            }
+            let opts: Vec<_> = HostKeyPolicy::ALL.iter().map(|k| (*k, k.label())).collect();
+            combo(ui, "Certificate Policy", &mut c.host_key_policy, &opts);
+            check(
+                ui,
+                "Allow servers without NLA",
+                &mut c.allow_tls_only,
+                "Plain TLS logon, e.g. xrdp. Less secure: the session is set up before you authenticate.",
+            );
+        });
+        section(ui, "Display", |ui| {
+            check(ui, "Scale to Fit", &mut c.scale_to_fit, "");
+            num(ui, "Width (0 = fit tab)", &mut c.width, 0..=8192);
+            err(ui, errs, "rdp.width");
+            num(ui, "Height (0 = fit tab)", &mut c.height, 0..=8192);
+            err(ui, errs, "rdp.height");
+            if c.width == 0 {
+                check(ui, "Resize With Tab", &mut c.dynamic_resolution, "Ask the server to match the tab's size as it changes");
+            }
+        });
+        section(ui, "Proxy", |ui| {
+            combo_s(ui, "Proxy Type", &mut c.proxy_type, &[("none", "None (direct connection)"), ("socks5", "SOCKS5"), ("http", "HTTP CONNECT")]);
+            err(ui, errs, "rdp.proxyType");
+            if c.proxy_type != "none" {
+                text(ui, "Proxy Host", &mut c.proxy_host, "proxy.example.com");
+                err(ui, errs, "rdp.proxyHost");
+                num(ui, "Proxy Port", &mut c.proxy_port, 0..=65535);
+                text(ui, "Proxy Username", &mut c.proxy_username, "Optional");
+                secret(ui, "Proxy Password", secrets, SecretKind::ProxyPassword, "Optional; leave blank to keep the saved password");
+            }
+        });
+        section(ui, "SSH Tunnel", |ui| {
+            tunnel(
+                ui,
+                "rdp",
                 Tunnel {
                     on: &mut c.ssh_tunnel,
                     host: &mut c.ssh_host,
@@ -1171,6 +1236,8 @@ fn tunnel(ui: &mut Ui, kind: &str, c: Tunnel, keys: &[String], checks: &mut KeyC
         let (l, k) = match (kind, c.auth.as_str()) {
             ("vnc", "password") => ("SSH Password", SecretKind::VncSshPassword),
             ("vnc", _) => ("SSH Key Passphrase", SecretKind::VncSshPassphrase),
+            ("rdp", "password") => ("SSH Password", SecretKind::RdpSshPassword),
+            ("rdp", _) => ("SSH Key Passphrase", SecretKind::RdpSshPassphrase),
             (_, "password") => ("SSH Password", SecretKind::IrcSshPassword),
             _ => ("SSH Key Passphrase", SecretKind::IrcSshPassphrase),
         };

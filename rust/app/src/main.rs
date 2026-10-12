@@ -4,6 +4,7 @@
 
 mod app;
 mod chrome;
+mod desktop_view;
 mod forwards;
 mod github_view;
 mod irc_view;
@@ -25,7 +26,6 @@ mod theme;
 mod transfer;
 mod triggers;
 mod views;
-mod vnc_view;
 mod widgets;
 
 use nexus_core::config::AppConfig;

@@ -162,6 +162,19 @@ The viewer's toolbar shows the connection state and desktop size, and has button
 
 Use SSH tunnelling for VNC whenever possible. If a VNC profile has no tunnel, Nexus Terminal warns that the traffic is unencrypted and offers **Connect Anyway**, **Edit Profile** or **Cancel**.
 
+### RDP
+
+- **RDP**: domain (optional), password storage mode, **Certificate Policy** and **Allow servers without NLA**. The username, host and port (3389) are the profile's own.
+- **Display**: **Scale to Fit**, a fixed **Width** and **Height** (0 × 0 fits the tab) and **Resize With Tab**.
+- **Proxy**: **SOCKS5** or **HTTP CONNECT**, with an optional username and password.
+- **SSH Tunnel**: carry RDP through SSH, as for VNC. Use either a proxy or a tunnel, not both.
+
+Nexus Terminal logs on with Network Level Authentication (CredSSP, NTLM), so your password is checked before a session is set up. Servers without NLA, such as xrdp, need **Allow servers without NLA**; the password is then passed to the server's own logon. Kerberos and smart cards are not supported.
+
+RDP servers usually present self-signed certificates, so the certificate is pinned like an SSH host key: its SHA-256 fingerprint is shown the first time and stored in **Known Hosts**, and a changed certificate offers Reject, Accept Once or Accept & Update. The check happens before any credentials are sent.
+
+The viewer works like the VNC one: click the desktop to give it keyboard focus, **Ctrl+Alt+Del** sends the key combination, and **Paste Clipboard** types your clipboard's text into the remote desktop (clipboard sharing is not supported yet). With **Resize With Tab**, the remote desktop follows the tab's size on servers that support it (Windows); otherwise the picture is scaled.
+
 ### IRC
 
 - **IRC**: nick, real name, **Use TLS** (port 6697 for most TLS networks) and an optional server password.

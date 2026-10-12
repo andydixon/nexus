@@ -109,10 +109,10 @@ pub enum Event {
         stored: Option<String>,
         reply: mpsc::Sender<HostKeyDecision>,
     },
-    VncReady {
+    DesktopReady {
         session: String,
     },
-    VncFrame {
+    DesktopFrame {
         session: String,
     },
     /// The remote desktop's clipboard changed.
@@ -154,6 +154,7 @@ enum Client {
     Github(Arc<github::Client>, Arc<AtomicBool>),
     Irc(Arc<irc::Client>, Option<Arc<SshClient>>),
     Vnc(Arc<clients::vnc::Client>, Option<Arc<SshClient>>),
+    Rdp(Arc<clients::rdp::Client>, Option<Arc<SshClient>>),
 }
 
 impl Client {
@@ -173,6 +174,12 @@ impl Client {
                 }
             }
             Client::Vnc(c, tunnel) => {
+                c.close();
+                if let Some(t) = tunnel {
+                    t.close();
+                }
+            }
+            Client::Rdp(c, tunnel) => {
                 c.close();
                 if let Some(t) = tunnel {
                     t.close();
@@ -236,7 +243,10 @@ fn attempt_failed(state: &SessionSecrets, error: &str) {
 /// host-key failure).
 pub fn is_auth_error(msg: &str) -> bool {
     let m = msg.to_lowercase();
-    ["unable to authenticate", "authentication failed", "permission denied", "no supported methods"].iter().any(|p| m.contains(p))
+    // The last two are CredSSP's (RDP with NLA) wording for a rejected password.
+    ["unable to authenticate", "authentication failed", "permission denied", "no supported methods", "logondenied", "logon failure"]
+        .iter()
+        .any(|p| m.contains(p))
 }
 
 pub struct Manager {
@@ -427,6 +437,7 @@ impl Manager {
             Protocol::Github => self.connect_github(id, epoch, p, prompt),
             Protocol::Irc => self.connect_irc(id, epoch, p, prompt),
             Protocol::Vnc => self.connect_vnc(id, epoch, p, prompt),
+            Protocol::Rdp => self.connect_rdp(id, epoch, p, prompt),
             Protocol::Local => err("unsupported protocol \"local\"".into()),
         }
     }
@@ -669,8 +680,11 @@ impl Manager {
         c.auth_methods = vec![if method.is_empty() { "publickey".into() } else { method.into() }];
         c.private_key_path = key.into();
         c.agent_auth = agent;
-        let (pw_kind, pp_kind) =
-            if kind == "vnc" { (SecretKind::VncSshPassword, SecretKind::VncSshPassphrase) } else { (SecretKind::IrcSshPassword, SecretKind::IrcSshPassphrase) };
+        let (pw_kind, pp_kind) = match kind {
+            "vnc" => (SecretKind::VncSshPassword, SecretKind::VncSshPassphrase),
+            "rdp" => (SecretKind::RdpSshPassword, SecretKind::RdpSshPassphrase),
+            _ => (SecretKind::IrcSshPassword, SecretKind::IrcSshPassphrase),
+        };
         let password = (method == "password").then(|| self.secret_fn(id, profile_id, pw_kind, mode, prompt.clone()));
         let passphrase = self.secret_fn(id, profile_id, pp_kind, mode, prompt);
         let t = SshClient::new(&tp, Callbacks::noop());
@@ -865,12 +879,12 @@ impl Manager {
             password,
             tunnel.clone(),
             cb,
-            Arc::new(move || me.emit(Event::VncFrame { session: sid.clone() })),
+            Arc::new(move || me.emit(Event::DesktopFrame { session: sid.clone() })),
             clip,
         );
         match c {
             Ok(c) => {
-                self.emit(Event::VncReady { session: id.into() });
+                self.emit(Event::DesktopReady { session: id.into() });
                 Ok(Client::Vnc(c, tunnel))
             }
             Err(e) => {
@@ -880,6 +894,103 @@ impl Manager {
                 Err(e)
             }
         }
+    }
+
+    fn connect_rdp(self: &Arc<Self>, id: &str, epoch: u64, p: &Profile, prompt: Prompt) -> Result<Client> {
+        let rc = p.rdp.clone().unwrap_or_else(RdpConfig::defaults);
+        let port = if p.port == 0 { DEFAULT_RDP_PORT } else { p.port as u16 };
+        let tunnel = if rc.ssh_tunnel {
+            Some(self.tunnel(
+                id,
+                &p.id,
+                &rc.ssh_host,
+                rc.ssh_port,
+                &rc.ssh_username,
+                &rc.ssh_auth_method,
+                &rc.ssh_private_key,
+                rc.ssh_agent_auth,
+                rc.ssh_secret_mode,
+                "rdp",
+                prompt.clone(),
+            )?)
+        } else {
+            None
+        };
+        let r = self.rdp_client(id, epoch, p, &rc, port, tunnel.clone(), prompt);
+        match r {
+            Ok(c) => {
+                self.emit(Event::DesktopReady { session: id.into() });
+                Ok(Client::Rdp(c, tunnel))
+            }
+            Err(e) => {
+                if let Some(t) = tunnel {
+                    t.close();
+                }
+                Err(e)
+            }
+        }
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn rdp_client(
+        self: &Arc<Self>,
+        id: &str,
+        epoch: u64,
+        p: &Profile,
+        rc: &RdpConfig,
+        port: u16,
+        tunnel: Option<Arc<SshClient>>,
+        prompt: Prompt,
+    ) -> Result<Arc<clients::rdp::Client>> {
+        let timeout = Duration::from_secs(p.connect_timeout.max(1) as u64);
+        let host = p.host.clone();
+        let dial: clients::rdp::Dial = match tunnel {
+            Some(t) => {
+                let h = host.clone();
+                Arc::new(move || t.open_tunnel(&h, port))
+            }
+            None => {
+                let proxy = clients::proxy::Proxy {
+                    kind: rc.proxy_type.clone(),
+                    host: rc.proxy_host.clone(),
+                    port: rc.proxy_port as u16,
+                    username: rc.proxy_username.clone(),
+                    password: self.secrets.get(&SecretKind::ProxyPassword.key(&p.id)).unwrap_or_default(),
+                };
+                let h = host.clone();
+                Arc::new(move || proxy.connect(&h, port, timeout))
+            }
+        };
+        let check = self.host_key_check(id, rc.host_key_policy);
+        let h = host.clone();
+        let check_cert: clients::rdp::CertCheck = Arc::new(move |fp: &str| {
+            check(&HostKeyInfo { host: h.clone(), port, key_type: "rdp-tls".into(), fingerprint: fp.into(), public_key_b64: String::new() })
+        });
+        // A 0×0 configured size follows the tab, which reports its pixel size like a terminal.
+        let (width, height) = match (rc.width, rc.height) {
+            (w, h) if w > 0 && h > 0 => (w as u16, h as u16),
+            _ => self.with(id, |s| s.pending_resize).ok().flatten().unwrap_or((1280, 800)),
+        };
+        let password = self.secret_fn(id, &p.id, SecretKind::RdpPassword, rc.secret_mode, prompt)()?;
+        let cb = self.terminal_callbacks(id, epoch);
+        let (me, sid) = (self.clone(), id.to_string());
+        let c = clients::rdp::Client::new(clients::rdp::Config {
+            host,
+            username: p.username.clone(),
+            domain: rc.domain.clone(),
+            password,
+            width,
+            height,
+            allow_tls_only: rc.allow_tls_only,
+            dial,
+            check_cert,
+            connect_timeout: timeout,
+            on_frame: Arc::new(move || me.emit(Event::DesktopFrame { session: sid.clone() })),
+            on_error: cb.on_error,
+            on_close: cb.on_close,
+        });
+        c.connect()?;
+        Ok(c)
     }
 
     // --- local shell --------------------------------------------------------------------
@@ -1187,6 +1298,11 @@ impl Manager {
             Client::Ssh(c) => c.resize(cols as u32, rows as u32),
             Client::Telnet(c) => c.resize(cols, rows),
             Client::Local(c) => c.resize(cols, rows),
+            // For a remote desktop the "size" is the tab's size in pixels.
+            Client::Rdp(c, _) => {
+                c.resize(cols, rows);
+                Ok(())
+            }
             _ => Ok(()),
         }
     }
@@ -1286,6 +1402,13 @@ impl Manager {
         match self.client(id)? {
             Client::Github(c, _) => Ok(c),
             _ => err(format!("sessions: session {id:?} is not a GitHub connection")),
+        }
+    }
+
+    pub fn rdp(&self, id: &str) -> Result<Arc<clients::rdp::Client>> {
+        match self.client(id)? {
+            Client::Rdp(c, _) => Ok(c),
+            _ => err(format!("sessions: session {id:?} is not an RDP connection")),
         }
     }
 

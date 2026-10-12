@@ -339,7 +339,7 @@ pub fn pane(app: &mut App, ui: &mut Ui, id: &str, rect: Rect) {
         View::Raw(v) => v.ui(ui, &mut app.s),
         View::Irc(v) => v.ui(ui, &mut app.s),
         View::Github(v) => v.ui(ui, &mut app.s),
-        View::Vnc(v) => v.ui(ui, &mut app.s),
+        View::Desktop(v) => v.ui(ui, &mut app.s),
     }
     let state = app.s.session_state(id).unwrap_or(pane.info.state);
     let local_exited = pane.local_exited;

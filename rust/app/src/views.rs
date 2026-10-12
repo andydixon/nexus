@@ -1,17 +1,18 @@
 //! How a session is drawn. Terminal-style protocols share `TermView`; the rest have their own.
 
+use crate::desktop_view::DesktopView;
 use crate::github_view::GithubView;
 use crate::irc_view::IrcView;
 use crate::raw_view::RawView;
 use crate::terminal::TermView;
-use crate::vnc_view::VncView;
 
 pub enum View {
     Terminal(Box<TermView>),
     Raw(Box<RawView>),
     Irc(Box<IrcView>),
     Github(Box<GithubView>),
-    Vnc(Box<VncView>),
+    /// VNC or RDP.
+    Desktop(Box<DesktopView>),
 }
 
 /// Protocol badge colour (the web build's --protocol-* tokens).
@@ -24,6 +25,7 @@ pub fn protocol_color(p: nexus_core::models::Protocol) -> egui::Color32 {
         Raw => rgb(0xab, 0x47, 0xbc),
         Github => rgb(0x7c, 0x8a, 0xff),
         Vnc => rgb(0xe8, 0x5d, 0x4a),
+        Rdp => rgb(0x26, 0xa6, 0x9a),
         Irc => rgb(0xd8, 0xb2, 0x4c),
         Local => rgb(0x8b, 0xc3, 0x4a),
         Serial => rgb(0x4f, 0xa3, 0xe0),
@@ -39,6 +41,7 @@ pub fn protocol_badge(p: nexus_core::models::Protocol) -> &'static str {
         Raw => "RAW",
         Github => "GitHub",
         Vnc => "VNC",
+        Rdp => "RDP",
         Irc => "IRC",
         Local => "LOCAL",
         Serial => "SERIAL",

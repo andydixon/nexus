@@ -9,7 +9,7 @@ use egui_phosphor::regular as icon;
 use nexus_core::clients::serial;
 use nexus_core::models::{Profile, Protocol};
 
-const PROTOCOLS: [Protocol; 5] = [Protocol::Ssh, Protocol::Telnet, Protocol::Raw, Protocol::Irc, Protocol::Serial];
+const PROTOCOLS: [Protocol; 6] = [Protocol::Ssh, Protocol::Rdp, Protocol::Telnet, Protocol::Raw, Protocol::Irc, Protocol::Serial];
 
 pub struct QuickConnect {
     open: bool,
@@ -67,7 +67,7 @@ impl QuickConnect {
         if self.protocol != Protocol::Serial {
             p.port = self.port;
         }
-        if matches!(self.protocol, Protocol::Ssh | Protocol::Irc) {
+        if matches!(self.protocol, Protocol::Ssh | Protocol::Rdp | Protocol::Irc) {
             p.username = self.username.trim().into();
         }
         if let Some(c) = &mut p.irc
@@ -134,7 +134,7 @@ impl QuickConnect {
                 label(ui, "Port");
                 ui.add(DragValue::new(&mut self.port).range(1..=65535).speed(0.25));
             }
-            if matches!(self.protocol, Protocol::Ssh | Protocol::Irc) {
+            if matches!(self.protocol, Protocol::Ssh | Protocol::Rdp | Protocol::Irc) {
                 label(ui, "Username");
                 ui.add(TextEdit::singleline(&mut self.username).hint_text("root").desired_width(f32::INFINITY));
             }

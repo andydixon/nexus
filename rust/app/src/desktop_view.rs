@@ -1,14 +1,16 @@
-//! VNC viewer: the remote framebuffer as a texture, with mouse, keyboard and clipboard input.
-//! Toolbar after the web build's `vnc.js` (status, Ctrl+Alt+Del, clipboard), plus refresh and a
-//! scale toggle.
+//! Remote desktop viewer for VNC and RDP: the remote framebuffer as a texture, with mouse,
+//! keyboard and clipboard input. Input is expressed in X keysyms and VNC pointer masks (VNC's own
+//! terms); `Remote` translates them for RDP. Toolbar after the web build's `vnc.js` (status,
+//! Ctrl+Alt+Del, clipboard), plus refresh and a scale toggle.
 
 use crate::state::Shared;
 use crate::theme::{self, Tokens};
 use crate::widgets;
 use egui::{Event, Key, Modifiers, Pos2, Rect, RichText, Sense, TextureHandle, Ui, vec2};
 use egui_phosphor::regular as icon;
+use nexus_core::clients::rdp::{self, MouseButton, MousePosition, Operation, Scancode, WheelRotations};
 use nexus_core::clients::vnc::{self, keysym_for};
-use nexus_core::models::Profile;
+use nexus_core::models::{Profile, Protocol};
 use std::sync::Arc;
 
 const XK_SHIFT: u32 = 0xffe1;
@@ -19,12 +21,121 @@ const XK_DELETE: u32 = 0xffff;
 /// Wheel distance (points) per remote scroll notch for pixel-precise wheels.
 const NOTCH: f32 = 40.0;
 
-pub struct VncView {
+/// The connected client a view drives.
+#[derive(Clone)]
+enum Remote {
+    Vnc(Arc<vnc::Client>),
+    Rdp(Arc<rdp::Client>),
+}
+
+impl Remote {
+    fn framebuffer(&self) -> Arc<parking_lot::Mutex<vnc::Framebuffer>> {
+        match self {
+            Remote::Vnc(c) => c.framebuffer(),
+            Remote::Rdp(c) => c.framebuffer(),
+        }
+    }
+
+    /// `held` is the modifier keysyms down on the remote side (for RDP shortcuts).
+    fn key(&self, sym: u32, down: bool, held: &[u32]) {
+        match self {
+            Remote::Vnc(c) => {
+                let _ = c.key(sym, down);
+            }
+            Remote::Rdp(c) => {
+                if let Some(op) = rdp_key(sym, down, held.iter().any(|&k| matches!(k, XK_CONTROL | XK_ALT | XK_SUPER))) {
+                    c.input(vec![op]);
+                }
+            }
+        }
+    }
+
+    /// Bits 0–2 left, middle, right; 3/4 a wheel notch up/down (VNC's pointer mask).
+    fn pointer(&self, x: u16, y: u16, mask: u8) {
+        match self {
+            Remote::Vnc(c) => {
+                let _ = c.pointer(x, y, mask);
+            }
+            Remote::Rdp(c) => {
+                let mut ops = vec![Operation::MouseMove(MousePosition { x, y })];
+                for (bit, b) in [(0, MouseButton::Left), (1, MouseButton::Middle), (2, MouseButton::Right)] {
+                    ops.push(if mask & 1 << bit != 0 { Operation::MouseButtonPressed(b) } else { Operation::MouseButtonReleased(b) });
+                }
+                for (bit, units) in [(3, 120), (4, -120)] {
+                    if mask & 1 << bit != 0 {
+                        ops.push(Operation::WheelRotations(WheelRotations { is_vertical: true, rotation_units: units }));
+                    }
+                }
+                c.input(ops);
+            }
+        }
+    }
+}
+
+/// An X keysym as an RDP key operation: named keys (and letters/digits pressed with Ctrl, Alt or
+/// Win, so shortcuts work) as US-layout scancodes, everything else as a Unicode key.
+fn rdp_key(sym: u32, down: bool, chord: bool) -> Option<Operation> {
+    let sc = |ext: bool, code: u8| {
+        Some(if down { Operation::KeyPressed(Scancode::from_u8(ext, code)) } else { Operation::KeyReleased(Scancode::from_u8(ext, code)) })
+    };
+    let named = match sym {
+        0xff1b => (false, 0x01),
+        0xff08 => (false, 0x0e),
+        0xff09 => (false, 0x0f),
+        0xff0d => (false, 0x1c),
+        0xffe1 => (false, 0x2a),
+        0xffe2 => (false, 0x36),
+        0xffe3 => (false, 0x1d),
+        0xffe4 => (true, 0x1d),
+        0xffe9 => (false, 0x38),
+        0xffea | 0xfe03 => (true, 0x38),
+        0xffeb => (true, 0x5b),
+        0xffec => (true, 0x5c),
+        0xffe5 => (false, 0x3a),
+        0xff50 => (true, 0x47),
+        0xff51 => (true, 0x4b),
+        0xff52 => (true, 0x48),
+        0xff53 => (true, 0x4d),
+        0xff54 => (true, 0x50),
+        0xff55 => (true, 0x49),
+        0xff56 => (true, 0x51),
+        0xff57 => (true, 0x4f),
+        0xff63 => (true, 0x52),
+        0xffff => (true, 0x53),
+        f @ 0xffbe..=0xffc7 => (false, 0x3b + (f - 0xffbe) as u8),
+        0xffc8 => (false, 0x57),
+        0xffc9 => (false, 0x58),
+        _ => (false, 0),
+    };
+    if named.1 != 0 {
+        return sc(named.0, named.1);
+    }
+    let ch = char::from_u32(if sym >= 0x0100_0000 { sym - 0x0100_0000 } else { sym })?;
+    if chord {
+        const LETTERS: &[u8; 26] = b"\x1e\x30\x2e\x20\x12\x21\x22\x23\x17\x24\x25\x26\x32\x31\x18\x19\x10\x13\x1f\x14\x16\x2f\x11\x2d\x15\x2c";
+        let lower = ch.to_ascii_lowercase();
+        match lower {
+            'a'..='z' => return sc(false, LETTERS[(lower as u8 - b'a') as usize]),
+            '1'..='9' => return sc(false, lower as u8 - b'1' + 0x02),
+            '0' => return sc(false, 0x0b),
+            ' ' => return sc(false, 0x39),
+            _ => {}
+        }
+    }
+    Some(if down { Operation::UnicodeKeyPressed(ch) } else { Operation::UnicodeKeyReleased(ch) })
+}
+
+pub struct DesktopView {
     pub session: String,
+    protocol: Protocol,
     view_only: bool,
     scale_to_fit: bool,
+    /// RDP: ask the server to match the tab's size.
+    dynamic_resolution: bool,
+    /// Last tab size reported (pixels) and when it changed, for debounced RDP resizes.
+    reported: ([u32; 2], [u32; 2], f64),
     ready: bool,
-    client: Option<Arc<vnc::Client>>,
+    client: Option<Remote>,
     texture: Option<TextureHandle>,
     fb_size: [usize; 2],
     name: String,
@@ -105,13 +216,20 @@ fn to_remote(p: Pos2, img: Rect, fb: [usize; 2]) -> (u16, u16) {
     (x as u16, y as u16)
 }
 
-impl VncView {
-    pub fn new(session: &str, profile: &Profile) -> VncView {
-        let cfg = profile.vnc.clone().unwrap_or_default();
-        VncView {
+impl DesktopView {
+    pub fn new(session: &str, profile: &Profile) -> DesktopView {
+        let (view_only, scale_to_fit, dynamic_resolution) = match (&profile.vnc, &profile.rdp) {
+            (Some(v), _) if profile.protocol == Protocol::Vnc => (v.view_only, v.scale_to_fit, false),
+            (_, Some(r)) => (false, r.scale_to_fit, r.dynamic_resolution && r.width == 0),
+            _ => (false, true, false),
+        };
+        DesktopView {
             session: session.into(),
-            view_only: cfg.view_only,
-            scale_to_fit: cfg.scale_to_fit,
+            protocol: profile.protocol,
+            view_only,
+            scale_to_fit,
+            dynamic_resolution,
+            reported: ([0, 0], [0, 0], 0.0),
             ready: false,
             client: None,
             texture: None,
@@ -125,7 +243,7 @@ impl VncView {
         }
     }
 
-    /// Called on `Event::VncReady` (the client is connected; fetch it via `s.svc.sessions.vnc(id)`).
+    /// Called on `Event::DesktopReady` (the client is connected; the view fetches it next frame).
     pub fn on_ready(&mut self) {
         self.ready = true;
         self.client = None;
@@ -133,7 +251,7 @@ impl VncView {
 
     fn key(&self, sym: u32, down: bool) {
         if let Some(c) = &self.client {
-            let _ = c.key(sym, down);
+            c.key(sym, down, &self.held);
         }
     }
 
@@ -161,23 +279,57 @@ impl VncView {
         if self.buttons != 0
             && let Some(c) = &self.client
         {
-            let _ = c.pointer(self.last_pos.0, self.last_pos.1, 0);
+            c.pointer(self.last_pos.0, self.last_pos.1, 0);
         }
         self.buttons = 0;
     }
 
+    /// VNC: sets the remote clipboard. RDP (no clipboard channel yet): types the text.
     fn paste(&self, s: &mut Shared, text: &str) {
-        if let Some(c) = &self.client
-            && let Err(e) = c.send_clipboard(text)
-        {
-            s.error(format!("Clipboard: {e}"));
+        match &self.client {
+            Some(Remote::Vnc(c)) => {
+                if let Err(e) = c.send_clipboard(text) {
+                    s.error(format!("Clipboard: {e}"));
+                }
+            }
+            Some(Remote::Rdp(c)) => c.input(
+                text.chars()
+                    .filter(|c| !c.is_control() || *c == '\n')
+                    .flat_map(|ch| [Operation::UnicodeKeyPressed(ch), Operation::UnicodeKeyReleased(ch)])
+                    .collect(),
+            ),
+            None => {}
+        }
+    }
+
+    /// RDP with dynamic resolution: report the tab's pixel size once it has settled.
+    fn report_size(&mut self, ui: &Ui, s: &Shared, area: Rect) {
+        if self.protocol != Protocol::Rdp || !self.dynamic_resolution {
+            return;
+        }
+        let ppp = ui.ctx().pixels_per_point();
+        let size = [(area.width() * ppp) as u32 & !1, (area.height() * ppp) as u32];
+        let now = ui.input(|i| i.time);
+        if size != self.reported.1 {
+            self.reported.1 = size;
+            self.reported.2 = now;
+        }
+        // ponytail: 0.4 s debounce; each resize is a server-side desktop reconfiguration.
+        if size != self.reported.0 && now - self.reported.2 > 0.4 && size[0] >= 200 && size[1] >= 200 {
+            self.reported.0 = size;
+            let _ = s.svc.sessions.resize(&self.session, size[0].min(8192) as u16, size[1].min(8192) as u16);
+        } else if size != self.reported.0 {
+            ui.ctx().request_repaint_after(std::time::Duration::from_millis(450));
         }
     }
 
     pub fn ui(&mut self, ui: &mut Ui, s: &mut Shared) {
         if self.ready && self.client.is_none() {
-            self.client = s.svc.sessions.vnc(&self.session).ok();
-            if let Some(c) = &self.client {
+            self.client = match self.protocol {
+                Protocol::Rdp => s.svc.sessions.rdp(&self.session).ok().map(Remote::Rdp),
+                _ => s.svc.sessions.vnc(&self.session).ok().map(Remote::Vnc),
+            };
+            if let Some(Remote::Vnc(c)) = &self.client {
                 self.name = c.desktop_name();
             }
         }
@@ -186,6 +338,7 @@ impl VncView {
 
         let t = Tokens::get(ui.ctx());
         let area = ui.available_rect_before_wrap();
+        self.report_size(ui, s, area);
         ui.painter().rect_filled(area, 0.0, t.canvas);
         let Some(tex) = self.texture.clone().filter(|_| self.ready) else {
             ui.allocate_rect(area, Sense::hover());
@@ -206,7 +359,7 @@ impl VncView {
             self.draw(ui, s, &tex, img);
         } else {
             let mut c = ui.new_child(egui::UiBuilder::new().max_rect(area));
-            egui::ScrollArea::both().id_salt(("vnc", &self.session)).auto_shrink([false, false]).show(&mut c, |ui| {
+            egui::ScrollArea::both().id_salt(("desktop", &self.session)).auto_shrink([false, false]).show(&mut c, |ui| {
                 let (img, _) = ui.allocate_exact_size(size, Sense::hover());
                 self.draw(ui, s, &tex, img);
             });
@@ -230,7 +383,7 @@ impl VncView {
         self.fb_size = size;
         match &mut self.texture {
             Some(t) => t.set(img, egui::TextureOptions::LINEAR),
-            None => self.texture = Some(ui.ctx().load_texture(format!("vnc-{}", self.session), img, egui::TextureOptions::LINEAR)),
+            None => self.texture = Some(ui.ctx().load_texture(format!("desktop-{}", self.session), img, egui::TextureOptions::LINEAR)),
         }
     }
 
@@ -262,16 +415,18 @@ impl VncView {
                         if widgets::icon_button(ui, g, tip).clicked() {
                             self.scale_to_fit = !self.scale_to_fit;
                         }
-                        if widgets::icon_button(ui, icon::ARROW_CLOCKWISE, "Refresh the screen").clicked()
-                            && let Some(c) = &self.client
+                        if let Some(Remote::Vnc(c)) = &self.client
+                            && widgets::icon_button(ui, icon::ARROW_CLOCKWISE, "Refresh the screen").clicked()
                         {
                             let _ = c.request_full_update();
                         }
                         if !self.view_only {
-                            if widgets::button(ui, icon::CLIPBOARD_TEXT, "Paste Clipboard")
-                                .on_hover_text("Send the local clipboard to the remote desktop")
-                                .clicked()
-                            {
+                            let tip = if self.protocol == Protocol::Rdp {
+                                "Type the local clipboard's text into the remote desktop"
+                            } else {
+                                "Send the local clipboard to the remote desktop"
+                            };
+                            if widgets::button(ui, icon::CLIPBOARD_TEXT, "Paste Clipboard").on_hover_text(tip).clicked() {
                                 match arboard::Clipboard::new().and_then(|mut c| c.get_text()) {
                                     Ok(text) if !text.is_empty() => {
                                         self.paste(s, &text);
@@ -292,7 +447,7 @@ impl VncView {
 
     fn draw(&mut self, ui: &mut Ui, s: &mut Shared, tex: &TextureHandle, img: Rect) {
         ui.painter().image(tex.id(), img, Rect::from_min_max(Pos2::ZERO, Pos2::new(1.0, 1.0)), egui::Color32::WHITE);
-        let id = egui::Id::new(("vnc-input", &self.session));
+        let id = egui::Id::new(("desktop-input", &self.session));
         let resp = ui.interact(img, id, Sense::click_and_drag());
         if resp.clicked() || resp.drag_started() || resp.secondary_clicked() || resp.middle_clicked() {
             resp.request_focus();
@@ -328,7 +483,7 @@ impl VncView {
         let buttons = if resp.hovered() || resp.dragged() || self.buttons != 0 { button_mask(left, middle, right) } else { 0 };
         let at = to_remote(pos, img, self.fb_size);
         if at != self.last_pos || buttons != self.buttons {
-            let _ = c.pointer(at.0, at.1, buttons);
+            c.pointer(at.0, at.1, buttons);
             self.last_pos = at;
             self.buttons = buttons;
         }
@@ -336,8 +491,8 @@ impl VncView {
             self.wheel += scroll;
             while self.wheel.abs() >= 1.0 {
                 let bit = if self.wheel > 0.0 { 1 << 3 } else { 1 << 4 };
-                let _ = c.pointer(at.0, at.1, buttons | bit);
-                let _ = c.pointer(at.0, at.1, buttons);
+                c.pointer(at.0, at.1, buttons | bit);
+                c.pointer(at.0, at.1, buttons);
                 self.wheel -= self.wheel.signum();
             }
         }
@@ -392,6 +547,20 @@ mod tests {
         assert_eq!(chord_keysym(Key::Num1, false), Some(u32::from(b'1')));
         assert_eq!(chord_keysym(Key::Space, false), Some(0x20));
         assert_eq!(modifier_syms(Modifiers::CTRL | Modifiers::SHIFT), vec![XK_SHIFT, XK_CONTROL]);
+    }
+
+    #[test]
+    fn keysyms_map_to_rdp_input() {
+        let sc = |ext, code| format!("{:?}", Some(Operation::KeyPressed(Scancode::from_u8(ext, code))));
+        let k = |sym, down, chord| format!("{:?}", rdp_key(sym, down, chord));
+        assert_eq!(k(0xff0d, true, false), sc(false, 0x1c), "Enter");
+        assert_eq!(k(0xff51, true, false), sc(true, 0x4b), "Left is extended");
+        assert_eq!(k(0xffc9, true, false), sc(false, 0x58), "F12");
+        assert_eq!(k(XK_DELETE, true, false), sc(true, 0x53));
+        assert_eq!(k(u32::from(b'c'), true, false), format!("{:?}", Some(Operation::UnicodeKeyPressed('c'))), "typed text is Unicode");
+        assert_eq!(k(u32::from(b'c'), true, true), sc(false, 0x2e), "Ctrl+C sends the C scancode");
+        assert_eq!(k(u32::from(b'1'), false, true), format!("{:?}", Some(Operation::KeyReleased(Scancode::from_u8(false, 0x02)))));
+        assert_eq!(k(0x0100_20ac, true, false), format!("{:?}", Some(Operation::UnicodeKeyPressed('€'))));
     }
 
     #[test]

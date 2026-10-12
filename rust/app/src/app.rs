@@ -259,7 +259,7 @@ impl App {
             (Protocol::Raw, Some(p)) => View::Raw(Box::new(crate::raw_view::RawView::new(&info.id, p))),
             (Protocol::Irc, Some(p)) => View::Irc(Box::new(crate::irc_view::IrcView::new(&info.id, p))),
             (Protocol::Github, Some(p)) => View::Github(Box::new(crate::github_view::GithubView::new(&info.id, &p.display_name))),
-            (Protocol::Vnc, Some(p)) => View::Vnc(Box::new(crate::vnc_view::VncView::new(&info.id, p))),
+            (Protocol::Vnc | Protocol::Rdp, Some(p)) => View::Desktop(Box::new(crate::desktop_view::DesktopView::new(&info.id, p))),
             (_, p) => {
                 let (scroll, size, cursor) = match p {
                     Some(p) => (p.terminal_scrollback, p.terminal_font_size, p.terminal_cursor_style.clone()),
@@ -522,12 +522,12 @@ impl App {
             Event::HostKeyVerify { host, key_type, fingerprint, stored, reply, .. } => {
                 self.prompts.push_back(Prompt::HostKey { host, key_type, fingerprint, stored, reply });
             }
-            Event::VncReady { session } => {
-                if let Some(View::Vnc(v)) = self.s.panes.get_mut(&session).map(|p| &mut p.view) {
+            Event::DesktopReady { session } => {
+                if let Some(View::Desktop(v)) = self.s.panes.get_mut(&session).map(|p| &mut p.view) {
                     v.on_ready();
                 }
             }
-            Event::VncFrame { .. } => {}
+            Event::DesktopFrame { .. } => {}
             Event::VncClipboard { text, .. } => self.remote_clipboard(&text),
         }
     }

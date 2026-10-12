@@ -1,6 +1,6 @@
 # Nexus Terminal Quick Start
 
-Nexus Terminal is a native desktop client for SSH, Telnet, RAW TCP, Serial, VNC, IRC, GitHub and local terminal sessions. This page is a shareable quick start for everyday use.
+Nexus Terminal is a native desktop client for SSH, Telnet, RAW TCP, Serial, VNC, RDP, IRC, GitHub and local terminal sessions. This page is a shareable quick start for everyday use.
 
 ## Get connected in minutes
 
@@ -31,6 +31,10 @@ Create a **Serial** profile, pick the device from the list (click refresh after 
 ## VNC remote desktops
 
 Create a **VNC** profile for remote desktop sessions. Use the SSH tunnel option when possible, especially outside trusted networks. Direct VNC is available for isolated or trusted networks, but classic VNC traffic is not encrypted, so Nexus Terminal asks before connecting without a tunnel.
+
+## RDP remote desktops
+
+Create an **RDP** profile with the host, your username and, if needed, a domain. Windows servers use Network Level Authentication by default; for xrdp and other servers without it, tick **Allow servers without NLA**. The first connection shows the server certificate's fingerprint to trust. Use the **Proxy** or **SSH Tunnel** sections to reach desktops behind a jump host or proxy.
 
 ## File transfers on SSH
 

@@ -10,6 +10,7 @@ pub const DEFAULT_TELNET_PORT: u16 = 23;
 pub const DEFAULT_RAW_PORT: u16 = 23;
 pub const DEFAULT_GITHUB_PORT: u16 = 443;
 pub const DEFAULT_VNC_PORT: u16 = 5900;
+pub const DEFAULT_RDP_PORT: u16 = 3389;
 pub const DEFAULT_IRC_PORT: u16 = 6667;
 pub const DEFAULT_IRC_TLS_PORT: u16 = 6697;
 pub const DEFAULT_CONNECT_TIMEOUT: i64 = 30;
@@ -52,13 +53,15 @@ pub enum Protocol {
     Raw,
     Github,
     Vnc,
+    Rdp,
     Irc,
     Serial,
     Local,
 }
 
 impl Protocol {
-    pub const SAVED: [Protocol; 7] = [Protocol::Ssh, Protocol::Telnet, Protocol::Raw, Protocol::Github, Protocol::Vnc, Protocol::Irc, Protocol::Serial];
+    pub const SAVED: [Protocol; 8] =
+        [Protocol::Ssh, Protocol::Telnet, Protocol::Raw, Protocol::Github, Protocol::Vnc, Protocol::Rdp, Protocol::Irc, Protocol::Serial];
     pub fn id(self) -> &'static str {
         match self {
             Protocol::Ssh => "ssh",
@@ -66,6 +69,7 @@ impl Protocol {
             Protocol::Raw => "raw",
             Protocol::Github => "github",
             Protocol::Vnc => "vnc",
+            Protocol::Rdp => "rdp",
             Protocol::Irc => "irc",
             Protocol::Serial => "serial",
             Protocol::Local => "local",
@@ -81,6 +85,7 @@ impl Protocol {
             Protocol::Raw => "RAW TCP",
             Protocol::Github => "GitHub",
             Protocol::Vnc => "VNC",
+            Protocol::Rdp => "RDP",
             Protocol::Irc => "IRC",
             Protocol::Serial => "Serial",
             Protocol::Local => "Local",
@@ -237,6 +242,8 @@ pub struct Profile {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub vnc: Option<VncConfig>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rdp: Option<RdpConfig>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub irc: Option<IrcConfig>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub serial: Option<SerialConfig>,
@@ -385,6 +392,53 @@ pub struct VncConfig {
     #[serde(rename = "sshPrivateKeyPath")]
     pub ssh_private_key: String,
     pub ssh_agent_auth: bool,
+}
+
+/// RDP connection settings; host, port and username are the profile's own.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase", default)]
+pub struct RdpConfig {
+    pub domain: String,
+    pub secret_mode: SecretMode,
+    /// Initial desktop size; 0×0 follows the tab's size.
+    pub width: i64,
+    pub height: i64,
+    pub scale_to_fit: bool,
+    /// Resize the remote desktop with the tab (Display Control); otherwise scale the image.
+    pub dynamic_resolution: bool,
+    /// Allow plain TLS logon for servers without Network Level Authentication (e.g. xrdp).
+    #[serde(rename = "allowTLSOnly")]
+    pub allow_tls_only: bool,
+    /// Trust policy for the server's TLS certificate (pinned like an SSH host key).
+    #[serde(deserialize_with = "lenient")]
+    pub host_key_policy: HostKeyPolicy,
+    /// "none", "socks5" or "http"; the password is a stored secret.
+    pub proxy_type: String,
+    pub proxy_host: String,
+    pub proxy_port: i64,
+    pub proxy_username: String,
+    pub ssh_tunnel: bool,
+    pub ssh_host: String,
+    pub ssh_port: i64,
+    pub ssh_username: String,
+    pub ssh_auth_method: String,
+    pub ssh_secret_mode: SecretMode,
+    #[serde(rename = "sshPrivateKeyPath")]
+    pub ssh_private_key: String,
+    pub ssh_agent_auth: bool,
+}
+
+impl RdpConfig {
+    pub fn defaults() -> Self {
+        RdpConfig {
+            scale_to_fit: true,
+            dynamic_resolution: true,
+            proxy_type: "none".into(),
+            ssh_port: DEFAULT_SSH_PORT.into(),
+            ssh_auth_method: "publickey".into(),
+            ..Default::default()
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
@@ -667,6 +721,7 @@ impl Profile {
             raw: None,
             github: None,
             vnc: None,
+            rdp: None,
             irc: None,
             serial: None,
         };
@@ -691,6 +746,10 @@ impl Profile {
             Protocol::Vnc => {
                 p.port = DEFAULT_VNC_PORT.into();
                 p.vnc = Some(VncConfig::defaults());
+            }
+            Protocol::Rdp => {
+                p.port = DEFAULT_RDP_PORT.into();
+                p.rdp = Some(RdpConfig::defaults());
             }
             Protocol::Irc => {
                 p.port = DEFAULT_IRC_PORT.into();
@@ -799,6 +858,18 @@ impl Profile {
                 }
                 if c.ssh_auth_method.is_empty() {
                     c.ssh_auth_method = "publickey".into();
+                }
+            }
+            Protocol::Rdp => {
+                let c = self.rdp.get_or_insert_with(RdpConfig::defaults);
+                if c.ssh_port == 0 {
+                    c.ssh_port = DEFAULT_SSH_PORT.into();
+                }
+                if c.ssh_auth_method.is_empty() {
+                    c.ssh_auth_method = "publickey".into();
+                }
+                if c.proxy_type.is_empty() {
+                    c.proxy_type = "none".into();
                 }
             }
             Protocol::Irc => {

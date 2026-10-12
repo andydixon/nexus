@@ -1,17 +1,17 @@
 # Nexus Terminal
 
-**A native desktop client for SSH, Telnet, RAW TCP, Serial, VNC, IRC, GitHub and local terminals — with secure credential handling and a focused, multi-session workflow.**
+**A native desktop client for SSH, Telnet, RAW TCP, Serial, VNC, RDP, IRC, GitHub and local terminals — with secure credential handling and a focused, multi-session workflow.**
 
 Nexus Terminal helps you manage many connections at once, keep terminal work organised, and move files with confidence. It is a single Rust application with no webview, so it starts quickly and stays responsive under heavy terminal output.
 
 ## Highlights
 
-- SSH, Telnet, RAW TCP, Serial, VNC, IRC, GitHub and local terminal sessions in one app
+- SSH, Telnet, RAW TCP, Serial, VNC, RDP, IRC, GitHub and local terminal sessions in one app
 - Tabbed sessions with split panes, pinning and drag-to-reorder
 - SFTP browser with drag-and-drop uploads and a permission-aware directory picker
 - SSH jump hosts, SOCKS5/HTTP proxies, local and remote port forwards, agent forwarding and TOTP auto-fill
 - Serial consoles with full line settings (baud, data bits, parity, stop bits, flow control)
-- Native VNC viewer, optionally tunnelled over SSH
+- Native VNC and RDP viewers; RDP with NLA, certificate pinning, and SOCKS5/HTTP proxy or SSH tunnel routes
 - Disconnected overlay with one-click reconnect, and auto-reconnect with backoff
 - Broadcast input, snippets, trigger rules and terminal search
 - Session recording (asciicast v2) and playback

@@ -16,13 +16,14 @@ const MIGRATIONS: &[(i64, &str)] = &[
     (5, include_str!("../migrations/005_irc_protocol.sql")),
     (6, include_str!("../migrations/006_irc_channel_state.sql")),
     (7, include_str!("../migrations/007_serial_protocol.sql")),
+    (8, include_str!("../migrations/008_rdp_protocol.sql")),
 ];
 
 const PROFILE_COLS: &str = "id, display_name, description, protocol, host, port, username,
     tags, folder, environment, notes, favourite, last_connected,
     connect_timeout, read_timeout,
     terminal_font_family, terminal_font_size, terminal_scrollback, terminal_cursor_style,
-    ssh_config, telnet_config, raw_config, github_config, vnc_config, irc_config, serial_config,
+    ssh_config, telnet_config, raw_config, github_config, vnc_config, irc_config, serial_config, rdp_config,
     created_at, updated_at";
 
 /// Formats like Go's `time.RFC3339` (whole seconds, `Z` for UTC).
@@ -81,8 +82,9 @@ fn scan_profile(r: &Row) -> rusqlite::Result<Profile> {
         vnc: parse_col(r.get(23)?),
         irc: parse_col(r.get(24)?),
         serial: parse_col(r.get(25)?),
-        created_at: parse_time(&r.get::<_, String>(26)?),
-        updated_at: parse_time(&r.get::<_, String>(27)?),
+        rdp: parse_col(r.get(26)?),
+        created_at: parse_time(&r.get::<_, String>(27)?),
+        updated_at: parse_time(&r.get::<_, String>(28)?),
     })
 }
 
@@ -136,7 +138,7 @@ impl Store {
         Ok(())
     }
 
-    fn profile_params(p: &Profile) -> [Box<dyn rusqlite::ToSql>; 25] {
+    fn profile_params(p: &Profile) -> [Box<dyn rusqlite::ToSql>; 26] {
         [
             Box::new(p.display_name.clone()),
             Box::new(p.description.clone()),
@@ -163,6 +165,7 @@ impl Store {
             Box::new(json_col(&p.vnc)),
             Box::new(json_col(&p.irc)),
             Box::new(json_col(&p.serial)),
+            Box::new(json_col(&p.rdp)),
         ]
     }
 
@@ -171,7 +174,7 @@ impl Store {
         args.extend(Self::profile_params(p));
         args.push(Box::new(fmt_time(&p.created_at)));
         args.push(Box::new(fmt_time(&p.updated_at)));
-        let sql = format!("INSERT INTO profiles ({PROFILE_COLS}) VALUES ({})", vec!["?"; 28].join(","));
+        let sql = format!("INSERT INTO profiles ({PROFILE_COLS}) VALUES ({})", vec!["?"; 29].join(","));
         self.db
             .lock()
             .execute(&sql, rusqlite::params_from_iter(args.iter().map(|b| b.as_ref())))
@@ -191,7 +194,7 @@ impl Store {
                  tags=?, folder=?, environment=?, notes=?, favourite=?, last_connected=?,
                  connect_timeout=?, read_timeout=?,
                  terminal_font_family=?, terminal_font_size=?, terminal_scrollback=?, terminal_cursor_style=?,
-                 ssh_config=?, telnet_config=?, raw_config=?, github_config=?, vnc_config=?, irc_config=?, serial_config=?,
+                 ssh_config=?, telnet_config=?, raw_config=?, github_config=?, vnc_config=?, irc_config=?, serial_config=?, rdp_config=?,
                  updated_at=? WHERE id=?",
                 rusqlite::params_from_iter(args.iter().map(|b| b.as_ref())),
             )
@@ -482,11 +485,18 @@ mod tests {
         assert_eq!(s.get_profile(&ssh.id).unwrap(), ssh);
         s.update_profile(&ssh).unwrap();
         assert_eq!(s.get_profile(&ssh.id).unwrap(), ssh, "updates are lossless");
+        let mut rdp = Profile::new(Protocol::Rdp);
+        rdp.host = "win".into();
+        rdp.username = "me".into();
+        rdp.rdp.as_mut().unwrap().domain = "CORP".into();
+        rdp.normalize();
+        s.create_profile(&rdp).unwrap();
+        assert_eq!(s.get_profile(&rdp.id).unwrap(), rdp.clone().with_secs());
         let mut serial = Profile::new(Protocol::Serial);
         serial.host = "/dev/ttyUSB0".into();
         serial.normalize();
         s.create_profile(&serial).unwrap();
-        assert_eq!(s.list_profiles().unwrap().len(), 2);
+        assert_eq!(s.list_profiles().unwrap().len(), 3);
 
         s.save_irc_last_rooms(&ssh.id, &["#rust".into(), "#nexus".into()]).unwrap();
         assert_eq!(s.irc_last_rooms(&ssh.id).unwrap(), ["#rust", "#nexus"]);
