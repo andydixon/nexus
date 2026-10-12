@@ -37,6 +37,12 @@ fn nd<'de, D: Deserializer<'de>, T: Default + Deserialize<'de>>(d: D) -> Result<
     Ok(Option::<T>::deserialize(d)?.unwrap_or_default())
 }
 
+/// For enum fields: an unknown value (e.g. written by a newer build) falls back to the default
+/// for that field instead of failing the whole config, which would reset every other setting.
+fn lenient<'de, D: Deserializer<'de>, T: Default + serde::de::DeserializeOwned>(d: D) -> Result<T, D::Error> {
+    Ok(Option::<serde_json::Value>::deserialize(d)?.and_then(|v| T::deserialize(v).ok()).unwrap_or_default())
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum Protocol {
@@ -244,6 +250,7 @@ pub struct SshConfig {
     pub secret_mode: SecretMode,
     pub private_key_path: String,
     pub key_secret_mode: SecretMode,
+    #[serde(deserialize_with = "lenient")]
     pub host_key_policy: HostKeyPolicy,
     pub terminal_type: String,
     pub keepalive_interval: i64,
@@ -303,6 +310,7 @@ pub enum ForwardDirection {
 #[serde(rename_all = "camelCase", default)]
 pub struct PortForward {
     pub id: String,
+    #[serde(deserialize_with = "lenient")]
     pub direction: ForwardDirection,
     pub bind_host: String,
     pub bind_port: i64,
@@ -316,6 +324,7 @@ pub struct PortForward {
 #[serde(rename_all = "camelCase", default)]
 pub struct TelnetConfig {
     pub local_echo: bool,
+    #[serde(deserialize_with = "lenient")]
     pub line_ending: LineEnding,
     pub terminal_type: String,
     pub encoding: String,
@@ -331,6 +340,7 @@ pub struct TelnetConfig {
 #[serde(rename_all = "camelCase", default)]
 pub struct RawConfig {
     pub auto_reconnect: bool,
+    #[serde(deserialize_with = "lenient")]
     pub line_ending: LineEnding,
     pub encoding: String,
     pub show_timestamps: bool,
@@ -431,9 +441,12 @@ pub enum FlowControl {
 pub struct SerialConfig {
     pub baud_rate: u32,
     pub data_bits: u8,
+    #[serde(deserialize_with = "lenient")]
     pub parity: Parity,
     pub stop_bits: u8,
+    #[serde(deserialize_with = "lenient")]
     pub flow_control: FlowControl,
+    #[serde(deserialize_with = "lenient")]
     pub line_ending: LineEnding,
     pub local_echo: bool,
     pub dtr_on_connect: bool,
@@ -917,5 +930,20 @@ impl IrcConfig {
             auto_reconnect: true,
             ..Default::default()
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn unknown_enum_values_fall_back_per_field() {
+        let c: SshConfig = serde_json::from_str(r#"{"hostKeyPolicy":"from-the-future","keepaliveInterval":42,"agentForwarding":true}"#).unwrap();
+        assert_eq!((c.host_key_policy, c.keepalive_interval, c.agent_forwarding), (HostKeyPolicy::Ask, 42, true));
+        let c: SshConfig = serde_json::from_str(r#"{"hostKeyPolicy":"strict"}"#).unwrap();
+        assert_eq!(c.host_key_policy, HostKeyPolicy::Strict);
+        let t: TelnetConfig = serde_json::from_str(r#"{"lineEnding":"weird","localEcho":true}"#).unwrap();
+        assert_eq!((t.line_ending, t.local_echo), (LineEnding::default(), true));
     }
 }

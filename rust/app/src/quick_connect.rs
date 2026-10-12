@@ -184,4 +184,21 @@ mod tests {
         let p = q.profile().unwrap();
         assert_eq!((p.port, p.username.as_str()), (0, ""));
     }
+
+    #[test]
+    fn quick_profiles_pass_validation_unless_incomplete() {
+        use nexus_core::validation::validate_profile;
+        for proto in PROTOCOLS {
+            let mut q = QuickConnect { host: "box".into(), username: "me".into(), ..Default::default() };
+            q.set_protocol(proto);
+            let mut p = q.profile().unwrap();
+            p.normalize();
+            assert!(validate_profile(&p).is_ok(), "{proto:?}: {:?}", validate_profile(&p).err().map(|e| e.to_string()));
+        }
+        let mut q = QuickConnect { host: "box".into(), ..Default::default() };
+        q.set_protocol(Protocol::Ssh);
+        let mut p = q.profile().unwrap();
+        p.normalize();
+        assert!(validate_profile(&p).is_err(), "SSH needs a username");
+    }
 }

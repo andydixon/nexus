@@ -586,9 +586,13 @@ impl App {
                 Request::Connect(id) => self.connect_profile(&id, false),
                 Request::ConnectQuick(p) => {
                     let name = if p.display_name.is_empty() { p.host.clone() } else { p.display_name.clone() };
-                    let sid = self.s.svc.connect_quick(p);
-                    self.add_session(&sid, true);
-                    self.s.info(format!("Connecting to {name}…"));
+                    match self.s.svc.connect_quick(p) {
+                        Ok(sid) => {
+                            self.add_session(&sid, true);
+                            self.s.info(format!("Connecting to {name}…"));
+                        }
+                        Err(e) => self.s.error(format!("Can't connect to {name}: {e}")),
+                    }
                 }
                 Request::ReloadProfiles => self.s.reload_profiles(),
                 Request::ReloadPreferences => {

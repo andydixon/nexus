@@ -46,7 +46,8 @@ fn json_col<T: serde::Serialize>(v: &Option<T>) -> Option<String> {
 }
 
 fn parse_col<T: serde::de::DeserializeOwned>(s: Option<String>) -> Option<T> {
-    s.filter(|s| !s.is_empty() && s != "null").and_then(|s| serde_json::from_str(&s).ok())
+    let s = s.filter(|s| !s.is_empty() && s != "null")?;
+    serde_json::from_str(&s).inspect_err(|e| eprintln!("storage: ignoring unreadable profile config: {e}")).ok()
 }
 
 fn scan_profile(r: &Row) -> rusqlite::Result<Profile> {

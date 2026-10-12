@@ -543,7 +543,7 @@ impl Settings {
             if widgets::button(ui, icon::DOWNLOAD_SIMPLE, "Import ~/.ssh/config").clicked() {
                 match s.svc.import_ssh_config(None, "SSH Config") {
                     Ok(n) => {
-                        s.success(format!("Imported {n} host(s) from ~/.ssh/config"));
+                        s.success(ssh_import_summary(n));
                         s.request(Request::ReloadProfiles);
                     }
                     Err(e) => s.error(format!("SSH config import failed: {e}")),
@@ -934,6 +934,12 @@ Open two or more sessions and press {Mod+Shift+B} to turn on broadcast mode. Eve
     ),
 ];
 
+pub fn ssh_import_summary((n, skipped): (usize, usize)) -> String {
+    match skipped {
+        0 => format!("Imported {n} host(s) from ~/.ssh/config"),
+        k => format!("Imported {n} host(s) from ~/.ssh/config; skipped {k} that couldn't be used as-is"),
+    }
+}
 #[cfg(test)]
 mod tests {
     use super::*;

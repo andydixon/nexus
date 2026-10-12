@@ -109,12 +109,17 @@ impl Service {
     }
 
     /// Opens an unsaved profile (Quick Connect).
-    pub fn connect_quick(&self, mut p: Profile) -> String {
+    /// Validates like a saved profile (so e.g. an empty SSH username fails here, not at auth).
+    pub fn connect_quick(&self, mut p: Profile) -> Result<String> {
         if p.id.is_empty() {
             p.id = new_id();
         }
+        if p.display_name.trim().is_empty() {
+            p.display_name = p.host.clone();
+        }
         p.normalize();
-        self.sessions.connect(p)
+        validation::validate_profile(&p).map_err(|e| e.to_string())?;
+        Ok(self.sessions.connect(p))
     }
 
     pub fn connect_local(&self) -> String {
@@ -277,15 +282,30 @@ impl Service {
         self.import(ps, strategy)
     }
 
-    pub fn import_ssh_config(&self, path: Option<&Path>, folder: &str) -> Result<usize> {
+    /// Imports Host blocks as profiles; returns (imported, skipped). A block without `User` gets
+    /// the local user name, as `ssh` itself would; blocks that still don't validate are skipped.
+    pub fn import_ssh_config(&self, path: Option<&Path>, folder: &str) -> Result<(usize, usize)> {
         let path = path.map(Path::to_path_buf).or_else(sshconfig::default_config_path).ok_or("no ~/.ssh/config found")?;
         let blocks = sshconfig::parse_file(&path)?;
-        let mut n = 0;
-        for p in sshconfig::to_profiles(&blocks, folder) {
-            n += self.store.create_profile(&p).is_ok() as usize;
+        let local_user = std::env::var("USER").or_else(|_| std::env::var("USERNAME")).unwrap_or_default();
+        let (mut n, mut skipped) = (0, 0);
+        for mut p in sshconfig::to_profiles(&blocks, folder) {
+            if p.username.is_empty() {
+                p.username = local_user.clone();
+            }
+            for jh in p.ssh.iter_mut().flat_map(|s| s.jump_hosts.iter_mut()) {
+                if jh.username.is_empty() {
+                    jh.username = local_user.clone();
+                }
+            }
+            if validation::validate_profile(&p).is_ok() && self.store.create_profile(&p).is_ok() {
+                n += 1;
+            } else {
+                skipped += 1;
+            }
         }
-        self.store.add_audit("import", "", "", &format!("Imported {n} profile(s)"));
-        Ok(n)
+        self.store.add_audit("import", "", "", &format!("Imported {n} profile(s) from SSH config, skipped {skipped}"));
+        Ok((n, skipped))
     }
 
     // --- SSH keys -----------------------------------------------------------------------

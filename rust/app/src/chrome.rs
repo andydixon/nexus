@@ -80,7 +80,7 @@ pub fn title_bar(app: &mut App, ui: &mut Ui) {
                 if item(ui, icon::FILE_ARROW_DOWN, "Import ~/.ssh/config", "") {
                     match app.s.svc.import_ssh_config(None, "SSH Config") {
                         Ok(n) => {
-                            app.s.success(format!("Imported {n} host(s) from ~/.ssh/config"));
+                            app.s.success(crate::settings::ssh_import_summary(n));
                             app.s.reload_profiles();
                         }
                         Err(e) => app.s.error(format!("Import failed: {e}")),
