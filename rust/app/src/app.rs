@@ -614,7 +614,13 @@ impl App {
                 }
                 Request::ExportEncrypted(ids) => self.transfer.export_encrypted(ids),
                 Request::ImportEncrypted => self.transfer.import_encrypted(),
-                Request::Sftp(id) => self.sftp.toggle(&id),
+                Request::Sftp(id) => {
+                    let at = match self.s.pane(&id).map(|p| &p.view) {
+                        Some(View::Terminal(t)) => t.reported_cwd.as_ref().map(|c| c.1.clone()),
+                        _ => None,
+                    };
+                    self.sftp.toggle(&id, at);
+                }
                 Request::SendToActive(text) => match self.s.focused_session() {
                     Some(id) if self.s.session_state(&id) == Some(SessionState::Connected) => self.send_input(&id, text.as_bytes()),
                     _ => self.s.error("No active connected session"),

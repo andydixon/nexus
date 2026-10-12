@@ -132,7 +132,7 @@ pub fn title_bar(app: &mut App, ui: &mut Ui) {
                     if item(ui, icon::FOLDER_OPEN, "SFTP browser", "")
                         && let Some(f) = focused.clone()
                     {
-                        app.sftp.toggle(&f);
+                        app.s.request(crate::state::Request::Sftp(f));
                     }
                     if item(ui, icon::ARROWS_LEFT_RIGHT, "Port forwards", "")
                         && let Some(f) = focused.clone()

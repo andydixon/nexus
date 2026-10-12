@@ -109,6 +109,8 @@ pub struct Sftp {
     /// Profile id (or host:port for quick connects) → bookmarked paths. Loaded on first use.
     bookmarks: Option<BTreeMap<String, Vec<String>>>,
     inbox: Arc<Mutex<Vec<Done>>>,
+    /// Where a browser opened from a terminal should start: the directory its shell reported.
+    start_at: HashMap<String, String>,
 }
 
 // --- path helpers ---------------------------------------------------------------------------
@@ -215,11 +217,16 @@ fn state_line(ui: &mut Ui, loading: bool, error: Option<&str>) -> bool {
 }
 
 impl Sftp {
-    pub fn toggle(&mut self, session: &str) {
+    /// Opens (or closes) the browser for `session`; `at` is the shell's reported directory, which
+    /// the browser goes to when it opens.
+    pub fn toggle(&mut self, session: &str, at: Option<String>) {
         if self.open_for.as_deref() == Some(session) {
             self.close(session);
         } else {
             self.open_for = Some(session.into());
+            if let Some(dir) = at.filter(|d| d.starts_with('/')) {
+                self.start_at.insert(session.into(), dir);
+            }
         }
     }
 
@@ -488,7 +495,11 @@ impl Sftp {
         let Some(session) = self.open_for.clone() else {
             return;
         };
-        if !self.panels.contains_key(&session) {
+        if let Some(dir) = self.start_at.remove(&session) {
+            if self.panels.get(&session).is_none_or(|p| p.cwd != dir) {
+                self.navigate(s, &session, Some(dir));
+            }
+        } else if !self.panels.contains_key(&session) {
             self.navigate(s, &session, None);
         }
         let t = Tokens::get(ui.ctx());
