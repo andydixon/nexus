@@ -118,7 +118,24 @@ pub struct TermView {
     max_history: usize,
     /// The working directory the shell last reported (OSC 7): (host, path).
     pub reported_cwd: Option<(String, String)>,
+    /// Inline images (iTerm2 OSC 1337), oldest first.
+    images: Vec<InlineImage>,
+    /// Cell size in points from the last frame, for sizing images that arrive between frames.
+    cell_px: (f32, f32),
 }
+
+struct InlineImage {
+    stable: i64,
+    col: usize,
+    cols: usize,
+    rows: usize,
+    pixels: Option<egui::ColorImage>,
+    texture: Option<egui::TextureHandle>,
+    size: usize,
+}
+
+/// Pixels of inline images kept per terminal; the oldest go first.
+const MAX_IMAGE_PIXELS: usize = 32 << 20;
 
 /// One command as shell integration reported it. Lines are stable indexes (see `stable`).
 #[derive(Clone, Debug)]
@@ -165,6 +182,8 @@ impl TermView {
             rotated: 0,
             max_history: scrollback.min(100_000),
             reported_cwd: None,
+            images: Vec::new(),
+            cell_px: (8.0, 16.0),
         }
     }
 
@@ -182,7 +201,7 @@ impl TermView {
     /// Feeds the VT parser, counting lines a full scrollback rotates out (one per line feed at the
     /// bottom of the screen) so shell-integration marks stay on their lines.
     fn advance(&mut self, bytes: &[u8]) {
-        if self.prompts.is_empty() || self.term.mode().contains(TermMode::ALT_SCREEN) {
+        if (self.prompts.is_empty() && self.images.is_empty()) || self.term.mode().contains(TermMode::ALT_SCREEN) {
             self.parser.advance(&mut self.term, bytes);
             return;
         }
@@ -204,6 +223,7 @@ impl TermView {
         if self.term.grid().history_size() < h0 {
             // The scrollback was cleared: earlier marks point at nothing.
             self.prompts.clear();
+            self.images.clear();
         }
     }
 
@@ -249,6 +269,88 @@ impl TermView {
                 }
             }
             Osc::Cwd { host, path } => self.reported_cwd = Some((host, path)),
+            Osc::Image { data, width, height } => self.place_image(&data, &width, &height),
+        }
+    }
+
+    /// Decodes an inline image (PNG, JPEG or GIF, within size limits), anchors it at the cursor and
+    /// moves the cursor below it, as iTerm2 does.
+    fn place_image(&mut self, data: &[u8], width: &str, height: &str) {
+        if self.term.mode().contains(TermMode::ALT_SCREEN) {
+            return;
+        }
+        let decoded = (|| {
+            let mut r = image::ImageReader::new(std::io::Cursor::new(data)).with_guessed_format().ok()?;
+            let mut limits = image::Limits::default();
+            limits.max_image_width = Some(8192);
+            limits.max_image_height = Some(8192);
+            limits.max_alloc = Some(256 << 20);
+            r.limits(limits);
+            Some(r.decode().ok()?.to_rgba8())
+        })();
+        let Some(img) = decoded else { return };
+        let (cw, ch) = self.cell_px;
+        let (iw, ih) = (img.width() as f32, img.height() as f32);
+        let full_w = self.cols as f32 * cw;
+        let dim = |arg: &str, full: f32, cell: f32| -> Option<f32> {
+            let a = arg.trim();
+            if a.is_empty() || a == "auto" {
+                None
+            } else if let Some(px) = a.strip_suffix("px") {
+                px.parse().ok()
+            } else if let Some(pc) = a.strip_suffix('%') {
+                pc.parse::<f32>().ok().map(|p| full * p / 100.0)
+            } else {
+                a.parse::<f32>().ok().map(|n| n * cell)
+            }
+        };
+        let (w, h) = match (dim(width, full_w, cw), dim(height, self.rows as f32 * ch, ch)) {
+            (Some(w), Some(h)) => (w, h),
+            (Some(w), None) => (w, w * ih / iw),
+            (None, Some(h)) => (h * iw / ih, h),
+            (None, None) => (iw, ih),
+        };
+        // Never wider than the terminal; keep the aspect ratio when shrinking.
+        let scale = (full_w / w).min(1.0);
+        let (w, h) = (w * scale, h * scale);
+        let cols = ((w / cw).ceil() as usize).clamp(1, self.cols as usize);
+        let rows = ((h / ch).ceil() as usize).clamp(1, 1000);
+        let size = img.width() as usize * img.height() as usize;
+        while !self.images.is_empty() && self.images.iter().map(|i| i.size).sum::<usize>() + size > MAX_IMAGE_PIXELS {
+            self.images.remove(0);
+        }
+        let pixels = egui::ColorImage::from_rgba_unmultiplied([img.width() as usize, img.height() as usize], img.as_raw());
+        let (stable, col) = (self.cursor_stable(), self.term.grid().cursor.point.column.0);
+        self.images.push(InlineImage { stable, col, cols, rows, pixels: Some(pixels), texture: None, size });
+        // Leave room: the cursor ends up on the line below the image.
+        self.advance(&b"\r\n".repeat(rows));
+    }
+
+    fn paint_images(&mut self, ui: &Ui, rect: Rect, origin: Pos2, cw: f32, ch: f32) {
+        let top = self.term.grid().topmost_line().0;
+        let offset = self.term.grid().display_offset() as i32;
+        // Line of a stable index, without borrowing self (the loop below mutates the images).
+        let (rotated, history) = (self.rotated, self.term.grid().history_size() as i64);
+        let line_of = |stable: i64| (stable - rotated - history) as i32;
+        // Images that scrolled out of the scrollback are gone with it.
+        self.images.retain(|i| line_of(i.stable) + i.rows as i32 > top);
+        let painter = ui.painter_at(rect);
+        let rows = self.rows as i32;
+        for img in &mut self.images {
+            let vr = line_of(img.stable) + offset;
+            if vr + img.rows as i32 <= 0 || vr >= rows {
+                continue;
+            }
+            let at = Rect::from_min_size(origin + vec2(img.col as f32 * cw, vr as f32 * ch), vec2(img.cols as f32 * cw, img.rows as f32 * ch));
+            let tex = img.texture.get_or_insert_with(|| {
+                let px = img.pixels.take().unwrap_or_default();
+                ui.ctx().load_texture("term-image", px, egui::TextureOptions::LINEAR)
+            });
+            // Fit inside the reserved cells, keeping the aspect ratio.
+            let [tw, th] = tex.size();
+            let s = (at.width() / tw as f32).min(at.height() / th as f32);
+            let shown = Rect::from_min_size(at.min, vec2(tw as f32 * s, th as f32 * s));
+            painter.image(tex.id(), shown, Rect::from_min_max(Pos2::ZERO, pos2(1.0, 1.0)), Color32::WHITE);
         }
     }
 
@@ -439,6 +541,8 @@ impl TermView {
         }
 
         self.paint(ui, rect, origin, &font, cw, ch, theme, focused);
+        self.cell_px = (cw, ch);
+        self.paint_images(ui, rect, origin, cw, ch);
         // Exit status of each finished command, as a bar beside its prompt (shell integration).
         let hover = ui.input(|i| i.pointer.hover_pos());
         for (bar, exit, took) in self.status_bars(rect, origin, ch) {
@@ -1175,6 +1279,26 @@ mod tests {
         assert_eq!(at(11).as_deref(), Some("https://example.com/docs"));
         assert_eq!(at(12), None, "the link ends with its text");
         assert_eq!(at(0), None);
+    }
+
+    #[test]
+    fn inline_images_reserve_rows_and_respect_width() {
+        use base64::Engine;
+        let mut png = Vec::new();
+        image::RgbaImage::from_pixel(40, 32, image::Rgba([255, 0, 0, 255])).write_to(&mut std::io::Cursor::new(&mut png), image::ImageFormat::Png).unwrap();
+        let b64 = base64::engine::general_purpose::STANDARD.encode(&png);
+        let mut t = TermView::new(100, 14.0, CursorStyle::Block);
+        t.cell_px = (8.0, 16.0);
+        t.feed(format!("x\r\n\x1b]1337;File=inline=1;width=10:{b64}\x07after").as_bytes());
+        let img = &t.images[0];
+        // 10 cells wide (80 px) keeps the 40x32 aspect: 64 px = 4 rows; the text continues below.
+        assert_eq!((img.col, img.cols, img.rows), (0, 10, 4));
+        assert_eq!(t.line_of(img.stable), Line(1));
+        assert_eq!(t.term.grid().cursor.point.line, Line(5));
+        assert!(t.line_text(Line(5)).0.starts_with("after"));
+        // Garbage is ignored rather than placed.
+        t.feed(b"\x1b]1337;File=inline=1:bm90IGFuIGltYWdl\x07");
+        assert_eq!(t.images.len(), 1);
     }
 
     #[test]

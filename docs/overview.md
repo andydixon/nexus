@@ -73,6 +73,7 @@ Use Nexus Terminal when you need to:
 - Shift+PageUp/PageDown/Home/End and the mouse wheel scroll the scrollback; on the alternate screen the wheel sends arrow keys, so `tmux`, `screen` and `byobu` scroll naturally.
 - Context menu with Copy, Paste, Select All, Find, Send Snippet, Port Forwards, Split Right, Split Down, Export Output, Clear and Reset.
 - Export the whole scrollback as plain text.
+- Inline images in the iTerm2 format (`imgcat`, `wezterm imgcat`, `chafa -f iterm`…): PNG, JPEG and GIF, sized in cells, pixels or percent, scrolling with the text.
 - Shell integration (OSC 133): jump between prompts, copy the last command's output, and see each command's exit status and duration beside its prompt.
 - Status-bar latency for the active SSH session.
 

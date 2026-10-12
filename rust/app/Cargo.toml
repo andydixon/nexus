@@ -18,7 +18,8 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt", "env-filter", "std", "ansi"] }
 egui-phosphor = "0.14"
 rfd = "0.17"
-image = { version = "0.25", default-features = false, features = ["png"] }
+image = { version = "0.25", default-features = false, features = ["png", "gif"] }
+base64 = "0.22"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 regex = "1"

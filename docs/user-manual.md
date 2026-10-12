@@ -218,6 +218,10 @@ A new pane offers **Local Machine** and your terminal profiles (SSH, Telnet and 
 
 ## 6. Terminal actions and search
 
+### Inline images
+
+Programs that print images in the iTerm2 format (`imgcat`, `wezterm imgcat`, `chafa -f iterm`) show PNG, JPEG and GIF (first frame) images inline, sized as the program asks and never wider than the terminal; the text continues below the image. Images scroll with the text and are dropped with the scrollback. Very large images (over 8192 pixels a side) are ignored, and each terminal keeps at most 32 megapixels of images, dropping the oldest. Sixel and kitty graphics aren't supported.
+
 ### Shell integration
 
 When the shell marks its prompts and commands (the OSC 133 sequences), Nexus Terminal knows where each command starts and ends:
