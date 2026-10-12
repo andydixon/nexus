@@ -21,6 +21,23 @@ pub const VERSION: &str = match option_env!("NEXUS_VERSION") {
 };
 const MAX_IMPORT_JSON_BYTES: usize = 5 * 1024 * 1024;
 
+/// Secret-store key of the profile-sync password.
+const SYNC_PASSWORD: &str = "sync:password";
+/// Setting holding deleted profile ids and when, for sync.
+const SYNC_DELETED: &str = "sync_deleted";
+
+#[derive(Debug, Default, Clone, PartialEq)]
+pub struct SyncReport {
+    /// Profiles created or updated from the shared file.
+    pub pulled: usize,
+    /// Profiles deleted because another machine deleted them.
+    pub removed: usize,
+    /// Incoming profiles that failed validation.
+    pub skipped: usize,
+    /// Whether the shared file was rewritten.
+    pub pushed: bool,
+}
+
 pub struct Service {
     pub config: AppConfig,
     pub store: Arc<Store>,
@@ -72,6 +89,10 @@ impl Service {
         let p = self.store.get_profile(id).map_err(|e| format!("profile not found: {e}"))?;
         self.store.delete_profile(id).map_err(|e| format!("failed to delete profile: {e}"))?;
         self.secrets.delete_profile(id);
+        // So other machines syncing the same folder delete it too.
+        let mut gone = self.sync_tombstones();
+        gone.insert(id.to_string(), now());
+        let _ = self.store.set_setting(SYNC_DELETED, &serde_json::to_string(&gone).unwrap_or_default());
         self.store.add_audit("profile.delete", id, "", &format!("Deleted profile {:?}", p.display_name));
         Ok(())
     }
@@ -86,6 +107,65 @@ impl Service {
         self.store.create_profile(&d).map_err(|e| format!("failed to duplicate profile: {e}"))?;
         self.store.add_audit("profile.create", &d.id, "", &format!("Created profile {:?}", d.display_name));
         Ok(d)
+    }
+
+    fn sync_tombstones(&self) -> std::collections::BTreeMap<String, Time> {
+        self.store.setting(SYNC_DELETED).and_then(|j| serde_json::from_str(&j).ok()).unwrap_or_default()
+    }
+
+    /// Sets (or, when empty, forgets) the profile-sync password.
+    pub fn set_sync_password(&self, password: &str) -> Result<()> {
+        if password.is_empty() {
+            self.secrets.delete(SYNC_PASSWORD);
+            return Ok(());
+        }
+        self.secrets.set_checked(SYNC_PASSWORD, password)
+    }
+
+    pub fn has_sync_password(&self) -> bool {
+        self.secrets.get(SYNC_PASSWORD).is_some()
+    }
+
+    /// Merges profiles with the shared sync file; see [`crate::sync`].
+    pub fn sync_profiles(&self) -> Result<SyncReport> {
+        let folder = self.store.preferences().sync_folder;
+        if folder.trim().is_empty() {
+            return Err("profile sync isn't set up (choose a folder in Settings)".into());
+        }
+        let folder = PathBuf::from(folder.trim());
+        if !folder.is_dir() {
+            return Err(format!("sync folder {} isn't available", folder.display()).into());
+        }
+        let password = self.secrets.get(SYNC_PASSWORD).ok_or("no sync password is stored (set one in Settings)")?;
+        let remote = crate::sync::read(&folder, &password)?.unwrap_or_default();
+        let m = crate::sync::merge(&self.profiles(), &self.sync_tombstones(), &remote, now());
+        let mut report = SyncReport::default();
+        for mut p in m.upsert {
+            // The file is ours, but it crossed a shared folder: validate what comes in.
+            p.normalize();
+            if validation::validate_profile(&p).is_err() {
+                report.skipped += 1;
+                continue;
+            }
+            let r = if self.store.get_profile(&p.id).is_ok() { self.store.update_profile(&p) } else { self.store.create_profile(&p) };
+            match r {
+                Ok(()) => report.pulled += 1,
+                Err(_) => report.skipped += 1,
+            }
+        }
+        for id in &m.delete {
+            if self.store.delete_profile(id).is_ok() {
+                self.secrets.delete_profile(id);
+                report.removed += 1;
+            }
+        }
+        if m.file != remote {
+            crate::sync::write(&folder, &password, &m.file)?;
+            report.pushed = true;
+        }
+        self.store.set_setting(SYNC_DELETED, &serde_json::to_string(&m.file.deleted)?)?;
+        self.store.add_audit("sync", "", "", &format!("Profile sync: {} in, {} removed, wrote file: {}", report.pulled, report.removed, report.pushed));
+        Ok(report)
     }
 
     pub fn profiles(&self) -> Vec<Profile> {

@@ -14,6 +14,7 @@ pub mod service;
 pub mod sessions;
 pub mod sshconfig;
 pub mod storage;
+pub mod sync;
 pub mod terminalenv;
 pub mod updater;
 pub mod validation;

@@ -36,16 +36,33 @@ pub fn encrypt_and_export(profiles: &[Profile], password: &str, path: &Path) -> 
         profiles: profiles.to_vec(),
         count: profiles.len(),
     };
-    let plain = serde_json::to_vec_pretty(&bundle)?;
+    crate::secrets::write_private(path, &seal(&serde_json::to_vec_pretty(&bundle)?, password)?)
+}
+
+/// `[version][salt 32][nonce 12][AES-256-GCM ciphertext]` under an Argon2id key from `password`.
+pub fn seal(plain: &[u8], password: &str) -> Result<Vec<u8>> {
     let salt = random_bytes::<32>();
     let nonce = random_bytes::<12>();
     let key = derive_key(password, &salt)?;
-    let ct = Aes256Gcm::new((&*key).into()).encrypt(Nonce::from_slice(&nonce), plain.as_slice()).map_err(|e| e.to_string())?;
+    let ct = Aes256Gcm::new((&*key).into()).encrypt(Nonce::from_slice(&nonce), plain).map_err(|e| e.to_string())?;
     let mut out = vec![VERSION];
     out.extend(salt);
     out.extend(nonce);
     out.extend(ct);
-    crate::secrets::write_private(path, &out)
+    Ok(out)
+}
+
+pub fn open(data: &[u8], password: &str) -> Result<Vec<u8>> {
+    if data.len() < 1 + 32 + 12 + 1 + 16 {
+        return Err("exportimport: file is too small or corrupt".into());
+    }
+    if data[0] != VERSION {
+        return Err(format!("exportimport: unsupported format version {}", data[0]).into());
+    }
+    let key = derive_key(password, &data[1..33])?;
+    Ok(Aes256Gcm::new((&*key).into())
+        .decrypt(Nonce::from_slice(&data[33..45]), &data[45..])
+        .map_err(|_| "exportimport: decryption failed — wrong password or corrupt file")?)
 }
 
 pub fn decrypt_and_import(path: &Path, password: &str) -> Result<Vec<Profile>> {
@@ -55,17 +72,7 @@ pub fn decrypt_and_import(path: &Path, password: &str) -> Result<Vec<Profile>> {
     if std::fs::metadata(path)?.len() > MAX_IMPORT_BYTES {
         return Err("exportimport: file is too large (max 10 MiB)".into());
     }
-    let data = std::fs::read(path)?;
-    if data.len() < 1 + 32 + 12 + 1 + 16 {
-        return Err("exportimport: file is too small or corrupt".into());
-    }
-    if data[0] != VERSION {
-        return Err(format!("exportimport: unsupported format version {}", data[0]).into());
-    }
-    let key = derive_key(password, &data[1..33])?;
-    let plain = Aes256Gcm::new((&*key).into())
-        .decrypt(Nonce::from_slice(&data[33..45]), &data[45..])
-        .map_err(|_| "exportimport: decryption failed — wrong password or corrupt file")?;
+    let plain = open(&std::fs::read(path)?, password)?;
     let bundle: Bundle = serde_json::from_slice(&plain).map_err(|e| format!("exportimport: invalid bundle JSON: {e}"))?;
     Ok(bundle.profiles)
 }

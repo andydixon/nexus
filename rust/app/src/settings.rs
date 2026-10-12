@@ -104,6 +104,7 @@ pub struct Settings {
     known: Vec<KnownHost>,
     /// Add-CA form: (host pattern, public key), shown when Some.
     new_ca: Option<(String, String)>,
+    sync_password: String,
     default_shell: String,
     help_topic: usize,
     master: Option<MasterPrompt>,
@@ -381,6 +382,69 @@ impl Settings {
                 s.info("Secret store locked");
             }
         });
+        self.sync_section(ui, s);
+    }
+
+    fn sync_section(&mut self, ui: &mut Ui, s: &mut Shared) {
+        ui.add_space(12.0);
+        widgets::section(ui, "Profile sync");
+        widgets::hint(
+            ui,
+            "Keep connection profiles in step across machines through a folder they share (a cloud drive, a network share, a git checkout). \
+             Profiles are stored there encrypted with the sync password; passwords and keys are never synced.",
+        );
+        form(ui, "sync-form", |ui| {
+            field(ui, "Folder");
+            ui.horizontal(|ui| {
+                let shown = if self.prefs.sync_folder.is_empty() { "Not set".to_string() } else { self.prefs.sync_folder.clone() };
+                ui.label(RichText::new(shown).font(theme::mono(12.0)));
+                if widgets::button(ui, icon::FOLDER_OPEN, "Choose…").clicked()
+                    && let Some(dir) = rfd::FileDialog::new().set_title("Folder to sync profiles through").pick_folder()
+                {
+                    self.set_sync_folder(s, dir.to_string_lossy().into_owned());
+                }
+                if !self.prefs.sync_folder.is_empty() && ui.button("Turn Off").clicked() {
+                    self.set_sync_folder(s, String::new());
+                }
+            });
+            ui.end_row();
+            field(ui, "Sync password");
+            ui.horizontal(|ui| {
+                ui.add(
+                    egui::TextEdit::singleline(&mut self.sync_password)
+                        .password(true)
+                        .hint_text(if s.svc.has_sync_password() { "Stored — type to replace" } else { "Same on every machine" })
+                        .desired_width(220.0),
+                );
+                if ui.add_enabled(!self.sync_password.is_empty(), egui::Button::new("Save")).clicked() {
+                    match s.svc.set_sync_password(&self.sync_password) {
+                        Ok(()) => s.success("Sync password stored"),
+                        Err(e) => s.error(format!("Couldn't store the sync password: {e}")),
+                    }
+                    self.sync_password.clear();
+                }
+            });
+            ui.end_row();
+            field(ui, "");
+            if widgets::button(ui, icon::ARROWS_CLOCKWISE, "Sync Now").clicked() {
+                s.request(Request::SyncProfiles);
+            }
+            ui.end_row();
+        });
+    }
+
+    /// Saves just the sync folder (the rest of the form keeps its unsaved edits).
+    fn set_sync_folder(&mut self, s: &mut Shared, folder: String) {
+        let mut stored = s.svc.preferences();
+        stored.sync_folder = folder.clone();
+        match s.svc.save_preferences(&stored) {
+            Ok(()) => {
+                self.prefs.sync_folder = folder.clone();
+                s.prefs.sync_folder = folder;
+                s.request(Request::SyncProfiles);
+            }
+            Err(e) => s.error(format!("Failed to save: {e}")),
+        }
     }
 
     fn master_dialog(&mut self, ctx: &egui::Context, s: &mut Shared) {

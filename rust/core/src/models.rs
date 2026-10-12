@@ -628,6 +628,8 @@ pub struct AppPreferences {
     pub confirm_multiline_paste: bool,
     /// Reopen the previous session's tabs and splits at launch.
     pub restore_sessions: bool,
+    /// Folder holding the encrypted profile sync file (empty: sync off).
+    pub sync_folder: String,
 }
 
 impl Default for AppPreferences {
@@ -650,6 +652,7 @@ impl Default for AppPreferences {
             allow_remote_clipboard: true,
             confirm_multiline_paste: true,
             restore_sessions: true,
+            sync_folder: String::new(),
         }
     }
 }

@@ -10,6 +10,8 @@ use std::sync::Arc;
 /// Things a feature asks the main window to do (handled once per frame, in order).
 #[allow(clippy::large_enum_variant)] // a per-frame queue; boxing buys nothing
 pub enum Request {
+    /// Merge profiles with the sync folder (manual, or after a change).
+    SyncProfiles,
     /// Open the profile editor for a new profile (optionally pre-set protocol / folder).
     NewProfile {
         protocol: Option<Protocol>,

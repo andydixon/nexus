@@ -428,6 +428,15 @@ Connections, disconnections, profile changes, credential access, imports and exp
 
 ## 13. Import and export
 
+### Profile sync
+
+**Settings → Security → Profile sync** keeps connection profiles the same on several machines. Choose a folder all of them can reach (a Dropbox, iCloud Drive, OneDrive or Nextcloud folder, a network share, or a git checkout you commit), and set the same **sync password** on each. Nexus Terminal keeps one encrypted file there, `nexus-profiles.nexus` (Argon2id + AES-256-GCM, like an encrypted export), and merges it at launch, a few seconds after you change a profile, every ten minutes and when you click **Sync Now**:
+
+- for a profile changed on both sides, the more recent change wins;
+- a profile deleted on one machine is deleted on the others (unless it was edited after the deletion);
+- passwords, keys and other credentials are never synced; each machine keeps its own in its keychain or vault.
+
+
 - **Encrypted export**: **File → Export profiles…**, the sidebar footer, the command palette, or **Export…** on a profile's right-click menu. Choose the profiles, set a password and save a `.nexus` file. Credentials saved in the keychain or vault are not included.
 - **Encrypted import**: **File → Import profiles…** or the sidebar footer. Choose a `.nexus` file, enter its password, and choose what happens when a profile already exists: **Skip existing**, **Overwrite existing** or **Create duplicates**.
 - **JSON export and import**: **Export Profiles (JSON)** and **Import Profiles (JSON)** in the command palette. JSON export includes every profile; passwords in login-script `send` steps that answer a password prompt are blanked unless you tick **Include secrets**. Proxy passwords and TOTP secrets live in the keychain or vault, never in the profile, so no export carries them.

@@ -124,6 +124,10 @@ pub struct App {
     /// The tab layout as last saved for restoring (see restore.rs), and when it was last checked.
     pub saved_layout: Option<String>,
     layout_checked: f64,
+    /// A profile sync in flight; when the next automatic one is due; whether it was asked for.
+    sync_job: Option<crate::settings::Job<Result<nexus_core::service::SyncReport, String>>>,
+    sync_due: f64,
+    sync_manual: bool,
     rx: mpsc::Receiver<Event>,
     pub theme: ThemeKind,
     pub editor: profile_editor::ProfileEditor,
@@ -200,6 +204,9 @@ impl App {
             resize_sidebar: false,
             saved_layout: None,
             layout_checked: 0.0,
+            sync_job: None,
+            sync_due: 0.0,
+            sync_manual: false,
         };
         let restore = opts.connect.is_empty() && app.run_local.is_none() && opts.open.is_none() && app.s.prefs.restore_sessions;
         if restore {
@@ -614,7 +621,15 @@ impl App {
                         Err(e) => self.s.error(format!("Can't connect to {name}: {e}")),
                     }
                 }
-                Request::ReloadProfiles => self.s.reload_profiles(),
+                Request::ReloadProfiles => {
+                    self.s.reload_profiles();
+                    // A profile changed: sync it out shortly (batched with any further edits).
+                    self.sync_due = self.sync_due.min(self.s.now + 3.0);
+                }
+                Request::SyncProfiles => {
+                    self.sync_manual = true;
+                    self.sync_due = 0.0;
+                }
                 Request::ReloadPreferences => {
                     self.s.prefs = self.s.svc.preferences();
                     self.resize_sidebar = true;
@@ -782,6 +797,42 @@ impl App {
         } else {
             self.s.info("Blocked a remote clipboard write (Settings → General to allow)");
         }
+    }
+
+    /// Profile sync: at launch, a few seconds after a profile changes, every 10 minutes and on
+    /// request, when a folder and password are set. Automatic runs stay quiet unless something
+    /// changed or a manual one failed.
+    fn drive_sync(&mut self, ctx: &egui::Context) {
+        if let Some(r) = crate::settings::poll(&mut self.sync_job) {
+            let manual = std::mem::take(&mut self.sync_manual);
+            match r {
+                Ok(rep) => {
+                    if rep.pulled + rep.removed > 0 {
+                        self.s.reload_profiles();
+                        self.s.info(format!("Profile sync: {} updated, {} removed", rep.pulled, rep.removed));
+                    } else if manual {
+                        self.s.success(if rep.pushed { "Profiles synced" } else { "Profiles already in sync" });
+                    }
+                    if rep.skipped > 0 {
+                        self.s.error(format!("Profile sync skipped {} invalid profile(s) from the shared file", rep.skipped));
+                    }
+                }
+                Err(e) if manual => self.s.error(format!("Profile sync failed: {e}")),
+                Err(e) => tracing::warn!(error = %e, "profile sync failed"),
+            }
+        }
+        if self.screenshot.is_some() || self.sync_job.is_some() || self.s.now < self.sync_due {
+            return;
+        }
+        self.sync_due = self.s.now + 600.0;
+        if self.s.prefs.sync_folder.trim().is_empty() {
+            if std::mem::take(&mut self.sync_manual) {
+                self.s.error("Choose a sync folder first");
+            }
+            return;
+        }
+        let svc = self.s.svc.clone();
+        self.sync_job = Some(crate::settings::Job::spawn(ctx, move || svc.sync_profiles().map_err(|e| e.to_string())));
     }
 
     pub fn toggle_broadcast(&mut self) {
@@ -1012,6 +1063,7 @@ impl eframe::App for App {
         chrome::palette(self, &ctx);
         chrome::toasts(self, &ctx);
         self.screenshot(&ctx);
+        self.drive_sync(&ctx);
         if self.screenshot.is_none() && self.s.prefs.restore_sessions && self.s.now - self.layout_checked > 1.0 {
             self.layout_checked = self.s.now;
             crate::restore::save_if_changed(self);
