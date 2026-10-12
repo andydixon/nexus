@@ -1,0 +1,9 @@
+# cargo audit configuration (CI runs `cargo audit` from rust/).
+[advisories]
+ignore = [
+    # 2026-10-12: rsa Marvin timing side channel, pulled in by russh's `rsa` feature. No fixed
+    # release exists. The client signs once per user-initiated connection, so collecting enough
+    # timings is impractical; Ed25519 is the default for generated keys. Re-check when rsa ships a
+    # constant-time release (SEC-20261012-012).
+    "RUSTSEC-2023-0071",
+]

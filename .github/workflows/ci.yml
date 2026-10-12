@@ -5,6 +5,9 @@ on:
         branches: ["**"]
     pull_request:
 
+permissions:
+    contents: read
+
 jobs:
     test:
         name: Test (${{ matrix.os }})
@@ -18,7 +21,7 @@ jobs:
                 shell: bash
                 working-directory: rust
         steps:
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
             - name: Linux dependencies (GUI libs, and sshd for the SSH integration tests)
               if: runner.os == 'Linux'
               run: |
@@ -27,3 +30,15 @@ jobs:
             - run: cargo test --locked --workspace
             - run: cargo fmt --all --check
             - run: cargo clippy --locked --workspace --all-targets -- -D warnings
+
+    audit:
+        name: Dependency audit
+        runs-on: ubuntu-22.04
+        defaults:
+            run:
+                working-directory: rust
+        steps:
+            - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+            - run: cargo install cargo-audit --locked
+            # Ignored advisories and their reasons live in rust/.cargo/audit.toml.
+            - run: cargo audit
