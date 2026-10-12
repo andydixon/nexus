@@ -840,7 +840,7 @@ pub fn generate_key_pair(dir: &std::path::Path, name: &str, kind: &str, bits: u3
     let comment = format!("{name}@nexus-terminal");
     let key = russh::keys::PrivateKey::new(data, comment.as_str()).map_err(|e| e.to_string())?;
     let key = if passphrase.is_empty() { key } else { key.encrypt(&mut rng, passphrase.as_bytes()).map_err(|e| e.to_string())? };
-    std::fs::create_dir_all(dir)?;
+    crate::config::create_private_dir(dir)?;
     let path = dir.join(&name);
     if path.exists() || path.with_extension("pub").exists() {
         return Err(format!("key {name:?} already exists").into());
@@ -904,7 +904,11 @@ mod tests {
         let public = std::fs::read_to_string(dir.join("id_test.pub")).unwrap();
         assert!(public.starts_with("ssh-ed25519 ") && public.trim_end().ends_with("id_test@nexus-terminal"), "{public}");
         #[cfg(unix)]
-        assert_eq!(std::os::unix::fs::PermissionsExt::mode(&std::fs::metadata(&path).unwrap().permissions()) & 0o777, 0o600);
+        {
+            use std::os::unix::fs::PermissionsExt;
+            assert_eq!(std::fs::metadata(&path).unwrap().permissions().mode() & 0o777, 0o600);
+            assert_eq!(std::fs::metadata(&dir).unwrap().permissions().mode() & 0o777, 0o700, "a fresh ~/.ssh is private");
+        }
         assert!(crate::keyfiles::is_likely_private_key(&path));
         // Encrypted: unreadable without the passphrase, readable with it.
         let p = path.to_string_lossy().into_owned();

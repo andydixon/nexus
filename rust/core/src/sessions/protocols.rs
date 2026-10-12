@@ -17,7 +17,7 @@ impl Manager {
         let passphrase = self.secret_fn(id, &p.id, SecretKind::Passphrase, sc.key_secret_mode, prompt);
         let c = SshClient::new(&p, self.terminal_callbacks(id, epoch));
         c.set_authorities(self.cert_authorities());
-        let stored = |k: SecretKind| self.secrets.get(&k.key(&p.id)).unwrap_or_default();
+        let stored = |k: SecretKind| self.secrets.get(&k.key(&p.id)).map(|v| v.to_string()).unwrap_or_default();
         c.set_stored_secrets(stored(SecretKind::Totp), stored(SecretKind::ProxyPassword));
         c.connect(self.host_key_check(id, sc.host_key_policy), Some(password), Some(passphrase))?;
         for pf in sc.port_forwards.iter().filter(|f| f.enabled) {
@@ -347,7 +347,7 @@ impl Manager {
                     host: rc.proxy_host.clone(),
                     port: rc.proxy_port as u16,
                     username: rc.proxy_username.clone(),
-                    password: self.secrets.get(&SecretKind::ProxyPassword.key(&p.id)).unwrap_or_default(),
+                    password: self.secrets.get(&SecretKind::ProxyPassword.key(&p.id)).map(|v| v.to_string()).unwrap_or_default(),
                 };
                 let h = host.clone();
                 Arc::new(move || proxy.connect(&h, port, timeout))

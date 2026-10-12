@@ -803,7 +803,7 @@ mod tests {
         // Typed again and accepted: stored.
         resolve(&m, "s1");
         m.finish_connect("s1", e, Ok(Client::None), |_| {});
-        assert_eq!(m.secrets.get(&key).as_deref(), Some("hunter2"));
+        assert_eq!(m.secrets.get(&key).as_deref().map(String::as_str), Some("hunter2"));
         assert_eq!(asked.load(Ordering::SeqCst), 3);
 
         // The saved value is reused; once the server rejects it, the next attempt asks again.

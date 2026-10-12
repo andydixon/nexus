@@ -2,7 +2,12 @@
 //! one encrypted file, `nexus-profiles.nexus`, in the export format (Argon2id + AES-256-GCM) under
 //! a sync password. Each side merges profile by profile — the newer `updated_at` wins — and
 //! deletions travel as dated tombstones, so a profile removed on one machine goes away on the
-//! others. Credentials are never synced: they live in each machine's keychain or vault.
+//! others. Saved credentials are never synced: they live in each machine's keychain or vault
+//! (values a login script sends travel with their profile, as in an export).
+//!
+//! Timestamps in the shared file are clipped to the merging machine's clock: a record stamped in
+//! the future would otherwise win over every later local edit (or keep deleting a profile) for
+//! as long as the forged date, and the sync password is shared by every machine.
 
 use crate::Result;
 use crate::models::{Profile, Time};
@@ -37,14 +42,23 @@ pub struct Merged {
 
 /// Merges local state with the shared file.
 pub fn merge(local: &[Profile], local_deleted: &BTreeMap<String, Time>, remote: &SyncFile, now: Time) -> Merged {
-    let mut deleted = remote.deleted.clone();
+    let mut deleted: BTreeMap<String, Time> = remote.deleted.iter().map(|(id, t)| (id.clone(), (*t).min(now))).collect();
     for (id, t) in local_deleted {
         let e = deleted.entry(id.clone()).or_insert(*t);
-        *e = (*e).max(*t);
+        *e = (*e).max(*t).min(now);
     }
     deleted.retain(|_, t| (now - *t).num_days() < TOMBSTONE_DAYS);
 
-    let remote_by: HashMap<&str, &Profile> = remote.profiles.iter().map(|p| (p.id.as_str(), p)).collect();
+    let remote_profiles: Vec<Profile> = remote
+        .profiles
+        .iter()
+        .map(|p| {
+            let mut p = p.clone();
+            p.updated_at = p.updated_at.min(now);
+            p
+        })
+        .collect();
+    let remote_by: HashMap<&str, &Profile> = remote_profiles.iter().map(|p| (p.id.as_str(), p)).collect();
     let local_by: HashMap<&str, &Profile> = local.iter().map(|p| (p.id.as_str(), p)).collect();
     let mut out = Merged::default();
     let mut ids: Vec<&str> = local_by.keys().chain(remote_by.keys()).copied().collect();
@@ -64,8 +78,8 @@ pub fn merge(local: &[Profile], local_deleted: &BTreeMap<String, Time>, remote: 
             (None, Some(r)) => *r,
             (None, None) => continue,
         };
-        // A deletion newer than the last edit wins; an edit after the deletion brings it back.
-        if deleted.get(id).is_some_and(|t| *t >= winner.updated_at) {
+        // A deletion newer than the last edit wins; an edit at or after the deletion brings it back.
+        if deleted.get(id).is_some_and(|t| *t > winner.updated_at) {
             if local_by.contains_key(id) {
                 out.delete.push(id.to_string());
             }
@@ -136,6 +150,25 @@ mod tests {
         // Old tombstones are forgotten.
         let remote = SyncFile { version: 1, profiles: vec![], deleted: [("old".to_string(), at(0))].into() };
         assert!(merge(&[], &BTreeMap::new(), &remote, at(TOMBSTONE_DAYS * 86_400 + 10)).file.deleted.is_empty());
+    }
+
+    #[test]
+    fn future_dated_records_cannot_win_forever() {
+        let now = at(1_000_000);
+        // A forged remote edit "from the future" is clipped to now, so the user's later local edit
+        // (also at now) keeps winning, and the rewritten file no longer carries the forged date.
+        let remote = SyncFile { version: 1, profiles: vec![p("a", "forged", 9_000_000)], deleted: BTreeMap::new() };
+        let m = merge(&[p("a", "mine", 1_000_000)], &BTreeMap::new(), &remote, now);
+        assert!(m.upsert.is_empty());
+        assert_eq!(m.file.profiles[0].host, "mine");
+        // A brand-new remote profile stamped in the future is accepted, but with a sane time.
+        let remote = SyncFile { version: 1, profiles: vec![p("b", "new", 9_000_000)], deleted: BTreeMap::new() };
+        let m = merge(&[], &BTreeMap::new(), &remote, now);
+        assert_eq!(m.upsert[0].updated_at, now);
+        // A future-dated tombstone can't keep deleting a profile the user re-creates afterwards.
+        let remote = SyncFile { version: 1, profiles: vec![], deleted: [("c".to_string(), at(9_000_000))].into() };
+        let m = merge(&[p("c", "recreated", 1_000_001)], &BTreeMap::new(), &remote, at(1_000_001));
+        assert!(m.delete.is_empty() && m.file.profiles.len() == 1 && m.file.deleted.is_empty());
     }
 
     #[test]

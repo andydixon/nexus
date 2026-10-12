@@ -236,12 +236,13 @@ impl Vault {
         write_private(&self.path(), &data)
     }
 
-    pub fn get(&self, key: &str) -> Result<String> {
+    pub fn get(&self, key: &str) -> Result<Zeroizing<String>> {
         let st = self.state.lock();
         let u = st.as_ref().ok_or("secrets: vault is locked")?;
         let enc = u.vault.secrets.get(key).ok_or_else(|| format!("secrets: key {key:?} not found"))?;
         let data = B64.decode(enc).map_err(|e| format!("failed to decode secret: {e}"))?;
-        Ok(String::from_utf8_lossy(&open(&u.key, &data)?).into_owned())
+        let plain = Zeroizing::new(open(&u.key, &data)?);
+        Ok(Zeroizing::new(String::from_utf8_lossy(&plain).into_owned()))
     }
 
     pub fn set(&self, key: &str, value: &str) -> Result<()> {
@@ -269,17 +270,26 @@ impl Vault {
 
 /// Writes a file readable only by the owner, atomically: the data goes to a sibling temp file
 /// that replaces `path` only once it is fully written and synced, so a crash can't leave a
-/// truncated vault or export behind (and an existing file's wider mode is never kept).
+/// truncated vault or export behind (and an existing file's wider mode is never kept). The temp
+/// file is created exclusively under an unguessable name, so nothing pre-placed in the folder (a
+/// symlink in a shared sync folder, say) can be followed or overwritten.
 pub fn write_private(path: &std::path::Path, data: &[u8]) -> Result<()> {
     use std::io::Write;
-    let name = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
-    let tmp = path.with_file_name(format!(".{name}.tmp-{}", std::process::id()));
+    let name = path.file_name().ok_or("write_private: path has no file name")?.to_string_lossy().into_owned();
     let mut opts = std::fs::OpenOptions::new();
-    opts.write(true).create(true).truncate(true);
+    opts.write(true).create_new(true);
     #[cfg(unix)]
     std::os::unix::fs::OpenOptionsExt::mode(&mut opts, 0o600);
+    let mut tmp = path.to_path_buf();
     let written = (|| {
-        let mut f = opts.open(&tmp)?;
+        let mut f = loop {
+            let r = random_bytes::<8>();
+            tmp = path.with_file_name(format!(".{name}.tmp-{}", r.iter().map(|b| format!("{b:02x}")).collect::<String>()));
+            match opts.open(&tmp) {
+                Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
+                r => break r?,
+            }
+        };
         f.write_all(data)?;
         f.sync_all()?;
         std::fs::rename(&tmp, path)
@@ -321,9 +331,9 @@ impl Keychain {
         off_runtime(move || matches!(entry(&service, "__nexus_keychain_probe__").and_then(|e| e.get_password()), Ok(_) | Err(keyring::Error::NoEntry)))
     }
 
-    pub fn get(&self, key: &str) -> Option<String> {
+    pub fn get(&self, key: &str) -> Option<Zeroizing<String>> {
         let (service, key) = (self.service.clone(), key.to_string());
-        off_runtime(move || entry(&service, &key).and_then(|e| e.get_password())).ok()
+        off_runtime(move || entry(&service, &key).and_then(|e| e.get_password())).ok().map(Zeroizing::new)
     }
 
     pub fn set(&self, key: &str, value: &str) -> Result<()> {
@@ -352,7 +362,7 @@ impl Secrets {
         Secrets { vault, keychain, keychain_ok }
     }
 
-    pub fn get(&self, key: &str) -> Option<String> {
+    pub fn get(&self, key: &str) -> Option<Zeroizing<String>> {
         if self.keychain_ok
             && let Some(v) = self.keychain.get(key).filter(|v| !v.is_empty())
         {
@@ -423,7 +433,7 @@ mod tests {
         v.lock();
         assert!(v.get("a").is_err());
         v.unlock("pw").unwrap();
-        assert_eq!(v.get("a").unwrap(), "1");
+        assert_eq!(*v.get("a").unwrap(), "1");
         std::fs::remove_dir_all(dir).unwrap();
     }
 
@@ -459,7 +469,7 @@ mod tests {
         v.lock();
         assert!(v.unlock("old").is_err(), "the old password no longer opens it");
         v.unlock("new").unwrap();
-        assert_eq!((v.get("a").unwrap(), v.get("profile:p:password").unwrap()), ("1".to_string(), "hunter2".to_string()));
+        assert_eq!((v.get("a").unwrap().as_str(), v.get("profile:p:password").unwrap().as_str()), ("1", "hunter2"));
         assert_eq!(v.keys(), ["a", "profile:p:password"]);
         std::fs::remove_dir_all(dir).unwrap();
     }
@@ -496,7 +506,30 @@ mod tests {
         s.vault.set("profile:p2:password", "keep").unwrap();
         s.delete_profile("p1");
         assert!(SecretKind::ALL.iter().all(|k| s.get(&k.key("p1")).is_none()));
-        assert_eq!(s.get("profile:p2:password").as_deref(), Some("keep"));
+        assert_eq!(s.get("profile:p2:password").as_deref().map(String::as_str), Some("keep"));
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn write_private_never_follows_links_or_leaves_temp_files() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = std::env::temp_dir().join(format!("nexus-wp-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let canary = dir.join("canary");
+        std::fs::write(&canary, b"untouched").unwrap();
+        // A pre-placed symlink at the destination is replaced, not followed.
+        let target = dir.join("out");
+        std::os::unix::fs::symlink(&canary, &target).unwrap();
+        write_private(&target, b"secret").unwrap();
+        assert_eq!(std::fs::read(&canary).unwrap(), b"untouched");
+        assert!(std::fs::symlink_metadata(&target).unwrap().file_type().is_file());
+        assert_eq!(std::fs::read(&target).unwrap(), b"secret");
+        assert_eq!(std::fs::metadata(&target).unwrap().permissions().mode() & 0o777, 0o600);
+        // No temp file is left behind, and the temp name isn't the old predictable one.
+        let names: Vec<String> = std::fs::read_dir(&dir).unwrap().map(|e| e.unwrap().file_name().to_string_lossy().into_owned()).collect();
+        assert!(names.iter().all(|n| !n.contains(".tmp-")), "{names:?}");
         std::fs::remove_dir_all(dir).unwrap();
     }
 }

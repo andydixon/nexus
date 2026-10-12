@@ -43,6 +43,9 @@ pub struct Service {
     pub store: Arc<Store>,
     pub secrets: Arc<Secrets>,
     pub sessions: Arc<Manager>,
+    /// Whether a sync password is stored, probed at most every few seconds: the Settings page
+    /// asks every frame, and each probe is a keychain round trip that fetches the real value.
+    sync_password: parking_lot::Mutex<Option<(std::time::Instant, bool)>>,
 }
 
 #[derive(Clone, Debug)]
@@ -58,7 +61,7 @@ impl Service {
         let store = Arc::new(Store::open(&config.db_path)?);
         let secrets = Arc::new(Secrets::new(Vault::new(config.vault_dir.clone()), Keychain::new(KEYCHAIN_SERVICE)));
         let sessions = Manager::new(store.clone(), secrets.clone(), config.recordings_dir.clone());
-        Ok(Service { config, store, secrets, sessions })
+        Ok(Service { config, store, secrets, sessions, sync_password: Default::default() })
     }
 
     // --- profiles -----------------------------------------------------------------------
@@ -115,6 +118,7 @@ impl Service {
 
     /// Sets (or, when empty, forgets) the profile-sync password.
     pub fn set_sync_password(&self, password: &str) -> Result<()> {
+        *self.sync_password.lock() = None;
         if password.is_empty() {
             self.secrets.delete(SYNC_PASSWORD);
             return Ok(());
@@ -140,7 +144,15 @@ impl Service {
     }
 
     pub fn has_sync_password(&self) -> bool {
-        self.secrets.get(SYNC_PASSWORD).is_some()
+        let mut c = self.sync_password.lock();
+        if let Some((at, v)) = *c
+            && at.elapsed() < std::time::Duration::from_secs(5)
+        {
+            return v;
+        }
+        let v = self.secrets.get(SYNC_PASSWORD).is_some();
+        *c = Some((std::time::Instant::now(), v));
+        v
     }
 
     /// Merges profiles with the shared sync file; see [`crate::sync`].
@@ -431,7 +443,7 @@ impl Service {
             path.as_mut_os_string().push(format!(".{}", exportimport::EXTENSION));
         }
         exportimport::encrypt_and_export(&ps, password, &path)?;
-        self.store.add_audit("export", "", "", &format!("Exported {} profile(s) without secrets", ps.len()));
+        self.store.add_audit("export", "", "", &format!("Exported {} profile(s) (saved credentials not included)", ps.len()));
         Ok(path)
     }
 

@@ -434,7 +434,8 @@ Connections, disconnections, profile changes, credential access, imports and exp
 
 - for a profile changed on both sides, the more recent change wins;
 - a profile deleted on one machine is deleted on the others (unless it was edited after the deletion);
-- passwords, keys and other credentials are never synced; each machine keeps its own in its keychain or vault.
+- saved passwords, keys and tokens are never synced; each machine keeps its own in its keychain or vault. Values that a login script `send`s (including a password typed after a `wait "Password:"`) are part of the profile and do travel, as they do in an export;
+- timestamps in the shared file are never trusted beyond the local clock, so a file edited to claim a future date can't override later local changes.
 
 
 - **Encrypted export**: **File → Export profiles…**, the sidebar footer, the command palette, or **Export…** on a profile's right-click menu. Choose the profiles, set a password and save a `.nexus` file. Credentials saved in the keychain or vault are not included.

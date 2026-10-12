@@ -85,7 +85,8 @@ after you change a profile, every ten minutes and whenever you click \ui{Sync No
 \begin{checklist}
   \item[\color{green}\iCheck] Edited on two machines? The newer change wins, profile by profile.
   \item[\color{green}\iCheck] Deleted on one machine? It goes from the others too (unless someone edited it afterwards).
-  \item[\color{rose}\ph{E4F6}] Passwords, keys and tokens never sync. Each machine keeps its own in its keychain or vault.
+  \item[\color{rose}\ph{E4F6}] Saved passwords, keys and tokens never sync. Each machine keeps its own in its keychain or vault.
+        (Anything a login script \emph{sends} is part of the profile, so that does travel.)
 \end{checklist}
 
 \crop{settings-security.png}{581}{253}{576}{285}{0.8\linewidth}{Profile sync lives on the Security page, under your stored credentials.}

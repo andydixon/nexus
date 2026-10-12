@@ -62,7 +62,7 @@ impl Manager {
                 {
                     st.used.insert(key.clone());
                     store.add_audit("secret.access", &pid, "", &format!("Accessed {kind} credential"));
-                    return Ok(Zeroizing::new(v));
+                    return Ok(v);
                 }
             }
             if mode == SecretMode::SessionOnly

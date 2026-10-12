@@ -452,7 +452,8 @@ impl Settings {
         widgets::hint(
             ui,
             "Keep connection profiles in step across machines through a folder they share (a cloud drive, a network share, a git checkout). \
-             Profiles are stored there encrypted with the sync password; passwords and keys are never synced.",
+             Profiles are stored there encrypted with the sync password. Saved passwords and keys stay in each machine's keychain or vault; \
+             values a login script sends travel with their profile.",
         );
         form(ui, "sync-form", |ui| {
             field(ui, "Folder");
