@@ -180,8 +180,9 @@ The viewer works like the VNC one: click the desktop to give it keyboard focus, 
 ### IRC
 
 - **IRC**: nick, real name, **Use TLS** (port 6697 for most TLS networks) and an optional server password.
+- **SASL**: log in during registration with SASL PLAIN (account defaults to your nick), which most networks now expect; use TLS or an SSH tunnel so the password isn't sent in the clear. If the network doesn't offer SASL or rejects the login, the Server tab says so and the connection carries on.
 - **NickServ**: identify on connect, with an optional account name and password.
-- **Rooms**: rooms to join automatically, one per line or comma-separated.
+- **Rooms**: rooms to join automatically, one per line or comma-separated. Networks that support IRCv3 server-time stamp messages with the time they were sent, so replayed history shows its real times.
 - **SSH Tunnel** and **Reconnection** settings.
 
 The IRC view has a **Server** tab and a tab per room or conversation, with a dot on tabs that have unread messages. Type messages or `/commands` in the composer (`/join`, `/part`, `/msg`, `/me`, `/notice`, `/nick`, `/topic`, `/list`, `/names`, `/whois`, `/who`, `/raw`, `/quit`, `/help`). Press **Tab** to complete a nick, or click a nick to mention it. The side panel lists joined rooms, a room browser with a filter (click a room to join it), and the users in the current room.

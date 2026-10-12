@@ -143,6 +143,13 @@ impl Manager {
         } else {
             String::new()
         };
+        let (sasl_account, sasl_password) = if ic.sasl {
+            let account = if ic.sasl_account.trim().is_empty() { ic.nick.clone() } else { ic.sasl_account.trim().to_string() };
+            let pw = self.secret_fn(id, &p.id, SecretKind::IrcSaslPassword, ic.sasl_mode, prompt.clone())().map_err(|e| format!("SASL password: {e}"))?;
+            (account, pw.to_string())
+        } else {
+            (String::new(), String::new())
+        };
         let mut rooms = ic.auto_join_rooms.clone();
         if !p.id.is_empty() {
             let last = self.store.irc_last_rooms(&p.id).map_err(|e| format!("loading remembered IRC rooms: {e}"))?;
@@ -206,6 +213,8 @@ impl Manager {
             nickserv_identify: ic.nick_serv_identify,
             nickserv_account: ic.nick_serv_account.clone(),
             nickserv_password: ns_pass,
+            sasl_account,
+            sasl_password,
             connector,
             connect_timeout: Duration::from_secs(p.connect_timeout.max(1) as u64),
             on_event,

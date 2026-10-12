@@ -168,6 +168,7 @@ Use Nexus Terminal when you need to:
 
 ### IRC capabilities
 
+- IRCv3 capability negotiation with SASL PLAIN login and server-time timestamps.
 - Nick, real name, TLS and an optional server password.
 - NickServ identification on connect.
 - Auto-join rooms.

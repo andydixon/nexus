@@ -53,6 +53,10 @@ pub struct Config {
     pub nickserv_account: String,
     pub nickserv_password: String,
 
+    /// SASL PLAIN login during registration (IRCv3); empty account disables it.
+    pub sasl_account: String,
+    pub sasl_password: String,
+
     /// Provides the transport instead of a direct TCP connect (e.g. an SSH tunnel). TLS, when
     /// enabled, is layered on top of it.
     pub connector: Option<Connector>,
@@ -78,6 +82,8 @@ impl Default for Config {
             nickserv_identify: false,
             nickserv_account: String::new(),
             nickserv_password: String::new(),
+            sasl_account: String::new(),
+            sasl_password: String::new(),
             connector: None,
             connect_timeout: Duration::ZERO,
             on_event: Arc::new(|_| {}),
@@ -139,6 +145,8 @@ struct Channel {
 
 struct State {
     nick: String,
+    /// Capabilities from a multi-line CAP LS, gathered until the last line.
+    caps_offered: Vec<String>,
     connected: bool,
     closing: bool,
     list_rooms: Vec<RoomInfo>,
@@ -153,6 +161,9 @@ pub struct Client {
     cfg: Config,
     state: Mutex<State>,
     out: Mutex<Option<Sender<Out>>>,
+    /// The server-time of the line being handled (ms since the epoch; 0 = none), stamped on the
+    /// events it produces.
+    line_time: std::sync::atomic::AtomicI64,
 }
 
 /// A parsed server line.
@@ -160,6 +171,8 @@ struct Message {
     source: String,
     command: String,
     params: Vec<String>,
+    /// IRCv3 `@time=` tag, in ms since the epoch.
+    time: Option<i64>,
 }
 
 impl Message {
@@ -187,6 +200,7 @@ impl Client {
             cfg,
             state: Mutex::new(State {
                 nick,
+                caps_offered: Vec::new(),
                 connected: false,
                 closing: false,
                 list_rooms: Vec::new(),
@@ -196,6 +210,7 @@ impl Client {
                 last_pong: Instant::now(),
             }),
             out: Mutex::new(None),
+            line_time: Default::default(),
         })
     }
 
@@ -546,6 +561,8 @@ impl Client {
             stream.write_all(b"\r\n")?;
             Ok(stream.flush()?)
         };
+        // IRCv3 capability negotiation; servers without it ignore the command and register as usual.
+        write(&mut stream, "CAP LS 302")?;
         if !self.cfg.server_pass.is_empty() {
             write(&mut stream, &encode("PASS", &[&self.cfg.server_pass]))?;
         }
@@ -589,7 +606,9 @@ impl Client {
                 let raw: Vec<u8> = buf.drain(..=pos).collect();
                 let line = String::from_utf8_lossy(&raw);
                 if let Some(msg) = parse_line(line.trim_end_matches(['\r', '\n'])) {
+                    self.line_time.store(msg.time.unwrap_or(0), std::sync::atomic::Ordering::Relaxed);
                     self.handle_message(&msg);
+                    self.line_time.store(0, std::sync::atomic::Ordering::Relaxed);
                 }
             }
             if buf.len() > MAX_LINE_BYTES {
@@ -612,6 +631,27 @@ impl Client {
 
     fn handle_message(&self, m: &Message) {
         match m.command.as_str() {
+            "CAP" => self.handle_cap(m),
+            "AUTHENTICATE" if m.param(0) == "+" => {
+                // SASL PLAIN: authzid NUL authcid NUL password, base64, in 400-byte chunks.
+                use base64::Engine;
+                let blob = base64::engine::general_purpose::STANDARD.encode(format!("{0}\0{0}\0{1}", self.cfg.sasl_account, self.cfg.sasl_password));
+                for chunk in blob.as_bytes().chunks(400) {
+                    let _ = self.send("AUTHENTICATE", &[std::str::from_utf8(chunk).unwrap_or("")]);
+                }
+                if blob.len() % 400 == 0 {
+                    let _ = self.send("AUTHENTICATE", &["+"]);
+                }
+            }
+            // 900 logged in, 903 success; 902/904–907 failures. Either way registration goes on.
+            "903" => {
+                self.emit(Event { kind: "notice".into(), text: format!("SASL: logged in as {}", self.cfg.sasl_account), ..Default::default() });
+                let _ = self.send("CAP", &["END"]);
+            }
+            "902" | "904" | "905" | "906" | "907" => {
+                self.emit(Event { kind: "error".into(), text: format!("SASL login failed: {}", m.last()), ..Default::default() });
+                let _ = self.send("CAP", &["END"]);
+            }
             "001" => self.handle_welcome(m),
             "433" | "436" | "437" => {
                 let mut st = self.st();
@@ -734,6 +774,52 @@ impl Client {
             }
         }
         self.emit(Event { kind: "notice".into(), target, from: m.source.clone(), text: m.last().into(), ..Default::default() });
+    }
+
+    /// CAP LS / ACK / NAK: ask for server-time (and sasl when configured), then authenticate or
+    /// end negotiation.
+    fn handle_cap(&self, m: &Message) {
+        let sub = m.param(1).to_ascii_uppercase();
+        let caps: Vec<&str> = m.last().split_whitespace().map(|c| c.split('=').next().unwrap_or(c)).collect();
+        let want_sasl = !self.cfg.sasl_account.is_empty();
+        match sub.as_str() {
+            // A multi-line LS list ("CAP * LS * :…") continues; act on the last line.
+            "LS" if m.params.len() >= 4 && m.param(2) == "*" => {
+                self.st().caps_offered.extend(caps.iter().map(|c| c.to_string()));
+            }
+            "LS" => {
+                let offered: Vec<String> = {
+                    let mut st = self.st();
+                    st.caps_offered.extend(caps.iter().map(|c| c.to_string()));
+                    std::mem::take(&mut st.caps_offered)
+                };
+                let mut req = vec![];
+                if offered.iter().any(|c| c == "server-time") {
+                    req.push("server-time");
+                }
+                if want_sasl && offered.iter().any(|c| c == "sasl") {
+                    req.push("sasl");
+                } else if want_sasl {
+                    self.emit(Event { kind: "error".into(), text: "SASL: the server doesn't offer it".into(), ..Default::default() });
+                }
+                if req.is_empty() {
+                    let _ = self.send("CAP", &["END"]);
+                } else {
+                    let _ = self.send("CAP", &["REQ", &req.join(" ")]);
+                }
+            }
+            "ACK" => {
+                if want_sasl && caps.contains(&"sasl") {
+                    let _ = self.send("AUTHENTICATE", &["PLAIN"]);
+                } else {
+                    let _ = self.send("CAP", &["END"]);
+                }
+            }
+            "NAK" => {
+                let _ = self.send("CAP", &["END"]);
+            }
+            _ => {}
+        }
     }
 
     fn handle_join(&self, m: &Message) {
@@ -931,7 +1017,8 @@ impl Client {
 
     fn emit(&self, mut event: Event) {
         if event.timestamp == 0 {
-            event.timestamp = chrono::Utc::now().timestamp_millis();
+            let t = self.line_time.load(std::sync::atomic::Ordering::Relaxed);
+            event.timestamp = if t > 0 { t } else { chrono::Utc::now().timestamp_millis() };
         }
         if event.target.is_empty() {
             event.target = SERVER_TARGET.into();
@@ -1004,8 +1091,11 @@ fn encode(command: &str, params: &[&str]) -> String {
 
 fn parse_line(line: &str) -> Option<Message> {
     let mut rest = line.trim_start();
-    if rest.starts_with('@') {
-        rest = rest.split_once(' ')?.1.trim_start();
+    let mut time = None;
+    if let Some(tagged) = rest.strip_prefix('@') {
+        let (tags, tail) = tagged.split_once(' ')?;
+        time = tags.split(';').find_map(|t| t.strip_prefix("time=")).and_then(|v| chrono::DateTime::parse_from_rfc3339(v).ok()).map(|d| d.timestamp_millis());
+        rest = tail.trim_start();
     }
     let mut source = String::new();
     if let Some(prefixed) = rest.strip_prefix(':') {
@@ -1021,7 +1111,7 @@ fn parse_line(line: &str) -> Option<Message> {
     let command = words.next()?.to_uppercase();
     let mut params: Vec<String> = words.map(String::from).collect();
     params.extend(trailing.map(String::from));
-    Some(Message { source, command, params })
+    Some(Message { source, command, params, time })
 }
 
 /// A CTCP request in a PRIVMSG: `(TAG, args)`, as girc's `DecodeCTCP`.
@@ -1205,6 +1295,36 @@ mod tests {
     }
 
     #[test]
+    fn negotiates_server_time_and_sasl() {
+        let (client, listener, rx, _) = harness(Config { sasl_account: "acct".into(), sasl_password: "s3cret".into(), ..Default::default() });
+        let c = client.clone();
+        let connecting = std::thread::spawn(move || c.connect());
+        let mut srv = accept(&listener);
+        assert_eq!(srv.line(), "CAP LS 302");
+        assert_eq!(srv.line(), "NICK me");
+        assert_eq!(srv.line(), "USER me * * me");
+        // A two-line LS list; only the last line triggers the request.
+        srv.send(":srv CAP * LS * :multi-prefix server-time");
+        srv.send(":srv CAP * LS :sasl=PLAIN,EXTERNAL away-notify");
+        assert_eq!(srv.line(), "CAP REQ :server-time sasl");
+        srv.send(":srv CAP me ACK :server-time sasl");
+        assert_eq!(srv.line(), "AUTHENTICATE PLAIN");
+        srv.send("AUTHENTICATE +");
+        use base64::Engine;
+        assert_eq!(srv.line(), format!("AUTHENTICATE {}", base64::engine::general_purpose::STANDARD.encode("acct\0acct\0s3cret")));
+        srv.send(":srv 903 me :SASL authentication successful");
+        assert_eq!(srv.line(), "CAP END");
+        assert!(wait_for(&rx, |e| e.text.starts_with("SASL: logged in")).text.contains("acct"));
+        srv.send(":srv 001 me :Welcome");
+        connecting.join().unwrap().unwrap();
+        // server-time stamps events with the server's clock, not ours.
+        srv.send("@time=2024-05-01T12:00:00.250Z :bob!u@h PRIVMSG me :old news");
+        let e = wait_for(&rx, |e| e.kind == "message" || e.kind == "privmsg" || e.text == "old news");
+        assert_eq!(e.timestamp, 1714564800250);
+        client.close();
+    }
+
+    #[test]
     fn registers_tracks_rooms_and_handles_input() {
         let (client, listener, rx, closes) = harness(Config {
             server_pass: "pw".into(),
@@ -1217,6 +1337,7 @@ mod tests {
         let c = client.clone();
         let connecting = std::thread::spawn(move || c.connect());
         let mut srv = accept(&listener);
+        assert_eq!(srv.line(), "CAP LS 302");
         assert_eq!(srv.line(), "PASS pw");
         assert_eq!(srv.line(), "NICK me");
         assert_eq!(srv.line(), "USER me * * me");

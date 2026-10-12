@@ -466,6 +466,11 @@ pub struct IrcConfig {
     pub nick_serv_identify: bool,
     pub nick_serv_account: String,
     pub nick_serv_mode: SecretMode,
+    /// Log in with SASL PLAIN during registration (needs the network to offer it).
+    pub sasl: bool,
+    /// SASL account (defaults to the nick).
+    pub sasl_account: String,
+    pub sasl_mode: SecretMode,
     #[serde(deserialize_with = "nd")]
     pub auto_join_rooms: Vec<String>,
     pub ssh_tunnel: bool,

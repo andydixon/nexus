@@ -812,6 +812,19 @@ impl ProfileEditor {
                 }
             }
         });
+        section(ui, "SASL", |ui| {
+            check(ui, "Log In with SASL", &mut c.sasl, "Authenticates during registration (SASL PLAIN), as most networks now expect");
+            if c.sasl {
+                text(ui, "SASL Account", &mut c.sasl_account, "Defaults to your nick");
+                mode(ui, "SASL Password Storage", &mut c.sasl_mode);
+                if c.sasl_mode == SecretMode::Saved {
+                    secret(ui, "SASL Password", secrets, SecretKind::IrcSaslPassword, "Leave blank to keep the saved password");
+                }
+                if !c.use_tls && !c.ssh_tunnel {
+                    widgets::hint(ui, "Without TLS or an SSH tunnel the password crosses the network in the clear.");
+                }
+            }
+        });
         section(ui, "NickServ", |ui| {
             check(ui, "Identify on Connect", &mut c.nick_serv_identify, "");
             if c.nick_serv_identify {
