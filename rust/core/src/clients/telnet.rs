@@ -314,6 +314,17 @@ fn encode_outgoing(data: &[u8], encoding: &str) -> Vec<u8> {
     if super::is_latin1(encoding) { super::utf8_to_latin1(data) } else { data.to_vec() }
 }
 
+/// Fuzzing entry point: `data` through the IAC negotiation parser, in uneven chunks.
+#[cfg(feature = "fuzzing")]
+#[doc(hidden)]
+pub fn fuzz_negotiation(data: &[u8]) {
+    let c = TelnetClient::new(&crate::models::Profile::new(crate::models::Protocol::Telnet), Callbacks::noop(), None);
+    let mut pending = Vec::new();
+    for chunk in data.chunks(37) {
+        c.inner.process(&mut pending, chunk);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

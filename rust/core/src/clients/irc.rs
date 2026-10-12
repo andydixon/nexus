@@ -1046,6 +1046,25 @@ fn split_first_arg(input: &str) -> (&str, &str) {
     }
 }
 
+/// Fuzzing entry point: each line of `data` through the parser, the state machine (as a
+/// client in #a) and the mIRC formatter.
+#[cfg(feature = "fuzzing")]
+#[doc(hidden)]
+pub fn fuzz_lines(data: &[u8]) {
+    let client = Client::new(Config::default());
+    client.st().nick = "me".into();
+    if let Some(m) = parse_line(":me!u@h JOIN #a") {
+        client.handle_message(&m);
+    }
+    for line in String::from_utf8_lossy(data).lines() {
+        if let Some(m) = parse_line(line) {
+            client.handle_message(&m);
+            let e = Event { kind: "message".into(), target: m.param(0).into(), from: m.source.clone(), text: m.last().into(), ..Default::default() };
+            let _ = crate::ircformat::format_event(&e, "12:00");
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

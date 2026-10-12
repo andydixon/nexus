@@ -171,6 +171,15 @@ fn is_trueish(v: &str) -> bool {
     matches!(v.to_lowercase().as_str(), "yes" | "true" | "on" | "1")
 }
 
+/// Fuzzing entry point: `data` as an ~/.ssh/config file, then into profiles.
+#[cfg(feature = "fuzzing")]
+#[doc(hidden)]
+pub fn fuzz_parse(data: &[u8]) {
+    if let Ok(blocks) = parse(&String::from_utf8_lossy(data)) {
+        let _ = to_profiles(&blocks, "f");
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

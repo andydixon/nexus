@@ -3,6 +3,10 @@ name = "nexus-core"
 version.workspace = true
 edition.workspace = true
 
+[features]
+# Exposes parser entry points for rust/fuzz (cargo-fuzz).
+fuzzing = []
+
 [dependencies]
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

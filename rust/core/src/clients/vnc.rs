@@ -861,6 +861,19 @@ pub fn keysym_for(name: &str, ch: Option<char>) -> Option<u32> {
     }
 }
 
+/// Fuzzing entry point: `data` as a stream of FramebufferUpdate messages into a 64x64 desktop.
+#[cfg(feature = "fuzzing")]
+#[doc(hidden)]
+pub fn fuzz_updates(data: &[u8]) {
+    let (mut fb, mut dec) = (Framebuffer::new(64, 64), Decoders::default());
+    let mut r = data;
+    while !r.is_empty() && read_update(&mut r, &mut fb, &mut dec).is_ok() {
+        if fb.width as usize * fb.height as usize > 1 << 20 {
+            fb = Framebuffer::new(64, 64);
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

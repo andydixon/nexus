@@ -142,6 +142,13 @@ fn leading_int(s: Option<&&str>) -> i64 {
 }
 
 /// Cuts at `max` bytes (backing off to a char boundary) and appends "…".
+/// Fuzzing entry point: `data` as an update manifest response.
+#[cfg(feature = "fuzzing")]
+#[doc(hidden)]
+pub fn fuzz_manifest(data: &[u8]) {
+    let _ = parse_manifest(data, "1.2.3");
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -1,0 +1,60 @@
+[package]
+name = "nexus-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+nexus-core = { path = "../core", features = ["fuzzing"] }
+
+# Its own workspace (cargo-fuzz needs nightly and its own profile), so the root's IronRDP
+# patches are repeated here; see ../vendor/README.md.
+[workspace]
+members = ["."]
+
+[patch.crates-io]
+picky = { path = "../vendor/picky" }
+sspi = { path = "../vendor/sspi" }
+ironrdp-session = { path = "../vendor/ironrdp-session" }
+
+[profile.release]
+debug = 1
+
+[[bin]]
+name = "telnet"
+path = "fuzz_targets/telnet.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "irc"
+path = "fuzz_targets/irc.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "vnc"
+path = "fuzz_targets/vnc.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "sshconfig"
+path = "fuzz_targets/sshconfig.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "updater"
+path = "fuzz_targets/updater.rs"
+test = false
+doc = false
+bench = false
