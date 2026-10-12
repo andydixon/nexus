@@ -466,6 +466,7 @@ impl App {
                     v.on_error(error);
                 }
             }
+            Event::Warning { message, .. } => self.s.error(message),
             Event::Irc { session, event } => {
                 if let Some(View::Irc(v)) = self.s.panes.get_mut(&session).map(|p| &mut p.view) {
                     v.on_event(event);
@@ -884,7 +885,7 @@ pub fn theme_for(pref: &str) -> ThemeKind {
 /// Recognises auth and host-key failures for the guided error dialog.
 pub fn classify_error(msg: &str) -> Option<(&'static str, &'static str, bool)> {
     let m = msg.to_lowercase();
-    if ["unable to authenticate", "authentication failed", "permission denied", "no supported methods"].iter().any(|p| m.contains(p)) {
+    if nexus_core::sessions::is_auth_error(&m) {
         return Some(("Authentication Failed", "The server rejected the provided credentials. Check username, password, keys, and auth methods.", false));
     }
     if ["host key", "fingerprint"].iter().any(|p| m.contains(p)) {

@@ -10,7 +10,7 @@ use crate::models::*;
 use crate::recording::{self, Recorder};
 use crate::secrets::Secrets;
 use crate::storage::Store;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc;
@@ -54,6 +54,12 @@ pub enum Event {
     GithubError {
         session: String,
         error: String,
+    },
+    /// Something the user should know about that didn't stop the session (e.g. a credential that
+    /// couldn't be saved).
+    Warning {
+        session: String,
+        message: String,
     },
     Irc {
         session: String,
@@ -194,11 +200,42 @@ struct Session {
     cancel_reconnect: Option<Arc<AtomicBool>>,
     pending_resize: Option<(u16, u16)>,
     login: Arc<Mutex<LoginBuf>>,
-    /// Credentials in `SecretMode::SessionOnly`, kept across reconnects of this session.
+    /// Credential state kept across reconnects of this session.
     session_secrets: SessionSecrets,
 }
 
-type SessionSecrets = Arc<Mutex<HashMap<String, String>>>;
+type SessionSecrets = Arc<Mutex<SecretState>>;
+
+#[derive(Default)]
+struct SecretState {
+    /// `SecretMode::SessionOnly` values, asked once per session.
+    session_only: HashMap<String, String>,
+    /// `SecretMode::Saved` values typed during this attempt; stored only once it connects, so a
+    /// typo never ends up saved.
+    pending: HashMap<String, String>,
+    /// Saved values this attempt used.
+    used: HashSet<String>,
+    /// Saved values the server rejected: the next attempt asks again instead of reusing them.
+    rejected: HashSet<String>,
+}
+
+/// After a failed attempt, typed credentials are dropped and, when the server refused them, the
+/// saved ones used are skipped next time so the user can enter a replacement.
+fn attempt_failed(state: &SessionSecrets, error: &str) {
+    let mut st = state.lock().unwrap();
+    st.pending.clear();
+    if is_auth_error(error) {
+        let used = std::mem::take(&mut st.used);
+        st.rejected.extend(used);
+    }
+}
+
+/// Whether a connect error means the server refused the credentials (as opposed to a network or
+/// host-key failure).
+pub fn is_auth_error(msg: &str) -> bool {
+    let m = msg.to_lowercase();
+    ["unable to authenticate", "authentication failed", "permission denied", "no supported methods"].iter().any(|p| m.contains(p))
+}
 
 pub struct Manager {
     sessions: Mutex<HashMap<String, Session>>,
@@ -327,10 +364,12 @@ impl Manager {
             (Err(e), Some(s)) => {
                 s.info.state = SessionState::Error;
                 s.info.error = e.to_string();
+                attempt_failed(&s.session_secrets, &e.to_string());
                 drop(map);
                 self.emit_state(id, SessionState::Error, &e.to_string());
             }
             (Ok(client), Some(s)) => {
+                let typed = std::mem::take(&mut s.session_secrets.lock().unwrap().pending);
                 s.client = client.clone();
                 s.info.state = SessionState::Connected;
                 s.info.connected_at = now();
@@ -340,6 +379,11 @@ impl Manager {
                 if let Some((c, r)) = pending {
                     let _ = self.resize_client(&client, c, r);
                 }
+                for (key, value) in typed {
+                    if let Err(e) = self.secrets.set_checked(&key, &value) {
+                        self.emit(Event::Warning { session: id.into(), message: format!("Credential not saved: {e}") });
+                    }
+                }
                 self.emit_state(id, SessionState::Connected, "");
                 on_ok(self);
             }
@@ -347,6 +391,11 @@ impl Manager {
     }
 
     fn connect_protocol(self: &Arc<Self>, id: &str, epoch: u64, p: &Profile, prompt: Prompt) -> Result<Client> {
+        let _ = self.with(id, |s| {
+            let mut st = s.session_secrets.lock().unwrap();
+            st.pending.clear();
+            st.used.clear();
+        });
         match p.protocol {
             Protocol::Ssh => self.connect_ssh(id, epoch, p, prompt),
             Protocol::Telnet => {
@@ -428,30 +477,42 @@ impl Manager {
     // --- credentials --------------------------------------------------------------------
 
     /// Resolves a credential per its SecretMode (Go's buildSecretCallback): saved values come from
-    /// the keychain then the vault; session-only values are asked once per session and reused on
-    /// reconnects (so e.g. a NickServ password entered once keeps identifying after a drop).
+    /// the keychain then the vault (unless the server just rejected them), and newly typed ones
+    /// are saved once the connection succeeds; session-only values are asked once per session and
+    /// reused on reconnects (so e.g. a NickServ password entered once keeps identifying after a
+    /// drop).
     pub fn secret_fn(&self, session: &str, profile_id: &str, kind: &str, mode: SecretMode, prompt: Prompt) -> SecretFn {
         let key = format!("profile:{profile_id}:{kind}");
         let (secrets, store) = (self.secrets.clone(), self.store.clone());
         let (pid, kind) = (profile_id.to_string(), kind.to_string());
-        let cache: SessionSecrets = self.sessions.lock().unwrap().get(session).map(|s| s.session_secrets.clone()).unwrap_or_default();
+        let state: SessionSecrets = self.sessions.lock().unwrap().get(session).map(|s| s.session_secrets.clone()).unwrap_or_default();
         Arc::new(move || {
-            if mode == SecretMode::Saved
-                && let Some(v) = secrets.get(&key)
-            {
-                store.add_audit("secret.access", &pid, "", &format!("Accessed {kind} credential"));
-                return Ok(v);
+            if mode == SecretMode::Saved {
+                let mut st = state.lock().unwrap();
+                if let Some(v) = st.pending.get(&key) {
+                    return Ok(v.clone());
+                }
+                if !st.rejected.remove(&key)
+                    && let Some(v) = secrets.get(&key)
+                {
+                    st.used.insert(key.clone());
+                    store.add_audit("secret.access", &pid, "", &format!("Accessed {kind} credential"));
+                    return Ok(v);
+                }
             }
             if mode == SecretMode::SessionOnly
-                && let Some(v) = cache.lock().unwrap().get(&key).cloned()
+                && let Some(v) = state.lock().unwrap().session_only.get(&key).cloned()
             {
                 return Ok(v);
             }
             let v = prompt(&format!("Enter {kind}:"))?;
+            let mut st = state.lock().unwrap();
             match mode {
-                SecretMode::Saved => secrets.set(&key, &v),
+                SecretMode::Saved => {
+                    st.pending.insert(key.clone(), v.clone());
+                }
                 SecretMode::SessionOnly => {
-                    cache.lock().unwrap().insert(key.clone(), v.clone());
+                    st.session_only.insert(key.clone(), v.clone());
                 }
                 SecretMode::AskEveryTime => {}
             }
@@ -632,7 +693,7 @@ impl Manager {
                 let retry = auth.then(|| prompt("GitHub token did not work. Please enter a valid token:").ok()).flatten().filter(|t| !t.is_empty());
                 let Some(t) = retry else { return err(format!("GitHub authentication failed: {e}")) };
                 if gh.secret_mode == SecretMode::Saved {
-                    self.secrets.set(&format!("profile:{}:github-token", p.id), &t);
+                    let _ = self.with(id, |s| s.session_secrets.lock().unwrap().pending.insert(format!("profile:{}:github-token", p.id), t.clone()));
                 }
                 client = github::Client::new(&gh.base_url, &t);
                 client.validate_token().map_err(|e| format!("GitHub authentication failed: {e}"))?
@@ -1010,7 +1071,7 @@ impl Manager {
                 return;
             }
             me.emit_state(&id, SessionState::Connecting, "");
-            let prompt = me.prompt_for(&id, "Reconnection Credentials", Duration::from_secs(60));
+            let prompt = me.prompt_for(&id, "Reconnection Credentials", Duration::from_secs(300));
             match me.connect_protocol(&id, epoch, &p, prompt) {
                 Ok(c) => me.finish_connect(&id, epoch, Ok(c), |_| {}),
                 Err(e) => {
@@ -1020,6 +1081,7 @@ impl Manager {
                         }
                         s.info.state = SessionState::Error;
                         s.info.error = e.to_string();
+                        attempt_failed(&s.session_secrets, &e.to_string());
                         true
                     });
                     if current.unwrap_or(false) {
@@ -1398,6 +1460,67 @@ mod tests {
             n.fetch_add(1, Ordering::SeqCst);
             Ok("hunter2".into())
         })
+    }
+
+    #[test]
+    fn saved_credentials_are_stored_only_after_success_and_reasked_after_rejection() {
+        let (m, dir) = manager("saved");
+        let warnings: Arc<Mutex<Vec<String>>> = Arc::default();
+        let w = warnings.clone();
+        m.set_sink(Arc::new(move |e| {
+            if let Event::Warning { message, .. } = e {
+                w.lock().unwrap().push(message);
+            }
+        }));
+        let p = Profile { host: "127.0.0.1".into(), port: 1, ..Profile::new(Protocol::Raw) };
+        let key = format!("profile:{}:password", p.id);
+        let info = |id: &str| SessionInfo {
+            id: id.into(),
+            profile_id: p.id.clone(),
+            profile_name: String::new(),
+            protocol: Protocol::Raw,
+            host: p.host.clone(),
+            port: p.port,
+            state: SessionState::Connecting,
+            tab_name: String::new(),
+            pinned: false,
+            connected_at: now(),
+            error: String::new(),
+        };
+        let asked = Arc::new(AtomicUsize::new(0));
+        let resolve = |m: &Arc<Manager>, id: &str| m.secret_fn(id, &p.id, "password", SecretMode::Saved, counting_prompt(asked.clone()))().unwrap();
+
+        // Locked store: the credential can't be saved, and the user is told.
+        let e = m.new_session(info("s0"), Some(p.clone()), String::new(), SessionSecrets::default());
+        resolve(&m, "s0");
+        m.finish_connect("s0", e, Ok(Client::None), |_| {});
+        assert_eq!(warnings.lock().unwrap().len(), 1);
+
+        m.secrets.vault.initialise("pw").unwrap();
+        let e = m.new_session(info("s1"), Some(p.clone()), String::new(), SessionSecrets::default());
+        // A typed password the server rejects is never stored.
+        resolve(&m, "s1");
+        m.finish_connect("s1", e, Err("ssh: unable to authenticate".into()), |_| {});
+        assert!(m.secrets.get(&key).is_none());
+        // Typed again and accepted: stored.
+        resolve(&m, "s1");
+        m.finish_connect("s1", e, Ok(Client::None), |_| {});
+        assert_eq!(m.secrets.get(&key).as_deref(), Some("hunter2"));
+        assert_eq!(asked.load(Ordering::SeqCst), 3);
+
+        // The saved value is reused; once the server rejects it, the next attempt asks again.
+        let e = m.new_session(info("s2"), Some(p.clone()), String::new(), SessionSecrets::default());
+        resolve(&m, "s2");
+        assert_eq!(asked.load(Ordering::SeqCst), 3);
+        m.finish_connect("s2", e, Err("VNC authentication failed".into()), |_| {});
+        resolve(&m, "s2");
+        assert_eq!(asked.load(Ordering::SeqCst), 4);
+        // A network error doesn't count as a rejection.
+        m.finish_connect("s2", e, Err("connection refused".into()), |_| {});
+        resolve(&m, "s2");
+        assert_eq!(asked.load(Ordering::SeqCst), 4);
+        m.close_all();
+        let _ = std::fs::remove_dir_all(dir);
     }
 
     #[test]

@@ -269,10 +269,6 @@ impl Secrets {
     }
 
     /// Stores where possible: the keychain, else the vault if it's unlocked.
-    pub fn set(&self, key: &str, value: &str) {
-        let _ = self.set_checked(key, value);
-    }
-
     pub fn set_checked(&self, key: &str, value: &str) -> Result<()> {
         if self.keychain_ok && self.keychain.set(key, value).is_ok() {
             return Ok(());
