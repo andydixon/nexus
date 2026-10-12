@@ -627,14 +627,16 @@ impl TermView {
                 }
                 let hidden = cell.flags.contains(Flags::HIDDEN);
                 let chr = if hidden { ' ' } else { cell.c };
-                // ASCII runs share one text call; anything else is placed on its own cell so a
-                // fallback font's advance can't push later glyphs off the grid.
-                if chr.is_ascii() && width == 1.0 && fg == run_color && !run.is_empty() {
+                // ASCII runs share one text call; anything else (including ASCII with combining
+                // marks) is placed on its own cell so a fallback font's advance can't push later
+                // glyphs off the grid.
+                let plain = chr.is_ascii() && width == 1.0 && cell.zerowidth().is_none();
+                if plain && fg == run_color && !run.is_empty() {
                     run.push(chr);
                     continue;
                 }
                 flush(&mut run, run_x, run_color);
-                if chr.is_ascii() && width == 1.0 {
+                if plain {
                     run.push(chr);
                     run_x = x;
                     run_color = fg;
@@ -643,7 +645,9 @@ impl TermView {
                     if let Some(z) = cell.zerowidth() {
                         s.extend(z);
                     }
-                    painter.text(cell_rect.center(), egui::Align2::CENTER_CENTER, s, font.clone(), fg);
+                    // Top-anchored like the ASCII runs: centring vertically in the (rounded-up)
+                    // cell height drew accented and other non-ASCII glyphs below the baseline.
+                    painter.text(pos2(cell_rect.center().x, y), egui::Align2::CENTER_TOP, s, font.clone(), fg);
                 }
             }
             flush(&mut run, run_x, run_color);
