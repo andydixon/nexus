@@ -356,6 +356,12 @@ impl Manager {
             allow_tls_only: rc.allow_tls_only,
             audio: rc.audio,
             shared_folder: (!rc.shared_folder.trim().is_empty()).then(|| (rc.shared_folder.trim().into(), "Nexus".into())),
+            printer: rc.redirect_printer.then(|| {
+                let (me, sid) = (self.clone(), id.to_string());
+                let on_printed: clients::rdp_devices::PrintedFn =
+                    Arc::new(move |f: PathBuf| me.emit(Event::Info { session: sid.clone(), message: format!("Print job saved to {}", f.display()) }));
+                (downloads_dir(), on_printed)
+            }),
             dial,
             check_cert,
             connect_timeout: timeout,
@@ -417,4 +423,11 @@ pub(super) fn connect_vnc_client(
         }
         Err(e) => Err(e),
     }
+}
+
+/// Where print jobs and similar go: ~/Downloads when it exists, else the home folder.
+fn downloads_dir() -> PathBuf {
+    let home = std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" }).map(PathBuf::from).unwrap_or_else(std::env::temp_dir);
+    let d = home.join("Downloads");
+    if d.is_dir() { d } else { home }
 }

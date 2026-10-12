@@ -485,6 +485,7 @@ impl App {
                 }
             }
             Event::Warning { message, .. } => self.s.error(message),
+            Event::Info { message, .. } => self.s.success(message),
             Event::Irc { session, event } => {
                 if let Some(View::Irc(v)) = self.s.panes.get_mut(&session).map(|p| &mut p.view) {
                     v.on_event(event);

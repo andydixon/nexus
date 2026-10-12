@@ -702,6 +702,7 @@ impl ProfileEditor {
         });
         section(ui, "Devices", |ui| {
             check(ui, "Play Remote Audio", &mut c.audio, "");
+            check(ui, "Redirect Printer", &mut c.redirect_printer, "Adds a \"Nexus Terminal\" printer; jobs are saved as PostScript files in Downloads");
             if cfg!(unix) {
                 label(ui, "Shared Folder");
                 ui.horizontal(|ui| {

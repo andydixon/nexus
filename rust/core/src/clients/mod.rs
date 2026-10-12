@@ -40,8 +40,7 @@ impl Callbacks {
 pub mod proxy;
 pub mod raw;
 pub mod rdp;
-#[cfg(unix)]
-pub mod rdp_drive;
+pub mod rdp_devices;
 pub mod serial;
 pub mod telnet;
 pub mod vnc;

@@ -413,6 +413,8 @@ pub struct RdpConfig {
     pub audio: bool,
     /// Local folder shared with the remote desktop as a drive (empty: none). Linux and macOS.
     pub shared_folder: String,
+    /// Offer a printer; print jobs are saved as PostScript files in Downloads.
+    pub redirect_printer: bool,
     /// Trust policy for the server's TLS certificate (pinned like an SSH host key).
     #[serde(deserialize_with = "lenient")]
     pub host_key_policy: HostKeyPolicy,

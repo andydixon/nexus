@@ -65,6 +65,11 @@ pub enum Event {
         session: String,
         error: String,
     },
+    /// Something the user might like to know (e.g. where a print job was saved).
+    Info {
+        session: String,
+        message: String,
+    },
     /// Something the user should know about that didn't stop the session (e.g. a credential that
     /// couldn't be saved).
     Warning {

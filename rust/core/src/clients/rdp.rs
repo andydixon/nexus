@@ -52,6 +52,8 @@ pub struct Config {
     pub audio: bool,
     /// A local folder to share as a drive (Unix only), and the name it appears under.
     pub shared_folder: Option<(std::path::PathBuf, String)>,
+    /// Offer a printer; jobs are saved as PostScript in this folder.
+    pub printer: Option<(std::path::PathBuf, super::rdp_devices::PrintedFn)>,
     pub dial: Dial,
     pub check_cert: CertCheck,
     pub connect_timeout: Duration,
@@ -196,10 +198,25 @@ impl Client {
         if self.cfg.audio {
             connector.attach_static_channel(ironrdp::rdpsnd::client::Rdpsnd::new(Box::new(ironrdp_rdpsnd_native::cpal::RdpsndBackend::new())));
         }
-        #[cfg(unix)]
-        if let Some((folder, name)) = &self.cfg.shared_folder {
-            let drive = super::rdp_drive::ConfinedDrive::new(folder).map_err(|e| format!("shared folder {}: {e}", folder.display()))?;
-            connector.attach_static_channel(ironrdp::rdpdr::Rdpdr::new(Box::new(drive), "Nexus".into()).with_drives(Some(vec![(1, name.clone())])));
+        if self.cfg.shared_folder.is_some() || self.cfg.printer.is_some() {
+            let mut devices = super::rdp_devices::Devices::default();
+            let mut drives = vec![];
+            #[cfg(unix)]
+            if let Some((folder, name)) = &self.cfg.shared_folder {
+                devices = devices.with_drive(folder).map_err(|e| format!("shared folder {}: {e}", folder.display()))?;
+                drives.push((1, name.clone()));
+            }
+            if let Some((dir, on_printed)) = &self.cfg.printer {
+                devices = devices.with_printer(dir.clone(), on_printed.clone());
+            }
+            let mut rdpdr = ironrdp::rdpdr::Rdpdr::new(Box::new(devices), "Nexus".into());
+            if !drives.is_empty() {
+                rdpdr = rdpdr.with_drives(Some(drives));
+            }
+            if self.cfg.printer.is_some() {
+                rdpdr = rdpdr.with_printer(2, "Nexus Terminal".into());
+            }
+            connector.attach_static_channel(rdpdr);
         }
         let (clip_tx, clip_rx) = mpsc::channel();
         connector.attach_static_channel(CliprdrClient::new(Box::new(TextClipboard {
@@ -584,6 +601,7 @@ mod tests {
             allow_tls_only: true,
             audio: std::env::var("NEXUS_RDP_AUDIO").is_ok(),
             shared_folder: std::env::var("NEXUS_RDP_SHARE").ok().map(|p| (p.into(), "nexus".into())),
+            printer: std::env::var("NEXUS_RDP_PRINT").ok().map(|p| (p.into(), Arc::new(|f: std::path::PathBuf| eprintln!("printed {}", f.display())) as _)),
             dial: Arc::new(move || Ok(TcpStream::connect((h2.as_str(), port))?)),
             check_cert: Arc::new(move |fp| {
                 *sc.lock() = fp.to_string();
