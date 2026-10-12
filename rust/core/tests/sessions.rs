@@ -125,3 +125,81 @@ fn connect_failure_reports_error_state() {
     assert!(err.starts_with(&id) && err.len() > id.len() + 1, "{err}");
     let _ = std::fs::remove_dir_all(dir);
 }
+
+/// NickServ identification happens on every registration, including auto-reconnects, and a
+/// session-only NickServ password is asked once, not again for the reconnect.
+#[test]
+fn irc_reconnect_identifies_with_nickserv_again() {
+    use std::io::{BufRead, BufReader};
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    let (m, rx, dir) = manager("irc-nickserv");
+    let l = TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = l.local_addr().unwrap().port();
+    let identified = Arc::new(AtomicUsize::new(0));
+    let seen = identified.clone();
+    std::thread::spawn(move || {
+        for (n, s) in l.incoming().flatten().enumerate() {
+            let mut w = s.try_clone().unwrap();
+            let mut r = BufReader::new(s);
+            let mut line = String::new();
+            // Registration, then welcome.
+            while r.read_line(&mut line).unwrap_or(0) > 0 {
+                if line.starts_with("USER ") {
+                    break;
+                }
+                line.clear();
+            }
+            w.write_all(b":srv 001 nexus :Welcome\r\n").unwrap();
+            line.clear();
+            while r.read_line(&mut line).unwrap_or(0) > 0 {
+                if line == "PRIVMSG NickServ :IDENTIFY acct pw-once\r\n" {
+                    seen.fetch_add(1, Ordering::SeqCst);
+                    break;
+                }
+                line.clear();
+            }
+            // First connection: hang up so the session auto-reconnects. Second: stay open.
+            if n == 0 {
+                drop(w);
+            } else {
+                std::thread::sleep(Duration::from_secs(30));
+            }
+        }
+    });
+    let mut p = Profile::new(Protocol::Irc);
+    p.host = "127.0.0.1".into();
+    p.port = port as i64;
+    let c = p.irc.as_mut().unwrap();
+    c.nick_serv_identify = true;
+    c.nick_serv_account = "acct".into();
+    c.nick_serv_mode = nexus_core::models::SecretMode::SessionOnly;
+    c.auto_reconnect = true;
+    let id = m.connect(p);
+    let prompts = Arc::new(AtomicUsize::new(0));
+    let answer = |e: &Event| {
+        if let Event::SecretPrompt { reply, .. } = e {
+            prompts.fetch_add(1, Ordering::SeqCst);
+            let _ = reply.send("pw-once".into());
+        }
+    };
+    wait(&rx, |e| {
+        answer(e);
+        state(e, SessionState::Connected)
+    });
+    wait(&rx, |e| {
+        answer(e);
+        matches!(e, Event::State { state: SessionState::Reconnecting, .. }).then_some(())
+    });
+    wait(&rx, |e| {
+        answer(e);
+        state(e, SessionState::Connected)
+    });
+    let deadline = std::time::Instant::now() + Duration::from_secs(5);
+    while identified.load(Ordering::SeqCst) < 2 && std::time::Instant::now() < deadline {
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    assert_eq!(identified.load(Ordering::SeqCst), 2, "IDENTIFY sent on both registrations");
+    assert_eq!(prompts.load(Ordering::SeqCst), 1, "session-only password asked once");
+    m.disconnect(&id).unwrap();
+    let _ = std::fs::remove_dir_all(dir);
+}

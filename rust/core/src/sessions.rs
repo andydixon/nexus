@@ -181,7 +181,11 @@ struct Session {
     cancel_reconnect: Option<Arc<AtomicBool>>,
     pending_resize: Option<(u16, u16)>,
     login: Arc<Mutex<LoginBuf>>,
+    /// Credentials in `SecretMode::SessionOnly`, kept across reconnects of this session.
+    session_secrets: SessionSecrets,
 }
+
+type SessionSecrets = Arc<Mutex<HashMap<String, String>>>;
 
 pub struct Manager {
     sessions: Mutex<HashMap<String, Session>>,
@@ -240,7 +244,7 @@ impl Manager {
         self.with(id, |s| s.client.clone())
     }
 
-    fn new_session(&self, info: SessionInfo, profile: Option<Profile>, shell: String) -> u64 {
+    fn new_session(&self, info: SessionInfo, profile: Option<Profile>, shell: String, session_secrets: SessionSecrets) -> u64 {
         let epoch = self.next_epoch.fetch_add(1, Ordering::SeqCst);
         let s = Session {
             info,
@@ -255,6 +259,7 @@ impl Manager {
             cancel_reconnect: None,
             pending_resize: None,
             login: Arc::default(),
+            session_secrets,
         };
         let id = s.info.id.clone();
         self.sessions.lock().unwrap().insert(id, s);
@@ -264,6 +269,11 @@ impl Manager {
     /// Opens a session for `profile` and connects it on a worker thread. Returns the session id
     /// immediately; progress arrives as `Event::State`.
     pub fn connect(self: &Arc<Self>, profile: Profile) -> String {
+        self.connect_with(profile, SessionSecrets::default())
+    }
+
+    /// `connect` with session-only credentials carried over from a previous session (reconnect).
+    fn connect_with(self: &Arc<Self>, profile: Profile, session_secrets: SessionSecrets) -> String {
         let id = new_id();
         let prompt = self.prompt_for(&id, "Credentials Required", Duration::from_secs(300));
         let info = SessionInfo {
@@ -279,7 +289,7 @@ impl Manager {
             connected_at: now(),
             error: String::new(),
         };
-        let epoch = self.new_session(info, Some(profile.clone()), String::new());
+        let epoch = self.new_session(info, Some(profile.clone()), String::new(), session_secrets);
         self.emit_state(&id, SessionState::Connecting, "");
         let me = self.clone();
         let id2 = id.clone();
@@ -405,12 +415,13 @@ impl Manager {
     // --- credentials --------------------------------------------------------------------
 
     /// Resolves a credential per its SecretMode (Go's buildSecretCallback): saved values come from
-    /// the keychain then the vault; session-only values are asked once per connection.
-    pub fn secret_fn(&self, profile_id: &str, kind: &str, mode: SecretMode, prompt: Prompt) -> SecretFn {
+    /// the keychain then the vault; session-only values are asked once per session and reused on
+    /// reconnects (so e.g. a NickServ password entered once keeps identifying after a drop).
+    pub fn secret_fn(&self, session: &str, profile_id: &str, kind: &str, mode: SecretMode, prompt: Prompt) -> SecretFn {
         let key = format!("profile:{profile_id}:{kind}");
         let (secrets, store) = (self.secrets.clone(), self.store.clone());
         let (pid, kind) = (profile_id.to_string(), kind.to_string());
-        let cache: Arc<Mutex<Option<String>>> = Arc::default();
+        let cache: SessionSecrets = self.sessions.lock().unwrap().get(session).map(|s| s.session_secrets.clone()).unwrap_or_default();
         Arc::new(move || {
             if mode == SecretMode::Saved
                 && let Some(v) = secrets.get(&key)
@@ -419,14 +430,16 @@ impl Manager {
                 return Ok(v);
             }
             if mode == SecretMode::SessionOnly
-                && let Some(v) = cache.lock().unwrap().clone()
+                && let Some(v) = cache.lock().unwrap().get(&key).cloned()
             {
                 return Ok(v);
             }
             let v = prompt(&format!("Enter {kind}:"))?;
             match mode {
                 SecretMode::Saved => secrets.set(&key, &v),
-                SecretMode::SessionOnly => *cache.lock().unwrap() = Some(v.clone()),
+                SecretMode::SessionOnly => {
+                    cache.lock().unwrap().insert(key.clone(), v.clone());
+                }
                 SecretMode::AskEveryTime => {}
             }
             Ok(v)
@@ -521,8 +534,8 @@ impl Manager {
             sc.totp_secret = t;
         }
         let sc = sc.clone();
-        let password = self.secret_fn(&p.id, "password", sc.secret_mode, prompt.clone());
-        let passphrase = self.secret_fn(&p.id, "passphrase", sc.key_secret_mode, prompt);
+        let password = self.secret_fn(id, &p.id, "password", sc.secret_mode, prompt.clone());
+        let passphrase = self.secret_fn(id, &p.id, "passphrase", sc.key_secret_mode, prompt);
         let c = SshClient::new(&p, self.terminal_callbacks(id, epoch));
         c.connect(self.host_key_check(id, sc.host_key_policy), Some(password), Some(passphrase))?;
         for pf in sc.port_forwards.iter().filter(|f| f.enabled) {
@@ -559,8 +572,8 @@ impl Manager {
         c.auth_methods = vec![if method.is_empty() { "publickey".into() } else { method.into() }];
         c.private_key_path = key.into();
         c.agent_auth = agent;
-        let password = (method == "password").then(|| self.secret_fn(profile_id, &format!("{kind}-ssh-password"), mode, prompt.clone()));
-        let passphrase = self.secret_fn(profile_id, &format!("{kind}-ssh-passphrase"), mode, prompt);
+        let password = (method == "password").then(|| self.secret_fn(id, profile_id, &format!("{kind}-ssh-password"), mode, prompt.clone()));
+        let passphrase = self.secret_fn(id, profile_id, &format!("{kind}-ssh-passphrase"), mode, prompt);
         let t = SshClient::new(&tp, Callbacks::noop());
         t.connect_tunnel_only(self.host_key_check(id, HostKeyPolicy::Ask), password, Some(passphrase))?;
         Ok(t)
@@ -568,7 +581,7 @@ impl Manager {
 
     fn connect_github(self: &Arc<Self>, id: &str, epoch: u64, p: &Profile, prompt: Prompt) -> Result<Client> {
         let gh = p.github.clone().ok_or_else(|| format!("GitHub configuration missing on profile {:?}", p.id))?;
-        let token = self.secret_fn(&p.id, "github-token", gh.secret_mode, prompt.clone())().map_err(|e| format!("obtaining GitHub token: {e}"))?;
+        let token = self.secret_fn(id, &p.id, "github-token", gh.secret_mode, prompt.clone())().map_err(|e| format!("obtaining GitHub token: {e}"))?;
         if token.is_empty() {
             return err("GitHub token cannot be empty".into());
         }
@@ -629,12 +642,12 @@ impl Manager {
     fn connect_irc(self: &Arc<Self>, id: &str, epoch: u64, p: &Profile, prompt: Prompt) -> Result<Client> {
         let ic = p.irc.clone().ok_or("IRC configuration missing")?;
         let server_pass = if ic.server_password_required {
-            self.secret_fn(&p.id, "irc-server-password", ic.server_password_mode, prompt.clone())().map_err(|e| format!("IRC server password: {e}"))?
+            self.secret_fn(id, &p.id, "irc-server-password", ic.server_password_mode, prompt.clone())().map_err(|e| format!("IRC server password: {e}"))?
         } else {
             String::new()
         };
         let ns_pass = if ic.nick_serv_identify {
-            self.secret_fn(&p.id, "irc-nickserv-password", ic.nick_serv_mode, prompt.clone())().map_err(|e| format!("NickServ password: {e}"))?
+            self.secret_fn(id, &p.id, "irc-nickserv-password", ic.nick_serv_mode, prompt.clone())().map_err(|e| format!("NickServ password: {e}"))?
         } else {
             String::new()
         };
@@ -739,7 +752,7 @@ impl Manager {
         } else {
             None
         };
-        let password = self.secret_fn(&p.id, "vnc-password", vc.secret_mode, prompt);
+        let password = self.secret_fn(id, &p.id, "vnc-password", vc.secret_mode, prompt);
         let cb = self.terminal_callbacks(id, epoch);
         let (me, sid) = (self.clone(), id.to_string());
         let (me2, sid2) = (self.clone(), id.to_string());
@@ -786,7 +799,7 @@ impl Manager {
             connected_at: now(),
             error: String::new(),
         };
-        let epoch = self.new_session(info, None, shell.into());
+        let epoch = self.new_session(info, None, shell.into(), SessionSecrets::default());
         self.emit_state(&id, SessionState::Connecting, "");
         let me = self.clone();
         let id2 = id.clone();
@@ -862,10 +875,11 @@ impl Manager {
     pub fn reconnect(self: &Arc<Self>, id: &str) -> Result<String> {
         let s = self.sessions.lock().unwrap().remove(id).ok_or_else(|| format!("sessions: session {id:?} not found"))?;
         let (profile, tab, pinned, proto, shell) = (s.profile.clone(), s.info.tab_name.clone(), s.info.pinned, s.info.protocol, s.local_shell.clone());
+        let session_secrets = s.session_secrets.clone();
         self.close_session(s);
         let new = match (proto, profile) {
             (Protocol::Local, _) => self.connect_local(&shell),
-            (_, Some(p)) => self.connect(p),
+            (_, Some(p)) => self.connect_with(p, session_secrets),
             _ => return err("sessions: nothing to reconnect".into()),
         };
         let _ = self.with(&new, |s| {
@@ -1324,4 +1338,65 @@ fn wait_for_output(login: &Mutex<LoginBuf>, pattern: &str, timeout: Duration) ->
         std::thread::sleep(Duration::from_millis(100));
     }
     false
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::secrets::{Keychain, Secrets, Vault};
+    use std::sync::atomic::AtomicUsize;
+
+    fn manager(name: &str) -> (Arc<Manager>, PathBuf) {
+        let dir = std::env::temp_dir().join(format!("nexus-secretfn-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let store = Arc::new(Store::open(&dir.join("nexus.db")).unwrap());
+        let secrets = Arc::new(Secrets { vault: Vault::new(dir.join("vault")), keychain: Keychain::new("NexusTerminalTest", None), keychain_ok: false });
+        (Manager::new(store, secrets, dir.join("recordings")), dir)
+    }
+
+    fn counting_prompt(n: Arc<AtomicUsize>) -> Prompt {
+        Arc::new(move |_| {
+            n.fetch_add(1, Ordering::SeqCst);
+            Ok("hunter2".into())
+        })
+    }
+
+    #[test]
+    fn session_only_secrets_survive_reconnects() {
+        let (m, dir) = manager("cache");
+        let p = Profile { host: "127.0.0.1".into(), port: 1, ..Profile::new(Protocol::Raw) };
+        let info = SessionInfo {
+            id: "s1".into(),
+            profile_id: p.id.clone(),
+            profile_name: String::new(),
+            protocol: Protocol::Raw,
+            host: p.host.clone(),
+            port: p.port,
+            state: SessionState::Connecting,
+            tab_name: String::new(),
+            pinned: false,
+            connected_at: now(),
+            error: String::new(),
+        };
+        m.new_session(info, Some(p.clone()), String::new(), SessionSecrets::default());
+        let asked = Arc::new(AtomicUsize::new(0));
+        // Two separate resolutions (as two connects of the same session make) prompt once.
+        for _ in 0..2 {
+            let f = m.secret_fn("s1", &p.id, "irc-nickserv-password", SecretMode::SessionOnly, counting_prompt(asked.clone()));
+            assert_eq!(f().unwrap(), "hunter2");
+        }
+        assert_eq!(asked.load(Ordering::SeqCst), 1);
+        // Ask-every-time still prompts each time.
+        let f = m.secret_fn("s1", &p.id, "irc-nickserv-password", SecretMode::AskEveryTime, counting_prompt(asked.clone()));
+        f().unwrap();
+        assert_eq!(asked.load(Ordering::SeqCst), 2);
+        // An explicit reconnect carries the cache to the new session id.
+        let new = m.reconnect("s1").unwrap();
+        let f = m.secret_fn(&new, &p.id, "irc-nickserv-password", SecretMode::SessionOnly, counting_prompt(asked.clone()));
+        assert_eq!(f().unwrap(), "hunter2");
+        assert_eq!(asked.load(Ordering::SeqCst), 2);
+        m.close_all();
+        let _ = std::fs::remove_dir_all(dir);
+    }
 }
