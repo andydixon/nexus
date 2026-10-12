@@ -684,7 +684,8 @@ impl TermView {
                         if modifiers.command
                             && let Some(url) = self.url_at(origin, cw, ch, *pos)
                         {
-                            ui.ctx().open_url(egui::OpenUrl::new_tab(url));
+                            // Only web links: text from a remote host must not launch file: or custom-scheme handlers.
+                            crate::widgets::open_web_url(ui.ctx(), &url);
                             continue;
                         }
                         let now = ui.input(|i| i.time);
@@ -738,9 +739,20 @@ impl TermView {
                 _ => {}
             }
         }
+        // An OSC 8 link's text can say anything, so its real target is always shown on hover.
+        if let Some(p) = hover
+            && let Some(link) = self.hyperlink_at(self.point_at(origin, cw, ch, p).0)
+        {
+            egui::Tooltip::always_open(ui.ctx().clone(), ui.layer_id(), egui::Id::new("term-link"), egui::PopupAnchor::Pointer).show(|ui| {
+                ui.label(&link);
+                if !crate::widgets::is_web_url(&link) {
+                    ui.label(egui::RichText::new("Not a web link — won't be opened").weak());
+                }
+            });
+        }
         if let Some(p) = hover
             && ui.input(|i| i.modifiers.command)
-            && self.url_at(origin, cw, ch, p).is_some()
+            && self.url_at(origin, cw, ch, p).is_some_and(|u| crate::widgets::is_web_url(&u))
         {
             ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
         } else if hover.is_some() {
@@ -748,8 +760,12 @@ impl TermView {
         }
     }
 
+    /// The link under `p`: an OSC 8 hyperlink on the cell, else a URL in the text.
     fn url_at(&self, origin: Pos2, cw: f32, ch: f32, p: Pos2) -> Option<String> {
         let (point, _) = self.point_at(origin, cw, ch, p);
+        if let Some(link) = self.hyperlink_at(point) {
+            return Some(link);
+        }
         let (text, cols) = self.line_text(point.line);
         let re = regex::Regex::new(URL_RE).ok()?;
         re.find_iter(&text).find_map(|m| {
@@ -757,6 +773,13 @@ impl TermView {
             let end = start + m.as_str().chars().count() - 1;
             (cols.get(start)? <= &point.column.0 && cols.get(end)? >= &point.column.0).then(|| m.as_str().to_string())
         })
+    }
+
+    fn hyperlink_at(&self, point: Point) -> Option<String> {
+        let g = self.term.grid();
+        (point.line >= g.topmost_line() && point.line <= g.bottommost_line() && point.column.0 < self.term.columns())
+            .then(|| g[point].hyperlink().map(|h| h.uri().to_string()))
+            .flatten()
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -818,6 +841,13 @@ impl TermView {
                 }
                 if cell.flags.intersects(Flags::ALL_UNDERLINES) {
                     painter.hline(cell_rect.x_range(), y + ch - 1.5, Stroke::new(1.0, fg));
+                } else if cell.hyperlink().is_some() {
+                    // OSC 8 links: a dotted underline.
+                    let mut x0 = cell_rect.left();
+                    while x0 < cell_rect.right() {
+                        painter.hline(x0..=(x0 + 1.5).min(cell_rect.right()), y + ch - 1.5, Stroke::new(1.0, fg.gamma_multiply(0.8)));
+                        x0 += 3.0;
+                    }
                 }
                 if cell.flags.contains(Flags::STRIKEOUT) {
                     painter.hline(cell_rect.x_range(), y + ch * 0.55, Stroke::new(1.0, fg));
@@ -1134,6 +1164,17 @@ mod tests {
         t.feed(b"\x1b[3J\x1b[2J");
         t.feed(b"x\r\n");
         assert!(t.prompts.len() <= 1);
+    }
+
+    #[test]
+    fn osc8_links_are_found_on_their_cells() {
+        let mut t = TermView::new(100, 14.0, CursorStyle::Block);
+        t.feed(b"see \x1b]8;;https://example.com/docs\x1b\\the docs\x1b]8;;\x1b\\ now");
+        let at = |c| t.hyperlink_at(Point::new(Line(0), Column(c)));
+        assert_eq!(at(4).as_deref(), Some("https://example.com/docs"));
+        assert_eq!(at(11).as_deref(), Some("https://example.com/docs"));
+        assert_eq!(at(12), None, "the link ends with its text");
+        assert_eq!(at(0), None);
     }
 
     #[test]

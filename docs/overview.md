@@ -69,7 +69,7 @@ Use Nexus Terminal when you need to:
 - Find in terminal output, with case-sensitive and regular-expression options and a match counter.
 - Copy with Ctrl/Cmd+C when text is selected (otherwise it sends an interrupt), paste with Ctrl/Cmd+V.
 - Double-click selects a word, triple-click selects a line, Shift-click extends a selection.
-- Ctrl/Cmd-click a web link to open it in your browser.
+- Ctrl/Cmd-click a web link to open it in your browser, including OSC 8 hyperlinks (from `ls --hyperlink`, `git`, compilers…), which are underlined with a dotted line and show their real target on hover. Only http(s) links open.
 - Shift+PageUp/PageDown/Home/End and the mouse wheel scroll the scrollback; on the alternate screen the wheel sends arrow keys, so `tmux`, `screen` and `byobu` scroll naturally.
 - Context menu with Copy, Paste, Select All, Find, Send Snippet, Port Forwards, Split Right, Split Down, Export Output, Clear and Reset.
 - Export the whole scrollback as plain text.

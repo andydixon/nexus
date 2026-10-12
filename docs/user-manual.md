@@ -249,7 +249,7 @@ Shells that also report their working directory (OSC 7; fish, and zsh/bash with 
 - **Copy**: select text and press **Cmd+C** / **Ctrl+C**. With nothing selected, **Ctrl+C** sends an interrupt as usual.
 - **Paste**: **Cmd+V** / **Ctrl+V**. Pastes are bracketed when the remote application asks for it.
 - **Select**: drag to select, double-click for a word, triple-click for a line, Shift-click to extend.
-- **Links**: hold **Cmd** / **Ctrl** and click a web link to open it in your browser.
+- **Links**: hold **Cmd** / **Ctrl** and click a web link to open it in your browser. Programs can also print real hyperlinks (OSC 8, as `ls --hyperlink` and many build tools do); these have a dotted underline, and hovering one shows where it really points. Only http(s) links are opened.
 - **Scroll**: the mouse wheel, or **Shift+PageUp**, **Shift+PageDown**, **Shift+Home** and **Shift+End**. On the alternate screen (for example in `tmux`, `screen`, `byobu` or `less`) the wheel sends arrow keys instead.
 - Applications that use the mouse (such as `htop`, `vim` or `tmux` with mouse mode) receive mouse clicks and the wheel directly.
 
