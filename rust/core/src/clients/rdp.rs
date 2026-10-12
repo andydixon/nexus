@@ -48,6 +48,10 @@ pub struct Config {
     pub height: u16,
     /// Also allow plain TLS (graphical logon) for servers without NLA, such as xrdp.
     pub allow_tls_only: bool,
+    /// Play the remote desktop's sound locally.
+    pub audio: bool,
+    /// A local folder to share as a drive (Unix only), and the name it appears under.
+    pub shared_folder: Option<(std::path::PathBuf, String)>,
     pub dial: Dial,
     pub check_cert: CertCheck,
     pub connect_timeout: Duration,
@@ -165,7 +169,7 @@ impl Client {
             request_data: None,
             // Also hands the credentials to TLS-only servers (xrdp), which would otherwise show their own login screen.
             autologon: !c.password.is_empty(),
-            enable_audio_playback: false,
+            enable_audio_playback: c.audio,
             // ponytail: no bulk compression (the bitmap codecs already compress); enabling it means
             // carrying the decompressor across reactivations.
             compression_type: None,
@@ -189,6 +193,14 @@ impl Client {
         let mut framed = Framed::new(tcp);
         let drdynvc = DrdynvcClient::new().with_dynamic_channel(DisplayControlClient::new(|_| Ok(Vec::new())));
         let mut connector = ClientConnector::new(self.connector_config(), local).with_static_channel(drdynvc);
+        if self.cfg.audio {
+            connector.attach_static_channel(ironrdp::rdpsnd::client::Rdpsnd::new(Box::new(ironrdp_rdpsnd_native::cpal::RdpsndBackend::new())));
+        }
+        #[cfg(unix)]
+        if let Some((folder, name)) = &self.cfg.shared_folder {
+            let drive = super::rdp_drive::ConfinedDrive::new(folder).map_err(|e| format!("shared folder {}: {e}", folder.display()))?;
+            connector.attach_static_channel(ironrdp::rdpdr::Rdpdr::new(Box::new(drive), "Nexus".into()).with_drives(Some(vec![(1, name.clone())])));
+        }
         let (clip_tx, clip_rx) = mpsc::channel();
         connector.attach_static_channel(CliprdrClient::new(Box::new(TextClipboard {
             tx: clip_tx,
@@ -570,6 +582,8 @@ mod tests {
             width: 1024,
             height: 768,
             allow_tls_only: true,
+            audio: std::env::var("NEXUS_RDP_AUDIO").is_ok(),
+            shared_folder: std::env::var("NEXUS_RDP_SHARE").ok().map(|p| (p.into(), "nexus".into())),
             dial: Arc::new(move || Ok(TcpStream::connect((h2.as_str(), port))?)),
             check_cert: Arc::new(move |fp| {
                 *sc.lock() = fp.to_string();

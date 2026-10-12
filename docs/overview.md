@@ -148,6 +148,7 @@ Use Nexus Terminal when you need to:
 - Scale-to-fit or 1:1, a fixed resolution or one that follows the tab (Display Control).
 - Keyboard (scancodes for keys and shortcuts, Unicode for text), mouse and wheel; Ctrl+Alt+Del; text clipboard sharing in both directions.
 - Password storage modes and domain logon.
+- Remote audio playback, and a shared folder redirected as a drive (Linux and macOS), confined to that folder.
 
 ### VNC capabilities
 

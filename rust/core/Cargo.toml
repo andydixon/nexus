@@ -36,9 +36,13 @@ image = { version = "0.25", default-features = false, features = ["jpeg"] }
 
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
 webpki-roots = "1"
-ironrdp = { version = "0.17", features = ["connector", "session", "graphics", "pdu", "svc", "dvc", "displaycontrol", "input", "cliprdr"] }
+ironrdp = { version = "0.17", features = ["connector", "session", "graphics", "pdu", "svc", "dvc", "displaycontrol", "input", "cliprdr", "rdpsnd", "rdpdr"] }
+ironrdp-rdpsnd-native = { version = "0.7", default-features = false }
 ironrdp-blocking = "0.10"
 x509-cert = { version = "0.2", default-features = false, features = ["std"] }
+
+[target.'cfg(unix)'.dependencies]
+ironrdp-rdpdr-native = "0.7"
 
 [dev-dependencies]
 tiny_http = "0.12"

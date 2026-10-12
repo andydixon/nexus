@@ -17,7 +17,7 @@ The toolchain is pinned in `rust/rust-toolchain.toml`; `rustup` installs it on f
 
   ```bash
   sudo apt-get install -y build-essential pkg-config libxkbcommon-dev libgl1-mesa-dev \
-    libx11-dev libxcursor-dev libxrandr-dev libxi-dev libwayland-dev libgtk-3-dev zip
+    libx11-dev libxcursor-dev libxrandr-dev libxi-dev libwayland-dev libgtk-3-dev libasound2-dev zip
   ```
 
 - **macOS:** Xcode command-line tools (`xcode-select --install`).

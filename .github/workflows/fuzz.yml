@@ -21,6 +21,7 @@ jobs:
                 working-directory: rust/fuzz
         steps:
             - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+            - run: sudo apt-get update && sudo apt-get install -y libasound2-dev
             - run: rustup toolchain install nightly --profile minimal
             - run: cargo +nightly install cargo-fuzz --locked
             - run: cargo +nightly fuzz run ${{ matrix.target }} -- -max_total_time=120 -rss_limit_mb=2048

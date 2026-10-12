@@ -354,6 +354,8 @@ impl Manager {
             width,
             height,
             allow_tls_only: rc.allow_tls_only,
+            audio: rc.audio,
+            shared_folder: (!rc.shared_folder.trim().is_empty()).then(|| (rc.shared_folder.trim().into(), "Nexus".into())),
             dial,
             check_cert,
             connect_timeout: timeout,

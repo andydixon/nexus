@@ -700,6 +700,34 @@ impl ProfileEditor {
                 "Plain TLS logon, e.g. xrdp. Less secure: the session is set up before you authenticate.",
             );
         });
+        section(ui, "Devices", |ui| {
+            check(ui, "Play Remote Audio", &mut c.audio, "");
+            if cfg!(unix) {
+                label(ui, "Shared Folder");
+                ui.horizontal(|ui| {
+                    if widgets::button(ui, icon::FOLDER_OPEN, "Choose…").clicked()
+                        && let Some(dir) = rfd::FileDialog::new().set_title("Folder to share with the remote desktop").pick_folder()
+                    {
+                        c.shared_folder = dir.to_string_lossy().into_owned();
+                    }
+                    if !c.shared_folder.is_empty() && ui.button("Stop Sharing").clicked() {
+                        c.shared_folder.clear();
+                    }
+                });
+                err(ui, errs, "rdp.sharedFolder");
+                widgets::hint(
+                    ui,
+                    &if c.shared_folder.is_empty() {
+                        "Nothing is shared.".to_string()
+                    } else {
+                        format!(
+                            "{} appears on the remote desktop as a drive named Nexus; the server can read and change everything in it, and nothing outside it.",
+                            c.shared_folder
+                        )
+                    },
+                );
+            }
+        });
         section(ui, "Display", |ui| {
             check(ui, "Scale to Fit", &mut c.scale_to_fit, "");
             num(ui, "Width (0 = fit tab)", &mut c.width, 0..=8192);

@@ -409,6 +409,10 @@ pub struct RdpConfig {
     /// Allow plain TLS logon for servers without Network Level Authentication (e.g. xrdp).
     #[serde(rename = "allowTLSOnly")]
     pub allow_tls_only: bool,
+    /// Play remote audio locally.
+    pub audio: bool,
+    /// Local folder shared with the remote desktop as a drive (empty: none). Linux and macOS.
+    pub shared_folder: String,
     /// Trust policy for the server's TLS certificate (pinned like an SSH host key).
     #[serde(deserialize_with = "lenient")]
     pub host_key_policy: HostKeyPolicy,
@@ -433,6 +437,7 @@ impl RdpConfig {
         RdpConfig {
             scale_to_fit: true,
             dynamic_resolution: true,
+            audio: true,
             proxy_type: "none".into(),
             ssh_port: DEFAULT_SSH_PORT.into(),
             ssh_auth_method: "publickey".into(),

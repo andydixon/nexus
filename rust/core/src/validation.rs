@@ -334,6 +334,10 @@ pub fn validate_rdp_config(cfg: &RdpConfig) -> Result<(), ValidationErrors> {
         }
         t => errs.add("rdp.proxyType", format!("unsupported proxy type {t:?}")),
     }
+    let share = cfg.shared_folder.trim();
+    if !share.is_empty() && !std::path::Path::new(share).is_dir() {
+        errs.add("rdp.sharedFolder", "the shared folder must be an existing folder");
+    }
     if cfg.ssh_tunnel {
         if !matches!(cfg.proxy_type.as_str(), "" | "none") {
             errs.add("rdp.proxyType", "use either a proxy or an SSH tunnel, not both");

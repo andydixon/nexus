@@ -167,6 +167,7 @@ Use SSH tunnelling for VNC whenever possible. If a VNC profile has no tunnel, Ne
 - **RDP**: domain (optional), password storage mode, **Certificate Policy** and **Allow servers without NLA**. The username, host and port (3389) are the profile's own.
 - **Display**: **Scale to Fit**, a fixed **Width** and **Height** (0 × 0 fits the tab) and **Resize With Tab**.
 - **Proxy**: **SOCKS5** or **HTTP CONNECT**, with an optional username and password.
+- **Devices**: **Play Remote Audio**, and on Linux and macOS a **Shared Folder** that appears on the remote desktop as a drive named Nexus. The server can read and change everything in that folder and nothing outside it: paths that try to leave it (`..`, or symlinks pointing elsewhere) are refused.
 - **SSH Tunnel**: carry RDP through SSH, as for VNC. Use either a proxy or a tunnel, not both.
 
 Nexus Terminal logs on with Network Level Authentication (CredSSP, NTLM), so your password is checked before a session is set up. Servers without NLA, such as xrdp, need **Allow servers without NLA**; the password is then passed to the server's own logon. Kerberos and smart cards are not supported.
