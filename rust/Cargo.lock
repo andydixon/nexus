@@ -3452,6 +3452,7 @@ dependencies = [
  "egui",
  "egui-phosphor",
  "image",
+ "libc",
  "nexus-core",
  "parking_lot",
  "regex",

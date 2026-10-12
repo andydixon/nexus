@@ -33,6 +33,7 @@ use nexus_core::service::Service;
 use std::sync::Arc;
 
 fn main() -> eframe::Result {
+    harden_process();
     // A panic on a worker thread (a session's reader, a transfer) ends only that thread; say so in
     // the UI rather than letting the session just stop.
     let default_hook = std::panic::take_hook();
@@ -160,4 +161,21 @@ fn init_logging(data_dir: &std::path::Path) {
     let filter = tracing_subscriber::EnvFilter::try_from_default_env()
         .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("warn,nexus_terminal=info,nexus_core=info"));
     let _ = tracing_subscriber::registry().with(filter).with(file).with(stderr).try_init();
+}
+
+/// Release builds keep secrets out of core dumps and away from same-user debuggers: no core
+/// files, and on Linux the process is non-dumpable (also blocks ptrace attach by other processes
+/// of the same user). Debug builds skip this so they can still be debugged.
+fn harden_process() {
+    if cfg!(debug_assertions) {
+        return;
+    }
+    #[cfg(unix)]
+    // SAFETY: plain syscalls on this process with valid arguments; failure is harmless.
+    unsafe {
+        let none = libc::rlimit { rlim_cur: 0, rlim_max: 0 };
+        libc::setrlimit(libc::RLIMIT_CORE, &none);
+        #[cfg(target_os = "linux")]
+        libc::prctl(libc::PR_SET_DUMPABLE, 0, 0, 0, 0);
+    }
 }

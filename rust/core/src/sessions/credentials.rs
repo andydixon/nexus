@@ -55,29 +55,29 @@ impl Manager {
             if mode == SecretMode::Saved {
                 let mut st = state.lock();
                 if let Some(v) = st.pending.get(&key) {
-                    return Ok(v.to_string());
+                    return Ok(v.clone());
                 }
                 if !st.rejected.remove(&key)
                     && let Some(v) = secrets.get(&key)
                 {
                     st.used.insert(key.clone());
                     store.add_audit("secret.access", &pid, "", &format!("Accessed {kind} credential"));
-                    return Ok(v);
+                    return Ok(Zeroizing::new(v));
                 }
             }
             if mode == SecretMode::SessionOnly
-                && let Some(v) = state.lock().session_only.get(&key).map(|v| v.to_string())
+                && let Some(v) = state.lock().session_only.get(&key).cloned()
             {
                 return Ok(v);
             }
-            let v = prompt(&format!("Enter {kind}:"))?;
+            let v = Zeroizing::new(prompt(&format!("Enter {kind}:"))?);
             let mut st = state.lock();
             match mode {
                 SecretMode::Saved => {
-                    st.pending.insert(key.clone(), Zeroizing::new(v.clone()));
+                    st.pending.insert(key.clone(), v.clone());
                 }
                 SecretMode::SessionOnly => {
-                    st.session_only.insert(key.clone(), Zeroizing::new(v.clone()));
+                    st.session_only.insert(key.clone(), v.clone());
                 }
                 SecretMode::AskEveryTime => {}
             }

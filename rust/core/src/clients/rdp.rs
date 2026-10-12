@@ -37,7 +37,7 @@ pub struct Config {
     pub host: String,
     pub username: String,
     pub domain: String,
-    pub password: String,
+    pub password: zeroize::Zeroizing<String>,
     pub width: u16,
     pub height: u16,
     /// Also allow plain TLS (graphical logon) for servers without NLA, such as xrdp.
@@ -121,7 +121,7 @@ impl Client {
     fn connector_config(&self) -> connector::Config {
         let c = &self.cfg;
         connector::Config {
-            credentials: Credentials::UsernamePassword { username: c.username.clone(), password: c.password.clone() },
+            credentials: Credentials::UsernamePassword { username: c.username.clone(), password: c.password.to_string() },
             domain: (!c.domain.is_empty()).then(|| c.domain.clone()),
             enable_tls: c.allow_tls_only,
             enable_credssp: true,
@@ -458,7 +458,7 @@ mod tests {
             host: host.clone(),
             username: v[2].into(),
             domain: String::new(),
-            password: v[3].into(),
+            password: zeroize::Zeroizing::new(v[3].into()),
             width: 1024,
             height: 768,
             allow_tls_only: true,

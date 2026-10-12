@@ -125,11 +125,14 @@ impl Manager {
         let server_pass = if ic.server_password_required {
             self.secret_fn(id, &p.id, SecretKind::IrcServerPassword, ic.server_password_mode, prompt.clone())()
                 .map_err(|e| format!("IRC server password: {e}"))?
+                .to_string()
         } else {
             String::new()
         };
         let ns_pass = if ic.nick_serv_identify {
-            self.secret_fn(id, &p.id, SecretKind::IrcNickServPassword, ic.nick_serv_mode, prompt.clone())().map_err(|e| format!("NickServ password: {e}"))?
+            self.secret_fn(id, &p.id, SecretKind::IrcNickServPassword, ic.nick_serv_mode, prompt.clone())()
+                .map_err(|e| format!("NickServ password: {e}"))?
+                .to_string()
         } else {
             String::new()
         };
@@ -403,7 +406,7 @@ pub(super) fn connect_vnc_client(
         Ok(()) => Ok(c),
         // Ask for the password only when the server wants one.
         Err(e) if e.to_string().to_lowercase().contains("password") => {
-            cfg.password = Some(password()?);
+            cfg.password = Some(password()?.to_string());
             let c = clients::vnc::Client::new(cfg);
             c.connect()?;
             Ok(c)

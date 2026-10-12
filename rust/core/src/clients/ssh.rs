@@ -34,7 +34,8 @@ pub struct HostKeyInfo {
 
 pub type HostKeyCheck = Arc<dyn Fn(&HostKeyInfo) -> std::result::Result<(), String> + Send + Sync>;
 /// Blocking credential source (may prompt the user).
-pub type SecretFn = Arc<dyn Fn() -> Result<String> + Send + Sync>;
+/// The value is wiped from memory when dropped; libraries that need a plain `String` get a copy.
+pub type SecretFn = Arc<dyn Fn() -> Result<zeroize::Zeroizing<String>> + Send + Sync>;
 
 pub fn host_key_info(host: &str, port: u16, key: &PublicKey) -> HostKeyInfo {
     HostKeyInfo {
@@ -291,7 +292,7 @@ async fn authenticate(h: &mut Handle<Handler>, a: Auth<'_>) -> Result<()> {
             "password" => {
                 if let Some(get) = a.password.clone() {
                     let pw = blocking(move || get()).await?;
-                    if h.authenticate_password(a.user, pw).await?.success() {
+                    if h.authenticate_password(a.user, pw.as_str()).await?.success() {
                         return Ok(());
                     }
                 }
@@ -310,7 +311,7 @@ async fn authenticate(h: &mut Handle<Handler>, a: Auth<'_>) -> Result<()> {
                                     answers.push(totp_code(&a.totp_secret).map_err(|e| format!("failed to generate TOTP code: {e}"))?);
                                 } else {
                                     let get = get.clone();
-                                    answers.push(blocking(move || get()).await?);
+                                    answers.push(blocking(move || get()).await?.to_string());
                                 }
                             }
                             resp = h.authenticate_keyboard_interactive_respond(answers).await?;
@@ -848,7 +849,7 @@ mod tests {
         // Encrypted: unreadable without the passphrase, readable with it.
         let p = path.to_string_lossy().into_owned();
         assert!(load_private_key(&p, None).is_err());
-        let pp: SecretFn = Arc::new(|| Ok("pass phrase".into()));
+        let pp: SecretFn = Arc::new(|| Ok(zeroize::Zeroizing::new("pass phrase".into())));
         assert_eq!(load_private_key(&p, Some(&pp)).unwrap().algorithm().as_str(), "ssh-ed25519");
         assert!(generate_key_pair(&dir, "id_test", "ed25519", 0, "").is_err(), "must not overwrite");
         let plain = generate_key_pair(&dir, "id_plain", "ecdsa", 0, "").unwrap();

@@ -838,7 +838,7 @@ mod tests {
         // Two separate resolutions (as two connects of the same session make) prompt once.
         for _ in 0..2 {
             let f = m.secret_fn("s1", &p.id, SecretKind::IrcNickServPassword, SecretMode::SessionOnly, counting_prompt(asked.clone()));
-            assert_eq!(f().unwrap(), "hunter2");
+            assert_eq!(f().unwrap().as_str(), "hunter2");
         }
         assert_eq!(asked.load(Ordering::SeqCst), 1);
         // Ask-every-time still prompts each time.
@@ -848,7 +848,7 @@ mod tests {
         // An explicit reconnect carries the cache to the new session id.
         let new = m.reconnect("s1").unwrap();
         let f = m.secret_fn(&new, &p.id, SecretKind::IrcNickServPassword, SecretMode::SessionOnly, counting_prompt(asked.clone()));
-        assert_eq!(f().unwrap(), "hunter2");
+        assert_eq!(f().unwrap().as_str(), "hunter2");
         assert_eq!(asked.load(Ordering::SeqCst), 2);
         m.close_all();
         let _ = std::fs::remove_dir_all(dir);
