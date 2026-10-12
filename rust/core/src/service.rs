@@ -6,7 +6,7 @@ use crate::clients::sftp::{self, FileEntry};
 use crate::config::AppConfig;
 use crate::models::*;
 use crate::secrets::SecretKind;
-use crate::secrets::{KEYCHAIN_SERVICE, Keychain, LEGACY_KEYCHAIN_SERVICE, Secrets, Vault};
+use crate::secrets::{KEYCHAIN_SERVICE, Keychain, Secrets, Vault};
 use crate::sessions::Manager;
 use crate::storage::Store;
 use crate::{Result, exportimport, keyfiles, sshconfig, updater, validation};
@@ -39,7 +39,7 @@ pub struct SshKeyInfo {
 impl Service {
     pub fn open(config: AppConfig) -> Result<Service> {
         let store = Arc::new(Store::open(&config.db_path)?);
-        let secrets = Arc::new(Secrets::new(Vault::new(config.vault_dir.clone()), Keychain::new(KEYCHAIN_SERVICE, Some(LEGACY_KEYCHAIN_SERVICE))));
+        let secrets = Arc::new(Secrets::new(Vault::new(config.vault_dir.clone()), Keychain::new(KEYCHAIN_SERVICE)));
         let sessions = Manager::new(store.clone(), secrets.clone(), config.recordings_dir.clone());
         Ok(Service { config, store, secrets, sessions })
     }

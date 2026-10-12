@@ -249,8 +249,6 @@ pub fn write_private(path: &std::path::Path, data: &[u8]) -> Result<()> {
 }
 
 pub const KEYCHAIN_SERVICE: &str = "NexusTerminal";
-/// The service name Alchementary Link wrote under; read as a fallback (§7 of the port plan).
-pub const LEGACY_KEYCHAIN_SERVICE: &str = "AlchementaryLink";
 
 /// Runs a keychain call on a plain thread: the D-Bus backend may start its own async runtime,
 /// which panics if the caller is already inside tokio (as SSH authentication is).
@@ -259,20 +257,18 @@ fn off_runtime<T: Send + 'static>(f: impl FnOnce() -> T + Send + 'static) -> T {
 }
 
 fn entry(service: &str, key: &str) -> keyring::Result<keyring::Entry> {
-    // go-keyring's Windows target is "service:user"; keyring's default differs.
-    if cfg!(windows) { keyring::Entry::new_with_target(&format!("{service}:{key}"), service, key) } else { keyring::Entry::new(service, key) }
+    keyring::Entry::new(service, key)
 }
 
 /// The OS keychain. Every call can fail (no secret service, locked keyring); callers fall back
 /// to the vault.
 pub struct Keychain {
     service: String,
-    legacy: Option<String>,
 }
 
 impl Keychain {
-    pub fn new(service: &str, legacy: Option<&str>) -> Keychain {
-        Keychain { service: service.into(), legacy: legacy.map(Into::into) }
+    pub fn new(service: &str) -> Keychain {
+        Keychain { service: service.into() }
     }
 
     /// Probes with a read of an entry that doesn't exist: "no entry" proves the keychain answers,
@@ -283,17 +279,9 @@ impl Keychain {
         off_runtime(move || matches!(entry(&service, "__nexus_keychain_probe__").and_then(|e| e.get_password()), Ok(_) | Err(keyring::Error::NoEntry)))
     }
 
-    /// Reads a secret; a miss under the current service falls back to the legacy one and copies
-    /// the value forward. Legacy items are never deleted, so the old app keeps working.
     pub fn get(&self, key: &str) -> Option<String> {
-        let (service, key2) = (self.service.clone(), key.to_string());
-        if let Ok(v) = off_runtime(move || entry(&service, &key2).and_then(|e| e.get_password())) {
-            return Some(v);
-        }
-        let (legacy, key2) = (self.legacy.clone()?, key.to_string());
-        let v = off_runtime(move || entry(&legacy, &key2).and_then(|e| e.get_password())).ok()?;
-        let _ = self.set(key, &v);
-        Some(v)
+        let (service, key) = (self.service.clone(), key.to_string());
+        off_runtime(move || entry(&service, &key).and_then(|e| e.get_password())).ok()
     }
 
     pub fn set(&self, key: &str, value: &str) -> Result<()> {
@@ -439,7 +427,7 @@ mod tests {
     fn deleting_a_profile_clears_every_vault_kind() {
         let dir = std::env::temp_dir().join(format!("nexus-delprof-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
-        let s = Secrets { vault: Vault::new(dir.clone()), keychain: Keychain::new("NexusTerminalTest", None), keychain_ok: false };
+        let s = Secrets { vault: Vault::new(dir.clone()), keychain: Keychain::new("NexusTerminalTest"), keychain_ok: false };
         s.vault.initialise("pw").unwrap();
         for kind in SecretKind::ALL {
             s.vault.set(&kind.key("p1"), "v").unwrap();

@@ -16,7 +16,7 @@ fn manager(name: &str) -> (Arc<Manager>, mpsc::Receiver<Event>, std::path::PathB
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     let store = Arc::new(Store::open(&dir.join("nexus.db")).unwrap());
-    let secrets = Arc::new(Secrets { vault: Vault::new(dir.join("vault")), keychain: Keychain::new("NexusTerminalTest", None), keychain_ok: false });
+    let secrets = Arc::new(Secrets { vault: Vault::new(dir.join("vault")), keychain: Keychain::new("NexusTerminalTest"), keychain_ok: false });
     let m = Manager::new(store, secrets, dir.join("recordings"));
     let (tx, rx) = mpsc::channel();
     let tx = Mutex::new(tx);
