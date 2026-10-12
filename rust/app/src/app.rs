@@ -210,9 +210,6 @@ impl App {
             *sid = Some(id.clone());
             app.add_session(&id, true);
         }
-        if let Some(from) = &svc.config.migrated_from {
-            app.s.success(format!("Imported your Alchementary Link data from {}", from.display()));
-        }
         // Background update check, once per launch.
         if app.screenshot.is_none() && app.s.prefs.check_for_updates {
             let svc2 = svc.clone();

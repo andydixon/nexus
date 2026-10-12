@@ -55,10 +55,6 @@ The upload picker lists folders only and marks permissions:
 - Each password, passphrase or token can be saved, remembered for the session only, or asked for every time.
 - SSH host key checks can be set per profile (Strict, Ask, Accept new, Insecure).
 
-## Coming from Alchementary Link
-
-Your profiles, vault and recordings are copied across automatically on first run, and keychain entries are picked up the first time they are needed. Your old Alchementary Link data is left untouched.
-
 ## Common shortcuts
 
 | macOS Shortcut  | Windows/Linux Shortcut | Action                   |

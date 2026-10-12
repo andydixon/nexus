@@ -16,7 +16,7 @@
 12. Security and credentials
 13. Import and export
 14. Settings and updates
-15. Data locations and migration from Alchementary Link
+15. Data locations
 16. Troubleshooting
 
 ---
@@ -404,7 +404,7 @@ Nexus Terminal checks for a new version once at launch. When one is available, t
 
 ---
 
-## 15. Data locations and migration from Alchementary Link
+## 15. Data locations
 
 ### Data locations
 
@@ -423,15 +423,6 @@ The directory holds:
 - `sftp-bookmarks.json` — SFTP bookmarks
 
 Credentials saved in the OS keychain are stored under the service name `NexusTerminal`.
-
-### Migrating from Alchementary Link
-
-On first run, if Nexus Terminal has no database yet and an Alchementary Link data directory (`AlchementaryLink`, in the same parent folder) exists, Nexus Terminal **copies** `link.db` to `nexus.db`, along with the `vault/` and `recordings/` directories, and shows a toast saying where the data came from. The Alchementary Link directory is left untouched.
-
-- If a `NexusTerminal/nexus.db` already exists (for example from a version before the Alchementary Link rebrand), it is used as-is and nothing is copied.
-- Keychain entries saved under `AlchementaryLink` are found the first time they are needed and copied to `NexusTerminal`. The old entries are not deleted.
-- Your vault master password is unchanged.
-- Trigger rules and SFTP bookmarks from Alchementary Link are not migrated; recreate them in Nexus Terminal.
 
 ---
 

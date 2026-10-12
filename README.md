@@ -27,10 +27,6 @@ Prefer a one-off session? Use **Cmd+Shift+Q** / **Ctrl+Shift+Q** to quick connec
 
 If a session drops, use the **Reconnect** button in the disconnected overlay.
 
-### Coming from Alchementary Link?
-
-On first run, Nexus Terminal copies your Alchementary Link profiles, encrypted vault and recordings into its own data directory, and picks up credentials saved in the OS keychain. The old data is left untouched. Older `.link` export files can still be imported.
-
 ## Documentation
 
 - Product overview: [docs/overview.md](docs/overview.md)
