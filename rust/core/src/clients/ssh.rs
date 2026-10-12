@@ -15,6 +15,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio::sync::mpsc;
+use zeroize::Zeroizing;
 
 const MAX_PRIVATE_KEY_BYTES: u64 = 1 << 20;
 /// Bounds what `run_command` buffers, so a hostile server can't stream unlimited output into memory.
@@ -224,18 +225,18 @@ async fn blocking<T: Send + 'static>(f: impl FnOnce() -> T + Send + 'static) -> 
     tokio::task::spawn_blocking(f).await.expect("blocking task panicked")
 }
 
-async fn dial(sc: &SshConfig, host: &str, port: u16, timeout: Duration) -> Result<tokio::net::TcpStream> {
+async fn dial(sc: &SshConfig, proxy_password: &str, host: &str, port: u16, timeout: Duration) -> Result<tokio::net::TcpStream> {
     let fut = async {
         match sc.proxy_type.to_lowercase().as_str() {
-            "socks5" => socks5(sc, host, port).await,
-            "http" => http_connect(sc, host, port).await,
+            "socks5" => socks5(sc, proxy_password, host, port).await,
+            "http" => http_connect(sc, proxy_password, host, port).await,
             _ => Ok(tokio::net::TcpStream::connect((host, port)).await?),
         }
     };
     tokio::time::timeout(timeout, fut).await.map_err(|_| format!("dial tcp {host}:{port}: i/o timeout"))?
 }
 
-async fn socks5(sc: &SshConfig, host: &str, port: u16) -> Result<tokio::net::TcpStream> {
+async fn socks5(sc: &SshConfig, proxy_password: &str, host: &str, port: u16) -> Result<tokio::net::TcpStream> {
     let pport = if sc.proxy_port == 0 { 1080 } else { sc.proxy_port as u16 };
     let mut s = tokio::net::TcpStream::connect((sc.proxy_host.as_str(), pport)).await.map_err(|e| format!("SOCKS5 proxy setup failed: {e}"))?;
     let auth = !sc.proxy_username.is_empty();
@@ -245,7 +246,7 @@ async fn socks5(sc: &SshConfig, host: &str, port: u16) -> Result<tokio::net::Tcp
     match r[1] {
         0 => {}
         2 if auth => {
-            s.write_all(&socks5_auth_request(&sc.proxy_username, &sc.proxy_password)?).await?;
+            s.write_all(&socks5_auth_request(&sc.proxy_username, proxy_password)?).await?;
             s.read_exact(&mut r).await?;
             if r[1] != 0 {
                 return Err("SOCKS5 proxy: authentication failed".into());
@@ -291,12 +292,12 @@ fn socks5_connect_request(host: &str, port: u16) -> Result<Vec<u8>> {
     Ok(req)
 }
 
-async fn http_connect(sc: &SshConfig, host: &str, port: u16) -> Result<tokio::net::TcpStream> {
+async fn http_connect(sc: &SshConfig, proxy_password: &str, host: &str, port: u16) -> Result<tokio::net::TcpStream> {
     let pport = if sc.proxy_port == 0 { 8080 } else { sc.proxy_port as u16 };
     let mut s = tokio::net::TcpStream::connect((sc.proxy_host.as_str(), pport)).await.map_err(|e| format!("HTTP proxy connection failed: {e}"))?;
     let mut req = format!("CONNECT {host}:{port} HTTP/1.1\r\nHost: {host}:{port}\r\n");
     if !sc.proxy_username.is_empty() {
-        let cred = base64::engine::general_purpose::STANDARD.encode(format!("{}:{}", sc.proxy_username, sc.proxy_password));
+        let cred = base64::engine::general_purpose::STANDARD.encode(format!("{}:{proxy_password}", sc.proxy_username));
         req += &format!("Proxy-Authorization: Basic {cred}\r\n");
     }
     req += "\r\n";
@@ -422,6 +423,9 @@ pub struct SshClient {
     forwards: Mutex<HashMap<String, Forward>>,
     sftp: tokio::sync::Mutex<Option<Arc<russh_sftp::client::SftpSession>>>,
     closed: std::sync::atomic::AtomicBool,
+    /// Credentials that live in the secret store rather than the profile: (TOTP seed, proxy
+    /// password). Set by the session manager before connecting.
+    stored: Mutex<(Zeroizing<String>, Zeroizing<String>)>,
 }
 
 impl SshClient {
@@ -436,7 +440,13 @@ impl SshClient {
             forwards: Mutex::new(HashMap::new()),
             sftp: tokio::sync::Mutex::new(None),
             closed: false.into(),
+            stored: Mutex::default(),
         })
+    }
+
+    /// The TOTP seed (for keyboard-interactive 2FA prompts) and proxy password to use.
+    pub fn set_stored_secrets(&self, totp_secret: String, proxy_password: String) {
+        *self.stored.lock() = (Zeroizing::new(totp_secret), Zeroizing::new(proxy_password));
     }
 
     fn sc(&self) -> SshConfig {
@@ -510,8 +520,12 @@ impl SshClient {
             None
         };
 
+        let (totp_secret, proxy_password) = {
+            let s = self.stored.lock();
+            (s.0.to_string(), s.1.clone())
+        };
         let mut handle = if sc.jump_hosts.is_empty() {
-            let tcp = dial(&sc, &p.host, port, timeout).await.map_err(|e| format!("SSH connection failed: {e}"))?;
+            let tcp = dial(&sc, &proxy_password, &p.host, port, timeout).await.map_err(|e| format!("SSH connection failed: {e}"))?;
             self.handshake(tcp, &p.host, port, &check).await?
         } else {
             let (prev, h) = self.via_jumps(&sc, &check, passphrase.clone(), timeout).await?;
@@ -524,7 +538,7 @@ impl SshClient {
             self.handshake(ch.into_stream(), &p.host, port, &check).await?
         };
 
-        authenticate(&mut handle, Auth { user: &p.username, methods, agent: sc.agent_auth, key, password, totp_secret: sc.totp_secret.clone() }).await?;
+        authenticate(&mut handle, Auth { user: &p.username, methods, agent: sc.agent_auth, key, password, totp_secret }).await?;
         let handle = Arc::new(handle);
         if !shell {
             *self.handle.lock() = Some(handle);

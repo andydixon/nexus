@@ -551,8 +551,7 @@ impl ProfileEditor {
                 text(ui, "Proxy Host", &mut c.proxy_host, "proxy.example.com");
                 num(ui, "Proxy Port", &mut c.proxy_port, 1..=65535);
                 text(ui, "Proxy Username", &mut c.proxy_username, "Optional");
-                label(ui, "Proxy Password");
-                ui.add(TextEdit::singleline(&mut c.proxy_password).password(true).hint_text("Optional").desired_width(f32::INFINITY));
+                secret(ui, "Proxy Password", secrets, SecretKind::ProxyPassword, "Optional; leave blank to keep the saved password");
             }
         });
         section(ui, "Advanced", |ui| {

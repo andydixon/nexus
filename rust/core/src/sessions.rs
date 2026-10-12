@@ -628,16 +628,12 @@ impl Manager {
 
     fn connect_ssh(self: &Arc<Self>, id: &str, epoch: u64, p: &Profile, prompt: Prompt) -> Result<Client> {
         let mut p = p.clone();
-        let sc = p.ssh.get_or_insert_with(SshConfig::defaults);
-        if sc.totp_secret.is_empty()
-            && let Some(t) = self.secrets.get(&SecretKind::Totp.key(&p.id))
-        {
-            sc.totp_secret = t;
-        }
-        let sc = sc.clone();
+        let sc = p.ssh.get_or_insert_with(SshConfig::defaults).clone();
         let password = self.secret_fn(id, &p.id, SecretKind::Password, sc.secret_mode, prompt.clone());
         let passphrase = self.secret_fn(id, &p.id, SecretKind::Passphrase, sc.key_secret_mode, prompt);
         let c = SshClient::new(&p, self.terminal_callbacks(id, epoch));
+        let stored = |k: SecretKind| self.secrets.get(&k.key(&p.id)).unwrap_or_default();
+        c.set_stored_secrets(stored(SecretKind::Totp), stored(SecretKind::ProxyPassword));
         c.connect(self.host_key_check(id, sc.host_key_policy), Some(password), Some(passphrase))?;
         for pf in sc.port_forwards.iter().filter(|f| f.enabled) {
             match c.start_forward(pf.clone()) {

@@ -262,13 +262,10 @@ pub struct SshConfig {
     pub max_reconnect_tries: i64,
     #[serde(deserialize_with = "nd")]
     pub login_scripts: Vec<LoginScriptStep>,
-    #[serde(rename = "totpSecret")]
-    pub totp_secret: String,
     pub proxy_type: String,
     pub proxy_host: String,
     pub proxy_port: i64,
     pub proxy_username: String,
-    pub proxy_password: String,
     #[serde(deserialize_with = "nd")]
     pub jump_hosts: Vec<JumpHost>,
     #[serde(deserialize_with = "nd")]
@@ -936,6 +933,13 @@ impl IrcConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn profiles_never_carry_proxy_passwords_or_totp_seeds() {
+        let c: SshConfig = serde_json::from_str(r#"{"proxyPassword":"p","totpSecret":"JBSWY3DPEHPK3PXP","proxyUsername":"u"}"#).unwrap();
+        let out = serde_json::to_string(&c).unwrap();
+        assert!(!out.contains("proxyPassword") && !out.contains("totpSecret") && out.contains("\"proxyUsername\":\"u\""), "{out}");
+    }
 
     #[test]
     fn unknown_enum_values_fall_back_per_field() {

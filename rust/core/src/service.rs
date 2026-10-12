@@ -230,8 +230,6 @@ impl Service {
         if !include_secrets {
             for p in &mut ps {
                 if let Some(s) = &mut p.ssh {
-                    s.proxy_password.clear();
-                    s.totp_secret.clear();
                     redact_login_script(&mut s.login_scripts);
                 }
                 if let Some(t) = &mut p.telnet {
