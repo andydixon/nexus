@@ -37,6 +37,7 @@ impl Callbacks {
     }
 }
 
+pub mod proxy;
 pub mod raw;
 pub mod serial;
 pub mod telnet;

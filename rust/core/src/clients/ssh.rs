@@ -13,7 +13,7 @@ use russh::{Channel, ChannelMsg, Pty};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
+use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::sync::mpsc;
 use zeroize::Zeroizing;
 
@@ -226,95 +226,17 @@ async fn blocking<T: Send + 'static>(f: impl FnOnce() -> T + Send + 'static) -> 
 }
 
 async fn dial(sc: &SshConfig, proxy_password: &str, host: &str, port: u16, timeout: Duration) -> Result<tokio::net::TcpStream> {
-    let fut = async {
-        match sc.proxy_type.to_lowercase().as_str() {
-            "socks5" => socks5(sc, proxy_password, host, port).await,
-            "http" => http_connect(sc, proxy_password, host, port).await,
-            _ => Ok(tokio::net::TcpStream::connect((host, port)).await?),
-        }
+    let proxy = super::proxy::Proxy {
+        kind: sc.proxy_type.clone(),
+        host: sc.proxy_host.clone(),
+        port: sc.proxy_port as u16,
+        username: sc.proxy_username.clone(),
+        password: proxy_password.into(),
     };
-    tokio::time::timeout(timeout, fut).await.map_err(|_| format!("dial tcp {host}:{port}: i/o timeout"))?
-}
-
-async fn socks5(sc: &SshConfig, proxy_password: &str, host: &str, port: u16) -> Result<tokio::net::TcpStream> {
-    let pport = if sc.proxy_port == 0 { 1080 } else { sc.proxy_port as u16 };
-    let mut s = tokio::net::TcpStream::connect((sc.proxy_host.as_str(), pport)).await.map_err(|e| format!("SOCKS5 proxy setup failed: {e}"))?;
-    let auth = !sc.proxy_username.is_empty();
-    s.write_all(if auth { &[5, 2, 0, 2] } else { &[5, 1, 0] }).await?;
-    let mut r = [0u8; 2];
-    s.read_exact(&mut r).await?;
-    match r[1] {
-        0 => {}
-        2 if auth => {
-            s.write_all(&socks5_auth_request(&sc.proxy_username, proxy_password)?).await?;
-            s.read_exact(&mut r).await?;
-            if r[1] != 0 {
-                return Err("SOCKS5 proxy: authentication failed".into());
-            }
-        }
-        _ => return Err("SOCKS5 proxy: no acceptable authentication method".into()),
-    }
-    s.write_all(&socks5_connect_request(host, port)?).await?;
-    let mut head = [0u8; 4];
-    s.read_exact(&mut head).await?;
-    if head[1] != 0 {
-        return Err(format!("SOCKS5 proxy connection to {host}:{port} failed: reply code {}", head[1]).into());
-    }
-    let skip = match head[3] {
-        1 => 4,
-        4 => 16,
-        3 => s.read_u8().await? as usize,
-        _ => 0,
-    } + 2;
-    let mut rest = vec![0u8; skip];
-    s.read_exact(&mut rest).await?;
-    Ok(s)
-}
-
-/// RFC 1929 username/password sub-negotiation. Both fields carry a one-byte length, so longer
-/// values are rejected rather than silently truncated into a malformed request.
-fn socks5_auth_request(user: &str, pass: &str) -> Result<Vec<u8>> {
-    let ulen = u8::try_from(user.len()).map_err(|_| "SOCKS5 proxy: username longer than 255 bytes")?;
-    let plen = u8::try_from(pass.len()).map_err(|_| "SOCKS5 proxy: password longer than 255 bytes")?;
-    let mut m = vec![1, ulen];
-    m.extend(user.as_bytes());
-    m.push(plen);
-    m.extend(pass.as_bytes());
-    Ok(m)
-}
-
-/// RFC 1928 CONNECT with a domain-name address (one-byte length).
-fn socks5_connect_request(host: &str, port: u16) -> Result<Vec<u8>> {
-    let hlen = u8::try_from(host.len()).map_err(|_| "SOCKS5 proxy: host name longer than 255 bytes")?;
-    let mut req = vec![5, 1, 0, 3, hlen];
-    req.extend(host.as_bytes());
-    req.extend(port.to_be_bytes());
-    Ok(req)
-}
-
-async fn http_connect(sc: &SshConfig, proxy_password: &str, host: &str, port: u16) -> Result<tokio::net::TcpStream> {
-    let pport = if sc.proxy_port == 0 { 8080 } else { sc.proxy_port as u16 };
-    let mut s = tokio::net::TcpStream::connect((sc.proxy_host.as_str(), pport)).await.map_err(|e| format!("HTTP proxy connection failed: {e}"))?;
-    let mut req = format!("CONNECT {host}:{port} HTTP/1.1\r\nHost: {host}:{port}\r\n");
-    if !sc.proxy_username.is_empty() {
-        let cred = base64::engine::general_purpose::STANDARD.encode(format!("{}:{proxy_password}", sc.proxy_username));
-        req += &format!("Proxy-Authorization: Basic {cred}\r\n");
-    }
-    req += "\r\n";
-    s.write_all(req.as_bytes()).await?;
-    // Read the response head byte by byte so no tunnelled bytes are consumed.
-    let mut head = Vec::new();
-    while !head.ends_with(b"\r\n\r\n") {
-        head.push(s.read_u8().await.map_err(|e| format!("HTTP CONNECT response read failed: {e}"))?);
-        if head.len() > 16 * 1024 {
-            return Err("HTTP CONNECT response too large".into());
-        }
-    }
-    let status = String::from_utf8_lossy(&head).lines().next().unwrap_or("").to_string();
-    if status.split_whitespace().nth(1) != Some("200") {
-        return Err(format!("HTTP CONNECT proxy returned {status}").into());
-    }
-    Ok(s)
+    let host = host.to_string();
+    let s = blocking(move || proxy.connect(&host, port, timeout)).await?;
+    s.set_nonblocking(true)?;
+    Ok(tokio::net::TcpStream::from_std(s)?)
 }
 
 fn config(sc: &SshConfig) -> Arc<client::Config> {
@@ -910,15 +832,6 @@ mod tests {
         assert_eq!(server.peer_addr().unwrap(), ours);
         let (c, s) = loopback_pair().unwrap();
         assert_eq!(c.local_addr().unwrap(), s.peer_addr().unwrap());
-    }
-
-    #[test]
-    fn socks5_requests_reject_overlong_fields() {
-        assert_eq!(socks5_connect_request("example.com", 22).unwrap(), [&[5u8, 1, 0, 3, 11][..], b"example.com", &[0, 22]].concat());
-        assert!(socks5_connect_request(&"h".repeat(256), 22).is_err());
-        assert_eq!(socks5_auth_request("u", "pw").unwrap(), vec![1, 1, b'u', 2, b'p', b'w']);
-        assert!(socks5_auth_request("u", &"p".repeat(256)).is_err());
-        assert!(socks5_auth_request(&"u".repeat(256), "p").is_err());
     }
 
     #[test]
