@@ -272,9 +272,12 @@ impl Keychain {
         Keychain { service: service.into(), legacy: legacy.map(Into::into) }
     }
 
+    /// Probes with a read of an entry that doesn't exist: "no entry" proves the keychain answers,
+    /// without writing an item at every launch (which wakes D-Bus and can prompt on macOS). If
+    /// writes later fail anyway, `Secrets::set_checked` falls back to the vault.
     pub fn available(&self) -> bool {
         let service = self.service.clone();
-        off_runtime(move || entry(&service, "__nexus_keychain_probe__").and_then(|e| e.set_password("probe").and_then(|_| e.delete_credential())).is_ok())
+        off_runtime(move || matches!(entry(&service, "__nexus_keychain_probe__").and_then(|e| e.get_password()), Ok(_) | Err(keyring::Error::NoEntry)))
     }
 
     /// Reads a secret; a miss under the current service falls back to the legacy one and copies
