@@ -217,7 +217,7 @@ Use Nexus Terminal when you need to:
 - Secret store settings.
 - Known hosts management.
 - Help topics and troubleshooting inside Settings.
-- A background update check at launch, and a manual check in Settings → About.
+- A background update check at launch (can be turned off in Settings → General), and a manual check in Settings → About.
 
 ## Website-ready summary
 

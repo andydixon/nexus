@@ -248,6 +248,15 @@ impl Settings {
             field(ui, "Confirm on disconnect");
             ui.checkbox(&mut p.confirm_on_disconnect, "Ask before disconnecting sessions");
             ui.end_row();
+            field(ui, "Remote clipboard");
+            ui.checkbox(&mut p.allow_remote_clipboard, "Let remote hosts set the clipboard (OSC 52, VNC)");
+            ui.end_row();
+            field(ui, "Multi-line paste");
+            ui.checkbox(&mut p.confirm_multiline_paste, "Ask before pasting several lines into a terminal");
+            ui.end_row();
+            field(ui, "Updates");
+            ui.checkbox(&mut p.check_for_updates, "Check for updates at launch");
+            ui.end_row();
             field(ui, "Status bar");
             ui.checkbox(&mut p.show_status_bar, "Show status bar");
             ui.end_row();

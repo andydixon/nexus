@@ -328,6 +328,7 @@ pub fn pane(app: &mut App, ui: &mut Ui, id: &str, rect: Rect) {
                 find_bar(app, ui, term);
             }
             let theme = crate::terminal_themes::get(&theme_id);
+            term.confirm_paste = app.s.prefs.confirm_multiline_paste;
             let r = term.ui(ui, theme, focused_tab);
             if pane.highlight_until > app.s.now {
                 ui.painter().rect_stroke(rect.shrink(1.0), 0.0, Stroke::new(2.0, t.warning), egui::StrokeKind::Inside);
@@ -378,6 +379,12 @@ fn terminal_response(app: &mut App, id: &str, r: TermResponse, local_exited: boo
     }
     if r.bell {
         app.s.ctx.request_repaint();
+    }
+    if let Some(text) = r.clipboard {
+        app.remote_clipboard(&text);
+    }
+    if let Some(text) = r.confirm_paste {
+        app.dialog = Some(crate::app::Dialog::ConfirmPaste { session: id.into(), text });
     }
     if let Some(a) = r.menu {
         app.terminal_menu(id, a);

@@ -70,6 +70,11 @@ pub enum Dialog {
     Broadcast {
         picks: Vec<(String, String, bool)>,
     },
+    /// Multi-line paste into a terminal without bracketed paste.
+    ConfirmPaste {
+        session: String,
+        text: String,
+    },
     /// Guided help for an auth or host-key failure.
     Guided {
         session: String,
@@ -188,7 +193,7 @@ impl App {
             app.s.success(format!("Imported your Alchementary Link data from {}", from.display()));
         }
         // Background update check, once per launch.
-        if app.screenshot.is_none() {
+        if app.screenshot.is_none() && app.s.prefs.check_for_updates {
             let svc2 = svc.clone();
             let ctx = cc.egui_ctx.clone();
             std::thread::spawn(move || {
@@ -504,7 +509,7 @@ impl App {
                 }
             }
             Event::VncFrame { .. } => {}
-            Event::VncClipboard { text, .. } => self.s.ctx.copy_text(text),
+            Event::VncClipboard { text, .. } => self.remote_clipboard(&text),
         }
     }
 
@@ -728,6 +733,18 @@ impl App {
         }
     }
 
+    /// A remote host (OSC 52 or VNC) wants to set the clipboard: allowed per preference, and always
+    /// announced so a silent swap can't set up a paste into another shell.
+    pub fn remote_clipboard(&mut self, text: &str) {
+        let first: String = text.lines().next().unwrap_or("").chars().take(60).collect();
+        if self.s.prefs.allow_remote_clipboard {
+            self.s.ctx.copy_text(text.into());
+            self.s.info(format!("Remote host set the clipboard: {first}"));
+        } else {
+            self.s.info("Blocked a remote clipboard write (Settings → General to allow)");
+        }
+    }
+
     pub fn toggle_broadcast(&mut self) {
         self.s.broadcast = !self.s.broadcast;
         if !self.s.broadcast {
@@ -761,6 +778,9 @@ impl App {
                 {
                     let mut out = crate::terminal::TermResponse::default();
                     t.paste(&text, &mut out);
+                    if let Some(text) = out.confirm_paste {
+                        self.dialog = Some(Dialog::ConfirmPaste { session: id.into(), text });
+                    }
                     let input = out.input;
                     self.send_input(id, &input);
                 }

@@ -1122,7 +1122,8 @@ fn paste_files(s: &mut Shared, session: &str, paths: &[PathBuf]) {
     }
     if let Some(View::Terminal(term)) = s.panes.get_mut(session).map(|p| &mut p.view) {
         let mut out = crate::terminal::TermResponse::default();
-        term.paste(&combined, &mut out);
+        // The drop was already confirmed in its own dialog.
+        term.paste_now(&combined, &mut out);
         s.request(Request::Write(session.into(), out.input));
     }
 }

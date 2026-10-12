@@ -920,6 +920,35 @@ pub fn dialogs(app: &mut App, ctx: &egui::Context) {
                 });
             });
         }
+        Dialog::ConfirmPaste { session, text } => {
+            let lines = text.lines().count();
+            let preview: String = text.lines().take(12).collect::<Vec<_>>().join("\n");
+            modal(ctx, "confirm-paste", 480.0, |ui| {
+                ui.label(RichText::new("Paste multiple lines?").font(theme::semibold(15.0)));
+                widgets::hint(ui, &format!("{lines} line(s) will run as commands as soon as they are pasted:"));
+                egui::ScrollArea::vertical().max_height(220.0).show(ui, |ui| {
+                    ui.add(egui::Label::new(RichText::new(preview).monospace()).wrap());
+                });
+                if lines > 12 {
+                    widgets::hint(ui, &format!("… and {} more", lines - 12));
+                }
+                ui.add_space(6.0);
+                ui.horizontal(|ui| {
+                    if widgets::primary(ui, icon::CHECK, "Paste").clicked() {
+                        if let Some(View::Terminal(t)) = app.s.panes.get_mut(session.as_str()).map(|p| &mut p.view) {
+                            let mut out = crate::terminal::TermResponse::default();
+                            t.paste_now(text, &mut out);
+                            let id = session.clone();
+                            app.send_input(&id, &out.input);
+                        }
+                        keep = false;
+                    }
+                    if ui.button("Cancel").clicked() || ctx.input(|i| i.key_pressed(Key::Escape)) {
+                        keep = false;
+                    }
+                });
+            });
+        }
         Dialog::Guided { session, title, body, known_hosts } => {
             let label = app.s.pane(session).map(|p| p.info.tab_name.clone()).unwrap_or_else(|| "Session".into());
             let profile_id = app.s.pane(session).map(|p| p.info.profile_id.clone()).unwrap_or_default();

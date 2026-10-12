@@ -538,6 +538,12 @@ pub struct AppPreferences {
     pub default_cursor_style: String,
     pub use_native_paste: bool,
     pub local_shell: String,
+    /// Check the update manifest once at launch.
+    pub check_for_updates: bool,
+    /// Let remote hosts set the local clipboard (terminal OSC 52, VNC ServerCutText).
+    pub allow_remote_clipboard: bool,
+    /// Ask before pasting multi-line text into a terminal that isn't in bracketed-paste mode.
+    pub confirm_multiline_paste: bool,
 }
 
 impl Default for AppPreferences {
@@ -556,6 +562,9 @@ impl Default for AppPreferences {
             default_cursor_style: DEFAULT_CURSOR_STYLE.into(),
             use_native_paste: false,
             local_shell: String::new(),
+            check_for_updates: true,
+            allow_remote_clipboard: true,
+            confirm_multiline_paste: true,
         }
     }
 }

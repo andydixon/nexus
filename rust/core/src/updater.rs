@@ -1,6 +1,6 @@
-//! Update checks against a self-hosted manifest (or, as a fallback, GitHub's latest release).
-//! Opt-in and check-only: nothing is downloaded or installed. Calls block; run them off the UI
-//! thread.
+//! Update checks against a self-hosted manifest. Check-only: nothing is downloaded or installed.
+//! The launch-time check honours `AppPreferences::check_for_updates`. Calls block; run them off
+//! the UI thread.
 
 use crate::Result;
 use serde::{Deserialize, Serialize};
@@ -9,8 +9,6 @@ use std::time::Duration;
 
 /// Manifest URL template; expand with [`expand_update_url`].
 pub const DEFAULT_UPDATE_URL: &str = "https://dixon.cx/downloads/nexus/manifest-{platform}-{arch}.json";
-const GITHUB_OWNER: &str = "nexus-terminal";
-const GITHUB_REPO: &str = "nexus-terminal";
 const USER_AGENT: &str = "NexusTerminal-UpdateChecker";
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
 const MAX_UPDATE_RESPONSE_BYTES: usize = 1 << 20;
@@ -26,18 +24,6 @@ pub struct UpdateInfo {
     pub release_name: String,
     pub release_notes: String,
     pub published_at: String,
-}
-
-#[derive(Deserialize, Default)]
-#[serde(default)]
-struct Release {
-    tag_name: String,
-    name: String,
-    html_url: String,
-    published_at: String,
-    body: String,
-    prerelease: bool,
-    draft: bool,
 }
 
 #[derive(Deserialize, Default)]
@@ -109,34 +95,6 @@ pub fn check_url(url: &str, current_version: &str) -> Result<UpdateInfo> {
     Ok(UpdateInfo { available: is_newer(&latest, &current), current_version: current, latest_version: latest, ..Default::default() })
 }
 
-/// Checks the latest GitHub release of `nexus-terminal/nexus-terminal`.
-pub fn check_github(current_version: &str) -> Result<UpdateInfo> {
-    let current = normalise_version(current_version);
-    let url = format!("https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}/releases/latest");
-    let (status, body) = fetch(&url, "application/vnd.github+json")?;
-    if status == 404 {
-        // No releases yet.
-        return Ok(UpdateInfo { latest_version: current.clone(), current_version: current, ..Default::default() });
-    }
-    if status != 200 {
-        return Err(format!("updater: GitHub API returned {status}").into());
-    }
-    let release: Release = serde_json::from_slice(&body).map_err(|e| format!("updater: failed to decode response: {e}"))?;
-    let latest = normalise_version(&release.tag_name);
-    if release.draft || release.prerelease {
-        return Ok(UpdateInfo { current_version: current, latest_version: latest, ..Default::default() });
-    }
-    Ok(UpdateInfo {
-        available: is_newer(&latest, &current),
-        current_version: current,
-        latest_version: latest,
-        release_url: release.html_url,
-        release_name: release.name,
-        release_notes: truncate_notes(&release.body, 500),
-        published_at: release.published_at,
-    })
-}
-
 fn normalise_version(v: &str) -> String {
     let v = v.trim();
     v.strip_prefix('v').unwrap_or(v).to_string()
@@ -184,17 +142,6 @@ fn leading_int(s: Option<&&str>) -> i64 {
 }
 
 /// Cuts at `max` bytes (backing off to a char boundary) and appends "…".
-fn truncate_notes(body: &str, max: usize) -> String {
-    if body.len() <= max {
-        return body.into();
-    }
-    let mut i = max;
-    while !body.is_char_boundary(i) {
-        i -= 1;
-    }
-    format!("{}…", &body[..i])
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -245,15 +192,6 @@ mod tests {
         ] {
             assert_eq!(is_newer(l, c), w, "{l} vs {c}");
         }
-    }
-
-    #[test]
-    fn truncates_notes() {
-        assert_eq!(truncate_notes("Short note", 100), "Short note");
-        let got = truncate_notes(&"x".repeat(600), 500);
-        assert!(got.ends_with('…'));
-        assert_eq!(got.chars().count(), 501);
-        assert_eq!(truncate_notes("aé", 2), "a…");
     }
 
     #[test]
