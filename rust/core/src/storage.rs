@@ -34,6 +34,9 @@ pub fn parse_time(s: &str) -> Time {
     DateTime::parse_from_rfc3339(s).unwrap_or_else(|_| zero_time())
 }
 
+/// Audit-log entries kept; older ones are pruned as new ones arrive.
+pub const MAX_AUDIT_ROWS: i64 = 10_000;
+
 pub struct Store {
     db: Mutex<Connection>,
 }
@@ -318,11 +321,14 @@ impl Store {
         Ok(())
     }
 
+    /// Records an action; the log keeps the newest [`MAX_AUDIT_ROWS`] entries.
     pub fn add_audit(&self, action: &str, profile_id: &str, session_id: &str, details: &str) {
-        let _ = self.db.lock().execute(
+        let db = self.db.lock();
+        let _ = db.execute(
             "INSERT INTO audit_log (id, timestamp, action, profile_id, session_id, details) VALUES (?, ?, ?, ?, ?, ?)",
             params![new_id(), fmt_time(&now()), action, profile_id, session_id, details],
         );
+        let _ = db.execute("DELETE FROM audit_log WHERE rowid <= (SELECT MAX(rowid) FROM audit_log) - ?", [MAX_AUDIT_ROWS]);
     }
 
     pub fn list_audit(&self, limit: i64) -> Result<Vec<AuditEntry>> {
@@ -432,6 +438,29 @@ pub fn dedup_rooms(groups: &[&[String]]) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn audit_log_keeps_the_newest_entries() {
+        let tmp = std::env::temp_dir().join(format!("nexus-audit-{}.db", std::process::id()));
+        let s = Store::open(&tmp).unwrap();
+        {
+            let mut db = s.db.lock();
+            let tx = db.transaction().unwrap();
+            for n in 0..MAX_AUDIT_ROWS {
+                tx.execute("INSERT INTO audit_log (id, timestamp, action) VALUES (?, '2020-01-01T00:00:00Z', 'old')", [n.to_string()]).unwrap();
+            }
+            tx.commit().unwrap();
+        }
+        for _ in 0..3 {
+            s.add_audit("new", "", "", "");
+        }
+        let count = |action: &str| s.db.lock().query_row("SELECT COUNT(*) FROM audit_log WHERE action = ?", [action], |r| r.get::<_, i64>(0)).unwrap();
+        assert_eq!((count("old"), count("new")), (MAX_AUDIT_ROWS - 3, 3));
+        drop(s);
+        for ext in ["", "-wal", "-shm"] {
+            let _ = std::fs::remove_file(format!("{}{ext}", tmp.display()));
+        }
+    }
 
     #[test]
     fn opens_go_database_and_migrates() {

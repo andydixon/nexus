@@ -25,6 +25,8 @@ const PING_DELAY: Duration = Duration::from_secs(20);
 const PING_TIMEOUT: Duration = Duration::from_secs(60);
 const PING_GRACE: Duration = Duration::from_secs(30);
 const MAX_LINE_BYTES: usize = 1 << 20;
+/// Users tracked per channel; a hostile server can't grow the client past this.
+const MAX_CHANNEL_USERS: usize = 10_000;
 
 /// A bidirectional byte stream. Reads must not block indefinitely: they should return
 /// `WouldBlock` or `TimedOut` after a short interval (tens of milliseconds) so the client's
@@ -602,6 +604,12 @@ impl Client {
         fold(nick) == fold(&self.st().nick)
     }
 
+    /// Whether we're in `room`: state is only kept for channels the client itself joined, so a
+    /// server can't grow it with JOINs for rooms we never asked for.
+    fn tracks(&self, room: &str) -> bool {
+        self.st().channels.contains_key(&fold(room))
+    }
+
     fn handle_message(&self, m: &Message) {
         match m.command.as_str() {
             "001" => self.handle_welcome(m),
@@ -734,12 +742,16 @@ impl Client {
             return;
         }
         let from = m.source.clone();
+        let me = self.is_me(&from);
+        if !me && !self.tracks(&room) {
+            return;
+        }
         if !from.is_empty() {
             let mut st = self.st();
             let ch = st.channels.entry(fold(&room)).or_insert_with(|| Channel { name: room.clone(), topic: String::new(), users: Vec::new() });
             add_user(ch, &from);
         }
-        if self.is_me(&from) {
+        if me {
             self.remember_room_membership(&room, true);
         }
         self.emit(Event { kind: "join".into(), target: room.clone(), from: from.clone(), text: format!("{from} joined {room}"), ..Default::default() });
@@ -754,6 +766,9 @@ impl Client {
         }
         let from = m.source.clone();
         let me = self.is_me(&from);
+        if !self.tracks(&room) {
+            return;
+        }
         if !from.is_empty() {
             let mut st = self.st();
             if me {
@@ -777,6 +792,9 @@ impl Client {
         }
         let (room, kicked) = (m.param(0).to_string(), m.param(1).to_string());
         let me = self.is_me(&kicked);
+        if !self.tracks(&room) {
+            return;
+        }
         {
             let mut st = self.st();
             if me {
@@ -846,7 +864,7 @@ impl Client {
     }
 
     fn handle_names(&self, m: &Message) {
-        if m.params.len() < 4 {
+        if m.params.len() < 4 || !self.tracks(m.param(2)) {
             return;
         }
         {
@@ -943,7 +961,7 @@ fn fold(s: &str) -> String {
 }
 
 fn add_user(ch: &mut Channel, nick: &str) {
-    if !ch.users.iter().any(|u| fold(u) == fold(nick)) {
+    if ch.users.len() < MAX_CHANNEL_USERS && !ch.users.iter().any(|u| fold(u) == fold(nick)) {
         ch.users.push(nick.to_string());
     }
 }
@@ -1046,6 +1064,23 @@ mod tests {
         client.remember_room_membership("#ONE", false);
         assert_eq!(updates.lock().join("|"), "#One|#One,#two|#two");
         assert_eq!(client.st().room_names, vec!["#two"]);
+    }
+
+    #[test]
+    fn only_joined_channels_are_tracked_and_users_are_capped() {
+        let client = Client::new(Config::default());
+        client.st().nick = "me".into();
+        let feed = |l: &str| client.handle_message(&parse_line(l).unwrap());
+        for n in 0..20_000 {
+            feed(&format!(":x{n}!u@h JOIN #room-{n}"));
+        }
+        assert!(client.st().channels.is_empty(), "JOINs by others for rooms we're not in are ignored");
+        feed(":me!u@h JOIN #ours");
+        feed(":other!u@h JOIN #ours");
+        assert_eq!(client.st().channels[&fold("#ours")].users, vec!["me", "other"]);
+        let mut ch = Channel { name: "#big".into(), topic: String::new(), users: (0..MAX_CHANNEL_USERS).map(|n| format!("u{n}")).collect() };
+        add_user(&mut ch, "one-too-many");
+        assert_eq!(ch.users.len(), MAX_CHANNEL_USERS);
     }
 
     #[test]

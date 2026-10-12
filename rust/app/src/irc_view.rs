@@ -16,6 +16,9 @@ use std::sync::Arc;
 
 const SERVER: &str = "server";
 const MAX_LINES: usize = 2000;
+/// Open conversations; past this the oldest idle query is dropped, so a flood of messages from
+/// unique nicks can't grow the view without bound.
+const MAX_TARGETS: usize = 200;
 const SIDEBAR_W: f32 = 230.0;
 
 struct Line {
@@ -172,6 +175,15 @@ impl IrcView {
         let i = match self.targets.iter().position(|t| t.name == name) {
             Some(i) => i,
             None => {
+                if self.targets.len() >= MAX_TARGETS {
+                    // ponytail: evicts the oldest-opened idle target, not least-recently-used.
+                    let (active, joined) = (&self.active, &self.joined);
+                    if let Some(i) = self.targets.iter().position(|t| t.name != SERVER && t.name != *active && !joined.iter().any(|r| r.name == t.name)) {
+                        let gone = self.targets.remove(i);
+                        self.unread.remove(&gone.name);
+                        self.users.remove(&gone.name);
+                    }
+                }
                 self.targets.push(Target { name: name.into(), lines: VecDeque::new() });
                 self.targets.len() - 1
             }

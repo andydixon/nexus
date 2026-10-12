@@ -7,7 +7,7 @@ use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fs::File;
-use std::io::{Read, Write};
+use std::io::{BufRead, BufReader, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
@@ -328,22 +328,32 @@ impl Store {
         Ok(self.dir.join(format!("{id}.cast")))
     }
 
-    /// Header fields plus the last event's timestamp as the duration.
+    /// Header fields plus the last event's timestamp as the duration. Reads the header line and
+    /// the file's tail rather than the whole recording (they can be hundreds of MiB).
     fn read_meta(&self, filename: &str) -> Result<RecordingMeta> {
+        const TAIL: u64 = 64 << 10;
         let path = self.dir.join(filename);
-        let mut f = File::open(&path)?;
-        let size = f.metadata()?.len();
-        let mut raw = Vec::new();
-        f.read_to_end(&mut raw)?;
-        let mut values = serde_json::Deserializer::from_slice(&raw).into_iter::<serde_json::Value>();
-        let hdr: Header = serde_json::from_value(values.next().ok_or("recording: empty file")??)?;
-        let mut duration = 0.0;
-        for v in values {
-            let Ok(v) = v else { break };
-            if let Some(e) = v.get(0).and_then(|e| e.as_f64()) {
-                duration = e;
+        let mut f = BufReader::new(File::open(&path)?);
+        let size = f.get_ref().metadata()?.len();
+        let mut head = Vec::new();
+        f.by_ref().take(1 << 20).read_until(b'\n', &mut head)?;
+        if head.iter().all(u8::is_ascii_whitespace) {
+            return Err("recording: empty file".into());
+        }
+        let hdr: Header = serde_json::from_slice(&head)?;
+        let body = head.len() as u64;
+        let mut duration = None;
+        // The tail first; if one event is longer than the window, fall back to the whole body.
+        for start in [size.saturating_sub(TAIL).max(body), body] {
+            let mut tail = Vec::new();
+            f.seek(SeekFrom::Start(start))?;
+            f.read_to_end(&mut tail)?;
+            duration = tail.split(|b| *b == b'\n').rev().find_map(|l| serde_json::from_slice::<serde_json::Value>(l).ok()?.get(0)?.as_f64());
+            if duration.is_some() || start == body {
+                break;
             }
         }
+        let duration = duration.unwrap_or(0.0);
         let id = filename.trim_end_matches(".cast").to_string();
         let created_at = chrono::DateTime::from_timestamp(hdr.timestamp, 0).ok_or("recording: invalid timestamp")?.with_timezone(&chrono::Local).fixed_offset();
         Ok(RecordingMeta {
@@ -428,6 +438,25 @@ mod tests {
         store.delete("session-abc").unwrap();
         assert!(store.list().unwrap().is_empty());
         assert!(store.delete("../outside").is_err());
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn duration_comes_from_the_tail_even_with_long_events() {
+        let dir = tmp("tail");
+        std::fs::create_dir_all(&dir).unwrap();
+        let hdr = r#"{"version":2,"width":80,"height":24,"timestamp":1791633486}"#;
+        let mut many = format!("{hdr}\n");
+        for i in 0..20_000 {
+            many.push_str(&format!("[{}.5, \"o\", \"line {i}\\r\\n\"]\n", i));
+        }
+        std::fs::write(dir.join("many.cast"), many).unwrap();
+        // The last event alone is bigger than the tail window.
+        std::fs::write(dir.join("long.cast"), format!("{hdr}\n[1.0, \"o\", \"a\"]\n[7.25, \"o\", \"{}\"]\n", "x".repeat(200 << 10))).unwrap();
+        std::fs::write(dir.join("bare.cast"), format!("{hdr}\n")).unwrap();
+        let metas = Store::new(&dir).list().unwrap();
+        let d = |id: &str| metas.iter().find(|m| m.id == id).unwrap().duration;
+        assert_eq!((d("many"), d("long"), d("bare")), (19_999.5, 7.25, 0.0));
         std::fs::remove_dir_all(dir).unwrap();
     }
 
