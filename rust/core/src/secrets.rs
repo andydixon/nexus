@@ -67,6 +67,16 @@ struct VaultFile {
     version: i64,
     salt: String,
     secrets: BTreeMap<String, String>,
+    /// A known value sealed under the key, so even an empty vault can tell a wrong master
+    /// password. Absent in vaults written by Go or older builds; added on the next write.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    verifier: String,
+}
+
+const VERIFIER: &[u8] = b"nexus-vault-verifier";
+
+fn verifier(key: &[u8; 32]) -> String {
+    B64.encode(seal(key, VERIFIER))
 }
 
 struct Unlocked {
@@ -101,7 +111,9 @@ impl Vault {
             return Err("secrets: vault already initialised".into());
         }
         let salt = random_bytes::<32>();
-        let u = Unlocked { key: derive_key(password, &salt)?, vault: VaultFile { version: 1, salt: B64.encode(salt), secrets: BTreeMap::new() } };
+        let key = derive_key(password, &salt)?;
+        let vault = VaultFile { version: 1, salt: B64.encode(salt), secrets: BTreeMap::new(), verifier: verifier(&key) };
+        let u = Unlocked { key, vault };
         std::fs::create_dir_all(&self.dir)?;
         self.save(&u)?;
         *self.state.lock() = Some(u);
@@ -116,8 +128,10 @@ impl Vault {
         let vault: VaultFile = serde_json::from_slice(&std::fs::read(self.path())?)?;
         let salt = B64.decode(&vault.salt).map_err(|e| format!("secrets: corrupt vault salt: {e}"))?;
         let u = Unlocked { key: derive_key(password, &salt)?, vault };
-        // An empty vault accepts any password, as in Go; otherwise one entry must decrypt.
-        if let Some(v) = u.vault.secrets.values().next() {
+        // The verifier must open; without one (older vaults) one entry must decrypt, and an empty
+        // vault accepts any password, as in Go.
+        let check = if u.vault.verifier.is_empty() { u.vault.secrets.values().next() } else { Some(&u.vault.verifier) };
+        if let Some(v) = check {
             let data = B64.decode(v).unwrap_or_default();
             open(&u.key, &data).map_err(|_| "secrets: incorrect master password or corrupt vault")?;
         }
@@ -147,6 +161,9 @@ impl Vault {
         let u = st.as_mut().ok_or("secrets: vault is locked")?;
         let enc = B64.encode(seal(&u.key, value.as_bytes()));
         u.vault.secrets.insert(key.to_string(), enc);
+        if u.vault.verifier.is_empty() {
+            u.vault.verifier = verifier(&u.key);
+        }
         self.save(u)
     }
 
@@ -323,6 +340,32 @@ mod tests {
         assert!(v.get("a").is_err());
         v.unlock("pw").unwrap();
         assert_eq!(v.get("a").unwrap(), "1");
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn empty_vault_rejects_a_wrong_password_and_old_vaults_gain_a_verifier() {
+        let dir = std::env::temp_dir().join(format!("nexus-vault-verifier-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let v = Vault::new(dir.clone());
+        v.initialise("pw").unwrap();
+        v.lock();
+        assert!(v.unlock("typo").is_err(), "an empty vault must not accept any password");
+        v.unlock("pw").unwrap();
+        // A vault from Go/older builds (no verifier) keeps working and gains one on write.
+        let path = dir.join(VAULT_FILE);
+        let mut f: serde_json::Value = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+        f.as_object_mut().unwrap().remove("verifier");
+        std::fs::write(&path, f.to_string()).unwrap();
+        v.lock();
+        v.unlock("anything").unwrap();
+        v.lock();
+        v.unlock("pw").unwrap();
+        v.set("a", "1").unwrap();
+        v.lock();
+        assert!(std::fs::read_to_string(&path).unwrap().contains("verifier"));
+        assert!(v.unlock("typo").is_err());
+        v.unlock("pw").unwrap();
         std::fs::remove_dir_all(dir).unwrap();
     }
 
