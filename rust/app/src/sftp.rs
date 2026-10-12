@@ -13,9 +13,10 @@ use nexus_core::clients::sftp::{self as rsftp, FileEntry, Progress};
 use nexus_core::keyfiles::safe_sftp_upload_name;
 use nexus_core::models::Protocol;
 use nexus_core::service::Service;
+use parking_lot::Mutex;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 /// Worker results, applied on the UI thread.
 enum Done {
@@ -47,7 +48,7 @@ struct Inbox(Arc<Mutex<Vec<Done>>>, egui::Context);
 
 impl Inbox {
     fn push(&self, d: Done) {
-        self.0.lock().unwrap().push(d);
+        self.0.lock().push(d);
         self.1.request_repaint();
     }
 }
@@ -250,7 +251,7 @@ impl Sftp {
             let tr = self.transfers.remove(i);
             if self.open_for.as_deref() != Some(session) {
                 let verb = if tr.upload { "↑ Uploaded" } else { "↓ Downloaded" };
-                self.inbox.lock().unwrap().push(Done::Toast(format!("{verb} {}", base_name(&tr.path))));
+                self.inbox.lock().push(Done::Toast(format!("{verb} {}", base_name(&tr.path))));
             }
         }
     }
@@ -269,7 +270,7 @@ impl Sftp {
     }
 
     fn drain(&mut self, s: &mut Shared) {
-        let items = std::mem::take(&mut *self.inbox.lock().unwrap());
+        let items = std::mem::take(&mut *self.inbox.lock());
         for d in items {
             match d {
                 Done::Listed { session, path, files } => {

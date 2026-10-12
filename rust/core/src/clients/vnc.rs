@@ -6,9 +6,10 @@
 //! the shared `Arc<Mutex<Framebuffer>>` the UI reads, so the lock is never held across network reads.
 //! Outgoing input is queued and written whenever a read polls out, so the transport is never split.
 
+use parking_lot::{Mutex, MutexGuard};
 use std::io::{BufReader, ErrorKind, Read, Write};
+use std::sync::Arc;
 use std::sync::mpsc::{self, Receiver, Sender, TryRecvError};
-use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::Duration;
 
 use flate2::{Decompress, FlushDecompress};
@@ -152,7 +153,7 @@ impl Client {
     }
 
     fn st(&self) -> MutexGuard<'_, State> {
-        self.state.lock().unwrap_or_else(|e| e.into_inner())
+        self.state.lock()
     }
 
     /// Connects and blocks until the handshake completes (ServerInit received), fails, or times out.
@@ -160,7 +161,7 @@ impl Client {
         let (ready_tx, ready_rx) = mpsc::channel();
         let (out_tx, out_rx) = mpsc::channel();
         self.st().ready = Some(ready_tx);
-        *self.out.lock().unwrap_or_else(|e| e.into_inner()) = Some(out_tx);
+        *self.out.lock() = Some(out_tx);
 
         let client = self.clone();
         std::thread::spawn(move || client.io_thread(out_rx));
@@ -186,7 +187,7 @@ impl Client {
             st.closing = true;
         }
         // Dropping the sender makes the I/O thread's next poll end the connection.
-        *self.out.lock().unwrap_or_else(|e| e.into_inner()) = None;
+        *self.out.lock() = None;
     }
 
     pub fn framebuffer(&self) -> Arc<Mutex<Framebuffer>> {
@@ -233,20 +234,20 @@ impl Client {
     /// Asks for a non-incremental update of the whole screen.
     pub fn request_full_update(&self) -> crate::Result<()> {
         let (w, h) = {
-            let fb = self.fb.lock().unwrap_or_else(|e| e.into_inner());
+            let fb = self.fb.lock();
             (fb.width, fb.height)
         };
         self.queue(update_request(false, w, h))
     }
 
     fn queue(&self, msg: Vec<u8>) -> crate::Result<()> {
-        let guard = self.out.lock().unwrap_or_else(|e| e.into_inner());
+        let guard = self.out.lock();
         if guard.as_ref().is_some_and(|tx| tx.send(msg).is_ok()) { Ok(()) } else { Err("not connected".into()) }
     }
 
     fn io_thread(self: Arc<Self>, out_rx: Receiver<Vec<u8>>) {
         let result = self.open_transport().and_then(|io| self.run(io, out_rx));
-        *self.out.lock().unwrap_or_else(|e| e.into_inner()) = None;
+        *self.out.lock() = None;
         let (was_closing, was_connected, ready) = {
             let mut st = self.st();
             let r = (st.closing, st.connected, st.ready.take());
@@ -283,7 +284,7 @@ impl Client {
         let mut r = BufReader::with_capacity(1 << 16, Conn { io, out_rx });
         let (w, h) = self.handshake(&mut r)?;
         let mut local = Framebuffer::new_checked(w, h)?;
-        *self.fb.lock().unwrap_or_else(|e| e.into_inner()) = local.clone();
+        *self.fb.lock() = local.clone();
         (self.cfg.on_resize)(w, h);
         {
             let mut st = self.st();
@@ -302,7 +303,7 @@ impl Client {
                 0 => {
                     let (y0, y1, resized) = read_update(&mut r, &mut local, &mut dec)?;
                     {
-                        let mut fb = self.fb.lock().unwrap_or_else(|e| e.into_inner());
+                        let mut fb = self.fb.lock();
                         if resized {
                             *fb = local.clone();
                         } else if y0 < y1 {
@@ -983,7 +984,7 @@ mod tests {
         frame_rx.recv_timeout(Duration::from_secs(5)).unwrap();
         {
             let fb = client.framebuffer();
-            let fb = fb.lock().unwrap();
+            let fb = fb.lock();
             assert_eq!((fb.width, fb.height), (4, 4));
             assert!(fb.dirty);
             let px = |x: usize, y: usize| &fb.rgba[(y * 4 + x) * 4..(y * 4 + x) * 4 + 4];

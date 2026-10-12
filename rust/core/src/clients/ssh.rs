@@ -6,11 +6,12 @@ use super::{Callbacks, rt};
 use crate::Result;
 use crate::models::{ForwardDirection, JumpHost, PortForward, Profile, SshConfig};
 use base64::Engine;
+use parking_lot::Mutex;
 use russh::client::{self, Handle, Msg};
 use russh::keys::{HashAlg, PrivateKeyWithHashAlg, PublicKey};
 use russh::{Channel, ChannelMsg, Pty};
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio::sync::mpsc;
@@ -75,7 +76,7 @@ impl client::Handler for Handler {
         match res {
             Ok(()) => Ok(true),
             Err(why) => {
-                *self.shared.rejection.lock().unwrap() = Some(why);
+                *self.shared.rejection.lock() = Some(why);
                 Ok(false)
             }
         }
@@ -91,7 +92,7 @@ impl client::Handler for Handler {
         reply: client::ChannelOpenHandle,
         _session: &mut client::Session,
     ) -> std::result::Result<(), Self::Error> {
-        let dest = self.shared.remote_targets.lock().unwrap().get(&(connected_address.to_string(), connected_port)).cloned();
+        let dest = self.shared.remote_targets.lock().get(&(connected_address.to_string(), connected_port)).cloned();
         let Some((host, port)) = dest else {
             reply.reject(russh::ChannelOpenFailure::AdministrativelyProhibited).await;
             return Ok(());
@@ -485,7 +486,7 @@ impl SshClient {
         match tokio::time::timeout(timeout, client::connect_stream(config(&self.sc()), stream, handler)).await {
             Err(_) => Err(format!("SSH handshake with {host}:{port} timed out").into()),
             Ok(Ok(h)) => Ok(h),
-            Ok(Err(e)) => match self.shared.rejection.lock().unwrap().take() {
+            Ok(Err(e)) => match self.shared.rejection.lock().take() {
                 Some(why) => Err(why.into()),
                 None => Err(format!("SSH handshake failed: {e}").into()),
             },
@@ -518,15 +519,15 @@ impl SshClient {
                 .channel_open_direct_tcpip(p.host.clone(), port as u32, "127.0.0.1", 0)
                 .await
                 .map_err(|e| format!("failed to dial target {}:{port} through jump hosts: {e}", p.host))?;
-            self.hops.lock().unwrap().extend(h);
-            self.hops.lock().unwrap().push(prev);
+            self.hops.lock().extend(h);
+            self.hops.lock().push(prev);
             self.handshake(ch.into_stream(), &p.host, port, &check).await?
         };
 
         authenticate(&mut handle, Auth { user: &p.username, methods, agent: sc.agent_auth, key, password, totp_secret: sc.totp_secret.clone() }).await?;
         let handle = Arc::new(handle);
         if !shell {
-            *self.handle.lock().unwrap() = Some(handle);
+            *self.handle.lock() = Some(handle);
             return Ok(());
         }
 
@@ -551,8 +552,8 @@ impl SshClient {
 
         let (mut read, write) = ch.split();
         let (tx, mut rx) = mpsc::unbounded_channel::<Cmd>();
-        *self.tx.lock().unwrap() = Some(tx);
-        *self.handle.lock().unwrap() = Some(handle);
+        *self.tx.lock() = Some(tx);
+        *self.handle.lock() = Some(handle);
         tokio::spawn(async move {
             while let Some(cmd) = rx.recv().await {
                 let r = match cmd {
@@ -633,16 +634,16 @@ impl SshClient {
     }
 
     fn handle(&self) -> Result<Arc<Handle<Handler>>> {
-        self.handle.lock().unwrap().clone().ok_or_else(|| "not connected".into())
+        self.handle.lock().clone().ok_or_else(|| "not connected".into())
     }
 
     pub fn write(&self, data: &[u8]) -> Result<()> {
-        let tx = self.tx.lock().unwrap();
+        let tx = self.tx.lock();
         tx.as_ref().ok_or("not connected")?.send(Cmd::Data(data.to_vec())).map_err(|_| "not connected".into())
     }
 
     pub fn resize(&self, cols: u32, rows: u32) -> Result<()> {
-        let tx = self.tx.lock().unwrap();
+        let tx = self.tx.lock();
         tx.as_ref().ok_or("not connected")?.send(Cmd::Resize(cols, rows)).map_err(|_| "not connected".into())
     }
 
@@ -679,7 +680,7 @@ impl SshClient {
     }
 
     pub fn is_connected(&self) -> bool {
-        self.handle.lock().unwrap().as_ref().is_some_and(|h| !h.is_closed())
+        self.handle.lock().as_ref().is_some_and(|h| !h.is_closed())
     }
 
     /// Idempotent; fires on_close once.
@@ -688,9 +689,9 @@ impl SshClient {
             return;
         }
         self.stop_all_forwards();
-        *self.tx.lock().unwrap() = None;
-        let h = self.handle.lock().unwrap().take();
-        let hops = std::mem::take(&mut *self.hops.lock().unwrap());
+        *self.tx.lock() = None;
+        let h = self.handle.lock().take();
+        let hops = std::mem::take(&mut *self.hops.lock());
         rt().spawn(async move {
             if let Some(h) = h {
                 let _ = h.disconnect(russh::Disconnect::ByApplication, "", "en").await;
@@ -705,7 +706,7 @@ impl SshClient {
     // --- port forwarding -------------------------------------------------------------------
 
     pub fn start_forward(&self, rule: PortForward) -> Result<()> {
-        if self.forwards.lock().unwrap().contains_key(&rule.id) {
+        if self.forwards.lock().contains_key(&rule.id) {
             return Err(format!("forward {:?} is already active", rule.id).into());
         }
         let h = self.handle()?;
@@ -727,12 +728,12 @@ impl SshClient {
                                 let _ = tokio::io::copy_bidirectional(&mut sock, &mut remote).await;
                             }
                         });
-                        let mut handles = t2.lock().unwrap();
+                        let mut handles = t2.lock();
                         handles.retain(|h| !h.is_finished());
                         handles.push(conn.abort_handle());
                     }
                 });
-                tasks.lock().unwrap().push(task.abort_handle());
+                tasks.lock().push(task.abort_handle());
             }
             ForwardDirection::Remote => {
                 let bind = if rule.bind_host.is_empty() { "0.0.0.0".to_string() } else { rule.bind_host.clone() };
@@ -740,26 +741,26 @@ impl SshClient {
                     .block_on(h.tcpip_forward(bind.clone(), rule.bind_port as u32))
                     .map_err(|e| format!("remote forward: server listen on {bind}:{} failed: {e}", rule.bind_port))?;
                 let port = if rule.bind_port == 0 { port } else { rule.bind_port as u32 };
-                self.shared.remote_targets.lock().unwrap().insert((bind, port), (rule.dest_host.clone(), rule.dest_port as u16));
+                self.shared.remote_targets.lock().insert((bind, port), (rule.dest_host.clone(), rule.dest_port as u16));
             }
         }
-        self.forwards.lock().unwrap().insert(rule.id.clone(), Forward { rule, tasks });
+        self.forwards.lock().insert(rule.id.clone(), Forward { rule, tasks });
         Ok(())
     }
 
     pub fn stop_forward(&self, id: &str) -> Result<()> {
-        let f = self.forwards.lock().unwrap().remove(id).ok_or_else(|| format!("forward {id:?} not found"))?;
+        let f = self.forwards.lock().remove(id).ok_or_else(|| format!("forward {id:?} not found"))?;
         self.shutdown_forward(f);
         Ok(())
     }
 
     fn shutdown_forward(&self, f: Forward) {
-        for t in f.tasks.lock().unwrap().drain(..) {
+        for t in f.tasks.lock().drain(..) {
             t.abort();
         }
         if f.rule.direction == ForwardDirection::Remote {
             let bind = if f.rule.bind_host.is_empty() { "0.0.0.0".to_string() } else { f.rule.bind_host.clone() };
-            self.shared.remote_targets.lock().unwrap().retain(|(a, p), _| !(a == &bind && *p == f.rule.bind_port as u32));
+            self.shared.remote_targets.lock().retain(|(a, p), _| !(a == &bind && *p == f.rule.bind_port as u32));
             if let Ok(h) = self.handle() {
                 let port = f.rule.bind_port as u32;
                 rt().spawn(async move {
@@ -770,14 +771,14 @@ impl SshClient {
     }
 
     fn stop_all_forwards(&self) {
-        let all: Vec<Forward> = self.forwards.lock().unwrap().drain().map(|(_, f)| f).collect();
+        let all: Vec<Forward> = self.forwards.lock().drain().map(|(_, f)| f).collect();
         for f in all {
             self.shutdown_forward(f);
         }
     }
 
     pub fn active_forwards(&self) -> Vec<PortForward> {
-        self.forwards.lock().unwrap().values().map(|f| f.rule.clone()).collect()
+        self.forwards.lock().values().map(|f| f.rule.clone()).collect()
     }
 
     // --- SFTP -------------------------------------------------------------------------------

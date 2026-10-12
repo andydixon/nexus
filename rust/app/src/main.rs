@@ -33,6 +33,16 @@ use nexus_core::service::Service;
 use std::sync::Arc;
 
 fn main() -> eframe::Result {
+    // A panic on a worker thread (a session's reader, a transfer) ends only that thread; say so in
+    // the UI rather than letting the session just stop.
+    let default_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        default_hook(info);
+        let what =
+            info.payload().downcast_ref::<&str>().copied().or_else(|| info.payload().downcast_ref::<String>().map(String::as_str)).unwrap_or("unknown error");
+        let thread = std::thread::current().name().unwrap_or("worker").to_string();
+        app::post_error_nonblocking(format!("Internal error in {thread} thread: {what}. Other sessions are unaffected; reconnect the affected one."));
+    }));
     let mut opts = app::Options {
         screenshot: None,
         theme: None,

@@ -355,7 +355,8 @@ fn copy_limited_archive(dst: &mut impl Write, src: impl Read, max_bytes: u64) ->
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::{Arc, Mutex};
+    use parking_lot::Mutex;
+    use std::sync::Arc;
 
     #[test]
     fn read_limited_rejects_oversized_response() {
@@ -410,7 +411,7 @@ mod tests {
         std::thread::spawn(move || {
             for req in server.incoming_requests() {
                 let header = |name: &'static str| req.headers().iter().find(|h| h.field.equiv(name)).map(|h| h.value.to_string());
-                log.lock().unwrap().push((req.url().to_string(), header("Authorization"), header("User-Agent")));
+                log.lock().push((req.url().to_string(), header("Authorization"), header("User-Agent")));
                 let (status, body) = handler(req.url());
                 let _ = req.respond(tiny_http::Response::from_string(body).with_status_code(status));
             }
@@ -422,7 +423,7 @@ mod tests {
     fn validate_token_returns_login_and_reports_status() {
         let (base, seen) = serve(|_| (200, r#"{"login":"octocat"}"#.into()));
         assert_eq!(Client::new(&base, "tok").validate_token().unwrap(), "octocat");
-        let (url, auth, ua) = seen.lock().unwrap()[0].clone();
+        let (url, auth, ua) = seen.lock()[0].clone();
         assert_eq!(url, "/user");
         assert_eq!(auth.as_deref(), Some("Bearer tok"));
         assert_eq!(ua.as_deref(), Some(USER_AGENT));
@@ -459,7 +460,7 @@ mod tests {
             }
         });
         let calls = Mutex::new(Vec::new());
-        let repos = Client::new(&base, "t").fetch_repos_with_progress(|done, total| calls.lock().unwrap().push((done, total))).unwrap();
+        let repos = Client::new(&base, "t").fetch_repos_with_progress(|done, total| calls.lock().push((done, total))).unwrap();
         assert_eq!(repos.len(), 101);
         assert_eq!(repos[0].full_name, "me/r100");
         assert_eq!(repos[0].pushed_at, "2025-06-01T12:00:00Z");
@@ -472,12 +473,12 @@ mod tests {
         assert!(r0.private && r0.description.is_empty() && r0.language.is_empty());
         assert!(repos.iter().filter(|r| r.latest_committer.is_empty()).count() == 99);
 
-        let mut calls = calls.into_inner().unwrap();
+        let mut calls = calls.into_inner();
         assert_eq!(calls[0], (0, 101));
         calls.sort();
         assert_eq!(calls.last(), Some(&(101, 101)));
         assert_eq!(calls.len(), 102);
-        assert_eq!(seen.lock().unwrap().iter().filter(|s| s.0.starts_with("/user/repos")).count(), 2);
+        assert_eq!(seen.lock().iter().filter(|s| s.0.starts_with("/user/repos")).count(), 2);
     }
 
     #[test]
@@ -505,7 +506,7 @@ mod tests {
         assert_eq!(std::fs::read(&dest).unwrap(), b"ZIPDATA");
         let err = client.download_repo_archive("me/r", "", &dest).unwrap_err().to_string();
         assert_eq!(err, "GitHub API returned HTTP 404: missing");
-        assert_eq!(seen.lock().unwrap()[1].0, "/repos/me/r/zipball");
+        assert_eq!(seen.lock()[1].0, "/repos/me/r/zipball");
         assert!(client.download_repo_archive("bad", "", &dest).is_err());
         std::fs::remove_dir_all(dir).unwrap();
     }

@@ -2,8 +2,9 @@
 //! `Profile::host`, line settings come from `Profile::serial`. Same conventions as the other
 //! clients: blocking `connect`, an own reader thread, `on_close` exactly once (unplug included).
 
+use parking_lot::Mutex;
+use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use serialport::{DataBits, FlowControl, Parity, SerialPort, StopBits};
@@ -45,7 +46,7 @@ impl SerialClient {
     /// Opens and configures the port, applies DTR/RTS, and starts the reader thread.
     pub fn connect(&self) -> crate::Result<()> {
         let inner = &self.inner;
-        if inner.port.lock().unwrap().is_some() {
+        if inner.port.lock().is_some() {
             return Err("already connected".into());
         }
         if inner.path.is_empty() {
@@ -82,7 +83,7 @@ impl SerialClient {
         reader.set_timeout(READ_POLL)?;
         let stop = Arc::new(AtomicBool::new(false));
         {
-            let mut guard = inner.port.lock().unwrap();
+            let mut guard = inner.port.lock();
             if guard.is_some() {
                 return Err("already connected".into());
             }
@@ -128,11 +129,11 @@ impl SerialClient {
     }
 
     pub fn is_connected(&self) -> bool {
-        self.inner.port.lock().unwrap().is_some()
+        self.inner.port.lock().is_some()
     }
 
     fn with_port(&self, f: impl FnOnce(&mut Box<dyn SerialPort>) -> crate::Result<()>) -> crate::Result<()> {
-        let mut guard = self.inner.port.lock().unwrap();
+        let mut guard = self.inner.port.lock();
         let (port, _) = guard.as_mut().ok_or("not connected")?;
         f(port)
     }
@@ -165,7 +166,7 @@ impl Inner {
     }
 
     fn close(&self) {
-        let taken = self.port.lock().unwrap().take();
+        let taken = self.port.lock().take();
         if let Some((port, stop)) = taken {
             stop.store(true, Ordering::SeqCst);
             drop(port);

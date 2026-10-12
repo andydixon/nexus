@@ -2,8 +2,9 @@
 //! of sent ("send") and received ("recv") frames, JSON capture, and the hex/escape encoders the
 //! RAW view reuses.
 
+use parking_lot::Mutex;
 use std::collections::VecDeque;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use base64::Engine;
 use serde::Serialize;
@@ -115,11 +116,11 @@ impl RawClient {
     }
 
     pub fn history(&self) -> Vec<HistoryEntry> {
-        self.inner.history.lock().unwrap().entries.iter().cloned().collect()
+        self.inner.history.lock().entries.iter().cloned().collect()
     }
 
     pub fn clear_history(&self) {
-        *self.inner.history.lock().unwrap() = History::default();
+        *self.inner.history.lock() = History::default();
     }
 
     /// Writes the history to `path` as indented JSON (mode 0600 on Unix), as Go did.
@@ -146,7 +147,7 @@ impl Inner {
         if entry.data.len() > MAX_HISTORY_BYTES {
             entry.data.drain(..entry.data.len() - MAX_HISTORY_BYTES);
         }
-        let mut h = self.history.lock().unwrap();
+        let mut h = self.history.lock();
         h.bytes += entry.data.len();
         h.entries.push_back(entry);
         while h.entries.len() > MAX_HISTORY_ENTRIES || h.bytes > MAX_HISTORY_BYTES {

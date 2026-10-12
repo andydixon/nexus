@@ -3,12 +3,12 @@
 
 use crate::Result;
 use crate::models::Time;
+use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
 use std::time::Instant;
 
 pub const EVENT_OUTPUT: &str = "o";
@@ -156,7 +156,7 @@ impl Recorder {
     }
 
     fn write_event(&self, kind: &str, data: &[u8]) {
-        let mut g = self.inner.lock().unwrap();
+        let mut g = self.inner.lock();
         if g.closed || g.file.is_none() {
             return;
         }
@@ -177,7 +177,7 @@ impl Recorder {
 
     /// Flushes and closes the file. Idempotent.
     pub fn close(&self) -> Result<()> {
-        let mut g = self.inner.lock().unwrap();
+        let mut g = self.inner.lock();
         if g.closed {
             return Ok(());
         }
@@ -198,7 +198,7 @@ impl Recorder {
     }
 
     pub fn event_count(&self) -> usize {
-        self.inner.lock().unwrap().event_count
+        self.inner.lock().event_count
     }
 }
 

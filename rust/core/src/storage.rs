@@ -4,9 +4,9 @@
 use crate::Result;
 use crate::models::*;
 use chrono::{DateTime, SecondsFormat};
+use parking_lot::Mutex;
 use rusqlite::{Connection, OptionalExtension, Row, params};
 use std::path::Path;
-use std::sync::Mutex;
 
 const MIGRATIONS: &[(i64, &str)] = &[
     (1, include_str!("../migrations/001_initial.sql")),
@@ -121,7 +121,7 @@ impl Store {
     }
 
     fn migrate(&self) -> Result<()> {
-        let db = self.db.lock().unwrap();
+        let db = self.db.lock();
         db.execute_batch("CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)")?;
         let current: i64 = db.query_row("SELECT COALESCE(MAX(version), 0) FROM schema_version", [], |r| r.get(0))?;
         for (ver, sql) in MIGRATIONS {
@@ -170,7 +170,6 @@ impl Store {
         let sql = format!("INSERT INTO profiles ({PROFILE_COLS}) VALUES ({})", vec!["?"; 28].join(","));
         self.db
             .lock()
-            .unwrap()
             .execute(&sql, rusqlite::params_from_iter(args.iter().map(|b| b.as_ref())))
             .map_err(|e| format!("storage: failed to create profile: {e}"))?;
         Ok(())
@@ -183,7 +182,6 @@ impl Store {
         let n = self
             .db
             .lock()
-            .unwrap()
             .execute(
                 "UPDATE profiles SET display_name=?, description=?, protocol=?, host=?, port=?, username=?,
                  tags=?, folder=?, environment=?, notes=?, favourite=?, last_connected=?,
@@ -203,14 +201,13 @@ impl Store {
     pub fn get_profile(&self, id: &str) -> Result<Profile> {
         self.db
             .lock()
-            .unwrap()
             .query_row(&format!("SELECT {PROFILE_COLS} FROM profiles WHERE id = ?"), [id], scan_profile)
             .optional()?
             .ok_or_else(|| format!("storage: profile {id:?} not found").into())
     }
 
     pub fn delete_profile(&self, id: &str) -> Result<()> {
-        let mut db = self.db.lock().unwrap();
+        let mut db = self.db.lock();
         let tx = db.transaction()?;
         tx.execute("DELETE FROM irc_channel_state WHERE profile_id = ?", [id])?;
         if tx.execute("DELETE FROM profiles WHERE id = ?", [id])? == 0 {
@@ -221,14 +218,14 @@ impl Store {
     }
 
     pub fn list_profiles(&self) -> Result<Vec<Profile>> {
-        let db = self.db.lock().unwrap();
+        let db = self.db.lock();
         let mut st = db.prepare(&format!("SELECT {PROFILE_COLS} FROM profiles ORDER BY display_name"))?;
         let rows = st.query_map([], scan_profile)?.collect::<rusqlite::Result<Vec<_>>>()?;
         Ok(rows)
     }
 
     pub fn set_favourite(&self, id: &str, fav: bool) -> Result<()> {
-        let n = self.db.lock().unwrap().execute("UPDATE profiles SET favourite = ?, updated_at = ? WHERE id = ?", params![fav as i64, fmt_time(&now()), id])?;
+        let n = self.db.lock().execute("UPDATE profiles SET favourite = ?, updated_at = ? WHERE id = ?", params![fav as i64, fmt_time(&now()), id])?;
         if n == 0 {
             return Err(format!("storage: profile {id:?} not found").into());
         }
@@ -237,7 +234,7 @@ impl Store {
 
     pub fn update_last_connected(&self, id: &str) -> Result<()> {
         let now = fmt_time(&now());
-        self.db.lock().unwrap().execute("UPDATE profiles SET last_connected = ?, updated_at = ? WHERE id = ?", params![now, now, id])?;
+        self.db.lock().execute("UPDATE profiles SET last_connected = ?, updated_at = ? WHERE id = ?", params![now, now, id])?;
         Ok(())
     }
 
@@ -273,7 +270,6 @@ impl Store {
         Ok(self
             .db
             .lock()
-            .unwrap()
             .query_row(
                 "SELECT id, host, port, key_type, fingerprint, public_key, first_seen, last_seen, trusted
                  FROM known_hosts WHERE host = ? AND port = ?",
@@ -284,7 +280,7 @@ impl Store {
     }
 
     pub fn save_known_host(&self, kh: &KnownHost) -> Result<()> {
-        self.db.lock().unwrap().execute(
+        self.db.lock().execute(
             "INSERT INTO known_hosts (id, host, port, key_type, fingerprint, public_key, first_seen, last_seen, trusted)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
              ON CONFLICT(host, port, key_type) DO UPDATE SET
@@ -306,7 +302,7 @@ impl Store {
     }
 
     pub fn list_known_hosts(&self) -> Result<Vec<KnownHost>> {
-        let db = self.db.lock().unwrap();
+        let db = self.db.lock();
         let mut st = db.prepare(
             "SELECT id, host, port, key_type, fingerprint, public_key, first_seen, last_seen, trusted
              FROM known_hosts ORDER BY host, port",
@@ -316,21 +312,21 @@ impl Store {
     }
 
     pub fn delete_known_host(&self, id: &str) -> Result<()> {
-        if self.db.lock().unwrap().execute("DELETE FROM known_hosts WHERE id = ?", [id])? == 0 {
+        if self.db.lock().execute("DELETE FROM known_hosts WHERE id = ?", [id])? == 0 {
             return Err(format!("storage: known host {id:?} not found").into());
         }
         Ok(())
     }
 
     pub fn add_audit(&self, action: &str, profile_id: &str, session_id: &str, details: &str) {
-        let _ = self.db.lock().unwrap().execute(
+        let _ = self.db.lock().execute(
             "INSERT INTO audit_log (id, timestamp, action, profile_id, session_id, details) VALUES (?, ?, ?, ?, ?, ?)",
             params![new_id(), fmt_time(&now()), action, profile_id, session_id, details],
         );
     }
 
     pub fn list_audit(&self, limit: i64) -> Result<Vec<AuditEntry>> {
-        let db = self.db.lock().unwrap();
+        let db = self.db.lock();
         let mut st = db.prepare("SELECT id, timestamp, action, profile_id, session_id, details FROM audit_log ORDER BY timestamp DESC LIMIT ?")?;
         let rows = st
             .query_map([limit], |r| {
@@ -348,7 +344,7 @@ impl Store {
     }
 
     pub fn irc_last_rooms(&self, profile_id: &str) -> Result<Vec<String>> {
-        let db = self.db.lock().unwrap();
+        let db = self.db.lock();
         let mut st = db.prepare("SELECT room_name FROM irc_channel_state WHERE profile_id = ? ORDER BY position, room_name")?;
         let rows = st.query_map([profile_id], |r| r.get(0))?.collect::<rusqlite::Result<Vec<String>>>()?;
         Ok(rows)
@@ -360,7 +356,7 @@ impl Store {
             return Err("storage: IRC channel state requires a profile ID".into());
         }
         let rooms = dedup_rooms(&[rooms]);
-        let mut db = self.db.lock().unwrap();
+        let mut db = self.db.lock();
         let tx = db.transaction()?;
         tx.execute("DELETE FROM irc_channel_state WHERE profile_id = ?", [profile_id])?;
         let now = fmt_time(&now());
@@ -375,15 +371,14 @@ impl Store {
     }
 
     pub fn preferences(&self) -> AppPreferences {
-        let v: Option<String> =
-            self.db.lock().unwrap().query_row("SELECT value FROM preferences WHERE key = '_all'", [], |r| r.get(0)).optional().ok().flatten();
+        let v: Option<String> = self.db.lock().query_row("SELECT value FROM preferences WHERE key = '_all'", [], |r| r.get(0)).optional().ok().flatten();
         let mut p = v.and_then(|v| serde_json::from_str::<AppPreferences>(&v).ok()).unwrap_or_default();
         p.apply_defaults();
         p
     }
 
     pub fn save_preferences(&self, p: &AppPreferences) -> Result<()> {
-        self.db.lock().unwrap().execute(
+        self.db.lock().execute(
             "INSERT INTO preferences (key, value) VALUES ('_all', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
             [serde_json::to_string(p)?],
         )?;
@@ -391,14 +386,14 @@ impl Store {
     }
 
     pub fn list_snippets(&self) -> Result<Vec<Snippet>> {
-        let db = self.db.lock().unwrap();
+        let db = self.db.lock();
         let mut st = db.prepare("SELECT id, name, command, description, folder, tags, created_at, updated_at FROM snippets ORDER BY name ASC")?;
         let rows = st.query_map([], scan_snippet)?.collect::<rusqlite::Result<Vec<_>>>()?;
         Ok(rows)
     }
 
     pub fn create_snippet(&self, s: &Snippet) -> Result<()> {
-        self.db.lock().unwrap().execute(
+        self.db.lock().execute(
             "INSERT INTO snippets (id, name, command, description, folder, tags, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             params![s.id, s.name, s.command, s.description, s.folder, serde_json::to_string(&s.tags)?, fmt_time(&s.created_at), fmt_time(&s.updated_at)],
         )?;
@@ -406,7 +401,7 @@ impl Store {
     }
 
     pub fn update_snippet(&self, s: &Snippet) -> Result<()> {
-        self.db.lock().unwrap().execute(
+        self.db.lock().execute(
             "UPDATE snippets SET name=?, command=?, description=?, folder=?, tags=?, updated_at=? WHERE id=?",
             params![s.name, s.command, s.description, s.folder, serde_json::to_string(&s.tags)?, fmt_time(&s.updated_at), s.id],
         )?;
@@ -414,7 +409,7 @@ impl Store {
     }
 
     pub fn delete_snippet(&self, id: &str) -> Result<()> {
-        self.db.lock().unwrap().execute("DELETE FROM snippets WHERE id = ?", [id])?;
+        self.db.lock().execute("DELETE FROM snippets WHERE id = ?", [id])?;
         Ok(())
     }
 }

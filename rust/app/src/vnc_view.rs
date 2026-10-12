@@ -218,7 +218,7 @@ impl VncView {
     fn upload(&mut self, ui: &Ui) {
         let Some(c) = &self.client else { return };
         let fb = c.framebuffer();
-        let mut fb = fb.lock().unwrap_or_else(|e| e.into_inner());
+        let mut fb = fb.lock();
         if !fb.dirty || fb.width == 0 || fb.height == 0 {
             return;
         }

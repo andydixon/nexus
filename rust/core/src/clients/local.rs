@@ -2,10 +2,11 @@
 
 use super::Callbacks;
 use crate::Result;
+use parking_lot::Mutex;
 use portable_pty::{CommandBuilder, MasterPty, PtySize, native_pty_system};
 use std::io::{Read, Write};
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 pub fn default_shell() -> String {
     if cfg!(windows) {
@@ -36,7 +37,7 @@ impl LocalShell {
     }
 
     pub fn start(self: &Arc<Self>) -> Result<()> {
-        let mut st = self.state.lock().unwrap();
+        let mut st = self.state.lock();
         if st.4 {
             return Err("shell already closed".into());
         }
@@ -77,7 +78,7 @@ impl LocalShell {
         std::thread::Builder::new().name("nexus-local-wait".into()).spawn(move || {
             let _ = child.wait();
             let was_closed = {
-                let mut st = me.state.lock().unwrap();
+                let mut st = me.state.lock();
                 let was = st.4;
                 st.4 = true;
                 st.0 = None;
@@ -94,14 +95,14 @@ impl LocalShell {
         if data.iter().any(|b| matches!(b, b'\r' | b'\n' | 4)) {
             self.capture_cwd();
         }
-        let mut st = self.state.lock().unwrap();
+        let mut st = self.state.lock();
         let r = st.0.as_mut().ok_or("shell not running")?;
         r.writer.write_all(data)?;
         Ok(())
     }
 
     pub fn resize(&self, cols: u16, rows: u16) -> Result<()> {
-        let mut st = self.state.lock().unwrap();
+        let mut st = self.state.lock();
         if cols > 0 {
             st.2 = cols;
         }
@@ -117,7 +118,7 @@ impl LocalShell {
 
     /// Idempotent; does not fire on_close (matches Go: an explicit close is not an exit).
     pub fn close(&self) {
-        let mut st = self.state.lock().unwrap();
+        let mut st = self.state.lock();
         if st.4 {
             return;
         }
@@ -129,13 +130,13 @@ impl LocalShell {
 
     /// The last directory the shell was seen in (used to restart in the same place).
     pub fn working_directory(&self) -> PathBuf {
-        self.state.lock().unwrap().1.clone()
+        self.state.lock().1.clone()
     }
 
     fn capture_cwd(&self) {
-        let pid = self.state.lock().unwrap().0.as_ref().and_then(|r| r.pid);
+        let pid = self.state.lock().0.as_ref().and_then(|r| r.pid);
         if let Some(dir) = pid.and_then(process_cwd).filter(|d| d.is_dir()) {
-            self.state.lock().unwrap().1 = dir;
+            self.state.lock().1 = dir;
         }
     }
 }
@@ -165,22 +166,19 @@ mod tests {
         let seen: Arc<Mutex<Vec<u8>>> = Arc::default();
         let closed = Arc::new(Mutex::new(0));
         let (s2, c2) = (seen.clone(), closed.clone());
-        let cb = Callbacks {
-            on_data: Arc::new(move |d| s2.lock().unwrap().extend_from_slice(d)),
-            on_error: Arc::new(|_| {}),
-            on_close: Arc::new(move || *c2.lock().unwrap() += 1),
-        };
+        let cb =
+            Callbacks { on_data: Arc::new(move |d| s2.lock().extend_from_slice(d)), on_error: Arc::new(|_| {}), on_close: Arc::new(move || *c2.lock() += 1) };
         let sh = LocalShell::new("/bin/sh", Some("/tmp".into()), 80, 24, cb);
         sh.start().unwrap();
         sh.write(b"cd / && echo local-$((2*21))\n").unwrap();
         let t = Instant::now();
-        while !String::from_utf8_lossy(&seen.lock().unwrap()).contains("local-42") {
+        while !String::from_utf8_lossy(&seen.lock()).contains("local-42") {
             assert!(t.elapsed() < Duration::from_secs(5));
             std::thread::sleep(Duration::from_millis(20));
         }
         sh.resize(100, 30).unwrap();
         sh.write(b"exit\n").unwrap();
-        while *closed.lock().unwrap() == 0 {
+        while *closed.lock() == 0 {
             assert!(t.elapsed() < Duration::from_secs(5));
             std::thread::sleep(Duration::from_millis(20));
         }

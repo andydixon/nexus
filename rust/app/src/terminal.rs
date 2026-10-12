@@ -12,7 +12,8 @@ use alacritty_terminal::term::test::TermSize;
 use alacritty_terminal::term::{Config, Term, TermMode};
 use alacritty_terminal::vte::ansi::{self, Color, CursorShape, NamedColor, Processor, StdSyncHandler};
 use egui::{Color32, Event, FontId, Key, Modifiers, PointerButton, Pos2, Rect, Sense, Stroke, Ui, pos2, vec2};
-use std::sync::{Arc, Mutex};
+use parking_lot::Mutex;
+use std::sync::Arc;
 
 #[derive(Clone, Default)]
 struct Listener(Arc<Mutex<Vec<TermEvent>>>);
@@ -20,7 +21,7 @@ struct Listener(Arc<Mutex<Vec<TermEvent>>>);
 impl EventListener for Listener {
     fn send_event(&self, e: TermEvent) {
         if matches!(e, TermEvent::PtyWrite(_) | TermEvent::Title(_) | TermEvent::Bell | TermEvent::ClipboardStore(..)) {
-            self.0.lock().unwrap().push(e);
+            self.0.lock().push(e);
         }
     }
 }
@@ -294,7 +295,7 @@ impl TermView {
         self.mouse(ui, &resp, origin, cw, ch, &mut out);
 
         // Terminal-originated events.
-        for e in std::mem::take(&mut *self.events.0.lock().unwrap()) {
+        for e in std::mem::take(&mut *self.events.0.lock()) {
             match e {
                 TermEvent::PtyWrite(s) => out.reply.extend_from_slice(s.as_bytes()),
                 TermEvent::Title(t) => out.title = Some(t),
@@ -918,7 +919,7 @@ mod tests {
     fn replies_to_device_attributes() {
         let mut t = TermView::new(10, 14.0, CursorStyle::Block);
         t.feed(b"\x1b[6n");
-        let ev = t.events.0.lock().unwrap();
+        let ev = t.events.0.lock();
         assert!(ev.iter().any(|e| matches!(e, TermEvent::PtyWrite(s) if s == "\x1b[1;1R")));
     }
 

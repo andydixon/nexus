@@ -7,7 +7,8 @@ use crate::widgets;
 use egui::{Align, Key, Layout, RichText};
 use egui_phosphor::regular as icon;
 use nexus_core::models::{ForwardDirection, PortForward, new_id};
-use std::sync::{Arc, Mutex};
+use parking_lot::Mutex;
+use std::sync::Arc;
 
 struct Form {
     remote: bool,
@@ -49,7 +50,7 @@ impl Forwards {
     }
 
     pub fn ui(&mut self, ctx: &egui::Context, s: &mut Shared) {
-        for started in std::mem::take(&mut *self.done.lock().unwrap()) {
+        for started in std::mem::take(&mut *self.done.lock()) {
             if started {
                 s.success("Forward started");
                 self.form.bind_port.clear();
@@ -131,7 +132,7 @@ impl Forwards {
 
         if let Some(id) = stop {
             let (svc, sid, done) = (s.svc.clone(), sid.clone(), self.done.clone());
-            s.spawn(move || svc.sessions.stop_forward(&sid, &id).map_err(|e| format!("Failed to stop: {e}").into()), move |_| done.lock().unwrap().push(false));
+            s.spawn(move || svc.sessions.stop_forward(&sid, &id).map_err(|e| format!("Failed to stop: {e}").into()), move |_| done.lock().push(false));
         }
         if start {
             let f = &self.form;
@@ -153,7 +154,7 @@ impl Forwards {
                     let (svc, done) = (s.svc.clone(), self.done.clone());
                     s.spawn(
                         move || svc.sessions.start_forward(&sid, rule).map_err(|e| format!("Failed to start forward: {e}").into()),
-                        move |_| done.lock().unwrap().push(true),
+                        move |_| done.lock().push(true),
                     );
                 }
                 _ => s.error("Bind port and destination port are required"),

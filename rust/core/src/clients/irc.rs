@@ -5,11 +5,12 @@
 //! optionally wrapped in TLS). It alternates between short reads and draining the outgoing
 //! queue, so the transport never has to be split.
 
+use parking_lot::{Mutex, MutexGuard};
 use std::collections::HashMap;
 use std::io::{ErrorKind, Read, Write};
 use std::net::{TcpStream, ToSocketAddrs};
+use std::sync::Arc;
 use std::sync::mpsc::{self, Receiver, Sender};
-use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
@@ -197,7 +198,7 @@ impl Client {
     }
 
     fn st(&self) -> MutexGuard<'_, State> {
-        self.state.lock().unwrap_or_else(|e| e.into_inner())
+        self.state.lock()
     }
 
     /// Connects and blocks until registration succeeds (RPL_WELCOME), fails, or times out.
@@ -205,7 +206,7 @@ impl Client {
         let (ready_tx, ready_rx) = mpsc::channel();
         let (out_tx, out_rx) = mpsc::channel();
         self.st().ready = Some(ready_tx);
-        *self.out.lock().unwrap_or_else(|e| e.into_inner()) = Some(out_tx);
+        *self.out.lock() = Some(out_tx);
 
         let client = self.clone();
         std::thread::spawn(move || client.io_thread(out_rx));
@@ -234,7 +235,7 @@ impl Client {
     }
 
     fn queue(&self, out: Out) -> bool {
-        let guard = self.out.lock().unwrap_or_else(|e| e.into_inner());
+        let guard = self.out.lock();
         guard.as_ref().is_some_and(|tx| tx.send(out).is_ok())
     }
 
@@ -471,7 +472,7 @@ impl Client {
 
     fn io_thread(self: Arc<Self>, out_rx: Receiver<Out>) {
         let result = self.open_transport().and_then(|stream| self.run(stream, &out_rx));
-        *self.out.lock().unwrap_or_else(|e| e.into_inner()) = None;
+        *self.out.lock() = None;
         let (was_closing, was_connected, ready) = {
             let mut st = self.st();
             let r = (st.closing, st.connected, st.ready.take());
@@ -1037,13 +1038,13 @@ mod tests {
     fn remember_room_membership_tracks_confirmed_channels() {
         let updates = Arc::new(Mutex::new(Vec::new()));
         let log = updates.clone();
-        let client = Client::new(Config { on_rooms_changed: Arc::new(move |rooms| log.lock().unwrap().push(rooms.join(","))), ..Default::default() });
+        let client = Client::new(Config { on_rooms_changed: Arc::new(move |rooms| log.lock().push(rooms.join(","))), ..Default::default() });
         client.remember_room_membership("#One", true);
         client.remember_room_membership("#two", true);
         client.remember_room_membership("#one", true);
         client.remember_room_membership("#missing", false);
         client.remember_room_membership("#ONE", false);
-        assert_eq!(updates.lock().unwrap().join("|"), "#One|#One,#two|#two");
+        assert_eq!(updates.lock().join("|"), "#One|#One,#two|#two");
         assert_eq!(client.st().room_names, vec!["#two"]);
     }
 
@@ -1109,9 +1110,9 @@ mod tests {
             nick: "me".into(),
             connect_timeout: Duration::from_secs(5),
             on_event: Arc::new(move |e| {
-                let _ = tx.lock().unwrap().send(e);
+                let _ = tx.lock().send(e);
             }),
-            on_close: Arc::new(move || *c.lock().unwrap() += 1),
+            on_close: Arc::new(move || *c.lock() += 1),
             ..cfg
         });
         (client, listener, rx, closes)
@@ -1224,11 +1225,11 @@ mod tests {
         client.close();
         srv.expect("QUIT :Nexus Terminal disconnected");
         let deadline = Instant::now() + Duration::from_secs(5);
-        while *closes.lock().unwrap() == 0 && Instant::now() < deadline {
+        while *closes.lock() == 0 && Instant::now() < deadline {
             std::thread::sleep(Duration::from_millis(10));
         }
         std::thread::sleep(Duration::from_millis(100));
-        assert_eq!(*closes.lock().unwrap(), 1);
+        assert_eq!(*closes.lock(), 1);
         assert!(client.handle_input("#a", "late").is_err());
     }
 
@@ -1236,7 +1237,7 @@ mod tests {
     fn remote_close_reports_error_and_close() {
         let errors = Arc::new(Mutex::new(Vec::new()));
         let log = errors.clone();
-        let (client, listener, rx, closes) = harness(Config { on_error: Arc::new(move |e| log.lock().unwrap().push(e)), ..Default::default() });
+        let (client, listener, rx, closes) = harness(Config { on_error: Arc::new(move |e| log.lock().push(e)), ..Default::default() });
         let c = client.clone();
         let connecting = std::thread::spawn(move || c.connect());
         let mut srv = accept(&listener);
@@ -1248,8 +1249,8 @@ mod tests {
         drop(srv);
         assert_eq!(wait_for(&rx, |e| e.kind == "error").text, "connection closed by server");
         std::thread::sleep(Duration::from_millis(100));
-        assert_eq!(*errors.lock().unwrap(), vec!["connection closed by server"]);
-        assert_eq!(*closes.lock().unwrap(), 1);
+        assert_eq!(*errors.lock(), vec!["connection closed by server"]);
+        assert_eq!(*closes.lock(), 1);
     }
 
     #[test]
@@ -1259,7 +1260,7 @@ mod tests {
         let err = client.connect().unwrap_err().to_string();
         assert_eq!(err, "IRC connection timed out after 300ms");
         drop(listener);
-        assert_eq!(*closes.lock().unwrap(), 0);
+        assert_eq!(*closes.lock(), 0);
     }
 
     #[test]
@@ -1273,7 +1274,7 @@ mod tests {
             nick: "me".into(),
             connect_timeout: Duration::from_secs(5),
             connector: Some(Arc::new(move || {
-                *flag.lock().unwrap() = true;
+                *flag.lock() = true;
                 let s = TcpStream::connect(addr)?;
                 s.set_read_timeout(Some(Duration::from_millis(20)))?;
                 Ok(Box::new(s) as Box<dyn ReadWrite>)
@@ -1286,7 +1287,7 @@ mod tests {
         srv.expect("USER me * * me");
         srv.send(":srv 001 me :Welcome");
         connecting.join().unwrap().unwrap();
-        assert!(*used.lock().unwrap());
+        assert!(*used.lock());
         client.handle_input("", "/quit gone").unwrap();
         srv.expect("QUIT gone");
     }

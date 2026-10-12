@@ -6,11 +6,11 @@ use aes_gcm::aead::{Aead, KeyInit};
 use aes_gcm::{Aes256Gcm, Nonce};
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as B64;
+use parking_lot::Mutex;
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::path::PathBuf;
-use std::sync::Mutex;
 use zeroize::Zeroizing;
 
 const VAULT_FILE: &str = "vault.json";
@@ -93,7 +93,7 @@ impl Vault {
     }
 
     pub fn is_unlocked(&self) -> bool {
-        self.state.lock().unwrap().is_some()
+        self.state.lock().is_some()
     }
 
     pub fn initialise(&self, password: &str) -> Result<()> {
@@ -104,7 +104,7 @@ impl Vault {
         let u = Unlocked { key: derive_key(password, &salt)?, vault: VaultFile { version: 1, salt: B64.encode(salt), secrets: BTreeMap::new() } };
         std::fs::create_dir_all(&self.dir)?;
         self.save(&u)?;
-        *self.state.lock().unwrap() = Some(u);
+        *self.state.lock() = Some(u);
         Ok(())
     }
 
@@ -121,12 +121,12 @@ impl Vault {
             let data = B64.decode(v).unwrap_or_default();
             open(&u.key, &data).map_err(|_| "secrets: incorrect master password or corrupt vault")?;
         }
-        *self.state.lock().unwrap() = Some(u);
+        *self.state.lock() = Some(u);
         Ok(())
     }
 
     pub fn lock(&self) {
-        *self.state.lock().unwrap() = None;
+        *self.state.lock() = None;
     }
 
     fn save(&self, u: &Unlocked) -> Result<()> {
@@ -135,7 +135,7 @@ impl Vault {
     }
 
     pub fn get(&self, key: &str) -> Result<String> {
-        let st = self.state.lock().unwrap();
+        let st = self.state.lock();
         let u = st.as_ref().ok_or("secrets: vault is locked")?;
         let enc = u.vault.secrets.get(key).ok_or_else(|| format!("secrets: key {key:?} not found"))?;
         let data = B64.decode(enc).map_err(|e| format!("failed to decode secret: {e}"))?;
@@ -143,7 +143,7 @@ impl Vault {
     }
 
     pub fn set(&self, key: &str, value: &str) -> Result<()> {
-        let mut st = self.state.lock().unwrap();
+        let mut st = self.state.lock();
         let u = st.as_mut().ok_or("secrets: vault is locked")?;
         let enc = B64.encode(seal(&u.key, value.as_bytes()));
         u.vault.secrets.insert(key.to_string(), enc);
@@ -151,14 +151,14 @@ impl Vault {
     }
 
     pub fn delete_prefix(&self, prefix: &str) -> Result<()> {
-        let mut st = self.state.lock().unwrap();
+        let mut st = self.state.lock();
         let u = st.as_mut().ok_or("secrets: vault is locked")?;
         u.vault.secrets.retain(|k, _| !k.starts_with(prefix));
         self.save(u)
     }
 
     pub fn delete(&self, key: &str) -> Result<()> {
-        let mut st = self.state.lock().unwrap();
+        let mut st = self.state.lock();
         let u = st.as_mut().ok_or("secrets: vault is locked")?;
         u.vault.secrets.remove(key);
         self.save(u)

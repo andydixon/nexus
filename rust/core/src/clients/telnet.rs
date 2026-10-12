@@ -2,7 +2,8 @@
 //! TTYPE, NAWS; everything else refused), IAC escaping, line-ending conversion, ISO 8859-1 output
 //! encoding and BRK. Go read but never acted on `lineMode`, and neither do we.
 
-use std::sync::{Arc, Mutex};
+use parking_lot::Mutex;
+use std::sync::Arc;
 
 use super::{Callbacks, DataFn, DebugFn, TcpConn};
 use crate::models::{LineEnding, Profile, TelnetConfig};
@@ -96,7 +97,7 @@ impl TelnetClient {
             return Err("not connected".into());
         }
         {
-            let mut st = self.inner.state.lock().unwrap();
+            let mut st = self.inner.state.lock();
             st.cols = cols;
             st.rows = rows;
         }
@@ -119,7 +120,7 @@ impl TelnetClient {
     /// The negotiated local-echo state: starts at the profile's `localEcho`, cleared by the
     /// server's WILL ECHO and set by WONT ECHO. Like Go, the client itself never echoes.
     pub fn local_echo(&self) -> bool {
-        self.inner.state.lock().unwrap().local_echo
+        self.inner.state.lock().local_echo
     }
 }
 
@@ -196,7 +197,7 @@ impl Inner {
             OPT_NAWS => {
                 self.negotiate(WILL, opt);
                 let (cols, rows) = {
-                    let st = self.state.lock().unwrap();
+                    let st = self.state.lock();
                     (st.cols, st.rows)
                 };
                 let _ = self.send_naws(cols, rows);
@@ -215,7 +216,7 @@ impl Inner {
         match opt {
             OPT_ECHO => {
                 self.negotiate(DO, opt);
-                self.state.lock().unwrap().local_echo = false;
+                self.state.lock().local_echo = false;
             }
             OPT_SGA => self.negotiate(DO, opt),
             _ => self.negotiate(DONT, opt),
@@ -225,7 +226,7 @@ impl Inner {
     fn handle_wont(&self, opt: u8) {
         self.debug(format!("received WONT {opt}"));
         if opt == OPT_ECHO {
-            self.state.lock().unwrap().local_echo = true;
+            self.state.lock().local_echo = true;
         }
         self.negotiate(DONT, opt);
     }
@@ -362,7 +363,7 @@ mod tests {
             on_error: Arc::new(move |e| etx.send(e).unwrap()),
             on_close: Arc::new(move || ctx.send(()).unwrap()),
         };
-        let client = TelnetClient::new(&profile, cb, Some(Arc::new(move |m| dbg.lock().unwrap().push(m))));
+        let client = TelnetClient::new(&profile, cb, Some(Arc::new(move |m| dbg.lock().push(m))));
         client.connect().unwrap();
         let (mut srv, _) = listener.accept().unwrap();
         srv.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
@@ -399,7 +400,7 @@ mod tests {
         client.write(b"ls\n\xff").unwrap();
         assert_eq!(read_n(&mut srv, 6), b"ls\r\n\xff\xff");
 
-        let log = debug.lock().unwrap().clone();
+        let log = debug.lock().clone();
         for m in ["received DO 24", "sending WILL 31", "sending NAWS: 80x24", "sending WONT 99", "sending terminal type: xterm-256color"] {
             assert!(log.iter().any(|l| l == m), "missing debug {m:?} in {log:?}");
         }

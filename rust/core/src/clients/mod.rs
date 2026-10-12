@@ -69,20 +69,20 @@ pub(crate) fn dial(host: &str, port: i64, timeout_secs: i64) -> (String, std::io
 /// a lock, a reader thread that feeds `on_read`, and Go's error/close semantics (a read error or EOF
 /// reports `read error: …` then closes; `close` is idempotent and fires `on_close` once).
 pub(crate) struct TcpConn {
-    stream: std::sync::Mutex<Option<std::net::TcpStream>>,
+    stream: parking_lot::Mutex<Option<std::net::TcpStream>>,
     on_error: ErrorFn,
     on_close: CloseFn,
 }
 
 impl TcpConn {
     pub(crate) fn new(on_error: ErrorFn, on_close: CloseFn) -> TcpConn {
-        TcpConn { stream: std::sync::Mutex::new(None), on_error, on_close }
+        TcpConn { stream: parking_lot::Mutex::new(None), on_error, on_close }
     }
 
     pub(crate) fn connect(self: &Arc<Self>, stream: std::net::TcpStream, mut on_read: impl FnMut(&[u8]) + Send + 'static) -> crate::Result<()> {
         let mut reader = stream.try_clone()?;
         {
-            let mut guard = self.stream.lock().unwrap();
+            let mut guard = self.stream.lock();
             if guard.is_some() {
                 return Err("already connected".into());
             }
@@ -115,18 +115,18 @@ impl TcpConn {
 
     pub(crate) fn write(&self, data: &[u8]) -> crate::Result<()> {
         use std::io::Write;
-        let guard = self.stream.lock().unwrap();
+        let guard = self.stream.lock();
         let mut s = guard.as_ref().ok_or("not connected")?;
         s.write_all(data)?;
         Ok(())
     }
 
     pub(crate) fn is_connected(&self) -> bool {
-        self.stream.lock().unwrap().is_some()
+        self.stream.lock().is_some()
     }
 
     pub(crate) fn close(&self) {
-        let taken = self.stream.lock().unwrap().take();
+        let taken = self.stream.lock().take();
         if let Some(s) = taken {
             let _ = s.shutdown(std::net::Shutdown::Both);
             (self.on_close)();

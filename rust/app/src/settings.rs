@@ -9,7 +9,8 @@ use egui::{RichText, Ui, vec2};
 use egui_phosphor::regular as icon;
 use nexus_core::models::{AppPreferences, KnownHost, Protocol};
 use nexus_core::updater::UpdateInfo;
-use std::sync::{Arc, Mutex};
+use parking_lot::Mutex;
+use std::sync::Arc;
 
 /// A result from a worker thread, polled each frame (`Some` while the work is in flight).
 pub struct Job<T>(Arc<Mutex<Option<T>>>);
@@ -20,14 +21,14 @@ impl<T: Send + 'static> Job<T> {
         let (out, ctx) = (slot.clone(), ctx.clone());
         std::thread::spawn(move || {
             let v = f();
-            *out.lock().unwrap() = Some(v);
+            *out.lock() = Some(v);
             ctx.request_repaint();
         });
         Job(slot)
     }
 
     pub fn take(&self) -> Option<T> {
-        self.0.lock().unwrap().take()
+        self.0.lock().take()
     }
 }
 

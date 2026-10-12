@@ -5,11 +5,12 @@ use nexus_core::clients::Callbacks;
 use nexus_core::clients::sftp;
 use nexus_core::clients::ssh::{HostKeyCheck, SshClient};
 use nexus_core::models::{ForwardDirection, JumpHost, PortForward, Profile, Protocol};
+use parking_lot::Mutex;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 struct Server {
@@ -87,7 +88,7 @@ fn callbacks() -> (Callbacks, Seen) {
     let seen: Seen = Arc::default();
     let s2 = seen.clone();
     let mut cb = Callbacks::noop();
-    cb.on_data = Arc::new(move |d| s2.lock().unwrap().extend_from_slice(d));
+    cb.on_data = Arc::new(move |d| s2.lock().extend_from_slice(d));
     (cb, seen)
 }
 
@@ -96,7 +97,7 @@ fn accept_all() -> (HostKeyCheck, Arc<Mutex<Vec<String>>>) {
     let f2 = fps.clone();
     (
         Arc::new(move |i| {
-            f2.lock().unwrap().push(format!("{} {}", i.key_type, i.fingerprint));
+            f2.lock().push(format!("{} {}", i.key_type, i.fingerprint));
             Ok(())
         }),
         fps,
@@ -106,7 +107,7 @@ fn accept_all() -> (HostKeyCheck, Arc<Mutex<Vec<String>>>) {
 fn wait_for(seen: &Seen, needle: &str) -> bool {
     let start = Instant::now();
     while start.elapsed() < Duration::from_secs(10) {
-        if String::from_utf8_lossy(&seen.lock().unwrap()).contains(needle) {
+        if String::from_utf8_lossy(&seen.lock()).contains(needle) {
             return true;
         }
         std::thread::sleep(Duration::from_millis(50));
@@ -160,11 +161,11 @@ fn shell_exec_forwards_sftp() {
     let (check, fps) = accept_all();
     let c = SshClient::new(&profile(&s), cb);
     c.connect(check, None, None).unwrap();
-    assert!(fps.lock().unwrap()[0].starts_with("ssh-ed25519 SHA256:"));
+    assert!(fps.lock()[0].starts_with("ssh-ed25519 SHA256:"));
 
     c.resize(120, 40).unwrap();
     c.write(b"echo nexus-$((40+2)) $COLUMNS\n").unwrap();
-    assert!(wait_for(&seen, "nexus-42"), "shell output: {}", String::from_utf8_lossy(&seen.lock().unwrap()));
+    assert!(wait_for(&seen, "nexus-42"), "shell output: {}", String::from_utf8_lossy(&seen.lock()));
     assert_eq!(c.run_command("echo hi").unwrap(), "hi");
     assert!(c.ping().unwrap() >= 0);
 
@@ -222,16 +223,16 @@ fn close_fires_once_and_remote_exit_closes() {
     let (mut cb, _) = callbacks();
     let n = Arc::new(Mutex::new(0));
     let n2 = n.clone();
-    cb.on_close = Arc::new(move || *n2.lock().unwrap() += 1);
+    cb.on_close = Arc::new(move || *n2.lock() += 1);
     let c = SshClient::new(&profile(&s), cb);
     c.connect(accept_all().0, None, None).unwrap();
     c.write(b"exit\n").unwrap();
     let start = Instant::now();
-    while *n.lock().unwrap() == 0 && start.elapsed() < Duration::from_secs(10) {
+    while *n.lock() == 0 && start.elapsed() < Duration::from_secs(10) {
         std::thread::sleep(Duration::from_millis(50));
     }
     c.close();
-    assert_eq!(*n.lock().unwrap(), 1);
+    assert_eq!(*n.lock(), 1);
 }
 
 #[test]
@@ -252,7 +253,7 @@ fn jump_host_chain() {
     let (check, fps) = accept_all();
     let c = SshClient::new(&p, Callbacks::noop());
     c.connect(check, None, None).unwrap();
-    assert_eq!(fps.lock().unwrap().len(), 2, "jump and target both verified");
+    assert_eq!(fps.lock().len(), 2, "jump and target both verified");
     assert_eq!(c.run_command("echo via-jump").unwrap(), "via-jump");
     c.close();
 }
@@ -281,6 +282,6 @@ fn agent_auth_and_forwarding() {
     let cl = SshClient::new(&p, cb);
     cl.connect(accept_all().0, None, None).unwrap();
     cl.write(b"ssh-add -l >/dev/null && echo agent-$((1+1))-ok\n").unwrap();
-    assert!(wait_for(&seen, "agent-2-ok"), "forwarded agent not usable: {}", String::from_utf8_lossy(&seen.lock().unwrap()));
+    assert!(wait_for(&seen, "agent-2-ok"), "forwarded agent not usable: {}", String::from_utf8_lossy(&seen.lock()));
     cl.close();
 }

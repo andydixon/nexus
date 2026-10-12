@@ -12,6 +12,7 @@ path = "src/main.rs"
 nexus-core = { path = "../core" }
 eframe = { version = "0.36", default-features = false, features = ["default_fonts", "glow", "wayland", "x11", "accesskit", "persistence"] }
 egui = "0.36"
+parking_lot = "0.12"
 egui-phosphor = "0.14"
 rfd = "0.17"
 image = { version = "0.25", default-features = false, features = ["png"] }

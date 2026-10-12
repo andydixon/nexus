@@ -370,13 +370,13 @@ pub fn status_bar(app: &mut App, ui: &mut Ui) {
     });
 }
 
-static LATENCY: std::sync::Mutex<Option<(String, Result<i64, String>)>> = std::sync::Mutex::new(None);
+static LATENCY: parking_lot::Mutex<Option<(String, Result<i64, String>)>> = parking_lot::Mutex::new(None);
 
 /// Pings the active SSH session every 10 s for the status-bar latency.
 fn latency_tick(app: &mut App) {
     let id = app.s.active.clone();
     let ssh = id.as_deref().and_then(|a| app.s.pane(a)).is_some_and(|p| p.info.protocol == Protocol::Ssh);
-    if let Some(r) = LATENCY.lock().unwrap().take() {
+    if let Some(r) = LATENCY.lock().take() {
         app.latency = Some(r);
     }
     let Some(id) = id.filter(|_| ssh) else { return };
@@ -395,7 +395,7 @@ fn latency_tick(app: &mut App) {
     let (svc, ctx) = (app.s.svc.clone(), app.s.ctx.clone());
     std::thread::spawn(move || {
         let r = svc.sessions.ping(&id).map_err(|e| e.to_string());
-        *LATENCY.lock().unwrap() = Some((id, r));
+        *LATENCY.lock() = Some((id, r));
         ctx.request_repaint();
     });
 }

@@ -11,9 +11,10 @@ use nexus_core::clients::serial;
 use nexus_core::keyfiles;
 use nexus_core::models::*;
 use nexus_core::validation::{ValidationError, validate_profile};
+use parking_lot::Mutex;
 use std::collections::{BTreeMap, HashMap};
 use std::path::Path;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 type KeyChecks = HashMap<String, Result<&'static str, &'static str>>;
 
@@ -184,7 +185,7 @@ impl ProfileEditor {
     /// Drawn inside the right dock while open.
     pub fn ui(&mut self, ui: &mut Ui, s: &mut Shared) {
         let t = Tokens::get(ui.ctx());
-        if let Some(r) = self.test.lock().unwrap().take() {
+        if let Some(r) = self.test.lock().take() {
             self.testing = false;
             match r {
                 Ok(ms) => s.success(format!("Reachable — {ms} ms")),
@@ -336,7 +337,7 @@ impl ProfileEditor {
         let (slot, svc, ctx) = (self.test.clone(), s.svc.clone(), s.ctx.clone());
         std::thread::spawn(move || {
             let r = svc.test_connection(&host, port).map_err(|e| e.to_string());
-            *slot.lock().unwrap() = Some(r);
+            *slot.lock() = Some(r);
             ctx.request_repaint();
         });
     }

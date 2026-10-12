@@ -4,10 +4,11 @@ use nexus_core::models::{Profile, Protocol, SessionState};
 use nexus_core::secrets::{Keychain, Secrets, Vault};
 use nexus_core::sessions::{Event, HostKeyDecision, Manager};
 use nexus_core::storage::Store;
+use parking_lot::Mutex;
 use std::io::{Read, Write};
 use std::net::TcpListener;
+use std::sync::Arc;
 use std::sync::mpsc;
-use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 fn manager(name: &str) -> (Arc<Manager>, mpsc::Receiver<Event>, std::path::PathBuf) {
@@ -20,7 +21,7 @@ fn manager(name: &str) -> (Arc<Manager>, mpsc::Receiver<Event>, std::path::PathB
     let (tx, rx) = mpsc::channel();
     let tx = Mutex::new(tx);
     m.set_sink(Arc::new(move |e| {
-        let _ = tx.lock().unwrap().send(e);
+        let _ = tx.lock().send(e);
     }));
     (m, rx, dir)
 }

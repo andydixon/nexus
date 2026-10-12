@@ -8,7 +8,8 @@ use chrono::{DateTime, Utc};
 use egui::{Color32, RichText, Sense, Ui, vec2};
 use egui_phosphor::regular as icon;
 use nexus_core::models::GitHubRepo;
-use std::sync::{Arc, Mutex};
+use parking_lot::Mutex;
+use std::sync::Arc;
 
 enum Msg {
     Repos(Vec<GitHubRepo>),
@@ -175,7 +176,7 @@ impl GithubView {
                 Ok(r) => Msg::Repos(r),
                 Err(e) => Msg::RefreshFailed(e.to_string()),
             };
-            inbox.lock().unwrap().push(msg);
+            inbox.lock().push(msg);
             ctx.request_repaint();
         });
     }
@@ -193,13 +194,13 @@ impl GithubView {
                 Ok(()) => Msg::Downloaded(full, path.display().to_string()),
                 Err(e) => Msg::DownloadFailed(e.to_string()),
             };
-            inbox.lock().unwrap().push(msg);
+            inbox.lock().push(msg);
             ctx.request_repaint();
         });
     }
 
     pub fn ui(&mut self, ui: &mut Ui, s: &mut Shared) {
-        let msgs = std::mem::take(&mut *self.inbox.lock().unwrap());
+        let msgs = std::mem::take(&mut *self.inbox.lock());
         for m in msgs {
             match m {
                 Msg::Repos(r) => {

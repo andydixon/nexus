@@ -11,9 +11,10 @@ use egui::{Key, KeyboardShortcut, Modifiers, Ui};
 use nexus_core::models::{Profile, Protocol, SessionInfo, SessionState};
 use nexus_core::service::Service;
 use nexus_core::sessions::{Event, HostKeyDecision};
+use parking_lot::Mutex;
 use std::collections::VecDeque;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex, mpsc};
+use std::sync::{Arc, mpsc};
 
 pub struct Options {
     pub screenshot: Option<PathBuf>,
@@ -37,7 +38,14 @@ pub struct Options {
 static POSTED: Mutex<Vec<String>> = Mutex::new(Vec::new());
 
 pub fn post_error(e: String) {
-    POSTED.lock().unwrap().push(e);
+    POSTED.lock().push(e);
+}
+
+/// For the panic hook: the panicking thread may already hold the lock.
+pub fn post_error_nonblocking(e: String) {
+    if let Some(mut p) = POSTED.try_lock() {
+        p.push(e);
+    }
 }
 
 /// A credential or host-key question from a connecting session.
@@ -141,7 +149,7 @@ impl App {
         let ctx = cc.egui_ctx.clone();
         let tx = Mutex::new(tx);
         svc.sessions.set_sink(Arc::new(move |e| {
-            let _ = tx.lock().unwrap().send(e);
+            let _ = tx.lock().send(e);
             ctx.request_repaint();
         }));
         let s = Shared::new(svc.clone(), cc.egui_ctx.clone());
@@ -405,7 +413,7 @@ impl App {
     // --- events ---------------------------------------------------------------------------
 
     fn drain_events(&mut self) {
-        for e in POSTED.lock().unwrap().drain(..) {
+        for e in POSTED.lock().drain(..) {
             self.s.error(e);
         }
         while let Ok(e) = self.rx.try_recv() {

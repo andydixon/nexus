@@ -10,11 +10,12 @@ use crate::models::*;
 use crate::recording::{self, Recorder};
 use crate::secrets::Secrets;
 use crate::storage::Store;
+use parking_lot::Mutex;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc;
-use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 /// Everything the UI hears about. Prompts carry their reply channel; dropping it cancels.
@@ -222,7 +223,7 @@ struct SecretState {
 /// After a failed attempt, typed credentials are dropped and, when the server refused them, the
 /// saved ones used are skipped next time so the user can enter a replacement.
 fn attempt_failed(state: &SessionSecrets, error: &str) {
-    let mut st = state.lock().unwrap();
+    let mut st = state.lock();
     st.pending.clear();
     if is_auth_error(error) {
         let used = std::mem::take(&mut st.used);
@@ -263,11 +264,11 @@ impl Manager {
     }
 
     pub fn set_sink(&self, sink: EventSink) {
-        *self.sink.lock().unwrap() = Some(sink);
+        *self.sink.lock() = Some(sink);
     }
 
     fn emit(&self, e: Event) {
-        let sink = self.sink.lock().unwrap().clone();
+        let sink = self.sink.lock().clone();
         if let Some(s) = sink {
             s(e);
         }
@@ -279,11 +280,11 @@ impl Manager {
 
     /// True while `id` still names the Session object with `epoch` and it isn't closed.
     fn is_current(&self, id: &str, epoch: u64) -> bool {
-        self.sessions.lock().unwrap().get(id).is_some_and(|s| s.epoch == epoch && !s.closed)
+        self.sessions.lock().get(id).is_some_and(|s| s.epoch == epoch && !s.closed)
     }
 
     fn with<R>(&self, id: &str, f: impl FnOnce(&mut Session) -> R) -> Result<R> {
-        let mut map = self.sessions.lock().unwrap();
+        let mut map = self.sessions.lock();
         match map.get_mut(id) {
             Some(s) => Ok(f(s)),
             None => err(format!("sessions: session {id:?} not found")),
@@ -312,7 +313,7 @@ impl Manager {
             session_secrets,
         };
         let id = s.info.id.clone();
-        self.sessions.lock().unwrap().insert(id, s);
+        self.sessions.lock().insert(id, s);
         epoch
     }
 
@@ -353,7 +354,7 @@ impl Manager {
     }
 
     fn finish_connect(&self, id: &str, epoch: u64, r: Result<Client>, on_ok: impl FnOnce(&Self)) {
-        let mut map = self.sessions.lock().unwrap();
+        let mut map = self.sessions.lock();
         let current = map.get_mut(id).filter(|s| s.epoch == epoch && !s.closed);
         match (r, current) {
             (Ok(client), None) => {
@@ -369,7 +370,7 @@ impl Manager {
                 self.emit_state(id, SessionState::Error, &e.to_string());
             }
             (Ok(client), Some(s)) => {
-                let typed = std::mem::take(&mut s.session_secrets.lock().unwrap().pending);
+                let typed = std::mem::take(&mut s.session_secrets.lock().pending);
                 s.client = client.clone();
                 s.info.state = SessionState::Connected;
                 s.info.connected_at = now();
@@ -392,7 +393,7 @@ impl Manager {
 
     fn connect_protocol(self: &Arc<Self>, id: &str, epoch: u64, p: &Profile, prompt: Prompt) -> Result<Client> {
         let _ = self.with(id, |s| {
-            let mut st = s.session_secrets.lock().unwrap();
+            let mut st = s.session_secrets.lock();
             st.pending.clear();
             st.used.clear();
         });
@@ -431,15 +432,15 @@ impl Manager {
 
     /// Callbacks for terminal-style clients: output to the UI, recording and login scripts.
     fn terminal_callbacks(self: &Arc<Self>, id: &str, epoch: u64) -> Callbacks {
-        let login = self.sessions.lock().unwrap().get(id).map(|s| s.login.clone()).unwrap_or_default();
+        let login = self.sessions.lock().get(id).map(|s| s.login.clone()).unwrap_or_default();
         let (me, sid) = (self.clone(), id.to_string());
         let on_data = Arc::new(move |d: &[u8]| {
             me.emit(Event::Data { session: sid.clone(), data: d.to_vec() });
-            let rec = me.sessions.lock().unwrap().get(&sid).and_then(|s| s.recorder.clone());
+            let rec = me.sessions.lock().get(&sid).and_then(|s| s.recorder.clone());
             if let Some(r) = rec {
                 r.write_output(d);
             }
-            let mut l = login.lock().unwrap();
+            let mut l = login.lock();
             if l.active {
                 l.buf.extend_from_slice(d);
                 if l.buf.len() > 16384 {
@@ -485,10 +486,10 @@ impl Manager {
         let key = format!("profile:{profile_id}:{kind}");
         let (secrets, store) = (self.secrets.clone(), self.store.clone());
         let (pid, kind) = (profile_id.to_string(), kind.to_string());
-        let state: SessionSecrets = self.sessions.lock().unwrap().get(session).map(|s| s.session_secrets.clone()).unwrap_or_default();
+        let state: SessionSecrets = self.sessions.lock().get(session).map(|s| s.session_secrets.clone()).unwrap_or_default();
         Arc::new(move || {
             if mode == SecretMode::Saved {
-                let mut st = state.lock().unwrap();
+                let mut st = state.lock();
                 if let Some(v) = st.pending.get(&key) {
                     return Ok(v.clone());
                 }
@@ -501,12 +502,12 @@ impl Manager {
                 }
             }
             if mode == SecretMode::SessionOnly
-                && let Some(v) = state.lock().unwrap().session_only.get(&key).cloned()
+                && let Some(v) = state.lock().session_only.get(&key).cloned()
             {
                 return Ok(v);
             }
             let v = prompt(&format!("Enter {kind}:"))?;
-            let mut st = state.lock().unwrap();
+            let mut st = state.lock();
             match mode {
                 SecretMode::Saved => {
                     st.pending.insert(key.clone(), v.clone());
@@ -693,7 +694,7 @@ impl Manager {
                 let retry = auth.then(|| prompt("GitHub token did not work. Please enter a valid token:").ok()).flatten().filter(|t| !t.is_empty());
                 let Some(t) = retry else { return err(format!("GitHub authentication failed: {e}")) };
                 if gh.secret_mode == SecretMode::Saved {
-                    let _ = self.with(id, |s| s.session_secrets.lock().unwrap().pending.insert(format!("profile:{}:github-token", p.id), t.clone()));
+                    let _ = self.with(id, |s| s.session_secrets.lock().pending.insert(format!("profile:{}:github-token", p.id), t.clone()));
                 }
                 client = github::Client::new(&gh.base_url, &t);
                 client.validate_token().map_err(|e| format!("GitHub authentication failed: {e}"))?
@@ -963,7 +964,7 @@ impl Manager {
 
     /// Explicit close: the tab is gone, so no reconnect.
     pub fn disconnect(&self, id: &str) -> Result<()> {
-        let s = self.sessions.lock().unwrap().remove(id).ok_or_else(|| format!("sessions: session {id:?} not found"))?;
+        let s = self.sessions.lock().remove(id).ok_or_else(|| format!("sessions: session {id:?} not found"))?;
         self.close_session(s);
         self.store.add_audit("disconnect", "", id, "Session disconnected");
         Ok(())
@@ -972,7 +973,7 @@ impl Manager {
     /// Closes and re-opens a session from its profile, keeping the tab name and pin; returns the
     /// new session id.
     pub fn reconnect(self: &Arc<Self>, id: &str) -> Result<String> {
-        let s = self.sessions.lock().unwrap().remove(id).ok_or_else(|| format!("sessions: session {id:?} not found"))?;
+        let s = self.sessions.lock().remove(id).ok_or_else(|| format!("sessions: session {id:?} not found"))?;
         let (profile, tab, pinned, proto, shell) = (s.profile.clone(), s.info.tab_name.clone(), s.info.pinned, s.info.protocol, s.local_shell.clone());
         let session_secrets = s.session_secrets.clone();
         self.close_session(s);
@@ -1001,7 +1002,7 @@ impl Manager {
 
     fn handle_closed(self: &Arc<Self>, id: &str, epoch: u64) {
         let profile = {
-            let mut map = self.sessions.lock().unwrap();
+            let mut map = self.sessions.lock();
             let Some(s) = map.get_mut(id).filter(|s| s.epoch == epoch && !s.closed) else { return };
             s.info.state = SessionState::Disconnected;
             if !matches!(s.client, Client::Local(_)) {
@@ -1109,7 +1110,7 @@ impl Manager {
     }
 
     pub fn close_all(&self) {
-        let all: Vec<Session> = self.sessions.lock().unwrap().drain().map(|(_, s)| s).collect();
+        let all: Vec<Session> = self.sessions.lock().drain().map(|(_, s)| s).collect();
         for s in all {
             self.close_session(s);
         }
@@ -1122,7 +1123,7 @@ impl Manager {
             return;
         }
         let Ok(login) = self.with(id, |s| s.login.clone()) else { return };
-        *login.lock().unwrap() = LoginBuf { active: true, buf: vec![] };
+        *login.lock() = LoginBuf { active: true, buf: vec![] };
         let (me, id) = (self.clone(), id.to_string());
         std::thread::spawn(move || {
             std::thread::sleep(Duration::from_millis(500));
@@ -1157,7 +1158,7 @@ impl Manager {
                     _ => {}
                 }
             }
-            *login.lock().unwrap() = LoginBuf::default();
+            *login.lock() = LoginBuf::default();
         });
     }
 
@@ -1202,15 +1203,15 @@ impl Manager {
     }
 
     pub fn info(&self, id: &str) -> Option<SessionInfo> {
-        self.sessions.lock().unwrap().get(id).map(|s| s.info.clone())
+        self.sessions.lock().get(id).map(|s| s.info.clone())
     }
 
     pub fn list(&self) -> Vec<SessionInfo> {
-        self.sessions.lock().unwrap().values().map(|s| s.info.clone()).collect()
+        self.sessions.lock().values().map(|s| s.info.clone()).collect()
     }
 
     pub fn profile(&self, id: &str) -> Option<Profile> {
-        self.sessions.lock().unwrap().get(id).and_then(|s| s.profile.clone())
+        self.sessions.lock().get(id).and_then(|s| s.profile.clone())
     }
 
     pub fn rename(&self, id: &str, name: &str) -> Result<()> {
@@ -1426,7 +1427,7 @@ fn wait_for_output(login: &Mutex<LoginBuf>, pattern: &str, timeout: Duration) ->
     let deadline = std::time::Instant::now() + timeout;
     while std::time::Instant::now() < deadline {
         {
-            let mut l = login.lock().unwrap();
+            let mut l = login.lock();
             let text = String::from_utf8_lossy(&l.buf).into_owned();
             if let Some(i) = text.find(pattern) {
                 let consumed = text[..i + pattern.len()].len();
@@ -1469,7 +1470,7 @@ mod tests {
         let w = warnings.clone();
         m.set_sink(Arc::new(move |e| {
             if let Event::Warning { message, .. } = e {
-                w.lock().unwrap().push(message);
+                w.lock().push(message);
             }
         }));
         let p = Profile { host: "127.0.0.1".into(), port: 1, ..Profile::new(Protocol::Raw) };
@@ -1494,7 +1495,7 @@ mod tests {
         let e = m.new_session(info("s0"), Some(p.clone()), String::new(), SessionSecrets::default());
         resolve(&m, "s0");
         m.finish_connect("s0", e, Ok(Client::None), |_| {});
-        assert_eq!(warnings.lock().unwrap().len(), 1);
+        assert_eq!(warnings.lock().len(), 1);
 
         m.secrets.vault.initialise("pw").unwrap();
         let e = m.new_session(info("s1"), Some(p.clone()), String::new(), SessionSecrets::default());
@@ -1570,40 +1571,40 @@ mod tests {
         let (a, pr) = (answers.clone(), prompts.clone());
         m.set_sink(Arc::new(move |e| {
             if let Event::HostKeyVerify { stored, reply, .. } = e {
-                pr.lock().unwrap().push(stored);
-                let _ = reply.send(a.lock().unwrap().remove(0));
+                pr.lock().push(stored);
+                let _ = reply.send(a.lock().remove(0));
             }
         }));
         let info = |fp: &str| HostKeyInfo { host: "h".into(), port: 22, key_type: "ssh-ed25519".into(), fingerprint: fp.into(), public_key_b64: "AAAA".into() };
         let stored = |m: &Manager| m.store.get_known_host("h", 22).unwrap().map(|k| k.fingerprint);
         // Unknown key: accept once records nothing; accept & save records it.
         let check = m.host_key_check("s", HostKeyPolicy::Ask);
-        answers.lock().unwrap().push(HostKeyDecision::AcceptOnce);
+        answers.lock().push(HostKeyDecision::AcceptOnce);
         check(&info("A")).unwrap();
         assert_eq!(stored(&m), None);
-        answers.lock().unwrap().push(HostKeyDecision::AcceptAndSave);
+        answers.lock().push(HostKeyDecision::AcceptAndSave);
         check(&info("A")).unwrap();
         assert_eq!(stored(&m).as_deref(), Some("A"));
-        assert_eq!(prompts.lock().unwrap().as_slice(), [None, None]);
+        assert_eq!(prompts.lock().as_slice(), [None, None]);
         // Same key again: no prompt.
         check(&info("A")).unwrap();
-        assert_eq!(prompts.lock().unwrap().len(), 2);
+        assert_eq!(prompts.lock().len(), 2);
         // Changed key: reject, accept once (record untouched), accept & update (record replaced).
-        answers.lock().unwrap().push(HostKeyDecision::Reject);
+        answers.lock().push(HostKeyDecision::Reject);
         assert!(check(&info("B")).unwrap_err().contains("has changed"));
-        answers.lock().unwrap().push(HostKeyDecision::AcceptOnce);
+        answers.lock().push(HostKeyDecision::AcceptOnce);
         check(&info("B")).unwrap();
         assert_eq!(stored(&m).as_deref(), Some("A"));
-        answers.lock().unwrap().push(HostKeyDecision::AcceptAndSave);
+        answers.lock().push(HostKeyDecision::AcceptAndSave);
         check(&info("B")).unwrap();
         assert_eq!(stored(&m).as_deref(), Some("B"));
-        assert_eq!(prompts.lock().unwrap()[2..], [Some("A".to_string()), Some("A".into()), Some("A".into())]);
+        assert_eq!(prompts.lock()[2..], [Some("A".to_string()), Some("A".into()), Some("A".into())]);
         assert_eq!(m.store.list_known_hosts().unwrap().len(), 1);
         // Strict and accept-new never prompt on a changed key.
         for policy in [HostKeyPolicy::Strict, HostKeyPolicy::AcceptNew] {
             assert!(m.host_key_check("s", policy)(&info("C")).unwrap_err().contains("has changed"));
         }
-        assert_eq!(prompts.lock().unwrap().len(), 5);
+        assert_eq!(prompts.lock().len(), 5);
         let _ = std::fs::remove_dir_all(dir);
     }
 }
