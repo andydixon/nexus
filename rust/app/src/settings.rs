@@ -102,6 +102,8 @@ pub struct Settings {
     prefs: AppPreferences,
     theme: ThemeKind,
     known: Vec<KnownHost>,
+    /// Add-CA form: (host pattern, public key), shown when Some.
+    new_ca: Option<(String, String)>,
     default_shell: String,
     help_topic: usize,
     master: Option<MasterPrompt>,
@@ -444,6 +446,58 @@ impl Settings {
 
     fn known_hosts(&mut self, ui: &mut Ui, s: &mut Shared) {
         let t = Tokens::get(ui.ctx());
+        ui.horizontal(|ui| {
+            if widgets::button(ui, icon::DOWNLOAD_SIMPLE, "Import ~/.ssh/known_hosts").clicked() {
+                match s.svc.import_known_hosts(None) {
+                    Ok((n, ca, skipped)) => {
+                        let extra = if skipped > 0 { format!(" ({skipped} hashed or unsupported line(s) skipped)") } else { String::new() };
+                        s.success(format!("Imported {n} host key(s) and {ca} certificate authorit{}{extra}", if ca == 1 { "y" } else { "ies" }));
+                        self.known = s.svc.known_hosts();
+                    }
+                    Err(e) => s.error(format!("Import failed: {e}")),
+                }
+            }
+            if widgets::button(ui, icon::UPLOAD_SIMPLE, "Export…").clicked()
+                && let Some(path) = rfd::FileDialog::new().set_file_name("known_hosts").save_file()
+            {
+                match s.svc.export_known_hosts(&path) {
+                    Ok(n) => s.success(format!("Wrote {n} line(s) to {}", path.display())),
+                    Err(e) => s.error(format!("Export failed: {e}")),
+                }
+            }
+            if widgets::button(ui, icon::SEAL_CHECK, "Trust a CA…").on_hover_text("Trust SSH host certificates signed by a certificate authority").clicked() {
+                self.new_ca = Some(Default::default());
+            }
+        });
+        let (mut done, mut added) = (false, false);
+        if let Some((pattern, key)) = &mut self.new_ca {
+            egui::Frame::group(ui.style()).show(ui, |ui| {
+                ui.label(RichText::new("Trust an SSH certificate authority").font(theme::semibold(13.0)));
+                widgets::hint(ui, "Servers whose host certificate this CA signed are trusted without a first-use prompt. Patterns use OpenSSH syntax: *.example.com, [host]:2222, !exclude.");
+                ui.add(egui::TextEdit::singleline(pattern).hint_text("*.example.com").desired_width(320.0));
+                ui.add(egui::TextEdit::multiline(key).hint_text("ssh-ed25519 AAAA… (the CA's public key)").desired_rows(2).desired_width(f32::INFINITY));
+                ui.horizontal(|ui| {
+                    if widgets::primary(ui, icon::CHECK, "Trust").clicked() {
+                        match s.svc.add_cert_authority(pattern, key) {
+                            Ok(()) => {
+                                s.success("Certificate authority trusted");
+                                (done, added) = (true, true);
+                            }
+                            Err(e) => s.error(e.to_string()),
+                        }
+                    } else if ui.button("Cancel").clicked() {
+                        done = true;
+                    }
+                });
+            });
+        }
+        if done {
+            self.new_ca = None;
+        }
+        if added {
+            self.known = s.svc.known_hosts();
+        }
+        ui.add_space(6.0);
         if self.known.is_empty() {
             widgets::empty(ui, icon::FINGERPRINT, "No known hosts recorded", "Host keys are recorded the first time you connect over SSH.");
             return;
@@ -462,7 +516,7 @@ impl Settings {
                 ui.end_row();
                 for kh in &self.known {
                     ui.label(&kh.host);
-                    ui.label(kh.port.to_string());
+                    ui.label(if kh.port == 0 { "—".to_string() } else { kh.port.to_string() });
                     ui.label(RichText::new(&kh.key_type).font(theme::mono(11.5)));
                     let short: String = kh.fingerprint.chars().take(24).collect();
                     let fp = ui.add(egui::Label::new(RichText::new(format!("{short}…")).font(theme::mono(11.5))).sense(egui::Sense::click()));
@@ -839,7 +893,7 @@ TOTP secrets for SSH two-factor authentication are stored alongside your other c
 ## Known Hosts
 When you connect to an SSH server for the first time, Nexus Terminal records the server's fingerprint. If the fingerprint changes on a later connection, you'll be warned — this protects against man-in-the-middle attacks.
 
-You can review and remove known hosts in **Settings → Known Hosts**.
+You can review and remove known hosts in **Settings → Known Hosts**, import or export them in OpenSSH known_hosts format, and trust SSH certificate authorities for host patterns.
 ## Encrypted Export
 When exporting profiles, encrypted export (a `.nexus` file) protects the file with a password, using the same AES-256-GCM encryption as the vault.",
     ),

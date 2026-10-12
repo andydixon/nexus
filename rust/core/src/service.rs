@@ -165,6 +165,65 @@ impl Service {
         self.store.delete_known_host(id)
     }
 
+    /// Imports an OpenSSH known_hosts file (default ~/.ssh/known_hosts); returns (host keys,
+    /// certificate authorities, lines skipped). Existing entries for the same host and port are
+    /// replaced.
+    pub fn import_known_hosts(&self, path: Option<&Path>) -> Result<(usize, usize, usize)> {
+        let path = match path {
+            Some(p) => p.to_path_buf(),
+            None => Self::ssh_dir()?.join("known_hosts"),
+        };
+        if std::fs::metadata(&path)?.len() > 5 << 20 {
+            return Err("known_hosts file is too large".into());
+        }
+        let parsed = crate::known_hosts::parse(&std::fs::read_to_string(&path)?);
+        for (host, port, key) in &parsed.hosts {
+            let i = crate::clients::ssh::host_key_info(host, *port, key);
+            let n = now();
+            self.store.save_known_host(&KnownHost {
+                id: String::new(),
+                host: i.host,
+                port: i.port as i64,
+                key_type: i.key_type,
+                fingerprint: i.fingerprint,
+                public_key: i.public_key_b64,
+                first_seen: n,
+                last_seen: n,
+                trusted: true,
+            })?;
+        }
+        for (pattern, key) in &parsed.authorities {
+            self.store.save_known_host(&crate::known_hosts::authority_row(pattern, key))?;
+        }
+        self.store.add_audit(
+            "knownhosts.import",
+            "",
+            "",
+            &format!("Imported {} host key(s) and {} CA(s) from {}", parsed.hosts.len(), parsed.authorities.len(), path.display()),
+        );
+        Ok((parsed.hosts.len(), parsed.authorities.len(), parsed.skipped))
+    }
+
+    /// Writes the SSH known hosts and CAs in OpenSSH known_hosts format.
+    pub fn export_known_hosts(&self, path: &Path) -> Result<usize> {
+        let rows = self.store.list_known_hosts()?;
+        let text = crate::known_hosts::export(&rows);
+        std::fs::write(path, &text)?;
+        Ok(text.lines().count())
+    }
+
+    /// Trusts an SSH certificate authority for hosts matching `pattern` (OpenSSH syntax).
+    pub fn add_cert_authority(&self, pattern: &str, public_key: &str) -> Result<()> {
+        let pattern = pattern.trim();
+        if pattern.is_empty() || pattern.contains(char::is_whitespace) {
+            return Err("the host pattern must be one word, e.g. *.example.com".into());
+        }
+        let key = russh::keys::PublicKey::from_openssh(public_key.trim()).map_err(|e| format!("not an OpenSSH public key: {e}"))?;
+        self.store.save_known_host(&crate::known_hosts::authority_row(pattern, &key))?;
+        self.store.add_audit("knownhosts.ca", "", "", &format!("Trusted SSH CA {} for {pattern}", key.fingerprint(russh::keys::HashAlg::Sha256)));
+        Ok(())
+    }
+
     pub fn preferences(&self) -> AppPreferences {
         self.store.preferences()
     }

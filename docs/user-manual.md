@@ -405,6 +405,10 @@ Choose one of the following policies per SSH profile:
 - **Accept new, reject changed**: trust first-time keys automatically.
 - **Insecure (accept anything)**: accept any key (not recommended).
 
+**Settings → Known Hosts** can **Import ~/.ssh/known_hosts** (hashed host names can't be read back and are skipped) and **Export…** the list in OpenSSH format, so Nexus Terminal and `ssh` can share what they trust.
+
+**SSH certificates.** **Trust a CA…** adds a certificate authority for a host pattern in OpenSSH syntax (`*.example.com`, `[host]:2222`, `!excluded.example.com`; `@cert-authority` lines in an imported known_hosts work too). Servers covered by a trusted CA are asked for their host certificate, and a certificate that the CA signed, that names the host and that is in date is trusted without a first-use prompt; any other certificate is refused. For logging in, a user certificate next to your key (`id_ed25519-cert.pub` beside `id_ed25519`) is used automatically.
+
 Under every policy except Insecure, a key that differs from the saved one is rejected. Nexus Terminal keeps its own known-hosts list and does not read `~/.ssh/known_hosts`. Review and remove entries in **Settings → Known Hosts**; click a fingerprint to copy it.
 
 ### TOTP / 2FA

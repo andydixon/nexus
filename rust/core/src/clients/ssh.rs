@@ -61,6 +61,22 @@ struct Handler {
     port: u16,
     check: HostKeyCheck,
     shared: Arc<Shared>,
+    /// Certificate authorities trusted for this host (from `@cert-authority` known-hosts rows).
+    cas: Vec<PublicKey>,
+}
+
+/// A host certificate is trusted when a CA for this host signed it, it is a host certificate,
+/// it names the host as a principal and it is inside its validity window.
+fn check_host_certificate(cert: &russh::keys::Certificate, cas: &[PublicKey], host: &str) -> std::result::Result<(), String> {
+    use russh::keys::ssh_key::certificate::CertType;
+    if cert.cert_type() != CertType::Host {
+        return Err(format!("{host} presented a user certificate as its host key"));
+    }
+    if !cert.valid_principals().iter().any(|p| p.eq_ignore_ascii_case(host)) {
+        return Err(format!("host certificate for {host} doesn't list it (principals: {})", cert.valid_principals().join(", ")));
+    }
+    let fps: Vec<_> = cas.iter().map(|k| k.fingerprint(HashAlg::Sha256)).collect();
+    cert.validate(&fps).map_err(|_| format!("host certificate for {host} isn't signed by a trusted CA, or is expired"))
 }
 
 impl client::Handler for Handler {
@@ -69,7 +85,19 @@ impl client::Handler for Handler {
     async fn check_server_key(&mut self, key: &russh::keys::PublicKeyOrCertificate) -> std::result::Result<bool, Self::Error> {
         let key = match key {
             russh::keys::PublicKeyOrCertificate::PublicKey { key, .. } => key.clone(),
-            russh::keys::PublicKeyOrCertificate::Certificate(c) => c.public_key().clone().into(),
+            // Only asked for when a CA covers this host, so it must check out against one.
+            russh::keys::PublicKeyOrCertificate::Certificate(c) => {
+                return match check_host_certificate(c, &self.cas, &self.host) {
+                    Ok(()) => {
+                        tracing::info!(host = %self.host, ca = %c.signature_key().fingerprint(HashAlg::Sha256), "host certificate accepted");
+                        Ok(true)
+                    }
+                    Err(why) => {
+                        *self.shared.rejection.lock() = Some(why);
+                        Ok(false)
+                    }
+                };
+            }
         };
         let info = host_key_info(&self.host, self.port, &key);
         let check = self.check.clone();
@@ -201,6 +229,15 @@ fn base32_decode(s: &str) -> Option<Vec<u8>> {
 }
 
 /// Reads an OpenSSH/PEM private key, asking for a passphrase only if it's encrypted.
+/// The OpenSSH user certificate next to a private key (`id_ed25519` → `id_ed25519-cert.pub`).
+fn load_user_certificate(key_path: &str) -> Option<russh::keys::Certificate> {
+    if key_path.is_empty() {
+        return None;
+    }
+    let text = std::fs::read_to_string(format!("{key_path}-cert.pub")).ok().filter(|t| t.len() < 64 << 10)?;
+    russh::keys::Certificate::from_openssh(text.trim()).ok()
+}
+
 pub fn load_private_key(path: &str, passphrase: Option<&SecretFn>) -> Result<russh::keys::PrivateKey> {
     let meta = std::fs::metadata(path).map_err(|e| format!("unable to stat key file: {e}"))?;
     if meta.is_dir() {
@@ -240,8 +277,12 @@ async fn dial(sc: &SshConfig, proxy_password: &str, host: &str, port: u16, timeo
     Ok(tokio::net::TcpStream::from_std(s)?)
 }
 
-fn config(sc: &SshConfig) -> Arc<client::Config> {
+/// `host_certificates`: ask for a host certificate first (when a CA applies), as OpenSSH does.
+fn config(sc: &SshConfig, host_certificates: bool) -> Arc<client::Config> {
     let mut c = client::Config::default();
+    if host_certificates {
+        c.preferred.host_key_certificates = c.preferred.key.clone();
+    }
     if sc.keepalive_interval > 0 {
         c.keepalive_interval = Some(Duration::from_secs(sc.keepalive_interval as u64));
         c.keepalive_max = sc.keepalive_count_max.max(1) as usize;
@@ -260,6 +301,8 @@ struct Auth<'a> {
     methods: Vec<String>,
     agent: bool,
     key: Option<russh::keys::PrivateKey>,
+    /// `<key>-cert.pub` next to the private key: log in with the certificate instead.
+    cert: Option<russh::keys::Certificate>,
     password: Option<SecretFn>,
     totp_secret: String,
 }
@@ -282,6 +325,11 @@ async fn authenticate(h: &mut Handle<Handler>, a: Auth<'_>) -> Result<()> {
     for m in &a.methods {
         match m.as_str() {
             "publickey" => {
+                if let (Some(k), Some(cert)) = (&a.key, &a.cert)
+                    && h.authenticate_openssh_cert(a.user, Arc::new(k.clone()), cert.clone()).await?.success()
+                {
+                    return Ok(());
+                }
                 if let Some(k) = &a.key {
                     let hash = if k.algorithm().is_rsa() { h.best_supported_rsa_hash().await?.flatten() } else { None };
                     if h.authenticate_publickey(a.user, PrivateKeyWithHashAlg::new(Arc::new(k.clone()), hash)).await?.success() {
@@ -349,6 +397,8 @@ pub struct SshClient {
     /// Credentials that live in the secret store rather than the profile: (TOTP seed, proxy
     /// password). Set by the session manager before connecting.
     stored: Mutex<(Zeroizing<String>, Zeroizing<String>)>,
+    /// `@cert-authority` known-hosts rows (CA keys by host pattern), for host certificates.
+    authorities: Mutex<Vec<crate::models::KnownHost>>,
 }
 
 impl SshClient {
@@ -364,7 +414,13 @@ impl SshClient {
             sftp: tokio::sync::Mutex::new(None),
             closed: false.into(),
             stored: Mutex::default(),
+            authorities: Mutex::default(),
         })
+    }
+
+    /// Certificate authorities (known-hosts CA rows) to trust for host certificates.
+    pub fn set_authorities(&self, rows: Vec<crate::models::KnownHost>) {
+        *self.authorities.lock() = rows;
     }
 
     /// The TOTP seed (for keyboard-interactive 2FA prompts) and proxy password to use.
@@ -414,9 +470,11 @@ impl SshClient {
         port: u16,
         check: &HostKeyCheck,
     ) -> Result<Handle<Handler>> {
-        let handler = Handler { host: host.into(), port, check: check.clone(), shared: self.shared.clone() };
+        let cas = crate::known_hosts::authorities_for(&self.authorities.lock(), host, port);
+        let cfg = config(&self.sc(), !cas.is_empty());
+        let handler = Handler { host: host.into(), port, check: check.clone(), shared: self.shared.clone(), cas };
         let timeout = Duration::from_secs(self.profile.connect_timeout.max(1) as u64);
-        match tokio::time::timeout(timeout, client::connect_stream(config(&self.sc()), stream, handler)).await {
+        match tokio::time::timeout(timeout, client::connect_stream(cfg, stream, handler)).await {
             Err(_) => Err(format!("SSH handshake with {host}:{port} timed out").into()),
             Ok(Ok(h)) => Ok(h),
             Ok(Err(e)) => match self.shared.rejection.lock().take() {
@@ -461,7 +519,8 @@ impl SshClient {
             self.handshake(ch.into_stream(), &p.host, port, &check).await?
         };
 
-        authenticate(&mut handle, Auth { user: &p.username, methods, agent: sc.agent_auth, key, password, totp_secret }).await?;
+        let cert = load_user_certificate(&sc.private_key_path);
+        authenticate(&mut handle, Auth { user: &p.username, methods, agent: sc.agent_auth, key, cert, password, totp_secret }).await?;
         let handle = Arc::new(handle);
         if !shell {
             *self.handle.lock() = Some(handle);
@@ -558,6 +617,7 @@ impl SshClient {
                     methods: vec!["publickey".into()],
                     agent: key.is_none() || sc.agent_auth,
                     key,
+                    cert: None,
                     password: None,
                     totp_secret: String::new(),
                 },

@@ -80,6 +80,8 @@ Use Nexus Terminal when you need to:
 
 ### SSH capabilities
 
+- SSH certificates: host certificates from trusted CAs (by OpenSSH host pattern) skip the first-use prompt; user certificates (`*-cert.pub`) are used for login.
+- Import and export `~/.ssh/known_hosts`, including `@cert-authority` lines.
 - Password, public key, keyboard-interactive and SSH agent authentication.
 - SSH agent forwarding.
 - Private key suggestions from `~/.ssh`, with a key file check.

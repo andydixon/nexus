@@ -39,6 +39,12 @@ fn free_port() -> u16 {
 }
 
 fn start(name: &str) -> Option<Server> {
+    start_with(name, |_, _| String::new())
+}
+
+/// `extra` gets the server directory and ssh-keygen, may create files, and returns more
+/// sshd_config lines.
+fn start_with(name: &str, extra: impl FnOnce(&Path, &Path) -> String) -> Option<Server> {
     let sshd = which("sshd")?;
     let keygen = which("ssh-keygen")?;
     let sftp_server =
@@ -50,13 +56,15 @@ fn start(name: &str) -> Option<Server> {
         Command::new(&keygen).args(["-q", "-t", "ed25519", "-N", "", "-f"]).arg(dir.join(k)).status().unwrap();
     }
     std::fs::copy(dir.join("client.pub"), dir.join("authorized_keys")).unwrap();
+    let more = extra(&dir, &keygen);
     let port = free_port();
-    let cfg = format!(
+    let mut cfg = format!(
         "Port {port}\nListenAddress 127.0.0.1\nHostKey {d}/host\nAuthorizedKeysFile {d}/authorized_keys\nPidFile {d}/pid\n\
          StrictModes no\nUsePAM no\nPasswordAuthentication no\nKbdInteractiveAuthentication no\nPubkeyAuthentication yes\n\
          AllowTcpForwarding yes\nAllowAgentForwarding yes\nSubsystem sftp {sftp_server}\n",
         d = dir.display()
     );
+    cfg += &more;
     std::fs::write(dir.join("sshd_config"), cfg).unwrap();
     let child = Command::new(sshd).args(["-D", "-e", "-f"]).arg(dir.join("sshd_config")).spawn().ok()?;
     let start = Instant::now();
@@ -284,4 +292,46 @@ fn agent_auth_and_forwarding() {
     cl.write(b"ssh-add -l >/dev/null && echo agent-$((1+1))-ok\n").unwrap();
     assert!(wait_for(&seen, "agent-2-ok"), "forwarded agent not usable: {}", String::from_utf8_lossy(&seen.lock()));
     cl.close();
+}
+
+#[test]
+fn host_and_user_certificates() {
+    let user = std::env::var("USER").unwrap_or_else(|_| "root".into());
+    let u2 = user.clone();
+    let Some(s) = start_with("certs", move |d, keygen| {
+        let run = |args: &[&str]| assert!(Command::new(keygen).args(args).current_dir(d).status().unwrap().success());
+        run(&["-q", "-t", "ed25519", "-N", "", "-f", "ca"]);
+        // Host certificate for 127.0.0.1; user certificate for us. Only the CA authorises logins.
+        run(&["-q", "-s", "ca", "-I", "host", "-h", "-n", "127.0.0.1", "host.pub"]);
+        run(&["-q", "-s", "ca", "-I", "user", "-n", &u2, "client.pub"]);
+        std::fs::write(d.join("authorized_keys"), "").unwrap();
+        format!("HostCertificate {0}/host-cert.pub\nTrustedUserCAKeys {0}/ca.pub\n", d.display())
+    }) else {
+        return;
+    };
+    let ca = russh::keys::PublicKey::from_openssh(std::fs::read_to_string(s.dir.join("ca.pub")).unwrap().trim()).unwrap();
+    let never_asked: HostKeyCheck = Arc::new(|i| Err(format!("asked about plain key {}", i.fingerprint)));
+
+    // A CA for this host: the certificate is checked, no first-use prompt, and the user
+    // certificate (client-cert.pub next to the key) logs in.
+    let c = SshClient::new(&profile(&s), callbacks().0);
+    let here = format!("[127.0.0.1]:{}", s.port);
+    c.set_authorities(vec![nexus_core::known_hosts::authority_row(&here, &ca)]);
+    c.connect(never_asked.clone(), None, None).unwrap();
+    c.close();
+
+    // A CA for other hosts doesn't apply: back to the plain host key, which this check refuses.
+    let c = SshClient::new(&profile(&s), callbacks().0);
+    c.set_authorities(vec![nexus_core::known_hosts::authority_row("*.example.com", &ca)]);
+    let err = c.connect(never_asked.clone(), None, None).unwrap_err().to_string();
+    assert!(err.contains("asked about plain key"), "{err}");
+
+    // A different CA for this host: the certificate is refused.
+    let other = s.dir.join("other");
+    Command::new(which("ssh-keygen").unwrap()).args(["-q", "-t", "ed25519", "-N", "", "-f"]).arg(&other).status().unwrap();
+    let other = russh::keys::PublicKey::from_openssh(std::fs::read_to_string(other.with_extension("pub")).unwrap().trim()).unwrap();
+    let c = SshClient::new(&profile(&s), callbacks().0);
+    c.set_authorities(vec![nexus_core::known_hosts::authority_row(&here, &other)]);
+    let err = c.connect(never_asked, None, None).unwrap_err().to_string();
+    assert!(err.contains("trusted CA"), "{err}");
 }

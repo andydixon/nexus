@@ -3,6 +3,11 @@
 use super::*;
 
 impl Manager {
+    /// Known-hosts rows that are SSH certificate authorities.
+    pub(super) fn cert_authorities(&self) -> Vec<KnownHost> {
+        self.store.list_known_hosts().unwrap_or_default().into_iter().filter(|k| k.key_type == crate::known_hosts::CA_KEY_TYPE).collect()
+    }
+
     // --- per-protocol connect -----------------------------------------------------------
 
     pub(super) fn connect_ssh(self: &Arc<Self>, id: &str, epoch: u64, p: &Profile, prompt: Prompt) -> Result<Client> {
@@ -11,6 +16,7 @@ impl Manager {
         let password = self.secret_fn(id, &p.id, SecretKind::Password, sc.secret_mode, prompt.clone());
         let passphrase = self.secret_fn(id, &p.id, SecretKind::Passphrase, sc.key_secret_mode, prompt);
         let c = SshClient::new(&p, self.terminal_callbacks(id, epoch));
+        c.set_authorities(self.cert_authorities());
         let stored = |k: SecretKind| self.secrets.get(&k.key(&p.id)).unwrap_or_default();
         c.set_stored_secrets(stored(SecretKind::Totp), stored(SecretKind::ProxyPassword));
         c.connect(self.host_key_check(id, sc.host_key_policy), Some(password), Some(passphrase))?;
@@ -56,6 +62,7 @@ impl Manager {
         let password = (method == "password").then(|| self.secret_fn(id, profile_id, pw_kind, mode, prompt.clone()));
         let passphrase = self.secret_fn(id, profile_id, pp_kind, mode, prompt);
         let t = SshClient::new(&tp, Callbacks::noop());
+        t.set_authorities(self.cert_authorities());
         t.connect_tunnel_only(self.host_key_check(id, HostKeyPolicy::Ask), password, Some(passphrase))?;
         Ok(t)
     }

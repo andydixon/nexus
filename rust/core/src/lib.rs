@@ -6,6 +6,7 @@ pub mod config;
 pub mod exportimport;
 pub mod ircformat;
 pub mod keyfiles;
+pub mod known_hosts;
 pub mod models;
 pub mod recording;
 pub mod secrets;
