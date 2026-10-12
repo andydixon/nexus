@@ -16,20 +16,60 @@ use zeroize::Zeroizing;
 const VAULT_FILE: &str = "vault.json";
 const MAX_VAULT_BYTES: u64 = 10 * 1024 * 1024;
 
-/// Every credential kind the session manager stores under `profile:<id>:<kind>`.
-pub const PROFILE_SECRET_KINDS: [&str; 11] = [
-    "password",
-    "passphrase",
-    "totp",
-    "github-token",
-    "vnc-password",
-    "vnc-ssh-password",
-    "vnc-ssh-passphrase",
-    "irc-server-password",
-    "irc-nickserv-password",
-    "irc-ssh-password",
-    "irc-ssh-passphrase",
-];
+/// A credential stored per profile under `profile:<id>:<kind>`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum SecretKind {
+    Password,
+    Passphrase,
+    Totp,
+    GithubToken,
+    VncPassword,
+    VncSshPassword,
+    VncSshPassphrase,
+    IrcServerPassword,
+    IrcNickServPassword,
+    IrcSshPassword,
+    IrcSshPassphrase,
+}
+
+impl SecretKind {
+    /// Every kind, so deleting a profile can purge them all from the keychain. A new variant
+    /// must be added here as well as to `as_str`.
+    pub const ALL: [SecretKind; 11] = [
+        Self::Password,
+        Self::Passphrase,
+        Self::Totp,
+        Self::GithubToken,
+        Self::VncPassword,
+        Self::VncSshPassword,
+        Self::VncSshPassphrase,
+        Self::IrcServerPassword,
+        Self::IrcNickServPassword,
+        Self::IrcSshPassword,
+        Self::IrcSshPassphrase,
+    ];
+
+    /// The storage name, shared with the Go app.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Password => "password",
+            Self::Passphrase => "passphrase",
+            Self::Totp => "totp",
+            Self::GithubToken => "github-token",
+            Self::VncPassword => "vnc-password",
+            Self::VncSshPassword => "vnc-ssh-password",
+            Self::VncSshPassphrase => "vnc-ssh-passphrase",
+            Self::IrcServerPassword => "irc-server-password",
+            Self::IrcNickServPassword => "irc-nickserv-password",
+            Self::IrcSshPassword => "irc-ssh-password",
+            Self::IrcSshPassphrase => "irc-ssh-passphrase",
+        }
+    }
+
+    pub fn key(self, profile_id: &str) -> String {
+        format!("profile:{profile_id}:{}", self.as_str())
+    }
+}
 
 /// Argon2id with the Go parameters: t=3, m=128 MiB, p=4, 32-byte key. The key is wiped on drop.
 pub fn derive_key(password: &str, salt: &[u8]) -> Result<Zeroizing<[u8; 32]>> {
@@ -306,8 +346,8 @@ impl Secrets {
     /// Removes every credential saved for a profile from both stores.
     pub fn delete_profile(&self, profile_id: &str) {
         if self.keychain_ok {
-            for kind in PROFILE_SECRET_KINDS {
-                self.keychain.delete(&format!("profile:{profile_id}:{kind}"));
+            for kind in SecretKind::ALL {
+                self.keychain.delete(&kind.key(profile_id));
             }
         }
         let _ = self.vault.delete_prefix(&format!("profile:{profile_id}:"));
@@ -395,12 +435,12 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
         let s = Secrets { vault: Vault::new(dir.clone()), keychain: Keychain::new("NexusTerminalTest", None), keychain_ok: false };
         s.vault.initialise("pw").unwrap();
-        for kind in PROFILE_SECRET_KINDS {
-            s.vault.set(&format!("profile:p1:{kind}"), "v").unwrap();
+        for kind in SecretKind::ALL {
+            s.vault.set(&kind.key("p1"), "v").unwrap();
         }
         s.vault.set("profile:p2:password", "keep").unwrap();
         s.delete_profile("p1");
-        assert!(PROFILE_SECRET_KINDS.iter().all(|k| s.get(&format!("profile:p1:{k}")).is_none()));
+        assert!(SecretKind::ALL.iter().all(|k| s.get(&k.key("p1")).is_none()));
         assert_eq!(s.get("profile:p2:password").as_deref(), Some("keep"));
         std::fs::remove_dir_all(dir).unwrap();
     }

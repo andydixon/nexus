@@ -8,7 +8,7 @@ use crate::clients::ssh::{HostKeyCheck, HostKeyInfo, SecretFn, SshClient};
 use crate::clients::{self, Callbacks, github, irc, raw, serial, telnet};
 use crate::models::*;
 use crate::recording::{self, Recorder};
-use crate::secrets::Secrets;
+use crate::secrets::{SecretKind, Secrets};
 use crate::storage::Store;
 use parking_lot::Mutex;
 use std::collections::{HashMap, HashSet};
@@ -482,10 +482,10 @@ impl Manager {
     /// are saved once the connection succeeds; session-only values are asked once per session and
     /// reused on reconnects (so e.g. a NickServ password entered once keeps identifying after a
     /// drop).
-    pub fn secret_fn(&self, session: &str, profile_id: &str, kind: &str, mode: SecretMode, prompt: Prompt) -> SecretFn {
-        let key = format!("profile:{profile_id}:{kind}");
+    pub fn secret_fn(&self, session: &str, profile_id: &str, kind: SecretKind, mode: SecretMode, prompt: Prompt) -> SecretFn {
+        let key = kind.key(profile_id);
         let (secrets, store) = (self.secrets.clone(), self.store.clone());
-        let (pid, kind) = (profile_id.to_string(), kind.to_string());
+        let (pid, kind) = (profile_id.to_string(), kind.as_str());
         let state: SessionSecrets = self.sessions.lock().get(session).map(|s| s.session_secrets.clone()).unwrap_or_default();
         Arc::new(move || {
             if mode == SecretMode::Saved {
@@ -629,13 +629,13 @@ impl Manager {
         let mut p = p.clone();
         let sc = p.ssh.get_or_insert_with(SshConfig::defaults);
         if sc.totp_secret.is_empty()
-            && let Some(t) = self.secrets.get(&format!("profile:{}:totp", p.id))
+            && let Some(t) = self.secrets.get(&SecretKind::Totp.key(&p.id))
         {
             sc.totp_secret = t;
         }
         let sc = sc.clone();
-        let password = self.secret_fn(id, &p.id, "password", sc.secret_mode, prompt.clone());
-        let passphrase = self.secret_fn(id, &p.id, "passphrase", sc.key_secret_mode, prompt);
+        let password = self.secret_fn(id, &p.id, SecretKind::Password, sc.secret_mode, prompt.clone());
+        let passphrase = self.secret_fn(id, &p.id, SecretKind::Passphrase, sc.key_secret_mode, prompt);
         let c = SshClient::new(&p, self.terminal_callbacks(id, epoch));
         c.connect(self.host_key_check(id, sc.host_key_policy), Some(password), Some(passphrase))?;
         for pf in sc.port_forwards.iter().filter(|f| f.enabled) {
@@ -672,8 +672,10 @@ impl Manager {
         c.auth_methods = vec![if method.is_empty() { "publickey".into() } else { method.into() }];
         c.private_key_path = key.into();
         c.agent_auth = agent;
-        let password = (method == "password").then(|| self.secret_fn(id, profile_id, &format!("{kind}-ssh-password"), mode, prompt.clone()));
-        let passphrase = self.secret_fn(id, profile_id, &format!("{kind}-ssh-passphrase"), mode, prompt);
+        let (pw_kind, pp_kind) =
+            if kind == "vnc" { (SecretKind::VncSshPassword, SecretKind::VncSshPassphrase) } else { (SecretKind::IrcSshPassword, SecretKind::IrcSshPassphrase) };
+        let password = (method == "password").then(|| self.secret_fn(id, profile_id, pw_kind, mode, prompt.clone()));
+        let passphrase = self.secret_fn(id, profile_id, pp_kind, mode, prompt);
         let t = SshClient::new(&tp, Callbacks::noop());
         t.connect_tunnel_only(self.host_key_check(id, HostKeyPolicy::Ask), password, Some(passphrase))?;
         Ok(t)
@@ -681,7 +683,7 @@ impl Manager {
 
     fn connect_github(self: &Arc<Self>, id: &str, epoch: u64, p: &Profile, prompt: Prompt) -> Result<Client> {
         let gh = p.github.clone().ok_or_else(|| format!("GitHub configuration missing on profile {:?}", p.id))?;
-        let token = self.secret_fn(id, &p.id, "github-token", gh.secret_mode, prompt.clone())().map_err(|e| format!("obtaining GitHub token: {e}"))?;
+        let token = self.secret_fn(id, &p.id, SecretKind::GithubToken, gh.secret_mode, prompt.clone())().map_err(|e| format!("obtaining GitHub token: {e}"))?;
         if token.is_empty() {
             return err("GitHub token cannot be empty".into());
         }
@@ -694,7 +696,7 @@ impl Manager {
                 let retry = auth.then(|| prompt("GitHub token did not work. Please enter a valid token:").ok()).flatten().filter(|t| !t.is_empty());
                 let Some(t) = retry else { return err(format!("GitHub authentication failed: {e}")) };
                 if gh.secret_mode == SecretMode::Saved {
-                    let _ = self.with(id, |s| s.session_secrets.lock().pending.insert(format!("profile:{}:github-token", p.id), t.clone()));
+                    let _ = self.with(id, |s| s.session_secrets.lock().pending.insert(SecretKind::GithubToken.key(&p.id), t.clone()));
                 }
                 client = github::Client::new(&gh.base_url, &t);
                 client.validate_token().map_err(|e| format!("GitHub authentication failed: {e}"))?
@@ -742,12 +744,13 @@ impl Manager {
     fn connect_irc(self: &Arc<Self>, id: &str, epoch: u64, p: &Profile, prompt: Prompt) -> Result<Client> {
         let ic = p.irc.clone().ok_or("IRC configuration missing")?;
         let server_pass = if ic.server_password_required {
-            self.secret_fn(id, &p.id, "irc-server-password", ic.server_password_mode, prompt.clone())().map_err(|e| format!("IRC server password: {e}"))?
+            self.secret_fn(id, &p.id, SecretKind::IrcServerPassword, ic.server_password_mode, prompt.clone())()
+                .map_err(|e| format!("IRC server password: {e}"))?
         } else {
             String::new()
         };
         let ns_pass = if ic.nick_serv_identify {
-            self.secret_fn(id, &p.id, "irc-nickserv-password", ic.nick_serv_mode, prompt.clone())().map_err(|e| format!("NickServ password: {e}"))?
+            self.secret_fn(id, &p.id, SecretKind::IrcNickServPassword, ic.nick_serv_mode, prompt.clone())().map_err(|e| format!("NickServ password: {e}"))?
         } else {
             String::new()
         };
@@ -852,7 +855,7 @@ impl Manager {
         } else {
             None
         };
-        let password = self.secret_fn(id, &p.id, "vnc-password", vc.secret_mode, prompt);
+        let password = self.secret_fn(id, &p.id, SecretKind::VncPassword, vc.secret_mode, prompt);
         let cb = self.terminal_callbacks(id, epoch);
         let (me, sid) = (self.clone(), id.to_string());
         let (me2, sid2) = (self.clone(), id.to_string());
@@ -1474,7 +1477,7 @@ mod tests {
             }
         }));
         let p = Profile { host: "127.0.0.1".into(), port: 1, ..Profile::new(Protocol::Raw) };
-        let key = format!("profile:{}:password", p.id);
+        let key = SecretKind::Password.key(&p.id);
         let info = |id: &str| SessionInfo {
             id: id.into(),
             profile_id: p.id.clone(),
@@ -1489,7 +1492,7 @@ mod tests {
             error: String::new(),
         };
         let asked = Arc::new(AtomicUsize::new(0));
-        let resolve = |m: &Arc<Manager>, id: &str| m.secret_fn(id, &p.id, "password", SecretMode::Saved, counting_prompt(asked.clone()))().unwrap();
+        let resolve = |m: &Arc<Manager>, id: &str| m.secret_fn(id, &p.id, SecretKind::Password, SecretMode::Saved, counting_prompt(asked.clone()))().unwrap();
 
         // Locked store: the credential can't be saved, and the user is told.
         let e = m.new_session(info("s0"), Some(p.clone()), String::new(), SessionSecrets::default());
@@ -1545,17 +1548,17 @@ mod tests {
         let asked = Arc::new(AtomicUsize::new(0));
         // Two separate resolutions (as two connects of the same session make) prompt once.
         for _ in 0..2 {
-            let f = m.secret_fn("s1", &p.id, "irc-nickserv-password", SecretMode::SessionOnly, counting_prompt(asked.clone()));
+            let f = m.secret_fn("s1", &p.id, SecretKind::IrcNickServPassword, SecretMode::SessionOnly, counting_prompt(asked.clone()));
             assert_eq!(f().unwrap(), "hunter2");
         }
         assert_eq!(asked.load(Ordering::SeqCst), 1);
         // Ask-every-time still prompts each time.
-        let f = m.secret_fn("s1", &p.id, "irc-nickserv-password", SecretMode::AskEveryTime, counting_prompt(asked.clone()));
+        let f = m.secret_fn("s1", &p.id, SecretKind::IrcNickServPassword, SecretMode::AskEveryTime, counting_prompt(asked.clone()));
         f().unwrap();
         assert_eq!(asked.load(Ordering::SeqCst), 2);
         // An explicit reconnect carries the cache to the new session id.
         let new = m.reconnect("s1").unwrap();
-        let f = m.secret_fn(&new, &p.id, "irc-nickserv-password", SecretMode::SessionOnly, counting_prompt(asked.clone()));
+        let f = m.secret_fn(&new, &p.id, SecretKind::IrcNickServPassword, SecretMode::SessionOnly, counting_prompt(asked.clone()));
         assert_eq!(f().unwrap(), "hunter2");
         assert_eq!(asked.load(Ordering::SeqCst), 2);
         m.close_all();

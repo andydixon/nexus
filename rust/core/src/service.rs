@@ -5,6 +5,7 @@
 use crate::clients::sftp::{self, FileEntry};
 use crate::config::AppConfig;
 use crate::models::*;
+use crate::secrets::SecretKind;
 use crate::secrets::{KEYCHAIN_SERVICE, Keychain, LEGACY_KEYCHAIN_SERVICE, Secrets, Vault};
 use crate::sessions::Manager;
 use crate::storage::Store;
@@ -127,21 +128,21 @@ impl Service {
 
     // --- credentials --------------------------------------------------------------------
 
-    pub fn set_profile_secret(&self, profile_id: &str, kind: &str, value: &str) -> Result<()> {
-        self.secrets.set_checked(&format!("profile:{profile_id}:{kind}"), value)
+    pub fn set_profile_secret(&self, profile_id: &str, kind: SecretKind, value: &str) -> Result<()> {
+        self.secrets.set_checked(&kind.key(profile_id), value)
     }
 
     pub fn has_totp(&self, profile_id: &str) -> bool {
-        self.secrets.get(&format!("profile:{profile_id}:totp")).is_some()
+        self.secrets.get(&SecretKind::Totp.key(profile_id)).is_some()
     }
 
     pub fn totp_code(&self, profile_id: &str) -> Result<String> {
-        let s = self.secrets.get(&format!("profile:{profile_id}:totp")).ok_or("no TOTP secret configured for this profile")?;
+        let s = self.secrets.get(&SecretKind::Totp.key(profile_id)).ok_or("no TOTP secret configured for this profile")?;
         crate::clients::ssh::totp_code(&s).map_err(|e| format!("failed to generate TOTP code: {e}").into())
     }
 
     pub fn delete_totp(&self, profile_id: &str) {
-        self.secrets.delete(&format!("profile:{profile_id}:totp"));
+        self.secrets.delete(&SecretKind::Totp.key(profile_id));
     }
 
     // --- known hosts, prefs, snippets, audit --------------------------------------------
@@ -226,6 +227,10 @@ impl Service {
                 if let Some(s) = &mut p.ssh {
                     s.proxy_password.clear();
                     s.totp_secret.clear();
+                    redact_login_script(&mut s.login_scripts);
+                }
+                if let Some(t) = &mut p.telnet {
+                    redact_login_script(&mut t.login_scripts);
                 }
             }
         }
@@ -388,5 +393,38 @@ impl Service {
 
     pub fn audit_entries(&self, limit: i64) -> Vec<AuditEntry> {
         self.store.list_audit(limit).unwrap_or_default()
+    }
+}
+
+/// Blanks `send` steps that answer a password-like prompt (the `wait` before them), the documented
+/// way to script a login, so a "without secrets" export doesn't carry them.
+fn redact_login_script(steps: &mut [LoginScriptStep]) {
+    let mut after_secret_prompt = false;
+    for s in steps {
+        match s.kind.as_str() {
+            "wait" => {
+                let v = s.value.to_lowercase();
+                after_secret_prompt = ["password", "passphrase", "passcode", "pin", "token", "secret"].iter().any(|k| v.contains(k));
+            }
+            "send" if after_secret_prompt => {
+                s.value.clear();
+                after_secret_prompt = false;
+            }
+            _ => {}
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn login_script_passwords_are_redacted() {
+        let step = |k: &str, v: &str| LoginScriptStep { kind: k.into(), value: v.into(), timeout: 0 };
+        let mut steps = vec![step("wait", "login:"), step("send", "andy"), step("wait", "Password:"), step("send", "mysecretpassword"), step("send", "uptime")];
+        redact_login_script(&mut steps);
+        let values: Vec<&str> = steps.iter().map(|s| s.value.as_str()).collect();
+        assert_eq!(values, ["login:", "andy", "Password:", "", "uptime"]);
     }
 }

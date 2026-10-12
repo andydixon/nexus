@@ -10,6 +10,7 @@ use egui_phosphor::regular as icon;
 use nexus_core::clients::serial;
 use nexus_core::keyfiles;
 use nexus_core::models::*;
+use nexus_core::secrets::SecretKind;
 use nexus_core::validation::{ValidationError, validate_profile};
 use parking_lot::Mutex;
 use std::collections::{BTreeMap, HashMap};
@@ -28,7 +29,7 @@ pub struct ProfileEditor {
     rooms: String,
     /// Secrets typed into the editor, by session-manager kind ("password", "github-token", …);
     /// stored when the profile is saved.
-    secrets: BTreeMap<&'static str, String>,
+    secrets: BTreeMap<SecretKind, String>,
     totp: String,
     totp_show: bool,
     totp_saved: bool,
@@ -310,9 +311,9 @@ impl ProfileEditor {
             Ok(saved) => {
                 for (kind, v) in &self.secrets {
                     if !v.is_empty()
-                        && let Err(e) = s.svc.set_profile_secret(&saved.id, kind, v)
+                        && let Err(e) = s.svc.set_profile_secret(&saved.id, *kind, v)
                     {
-                        s.error(format!("Couldn't store the {kind} secret: {e}"));
+                        s.error(format!("Couldn't store the {} secret: {e}", kind.as_str()));
                     }
                 }
                 s.success(if self.is_new { "Profile created" } else { "Profile updated" });
@@ -387,7 +388,7 @@ impl ProfileEditor {
         section(ui, "Authentication", |ui| {
             mode(ui, "Password Mode", &mut c.secret_mode);
             if c.secret_mode == SecretMode::Saved {
-                secret(ui, "Password", secrets, "password", "Leave blank to keep the saved password");
+                secret(ui, "Password", secrets, SecretKind::Password, "Leave blank to keep the saved password");
             }
             label(ui, "Auth Methods");
             ui.horizontal_wrapped(|ui| {
@@ -410,7 +411,7 @@ impl ProfileEditor {
             widgets::hint(ui, "Select a key from your .ssh folder or type a full path");
             mode(ui, "Passphrase Mode", &mut c.key_secret_mode);
             if c.key_secret_mode == SecretMode::Saved {
-                secret(ui, "Passphrase", secrets, "passphrase", "Leave blank to keep the saved passphrase");
+                secret(ui, "Passphrase", secrets, SecretKind::Passphrase, "Leave blank to keep the saved passphrase");
             }
         });
         section(ui, "Host Verification", |ui| {
@@ -527,7 +528,7 @@ impl ProfileEditor {
                         *totp_saved = false;
                         s.info("TOTP secret removed.");
                     } else {
-                        match s.svc.set_profile_secret(&id, "totp", &v) {
+                        match s.svc.set_profile_secret(&id, SecretKind::Totp, &v) {
                             Ok(()) => {
                                 totp.clear();
                                 *totp_saved = true;
@@ -627,7 +628,7 @@ impl ProfileEditor {
             err(ui, errs, "github.baseURL");
             mode(ui, "Token Storage", &mut c.secret_mode);
             if c.secret_mode == SecretMode::Saved {
-                secret(ui, "Personal Access Token", secrets, "github-token", "Leave blank to keep the saved token");
+                secret(ui, "Personal Access Token", secrets, SecretKind::GithubToken, "Leave blank to keep the saved token");
             }
         });
         section(ui, "Refresh", |ui| {
@@ -646,7 +647,7 @@ impl ProfileEditor {
             err(ui, errs, "vnc.vncPort");
             mode(ui, "Password Storage", &mut c.secret_mode);
             if c.secret_mode == SecretMode::Saved {
-                secret(ui, "VNC Password", secrets, "vnc-password", "Leave blank to keep the saved password");
+                secret(ui, "VNC Password", secrets, SecretKind::VncPassword, "Leave blank to keep the saved password");
             }
         });
         section(ui, "Display", |ui| {
@@ -700,7 +701,7 @@ impl ProfileEditor {
             if c.server_password_required {
                 mode(ui, "Server Password Storage", &mut c.server_password_mode);
                 if c.server_password_mode == SecretMode::Saved {
-                    secret(ui, "Server Password", secrets, "irc-server-password", "Leave blank to keep the saved password");
+                    secret(ui, "Server Password", secrets, SecretKind::IrcServerPassword, "Leave blank to keep the saved password");
                 }
             }
         });
@@ -711,7 +712,7 @@ impl ProfileEditor {
                 err(ui, errs, "irc.nickServAccount");
                 mode(ui, "Password Storage", &mut c.nick_serv_mode);
                 if c.nick_serv_mode == SecretMode::Saved {
-                    secret(ui, "NickServ Password", secrets, "irc-nickserv-password", "Leave blank to keep the saved password");
+                    secret(ui, "NickServ Password", secrets, SecretKind::IrcNickServPassword, "Leave blank to keep the saved password");
                 }
             }
         });
@@ -980,7 +981,7 @@ fn reconnect(ui: &mut Ui, on: &mut bool, tries: &mut i64) {
 }
 
 /// A password field whose value is stored in the vault/keychain under `kind` on save.
-fn secret(ui: &mut Ui, l: &str, secrets: &mut BTreeMap<&'static str, String>, kind: &'static str, hint: &str) {
+fn secret(ui: &mut Ui, l: &str, secrets: &mut BTreeMap<SecretKind, String>, kind: SecretKind, hint: &str) {
     label(ui, l);
     ui.add(TextEdit::singleline(secrets.entry(kind).or_default()).password(true).hint_text(hint).desired_width(f32::INFINITY));
 }
@@ -1148,7 +1149,7 @@ struct Tunnel<'a> {
     mode: &'a mut SecretMode,
 }
 
-fn tunnel(ui: &mut Ui, kind: &str, c: Tunnel, keys: &[String], checks: &mut KeyChecks, secrets: &mut BTreeMap<&'static str, String>, errs: &[ValidationError]) {
+fn tunnel(ui: &mut Ui, kind: &str, c: Tunnel, keys: &[String], checks: &mut KeyChecks, secrets: &mut BTreeMap<SecretKind, String>, errs: &[ValidationError]) {
     check(ui, "Enable SSH Tunnel", c.on, "");
     if !*c.on {
         return;
@@ -1168,12 +1169,11 @@ fn tunnel(ui: &mut Ui, kind: &str, c: Tunnel, keys: &[String], checks: &mut KeyC
     }
     mode(ui, "SSH Secret Storage", c.mode);
     if *c.mode == SecretMode::Saved {
-        // Kinds match the session manager's tunnel secrets ("vnc-ssh-password", "irc-ssh-passphrase").
-        let (l, k): (&str, &'static str) = match (kind, c.auth.as_str()) {
-            ("vnc", "password") => ("SSH Password", "vnc-ssh-password"),
-            ("vnc", _) => ("SSH Key Passphrase", "vnc-ssh-passphrase"),
-            (_, "password") => ("SSH Password", "irc-ssh-password"),
-            _ => ("SSH Key Passphrase", "irc-ssh-passphrase"),
+        let (l, k) = match (kind, c.auth.as_str()) {
+            ("vnc", "password") => ("SSH Password", SecretKind::VncSshPassword),
+            ("vnc", _) => ("SSH Key Passphrase", SecretKind::VncSshPassphrase),
+            (_, "password") => ("SSH Password", SecretKind::IrcSshPassword),
+            _ => ("SSH Key Passphrase", SecretKind::IrcSshPassphrase),
         };
         secret(ui, l, secrets, k, "Leave blank to keep the saved secret");
     }
