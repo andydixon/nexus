@@ -335,3 +335,50 @@ fn host_and_user_certificates() {
     let err = c.connect(never_asked, None, None).unwrap_err().to_string();
     assert!(err.contains("trusted CA"), "{err}");
 }
+
+/// RDP over an SSH tunnel through the test sshd:
+/// `NEXUS_RDP_TEST="host port user password" cargo test --test ssh_integration rdp_through -- --ignored`
+#[test]
+#[ignore]
+fn rdp_through_ssh_tunnel() {
+    let spec = std::env::var("NEXUS_RDP_TEST").expect("NEXUS_RDP_TEST");
+    let v: Vec<String> = spec.split_whitespace().map(String::from).collect();
+    let Some(s) = start("rdptunnel") else { return };
+    let t = SshClient::new(&profile(&s), Callbacks::noop());
+    t.connect_tunnel_only(accept_all().0, None, None).unwrap();
+    let (host, port) = (v[0].clone(), v[1].parse::<u16>().unwrap());
+    let frames = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let f2 = frames.clone();
+    let tt = t.clone();
+    let c = nexus_core::clients::rdp::Client::new(nexus_core::clients::rdp::Config {
+        host: host.clone(),
+        username: v[2].clone(),
+        domain: String::new(),
+        password: zeroize::Zeroizing::new(v[3].clone()),
+        width: 800,
+        height: 600,
+        allow_tls_only: true,
+        audio: false,
+        kerberos_kdc: None,
+        shared_folder: None,
+        printer: None,
+        dial: Arc::new(move || tt.open_tunnel(&host, port)),
+        check_cert: Arc::new(|_| Ok(())),
+        connect_timeout: Duration::from_secs(20),
+        on_frame: Arc::new(move || {
+            f2.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        }),
+        on_clipboard: Arc::new(|_| {}),
+        on_error: Arc::new(|e| eprintln!("on_error: {e}")),
+        on_close: Arc::new(|| {}),
+    });
+    c.connect().unwrap();
+    let start = Instant::now();
+    while frames.load(std::sync::atomic::Ordering::SeqCst) == 0 && start.elapsed() < Duration::from_secs(30) {
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    eprintln!("frames over the tunnel: {}", frames.load(std::sync::atomic::Ordering::SeqCst));
+    assert!(frames.load(std::sync::atomic::Ordering::SeqCst) > 0);
+    c.close();
+    t.close();
+}
