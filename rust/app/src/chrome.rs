@@ -598,14 +598,14 @@ pub fn palette(app: &mut App, ctx: &egui::Context) {
     let matches: Vec<_> = matches.into_iter().map(|(_, c)| c).collect();
     pal.sel = pal.sel.min(matches.len().saturating_sub(1));
     let mut chosen = None;
-    let mut close = ctx.input(|i| i.key_pressed(Key::Escape));
+    let mut close = crate::chrome::modal_key(ctx, Key::Escape);
     if ctx.input(|i| i.key_pressed(Key::ArrowDown)) {
         pal.sel = (pal.sel + 1).min(matches.len().saturating_sub(1));
     }
     if ctx.input(|i| i.key_pressed(Key::ArrowUp)) {
         pal.sel = pal.sel.saturating_sub(1);
     }
-    if ctx.input(|i| i.key_pressed(Key::Enter)) {
+    if crate::chrome::modal_key(ctx, Key::Enter) {
         chosen = matches.get(pal.sel).map(|m| m.0.clone());
     }
     modal_backdrop(ctx);
@@ -675,6 +675,15 @@ pub fn modal(ctx: &egui::Context, id: &str, width: f32, body: impl FnOnce(&mut U
             body(ui);
         });
     });
+}
+
+/// Set each frame while a credential or host-key prompt is on screen.
+const PROMPT_OPEN: &str = "nexus-prompt-open";
+
+/// Enter/Escape for any modal except the prompts: while a prompt is showing it takes those keys,
+/// so one key press can't also confirm or dismiss the dialog underneath.
+pub fn modal_key(ctx: &egui::Context, key: Key) -> bool {
+    !ctx.data(|d| d.get_temp::<bool>(egui::Id::new(PROMPT_OPEN)).unwrap_or(false)) && ctx.input(|i| i.key_pressed(key))
 }
 
 pub fn prompts(app: &mut App, ctx: &egui::Context) {
@@ -781,7 +790,7 @@ pub fn dialogs(app: &mut App, ctx: &egui::Context) {
         return;
     };
     let t = Tokens::get(ctx);
-    let esc = ctx.input(|i| i.key_pressed(Key::Escape));
+    let esc = crate::chrome::modal_key(ctx, Key::Escape);
     let mut keep = !esc;
     match &mut d {
         Dialog::Reuse { profile, existing } => {
@@ -835,7 +844,7 @@ pub fn dialogs(app: &mut App, ctx: &egui::Context) {
                 ui.label(format!("{name} is still connected."));
                 ui.add_space(8.0);
                 ui.horizontal(|ui| {
-                    if widgets::primary(ui, icon::X, "Close").clicked() || ctx.input(|i| i.key_pressed(Key::Enter)) {
+                    if widgets::primary(ui, icon::X, "Close").clicked() || crate::chrome::modal_key(ctx, Key::Enter) {
                         let id = session.clone();
                         app.close_session(&id);
                         keep = false;
@@ -869,7 +878,7 @@ pub fn dialogs(app: &mut App, ctx: &egui::Context) {
                 let r = ui.add(egui::TextEdit::singleline(name).desired_width(f32::INFINITY));
                 r.request_focus();
                 ui.horizontal(|ui| {
-                    if widgets::primary(ui, icon::CHECK, "Rename").clicked() || ctx.input(|i| i.key_pressed(Key::Enter)) {
+                    if widgets::primary(ui, icon::CHECK, "Rename").clicked() || crate::chrome::modal_key(ctx, Key::Enter) {
                         let n = name.trim().to_string();
                         if !n.is_empty() {
                             let _ = app.s.svc.sessions.rename(session, &n);
@@ -943,7 +952,7 @@ pub fn dialogs(app: &mut App, ctx: &egui::Context) {
                         }
                         keep = false;
                     }
-                    if ui.button("Cancel").clicked() || ctx.input(|i| i.key_pressed(Key::Escape)) {
+                    if ui.button("Cancel").clicked() || crate::chrome::modal_key(ctx, Key::Escape) {
                         keep = false;
                     }
                 });
@@ -1012,7 +1021,7 @@ pub fn dialogs(app: &mut App, ctx: &egui::Context) {
                 let r = ui.add(egui::TextEdit::singleline(value).desired_width(f32::INFINITY));
                 r.request_focus();
                 ui.horizontal(|ui| {
-                    submit = widgets::primary(ui, icon::CHECK, "OK").clicked() || ctx.input(|i| i.key_pressed(Key::Enter));
+                    submit = widgets::primary(ui, icon::CHECK, "OK").clicked() || crate::chrome::modal_key(ctx, Key::Enter);
                     if ui.button("Cancel").clicked() {
                         keep = false;
                     }
@@ -1091,5 +1100,28 @@ pub fn toasts(app: &mut App, ctx: &egui::Context) {
     });
     if let Some(i) = dismiss {
         app.s.toasts.remove(i);
+    }
+}
+
+#[cfg(test)]
+mod modal_key_tests {
+    use super::*;
+
+    #[test]
+    fn an_open_prompt_takes_enter_and_escape() {
+        let ctx = egui::Context::default();
+        let press = |key| egui::RawInput {
+            events: vec![egui::Event::Key { key, physical_key: None, pressed: true, repeat: false, modifiers: Default::default() }],
+            ..Default::default()
+        };
+        for (prompt_open, want) in [(false, true), (true, false)] {
+            let mut got = None;
+            let mut out = ctx.run_ui(press(Key::Enter), |ui| {
+                ui.ctx().data_mut(|d| d.insert_temp(egui::Id::new(PROMPT_OPEN), prompt_open));
+                got = Some(modal_key(ui.ctx(), Key::Enter));
+            });
+            out.textures_delta.clear();
+            assert_eq!(got, Some(want), "prompt open: {prompt_open}");
+        }
     }
 }

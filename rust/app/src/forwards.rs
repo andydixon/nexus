@@ -73,7 +73,7 @@ impl Forwards {
             }
         };
         let t = Tokens::get(ctx);
-        let mut keep = !ctx.input(|i| i.key_pressed(Key::Escape));
+        let mut keep = !crate::chrome::modal_key(ctx, Key::Escape);
         let mut stop = None;
         let mut start = false;
         let f = &mut self.form;

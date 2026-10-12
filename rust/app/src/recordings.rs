@@ -266,7 +266,7 @@ impl Recordings {
         let Some(r) = &self.confirm_delete else {
             return;
         };
-        let (mut yes, mut no) = (false, ctx.input(|i| i.key_pressed(Key::Escape)));
+        let (mut yes, mut no) = (false, crate::chrome::modal_key(ctx, Key::Escape));
         let name = if r.title.is_empty() { r.id.clone() } else { r.title.clone() };
         crate::chrome::modal(ctx, "rec-delete", 380.0, |ui| {
             ui.label(RichText::new("Delete recording?").font(theme::semibold(15.0)));

@@ -291,7 +291,7 @@ impl Snippets {
 
     fn var_form(&mut self, ctx: &egui::Context, s: &mut Shared) {
         let Some(f) = &mut self.vars else { return };
-        let (mut send, mut cancel) = (false, ctx.input(|i| i.key_pressed(Key::Escape)));
+        let (mut send, mut cancel) = (false, crate::chrome::modal_key(ctx, Key::Escape));
         crate::chrome::modal(ctx, "snippet-vars", 360.0, |ui| {
             ui.label(RichText::new("Snippet Variables").font(theme::semibold(15.0)));
             ui.add_space(4.0);
@@ -304,7 +304,7 @@ impl Snippets {
             }
             ui.add_space(8.0);
             ui.horizontal(|ui| {
-                send = widgets::primary(ui, icon::PAPER_PLANE_RIGHT, "Send").clicked() || ui.input(|i| i.key_pressed(Key::Enter));
+                send = widgets::primary(ui, icon::PAPER_PLANE_RIGHT, "Send").clicked() || crate::chrome::modal_key(ui.ctx(), Key::Enter);
                 cancel |= ui.button("Cancel").clicked();
             });
         });
@@ -322,7 +322,7 @@ impl Snippets {
             return;
         };
         let name = self.list.iter().find(|x| x.id == id).map(|x| x.name.clone()).unwrap_or_default();
-        let (mut yes, mut no) = (false, ctx.input(|i| i.key_pressed(Key::Escape)));
+        let (mut yes, mut no) = (false, crate::chrome::modal_key(ctx, Key::Escape));
         crate::chrome::modal(ctx, "snippet-delete", 360.0, |ui| {
             ui.label(RichText::new("Delete snippet?").font(theme::semibold(15.0)));
             ui.label(format!("\u{201c}{name}\u{201d} will be permanently deleted."));

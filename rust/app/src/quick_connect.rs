@@ -84,7 +84,7 @@ impl QuickConnect {
             return;
         }
         let t = Tokens::get(ctx);
-        let (enter, esc) = ctx.input(|i| (i.key_pressed(Key::Enter), i.key_pressed(Key::Escape)));
+        let (enter, esc) = (crate::chrome::modal_key(ctx, Key::Enter), crate::chrome::modal_key(ctx, Key::Escape));
         let mut connect = enter;
         let mut close = esc;
         let label = |ui: &mut egui::Ui, l: &str| ui.label(RichText::new(l).color(t.text_dim).size(12.0));

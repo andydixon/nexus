@@ -931,7 +931,7 @@ impl eframe::App for App {
         if self.palette.is_none() && self.dialog.is_none() && self.prompts.is_empty() {
             self.shortcuts(&ctx);
         }
-        if ctx.input(|i| i.key_pressed(Key::Escape)) && ctx.input(|i| i.viewport().fullscreen.unwrap_or(false)) && self.palette.is_none() {
+        if crate::chrome::modal_key(&ctx, Key::Escape) && ctx.input(|i| i.viewport().fullscreen.unwrap_or(false)) && self.palette.is_none() {
             ctx.send_viewport_cmd(egui::ViewportCommand::Fullscreen(false));
         }
         self.file_drops(&ctx);
@@ -979,6 +979,8 @@ impl eframe::App for App {
         egui::CentralPanel::default().frame(egui::Frame::NONE.fill(t.dock)).show(ui, |ui| tabs::workspace(self, ui));
 
         // Floating windows and modals.
+        let prompt_open = !self.prompts.is_empty();
+        ctx.data_mut(|d| d.insert_temp(egui::Id::new("nexus-prompt-open"), prompt_open));
         self.quick.ui(&ctx, &mut self.s);
         self.settings.ui(&ctx, &mut self.s);
         self.keys.ui(&ctx, &mut self.s);

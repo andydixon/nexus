@@ -772,8 +772,8 @@ impl Sftp {
             return;
         };
         let t = Tokens::get(ctx);
-        let esc = ctx.input(|i| i.key_pressed(Key::Escape));
-        let enter = ctx.input(|i| i.key_pressed(Key::Enter));
+        let esc = crate::chrome::modal_key(ctx, Key::Escape);
+        let enter = crate::chrome::modal_key(ctx, Key::Enter);
         let mut keep = !esc;
         match &mut d {
             Dialog::Input { session, kind, value } => {
@@ -961,7 +961,7 @@ impl Sftp {
                     }
                 }
             }
-            if ctx.input(|i| i.key_pressed(Key::Enter)) && writable && !target.is_empty() {
+            if crate::chrome::modal_key(ctx, Key::Enter) && writable && !target.is_empty() {
                 chosen = Some(target.clone());
             }
             if back && pk.filter.is_empty() && !pk.cwd.is_empty() && pk.cwd != "/" {
