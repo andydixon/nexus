@@ -17,6 +17,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc;
 use std::time::Duration;
+use zeroize::Zeroizing;
 
 /// Everything the UI hears about. Prompts carry their reply channel; dropping it cancels.
 pub enum Event {
@@ -209,11 +210,11 @@ type SessionSecrets = Arc<Mutex<SecretState>>;
 
 #[derive(Default)]
 struct SecretState {
-    /// `SecretMode::SessionOnly` values, asked once per session.
-    session_only: HashMap<String, String>,
+    /// `SecretMode::SessionOnly` values, asked once per session. Wiped from memory on drop.
+    session_only: HashMap<String, Zeroizing<String>>,
     /// `SecretMode::Saved` values typed during this attempt; stored only once it connects, so a
     /// typo never ends up saved.
-    pending: HashMap<String, String>,
+    pending: HashMap<String, Zeroizing<String>>,
     /// Saved values this attempt used.
     used: HashSet<String>,
     /// Saved values the server rejected: the next attempt asks again instead of reusing them.
@@ -491,7 +492,7 @@ impl Manager {
             if mode == SecretMode::Saved {
                 let mut st = state.lock();
                 if let Some(v) = st.pending.get(&key) {
-                    return Ok(v.clone());
+                    return Ok(v.to_string());
                 }
                 if !st.rejected.remove(&key)
                     && let Some(v) = secrets.get(&key)
@@ -502,7 +503,7 @@ impl Manager {
                 }
             }
             if mode == SecretMode::SessionOnly
-                && let Some(v) = state.lock().session_only.get(&key).cloned()
+                && let Some(v) = state.lock().session_only.get(&key).map(|v| v.to_string())
             {
                 return Ok(v);
             }
@@ -510,10 +511,10 @@ impl Manager {
             let mut st = state.lock();
             match mode {
                 SecretMode::Saved => {
-                    st.pending.insert(key.clone(), v.clone());
+                    st.pending.insert(key.clone(), Zeroizing::new(v.clone()));
                 }
                 SecretMode::SessionOnly => {
-                    st.session_only.insert(key.clone(), v.clone());
+                    st.session_only.insert(key.clone(), Zeroizing::new(v.clone()));
                 }
                 SecretMode::AskEveryTime => {}
             }
@@ -696,7 +697,7 @@ impl Manager {
                 let retry = auth.then(|| prompt("GitHub token did not work. Please enter a valid token:").ok()).flatten().filter(|t| !t.is_empty());
                 let Some(t) = retry else { return err(format!("GitHub authentication failed: {e}")) };
                 if gh.secret_mode == SecretMode::Saved {
-                    let _ = self.with(id, |s| s.session_secrets.lock().pending.insert(SecretKind::GithubToken.key(&p.id), t.clone()));
+                    let _ = self.with(id, |s| s.session_secrets.lock().pending.insert(SecretKind::GithubToken.key(&p.id), Zeroizing::new(t.clone())));
                 }
                 client = github::Client::new(&gh.base_url, &t);
                 client.validate_token().map_err(|e| format!("GitHub authentication failed: {e}"))?

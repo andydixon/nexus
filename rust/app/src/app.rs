@@ -50,8 +50,21 @@ pub fn post_error_nonblocking(e: String) {
 
 /// A credential or host-key question from a connecting session.
 pub enum Prompt {
-    Secret { session: String, title: String, message: String, value: String, reply: mpsc::Sender<String> },
-    HostKey { host: String, key_type: String, fingerprint: String, stored: Option<String>, reply: mpsc::Sender<HostKeyDecision> },
+    /// `value` is wiped when the prompt is dropped (answered, cancelled or abandoned).
+    Secret {
+        session: String,
+        title: String,
+        message: String,
+        value: zeroize::Zeroizing<String>,
+        reply: mpsc::Sender<String>,
+    },
+    HostKey {
+        host: String,
+        key_type: String,
+        fingerprint: String,
+        stored: Option<String>,
+        reply: mpsc::Sender<HostKeyDecision>,
+    },
 }
 
 /// Modal dialogs owned by the main window.
@@ -507,7 +520,7 @@ impl App {
                 let _ = (session, title, message, reply.send(self.answers.remove(0)));
             }
             Event::SecretPrompt { session, title, message, reply } => {
-                self.prompts.push_back(Prompt::Secret { session, title, message, value: String::new(), reply });
+                self.prompts.push_back(Prompt::Secret { session, title, message, value: Default::default(), reply });
             }
             Event::HostKeyVerify { host, key_type, fingerprint, stored, reply, .. } => {
                 self.prompts.push_back(Prompt::HostKey { host, key_type, fingerprint, stored, reply });

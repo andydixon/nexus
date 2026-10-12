@@ -695,12 +695,12 @@ pub fn prompts(app: &mut App, ctx: &egui::Context) {
                 }
                 ui.add_space(4.0);
                 ui.label(message.as_str());
-                let r = ui.add(egui::TextEdit::singleline(value).password(true).desired_width(f32::INFINITY));
+                let r = ui.add(egui::TextEdit::singleline(&mut **value).password(true).desired_width(f32::INFINITY));
                 r.request_focus();
                 ui.add_space(6.0);
                 ui.horizontal(|ui| {
                     if widgets::primary(ui, icon::CHECK, "OK").clicked() || enter {
-                        let _ = reply.send(std::mem::take(value));
+                        let _ = reply.send(std::mem::take(&mut **value));
                         done = true;
                     }
                     if ui.button("Cancel").clicked() || esc {
