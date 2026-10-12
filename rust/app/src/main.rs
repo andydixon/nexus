@@ -82,8 +82,7 @@ fn main() -> eframe::Result {
     let config = match data_dir {
         Some(d) => {
             let c = AppConfig::in_dir(d.into());
-            std::fs::create_dir_all(&c.vault_dir).ok();
-            Ok(c)
+            nexus_core::config::create_private_dir(&c.data_dir).and_then(|_| nexus_core::config::create_private_dir(&c.vault_dir)).map(|_| c)
         }
         None => AppConfig::load(),
     };

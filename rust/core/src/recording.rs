@@ -116,7 +116,12 @@ impl Recorder {
     fn with_limit(dir: &Path, id: &str, title: &str, cols: i64, rows: i64, max_bytes: u64) -> Result<Recorder> {
         mkdir_private(dir).map_err(|e| format!("recording: failed to create directory: {e}"))?;
         let path = dir.join(format!("{id}.cast"));
-        let mut f = File::create(&path).map_err(|e| format!("recording: failed to create file: {e}"))?;
+        // Recordings capture typed input (passwords included): owner-only, like the vault.
+        let mut opts = std::fs::OpenOptions::new();
+        opts.write(true).create(true).truncate(true);
+        #[cfg(unix)]
+        std::os::unix::fs::OpenOptionsExt::mode(&mut opts, 0o600);
+        let mut f = opts.open(&path).map_err(|e| format!("recording: failed to create file: {e}"))?;
         let start = Instant::now();
         let hdr = Header {
             version: 2,
@@ -391,6 +396,11 @@ mod tests {
         assert_eq!(rec.event_count(), 4);
         rec.close().unwrap();
         rec.close().unwrap(); // double close is a no-op
+        #[cfg(unix)]
+        {
+            let mode = std::os::unix::fs::PermissionsExt::mode(&std::fs::metadata(dir.join("test-session-001.cast")).unwrap().permissions());
+            assert_eq!(mode & 0o777, 0o600);
+        }
         let text = std::fs::read_to_string(dir.join("test-session-001.cast")).unwrap();
         let lines: Vec<&str> = text.trim().lines().collect();
         assert_eq!(lines.len(), 5);

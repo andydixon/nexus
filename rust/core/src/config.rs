@@ -51,7 +51,8 @@ impl AppConfig {
     }
 }
 
-fn create_private_dir(d: &Path) -> std::io::Result<()> {
+/// Creates `d` (and parents) readable only by the owner.
+pub fn create_private_dir(d: &Path) -> std::io::Result<()> {
     std::fs::create_dir_all(d)?;
     #[cfg(unix)]
     std::fs::set_permissions(d, std::os::unix::fs::PermissionsExt::from_mode(0o700))?;

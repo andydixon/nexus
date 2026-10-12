@@ -11,16 +11,32 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::sync::Mutex;
+use zeroize::Zeroizing;
 
 const VAULT_FILE: &str = "vault.json";
 const MAX_VAULT_BYTES: u64 = 10 * 1024 * 1024;
 
-/// Argon2id with the Go parameters: t=3, m=128 MiB, p=4, 32-byte key.
-pub fn derive_key(password: &str, salt: &[u8]) -> Result<[u8; 32]> {
+/// Every credential kind the session manager stores under `profile:<id>:<kind>`.
+pub const PROFILE_SECRET_KINDS: [&str; 11] = [
+    "password",
+    "passphrase",
+    "totp",
+    "github-token",
+    "vnc-password",
+    "vnc-ssh-password",
+    "vnc-ssh-passphrase",
+    "irc-server-password",
+    "irc-nickserv-password",
+    "irc-ssh-password",
+    "irc-ssh-passphrase",
+];
+
+/// Argon2id with the Go parameters: t=3, m=128 MiB, p=4, 32-byte key. The key is wiped on drop.
+pub fn derive_key(password: &str, salt: &[u8]) -> Result<Zeroizing<[u8; 32]>> {
     let params = argon2::Params::new(128 * 1024, 3, 4, Some(32)).map_err(|e| e.to_string())?;
-    let mut key = [0u8; 32];
+    let mut key = Zeroizing::new([0u8; 32]);
     argon2::Argon2::new(argon2::Algorithm::Argon2id, argon2::Version::V0x13, params)
-        .hash_password_into(password.as_bytes(), salt, &mut key)
+        .hash_password_into(password.as_bytes(), salt, &mut *key)
         .map_err(|e| e.to_string())?;
     Ok(key)
 }
@@ -54,14 +70,8 @@ struct VaultFile {
 }
 
 struct Unlocked {
-    key: [u8; 32],
+    key: Zeroizing<[u8; 32]>,
     vault: VaultFile,
-}
-
-impl Drop for Unlocked {
-    fn drop(&mut self) {
-        self.key.fill(0);
-    }
 }
 
 pub struct Vault {
@@ -155,17 +165,27 @@ impl Vault {
     }
 }
 
-/// Writes a file readable only by the owner.
+/// Writes a file readable only by the owner, atomically: the data goes to a sibling temp file
+/// that replaces `path` only once it is fully written and synced, so a crash can't leave a
+/// truncated vault or export behind (and an existing file's wider mode is never kept).
 pub fn write_private(path: &std::path::Path, data: &[u8]) -> Result<()> {
     use std::io::Write;
+    let name = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+    let tmp = path.with_file_name(format!(".{name}.tmp-{}", std::process::id()));
     let mut opts = std::fs::OpenOptions::new();
     opts.write(true).create(true).truncate(true);
     #[cfg(unix)]
     std::os::unix::fs::OpenOptionsExt::mode(&mut opts, 0o600);
-    let mut f = opts.open(path)?;
-    f.write_all(data)?;
-    f.sync_all()?;
-    Ok(())
+    let written = (|| {
+        let mut f = opts.open(&tmp)?;
+        f.write_all(data)?;
+        f.sync_all()?;
+        std::fs::rename(&tmp, path)
+    })();
+    if written.is_err() {
+        let _ = std::fs::remove_file(&tmp);
+    }
+    Ok(written?)
 }
 
 pub const KEYCHAIN_SERVICE: &str = "NexusTerminal";
@@ -270,7 +290,13 @@ impl Secrets {
         let _ = self.vault.delete(key);
     }
 
+    /// Removes every credential saved for a profile from both stores.
     pub fn delete_profile(&self, profile_id: &str) {
+        if self.keychain_ok {
+            for kind in PROFILE_SECRET_KINDS {
+                self.keychain.delete(&format!("profile:{profile_id}:{kind}"));
+            }
+        }
         let _ = self.vault.delete_prefix(&format!("profile:{profile_id}:"));
     }
 }
@@ -301,6 +327,42 @@ mod tests {
         assert!(v.get("a").is_err());
         v.unlock("pw").unwrap();
         assert_eq!(v.get("a").unwrap(), "1");
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn private_writes_are_atomic_and_owner_only() {
+        let dir = std::env::temp_dir().join(format!("nexus-wp-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("secret.bin");
+        // A pre-existing world-readable file is replaced, not reused.
+        std::fs::write(&path, b"old").unwrap();
+        #[cfg(unix)]
+        std::fs::set_permissions(&path, std::os::unix::fs::PermissionsExt::from_mode(0o644)).unwrap();
+        write_private(&path, b"new").unwrap();
+        assert_eq!(std::fs::read(&path).unwrap(), b"new");
+        #[cfg(unix)]
+        assert_eq!(std::os::unix::fs::PermissionsExt::mode(&std::fs::metadata(&path).unwrap().permissions()) & 0o777, 0o600);
+        // No temp file is left behind, on success or when the target directory is unwritable.
+        assert_eq!(std::fs::read_dir(&dir).unwrap().count(), 1);
+        assert!(write_private(&dir.join("missing").join("x"), b"x").is_err());
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn deleting_a_profile_clears_every_vault_kind() {
+        let dir = std::env::temp_dir().join(format!("nexus-delprof-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let s = Secrets { vault: Vault::new(dir.clone()), keychain: Keychain::new("NexusTerminalTest", None), keychain_ok: false };
+        s.vault.initialise("pw").unwrap();
+        for kind in PROFILE_SECRET_KINDS {
+            s.vault.set(&format!("profile:p1:{kind}"), "v").unwrap();
+        }
+        s.vault.set("profile:p2:password", "keep").unwrap();
+        s.delete_profile("p1");
+        assert!(PROFILE_SECRET_KINDS.iter().all(|k| s.get(&format!("profile:p1:{k}")).is_none()));
+        assert_eq!(s.get("profile:p2:password").as_deref(), Some("keep"));
         std::fs::remove_dir_all(dir).unwrap();
     }
 }

@@ -41,7 +41,7 @@ pub fn encrypt_and_export(profiles: &[Profile], password: &str, path: &Path) -> 
     let salt = random_bytes::<32>();
     let nonce = random_bytes::<12>();
     let key = derive_key(password, &salt)?;
-    let ct = Aes256Gcm::new((&key).into()).encrypt(Nonce::from_slice(&nonce), plain.as_slice()).map_err(|e| e.to_string())?;
+    let ct = Aes256Gcm::new((&*key).into()).encrypt(Nonce::from_slice(&nonce), plain.as_slice()).map_err(|e| e.to_string())?;
     let mut out = vec![VERSION];
     out.extend(salt);
     out.extend(nonce);
@@ -64,7 +64,7 @@ pub fn decrypt_and_import(path: &Path, password: &str) -> Result<Vec<Profile>> {
         return Err(format!("exportimport: unsupported format version {}", data[0]).into());
     }
     let key = derive_key(password, &data[1..33])?;
-    let plain = Aes256Gcm::new((&key).into())
+    let plain = Aes256Gcm::new((&*key).into())
         .decrypt(Nonce::from_slice(&data[33..45]), &data[45..])
         .map_err(|_| "exportimport: decryption failed — wrong password or corrupt file")?;
     let bundle: Bundle = serde_json::from_slice(&plain).map_err(|e| format!("exportimport: invalid bundle JSON: {e}"))?;

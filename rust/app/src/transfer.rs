@@ -210,7 +210,12 @@ impl Transfer {
                             .add_filter("JSON", &["json"])
                             .save_file()
                     {
-                        match s.svc.export_json(*include_secrets).map_err(|e| e.to_string()).and_then(|j| std::fs::write(&path, j).map_err(|e| e.to_string())) {
+                        match s
+                            .svc
+                            .export_json(*include_secrets)
+                            .map_err(|e| e.to_string())
+                            .and_then(|j| nexus_core::secrets::write_private(&path, j.as_bytes()).map_err(|e| e.to_string()))
+                        {
                             Ok(()) => {
                                 s.success(format!("Exported {} profile(s) to {}", s.profiles.len(), path.display()));
                                 close = true;
