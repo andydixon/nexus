@@ -1,4 +1,4 @@
-//! SSH Key Manager window: key pairs in ~/.ssh — copy public key, delete, generate (ssh-keygen).
+//! SSH Key Manager window: key pairs in ~/.ssh — copy public key, delete, generate (in-process, OpenSSH format).
 
 use crate::settings::{Job, poll};
 use crate::state::Shared;

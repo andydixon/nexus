@@ -16,6 +16,8 @@ use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio::sync::mpsc;
 
 const MAX_PRIVATE_KEY_BYTES: u64 = 1 << 20;
+/// Bounds what `run_command` buffers, so a hostile server can't stream unlimited output into memory.
+const MAX_COMMAND_OUTPUT_BYTES: usize = 1 << 20;
 
 /// What a host-key decision needs. The manager's checker consults the known-hosts table and,
 /// per policy, prompts the user; it returns Err with the reason to reject.
@@ -242,11 +244,7 @@ async fn socks5(sc: &SshConfig, host: &str, port: u16) -> Result<tokio::net::Tcp
     match r[1] {
         0 => {}
         2 if auth => {
-            let mut m = vec![1, sc.proxy_username.len() as u8];
-            m.extend(sc.proxy_username.as_bytes());
-            m.push(sc.proxy_password.len() as u8);
-            m.extend(sc.proxy_password.as_bytes());
-            s.write_all(&m).await?;
+            s.write_all(&socks5_auth_request(&sc.proxy_username, &sc.proxy_password)?).await?;
             s.read_exact(&mut r).await?;
             if r[1] != 0 {
                 return Err("SOCKS5 proxy: authentication failed".into());
@@ -254,10 +252,7 @@ async fn socks5(sc: &SshConfig, host: &str, port: u16) -> Result<tokio::net::Tcp
         }
         _ => return Err("SOCKS5 proxy: no acceptable authentication method".into()),
     }
-    let mut req = vec![5, 1, 0, 3, host.len() as u8];
-    req.extend(host.as_bytes());
-    req.extend(port.to_be_bytes());
-    s.write_all(&req).await?;
+    s.write_all(&socks5_connect_request(host, port)?).await?;
     let mut head = [0u8; 4];
     s.read_exact(&mut head).await?;
     if head[1] != 0 {
@@ -272,6 +267,27 @@ async fn socks5(sc: &SshConfig, host: &str, port: u16) -> Result<tokio::net::Tcp
     let mut rest = vec![0u8; skip];
     s.read_exact(&mut rest).await?;
     Ok(s)
+}
+
+/// RFC 1929 username/password sub-negotiation. Both fields carry a one-byte length, so longer
+/// values are rejected rather than silently truncated into a malformed request.
+fn socks5_auth_request(user: &str, pass: &str) -> Result<Vec<u8>> {
+    let ulen = u8::try_from(user.len()).map_err(|_| "SOCKS5 proxy: username longer than 255 bytes")?;
+    let plen = u8::try_from(pass.len()).map_err(|_| "SOCKS5 proxy: password longer than 255 bytes")?;
+    let mut m = vec![1, ulen];
+    m.extend(user.as_bytes());
+    m.push(plen);
+    m.extend(pass.as_bytes());
+    Ok(m)
+}
+
+/// RFC 1928 CONNECT with a domain-name address (one-byte length).
+fn socks5_connect_request(host: &str, port: u16) -> Result<Vec<u8>> {
+    let hlen = u8::try_from(host.len()).map_err(|_| "SOCKS5 proxy: host name longer than 255 bytes")?;
+    let mut req = vec![5, 1, 0, 3, hlen];
+    req.extend(host.as_bytes());
+    req.extend(port.to_be_bytes());
+    Ok(req)
 }
 
 async fn http_connect(sc: &SshConfig, host: &str, port: u16) -> Result<tokio::net::TcpStream> {
@@ -443,13 +459,10 @@ impl SshClient {
     pub fn open_tunnel(&self, host: &str, port: u16) -> Result<std::net::TcpStream> {
         let h = self.handle()?;
         let host = host.to_string();
-        let listener = std::net::TcpListener::bind("127.0.0.1:0")?;
-        let addr = listener.local_addr()?;
         let ch = rt()
             .block_on(h.channel_open_direct_tcpip(host.clone(), port as u32, "127.0.0.1", 0))
             .map_err(|e| format!("SSH tunnel to {host}:{port} failed: {e}"))?;
-        let client = std::net::TcpStream::connect(addr)?;
-        let (server, _) = listener.accept()?;
+        let (client, server) = loopback_pair()?;
         server.set_nonblocking(true)?;
         rt().spawn(async move {
             if let Ok(mut local) = tokio::net::TcpStream::from_std(server) {
@@ -651,7 +664,12 @@ impl SshClient {
             let mut out = vec![];
             while let Some(m) = ch.wait().await {
                 match m {
-                    ChannelMsg::Data { data } => out.extend_from_slice(&data),
+                    ChannelMsg::Data { data } => {
+                        if out.len() + data.len() > MAX_COMMAND_OUTPUT_BYTES {
+                            return Err(format!("command output exceeds {MAX_COMMAND_OUTPUT_BYTES} bytes").into());
+                        }
+                        out.extend_from_slice(&data);
+                    }
                     ChannelMsg::Eof | ChannelMsg::Close => break,
                     _ => {}
                 }
@@ -709,7 +727,9 @@ impl SshClient {
                                 let _ = tokio::io::copy_bidirectional(&mut sock, &mut remote).await;
                             }
                         });
-                        t2.lock().unwrap().push(conn.abort_handle());
+                        let mut handles = t2.lock().unwrap();
+                        handles.retain(|h| !h.is_finished());
+                        handles.push(conn.abort_handle());
                     }
                 });
                 tasks.lock().unwrap().push(task.abort_handle());
@@ -780,9 +800,135 @@ impl SshClient {
     }
 }
 
+/// A connected pair of loopback sockets. The accepted end is checked against the connecting
+/// end's address, so another local process racing for the ephemeral port can't be bridged
+/// into the tunnel instead of our own client.
+pub(crate) fn loopback_pair() -> std::io::Result<(std::net::TcpStream, std::net::TcpStream)> {
+    let listener = std::net::TcpListener::bind("127.0.0.1:0")?;
+    let client = std::net::TcpStream::connect(listener.local_addr()?)?;
+    let ours = client.local_addr()?;
+    loop {
+        let (server, peer) = listener.accept()?;
+        if peer == ours {
+            return Ok((client, server));
+        }
+        // A stranger connected first: drop it and keep waiting for our own connection.
+        drop(server);
+    }
+}
+
+/// Generates `<dir>/<name>` and `<dir>/<name>.pub` in OpenSSH format, in-process, so a
+/// passphrase never appears on a command line. `kind` is ed25519 (default), ecdsa (P-256) or rsa
+/// (`bits` 2048/3072/4096, default 4096). Returns the private key path.
+pub fn generate_key_pair(dir: &std::path::Path, name: &str, kind: &str, bits: u32, passphrase: &str) -> Result<std::path::PathBuf> {
+    use russh::keys::ssh_key::private::{EcdsaKeypair, Ed25519Keypair, KeypairData, RsaKeypair};
+    use russh::keys::ssh_key::{EcdsaCurve, LineEnding};
+    let name = crate::keyfiles::validate_ssh_key_name(name)?;
+    let kind = if kind.trim().is_empty() { "ed25519".to_string() } else { kind.trim().to_lowercase() };
+    let mut rng = OsCryptoRng;
+    let data = match kind.as_str() {
+        "ed25519" => KeypairData::from(Ed25519Keypair::random(&mut rng)),
+        "ecdsa" => KeypairData::from(EcdsaKeypair::random(&mut rng, EcdsaCurve::NistP256).map_err(|e| e.to_string())?),
+        "rsa" => {
+            let bits = match bits {
+                0 => 4096,
+                2048 | 3072 | 4096 => bits,
+                b => return Err(format!("unsupported RSA key size {b} (use 2048, 3072, or 4096)").into()),
+            };
+            KeypairData::from(RsaKeypair::random(&mut rng, bits as usize).map_err(|e| e.to_string())?)
+        }
+        k => return Err(format!("unsupported SSH key type {k:?}").into()),
+    };
+    let comment = format!("{name}@nexus-terminal");
+    let key = russh::keys::PrivateKey::new(data, comment.as_str()).map_err(|e| e.to_string())?;
+    let key = if passphrase.is_empty() { key } else { key.encrypt(&mut rng, passphrase.as_bytes()).map_err(|e| e.to_string())? };
+    std::fs::create_dir_all(dir)?;
+    let path = dir.join(&name);
+    if path.exists() || path.with_extension("pub").exists() {
+        return Err(format!("key {name:?} already exists").into());
+    }
+    key.write_openssh_file(&path, LineEnding::LF).map_err(|e| format!("failed to write private key: {e}"))?;
+    let mut public = key.public_key().clone();
+    public.set_comment(comment.as_str());
+    public.write_openssh_file(path.with_extension("pub")).map_err(|e| format!("failed to write public key: {e}"))?;
+    Ok(path)
+}
+
+/// The OS CSPRNG as the `rand_core` 0.10 generator `ssh-key` expects (our `rand` is 0.8).
+struct OsCryptoRng;
+
+impl russh::keys::ssh_key::rand_core::TryRng for OsCryptoRng {
+    type Error = std::convert::Infallible;
+    fn try_next_u32(&mut self) -> std::result::Result<u32, Self::Error> {
+        Ok(rand::RngCore::next_u32(&mut rand::rngs::OsRng))
+    }
+    fn try_next_u64(&mut self) -> std::result::Result<u64, Self::Error> {
+        Ok(rand::RngCore::next_u64(&mut rand::rngs::OsRng))
+    }
+    fn try_fill_bytes(&mut self, dst: &mut [u8]) -> std::result::Result<(), Self::Error> {
+        rand::RngCore::fill_bytes(&mut rand::rngs::OsRng, dst);
+        Ok(())
+    }
+}
+
+impl russh::keys::ssh_key::rand_core::TryCryptoRng for OsCryptoRng {}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn loopback_pair_ignores_a_stranger_that_connects_first() {
+        // Bind, then let a "stranger" race us for the port before our own connect: the pair must
+        // still bridge our client to our server end.
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        let _stranger = std::net::TcpStream::connect(addr).unwrap();
+        let client = std::net::TcpStream::connect(addr).unwrap();
+        let ours = client.local_addr().unwrap();
+        let server = loop {
+            let (s, peer) = listener.accept().unwrap();
+            if peer == ours {
+                break s;
+            }
+        };
+        assert_eq!(server.peer_addr().unwrap(), ours);
+        let (c, s) = loopback_pair().unwrap();
+        assert_eq!(c.local_addr().unwrap(), s.peer_addr().unwrap());
+    }
+
+    #[test]
+    fn socks5_requests_reject_overlong_fields() {
+        assert_eq!(socks5_connect_request("example.com", 22).unwrap(), [&[5u8, 1, 0, 3, 11][..], b"example.com", &[0, 22]].concat());
+        assert!(socks5_connect_request(&"h".repeat(256), 22).is_err());
+        assert_eq!(socks5_auth_request("u", "pw").unwrap(), vec![1, 1, b'u', 2, b'p', b'w']);
+        assert!(socks5_auth_request("u", &"p".repeat(256)).is_err());
+        assert!(socks5_auth_request(&"u".repeat(256), "p").is_err());
+    }
+
+    #[test]
+    fn generates_encrypted_key_pairs_in_process() {
+        let dir = std::env::temp_dir().join(format!("nexus-keygen-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let path = generate_key_pair(&dir, "id_test", "ed25519", 0, "pass phrase").unwrap();
+        assert_eq!(path, dir.join("id_test"));
+        let public = std::fs::read_to_string(dir.join("id_test.pub")).unwrap();
+        assert!(public.starts_with("ssh-ed25519 ") && public.trim_end().ends_with("id_test@nexus-terminal"), "{public}");
+        #[cfg(unix)]
+        assert_eq!(std::os::unix::fs::PermissionsExt::mode(&std::fs::metadata(&path).unwrap().permissions()) & 0o777, 0o600);
+        assert!(crate::keyfiles::is_likely_private_key(&path));
+        // Encrypted: unreadable without the passphrase, readable with it.
+        let p = path.to_string_lossy().into_owned();
+        assert!(load_private_key(&p, None).is_err());
+        let pp: SecretFn = Arc::new(|| Ok("pass phrase".into()));
+        assert_eq!(load_private_key(&p, Some(&pp)).unwrap().algorithm().as_str(), "ssh-ed25519");
+        assert!(generate_key_pair(&dir, "id_test", "ed25519", 0, "").is_err(), "must not overwrite");
+        let plain = generate_key_pair(&dir, "id_plain", "ecdsa", 0, "").unwrap();
+        assert!(load_private_key(&plain.to_string_lossy(), None).is_ok());
+        assert!(generate_key_pair(&dir, "bad", "rsa", 1024, "").is_err());
+        assert!(generate_key_pair(&dir, "../x", "ed25519", 0, "").is_err());
+        std::fs::remove_dir_all(dir).unwrap();
+    }
 
     #[test]
     fn totp_matches_rfc_vector() {

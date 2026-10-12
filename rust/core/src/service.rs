@@ -283,7 +283,7 @@ impl Service {
         Ok(n)
     }
 
-    // --- SSH keys (via ssh-keygen, as before) -------------------------------------------
+    // --- SSH keys -----------------------------------------------------------------------
 
     fn ssh_dir() -> Result<PathBuf> {
         let home = std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" }).ok_or("unable to determine home directory")?;
@@ -310,32 +310,9 @@ impl Service {
         Ok(out)
     }
 
+    /// Generates a key pair in `~/.ssh` in-process (the passphrase never reaches a command line).
     pub fn generate_ssh_key(&self, name: &str, kind: &str, bits: u32, passphrase: &str) -> Result<()> {
-        let name = keyfiles::validate_ssh_key_name(name)?;
-        let kind = if kind.trim().is_empty() { "ed25519".to_string() } else { kind.trim().to_lowercase() };
-        let bits = match kind.as_str() {
-            "ed25519" | "ecdsa" => bits,
-            "rsa" if bits == 0 => 4096,
-            "rsa" if [2048, 3072, 4096].contains(&bits) => bits,
-            "rsa" => return Err(format!("unsupported RSA key size {bits} (use 2048, 3072, or 4096)").into()),
-            k => return Err(format!("unsupported SSH key type {k:?}").into()),
-        };
-        let dir = Self::ssh_dir()?;
-        std::fs::create_dir_all(&dir)?;
-        let path = dir.join(&name);
-        if path.exists() {
-            return Err(format!("key {name:?} already exists").into());
-        }
-        let mut cmd = std::process::Command::new("ssh-keygen");
-        cmd.args(["-q", "-t", &kind, "-f"]).arg(&path).args(["-C", &format!("{name}@nexus-terminal"), "-N", passphrase]);
-        if kind == "rsa" {
-            cmd.args(["-b", &bits.to_string()]);
-        }
-        let out = cmd.stdin(std::process::Stdio::null()).output().map_err(|e| format!("ssh-keygen failed: {e}"))?;
-        if !out.status.success() {
-            return Err(format!("ssh-keygen failed: {}", String::from_utf8_lossy(&out.stderr).trim()).into());
-        }
-        Ok(())
+        crate::clients::ssh::generate_key_pair(&Self::ssh_dir()?, name, kind, bits, passphrase).map(|_| ())
     }
 
     pub fn delete_ssh_key(&self, name: &str) -> Result<()> {
