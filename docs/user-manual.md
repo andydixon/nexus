@@ -173,7 +173,7 @@ Nexus Terminal logs on with Network Level Authentication (CredSSP, NTLM), so you
 
 RDP servers usually present self-signed certificates, so the certificate is pinned like an SSH host key: its SHA-256 fingerprint is shown the first time and stored in **Known Hosts**, and a changed certificate offers Reject, Accept Once or Accept & Update. The check happens before any credentials are sent.
 
-The viewer works like the VNC one: click the desktop to give it keyboard focus, **Ctrl+Alt+Del** sends the key combination, and **Paste Clipboard** types your clipboard's text into the remote desktop (clipboard sharing is not supported yet). With **Resize With Tab**, the remote desktop follows the tab's size on servers that support it (Windows); otherwise the picture is scaled.
+The viewer works like the VNC one: click the desktop to give it keyboard focus, **Ctrl+Alt+Del** sends the key combination, and text is shared through the clipboard both ways: text you copy on the remote desktop arrives on your clipboard (subject to the remote-clipboard setting), and your clipboard is offered to the remote desktop whenever you click into it, press Ctrl+V or use **Paste Clipboard**. Files and images are not shared. With **Resize With Tab**, the remote desktop follows the tab's size on servers that support it (Windows); otherwise the picture is scaled.
 
 ### IRC
 

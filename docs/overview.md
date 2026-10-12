@@ -146,7 +146,7 @@ Use Nexus Terminal when you need to:
 - Server certificate pinned by fingerprint in Known Hosts, checked before credentials are sent.
 - Direct, SOCKS5, HTTP CONNECT or SSH-tunnelled connections.
 - Scale-to-fit or 1:1, a fixed resolution or one that follows the tab (Display Control).
-- Keyboard (scancodes for keys and shortcuts, Unicode for text), mouse and wheel; Ctrl+Alt+Del; type the clipboard into the session.
+- Keyboard (scancodes for keys and shortcuts, Unicode for text), mouse and wheel; Ctrl+Alt+Del; text clipboard sharing in both directions.
 - Password storage modes and domain logon.
 
 ### VNC capabilities

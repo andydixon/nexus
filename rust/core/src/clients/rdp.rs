@@ -3,9 +3,15 @@
 //! tunnel), and the desktop decoded into the same RGBA framebuffer the VNC client uses. Like the
 //! other clients, `connect` blocks and the session runs on its own thread.
 
-use super::vnc::{FrameFn, Framebuffer};
+use super::vnc::{ClipboardFn, FrameFn, Framebuffer};
 use super::{CloseFn, ErrorFn};
 use crate::Result;
+use ironrdp::cliprdr::CliprdrClient;
+use ironrdp::cliprdr::backend::{ClipboardMessage, CliprdrBackend};
+use ironrdp::cliprdr::pdu::{
+    ClipboardFormat, ClipboardFormatId, ClipboardGeneralCapabilityFlags, FileContentsRequest, FileContentsResponse, FormatDataRequest, FormatDataResponse,
+    LockDataId,
+};
 use ironrdp::connector::connection_activation::ConnectionActivationState;
 use ironrdp::connector::{self, ClientConnector, ConnectionResult, Credentials, Sequence, ServerName};
 use ironrdp::displaycontrol::client::DisplayControlClient;
@@ -46,6 +52,8 @@ pub struct Config {
     pub check_cert: CertCheck,
     pub connect_timeout: Duration,
     pub on_frame: FrameFn,
+    /// Text the remote desktop copied (the app applies its remote-clipboard preference).
+    pub on_clipboard: ClipboardFn,
     pub on_error: ErrorFn,
     pub on_close: CloseFn,
 }
@@ -53,6 +61,8 @@ pub struct Config {
 enum Input {
     Ops(Vec<Operation>),
     Resize(u16, u16),
+    /// Offer local clipboard text to the remote desktop.
+    Clipboard(String),
     Close,
 }
 
@@ -60,6 +70,9 @@ pub struct Client {
     cfg: Config,
     fb: Arc<Mutex<Framebuffer>>,
     tx: Mutex<Option<Sender<Input>>>,
+    /// Local text offered to the remote clipboard, read by the clipboard channel on request.
+    clip_text: Arc<Mutex<Option<String>>>,
+    clip_rx: Mutex<Option<Receiver<ClipboardMessage>>>,
 }
 
 type Tls = rustls::StreamOwned<rustls::ClientConnection, TcpStream>;
@@ -69,7 +82,7 @@ const POLL: Duration = Duration::from_millis(15);
 
 impl Client {
     pub fn new(cfg: Config) -> Arc<Client> {
-        Arc::new(Client { cfg, fb: Arc::default(), tx: Mutex::new(None) })
+        Arc::new(Client { cfg, fb: Arc::default(), tx: Mutex::new(None), clip_text: Arc::default(), clip_rx: Mutex::new(None) })
     }
 
     pub fn framebuffer(&self) -> Arc<Mutex<Framebuffer>> {
@@ -104,6 +117,11 @@ impl Client {
     /// Asks the server to resize the desktop (Display Control channel); ignored when it can't.
     pub fn resize(&self, width: u16, height: u16) {
         self.send(Input::Resize(width, height));
+    }
+
+    /// Makes `text` the remote clipboard's contents (the remote pastes it on demand).
+    pub fn set_clipboard(&self, text: String) {
+        self.send(Input::Clipboard(text));
     }
 
     pub fn close(&self) {
@@ -171,6 +189,13 @@ impl Client {
         let mut framed = Framed::new(tcp);
         let drdynvc = DrdynvcClient::new().with_dynamic_channel(DisplayControlClient::new(|_| Ok(Vec::new())));
         let mut connector = ClientConnector::new(self.connector_config(), local).with_static_channel(drdynvc);
+        let (clip_tx, clip_rx) = mpsc::channel();
+        connector.attach_static_channel(CliprdrClient::new(Box::new(TextClipboard {
+            tx: clip_tx,
+            text: self.clip_text.clone(),
+            on_text: self.cfg.on_clipboard.clone(),
+        })));
+        *self.clip_rx.lock() = Some(clip_rx);
         let should_upgrade = ironrdp_blocking::connect_begin(&mut framed, &mut connector).map_err(|e| format!("RDP connection failed: {e}"))?;
 
         let tcp = framed.into_inner_no_leftover();
@@ -210,6 +235,7 @@ impl Client {
         }
         .build();
         let mut input = Database::new();
+        let clip_rx = self.clip_rx.lock().take();
         // A resize waits here until the Display Control channel is open (it opens after logon).
         let mut want_size: Option<(u16, u16)> = None;
         loop {
@@ -223,6 +249,14 @@ impl Client {
                         }
                     }
                     Ok(Input::Resize(w, h)) => want_size = Some((w, h)).filter(|&s| s != (image.width(), image.height())),
+                    Ok(Input::Clipboard(text)) => {
+                        *self.clip_text.lock() = Some(text);
+                        if let Some(c) = stage.get_svc_processor_mut::<CliprdrClient>()
+                            && let Ok(msgs) = c.initiate_copy(&[ClipboardFormat::new(ClipboardFormatId::CF_UNICODETEXT)])
+                        {
+                            outputs.push(ActiveStageOutput::ResponseFrame(stage.process_svc_processor_messages(msgs)?));
+                        }
+                    }
                     Ok(Input::Close) | Err(mpsc::TryRecvError::Disconnected) => {
                         for o in stage.graceful_shutdown()? {
                             if let ActiveStageOutput::ResponseFrame(f) = o {
@@ -232,6 +266,19 @@ impl Client {
                         return Ok(());
                     }
                     Err(mpsc::TryRecvError::Empty) => break,
+                }
+            }
+            // Requests the clipboard backend queued while the stage processed server PDUs.
+            for msg in clip_rx.iter().flat_map(|rx| rx.try_iter()) {
+                let Some(c) = stage.get_svc_processor_mut::<CliprdrClient>() else { break };
+                let msgs = match msg {
+                    ClipboardMessage::SendInitiateCopy(formats) => c.initiate_copy(&formats),
+                    ClipboardMessage::SendFormatData(response) => c.submit_format_data(response),
+                    ClipboardMessage::SendInitiatePaste(format) => c.initiate_paste(format),
+                    _ => continue,
+                };
+                if let Ok(msgs) = msgs {
+                    outputs.push(ActiveStageOutput::ResponseFrame(stage.process_svc_processor_messages(msgs)?));
                 }
             }
             if let Some((w, h)) = want_size {
@@ -290,6 +337,67 @@ impl Client {
             }
         }
     }
+}
+
+/// Text-only clipboard sharing (CF_UNICODETEXT) over CLIPRDR. Callbacks run inside the active
+/// stage, so they queue requests for the session loop instead of answering directly.
+struct TextClipboard {
+    tx: Sender<ClipboardMessage>,
+    text: Arc<Mutex<Option<String>>>,
+    on_text: ClipboardFn,
+}
+
+impl std::fmt::Debug for TextClipboard {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("TextClipboard")
+    }
+}
+
+impl ironrdp::core::AsAny for TextClipboard {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
+}
+
+impl CliprdrBackend for TextClipboard {
+    fn temporary_directory(&self) -> &str {
+        ""
+    }
+    fn client_capabilities(&self) -> ClipboardGeneralCapabilityFlags {
+        ClipboardGeneralCapabilityFlags::empty()
+    }
+    fn on_ready(&mut self) {}
+    fn on_request_format_list(&mut self) {
+        let formats = if self.text.lock().is_some() { vec![ClipboardFormat::new(ClipboardFormatId::CF_UNICODETEXT)] } else { vec![] };
+        let _ = self.tx.send(ClipboardMessage::SendInitiateCopy(formats));
+    }
+    fn on_process_negotiated_capabilities(&mut self, _: ClipboardGeneralCapabilityFlags) {}
+    fn on_remote_copy(&mut self, formats: &[ClipboardFormat]) {
+        if formats.iter().any(|f| f.id() == ClipboardFormatId::CF_UNICODETEXT) {
+            let _ = self.tx.send(ClipboardMessage::SendInitiatePaste(ClipboardFormatId::CF_UNICODETEXT));
+        }
+    }
+    fn on_format_data_request(&mut self, request: FormatDataRequest) {
+        let response = match &*self.text.lock() {
+            Some(t) if request.format == ClipboardFormatId::CF_UNICODETEXT => FormatDataResponse::new_unicode_string(t),
+            _ => FormatDataResponse::new_error(),
+        };
+        let _ = self.tx.send(ClipboardMessage::SendFormatData(ironrdp::core::IntoOwned::into_owned(response)));
+    }
+    fn on_format_data_response(&mut self, response: FormatDataResponse<'_>) {
+        if !response.is_error()
+            && let Ok(text) = response.to_unicode_string()
+        {
+            (self.on_text)(text);
+        }
+    }
+    fn on_file_contents_request(&mut self, _: FileContentsRequest) {}
+    fn on_file_contents_response(&mut self, _: FileContentsResponse<'_>) {}
+    fn on_lock(&mut self, _: LockDataId) {}
+    fn on_unlock(&mut self, _: LockDataId) {}
 }
 
 /// One step of a connection sequence: read the PDU it waits for (if any), answer if it says to.
@@ -471,6 +579,7 @@ mod tests {
             on_frame: Arc::new(move || {
                 f2.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
             }),
+            on_clipboard: Arc::new(|t| eprintln!("remote clipboard: {t:?}")),
             on_error: Arc::new(|e| eprintln!("on_error: {e}")),
             on_close: Arc::new(|| eprintln!("on_close")),
         });
@@ -483,6 +592,10 @@ mod tests {
         c.input(vec![Operation::MouseMove(MousePosition { x: 100, y: 100 })]);
         c.input(vec![Operation::KeyPressed(Scancode::from_u8(false, 0x1e)), Operation::KeyReleased(Scancode::from_u8(false, 0x1e))]);
         std::thread::sleep(Duration::from_secs(2));
+        if std::env::var("NEXUS_RDP_CLIP").is_ok() {
+            c.set_clipboard("from-nexus-123".into());
+            std::thread::sleep(Duration::from_secs(25));
+        }
         let fb = c.framebuffer().lock().clone();
         eprintln!("frames {} size {}x{}", frames.load(std::sync::atomic::Ordering::SeqCst), fb.width, fb.height);
         if let Ok(out) = std::env::var("NEXUS_RDP_PNG") {

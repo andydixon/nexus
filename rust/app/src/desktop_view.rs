@@ -284,7 +284,7 @@ impl DesktopView {
         self.buttons = 0;
     }
 
-    /// VNC: sets the remote clipboard. RDP (no clipboard channel yet): types the text.
+    /// Makes `text` the remote desktop's clipboard contents.
     fn paste(&self, s: &mut Shared, text: &str) {
         match &self.client {
             Some(Remote::Vnc(c)) => {
@@ -292,12 +292,7 @@ impl DesktopView {
                     s.error(format!("Clipboard: {e}"));
                 }
             }
-            Some(Remote::Rdp(c)) => c.input(
-                text.chars()
-                    .filter(|c| !c.is_control() || *c == '\n')
-                    .flat_map(|ch| [Operation::UnicodeKeyPressed(ch), Operation::UnicodeKeyReleased(ch)])
-                    .collect(),
-            ),
+            Some(Remote::Rdp(c)) => c.set_clipboard(text.to_string()),
             None => {}
         }
     }
@@ -421,12 +416,10 @@ impl DesktopView {
                             let _ = c.request_full_update();
                         }
                         if !self.view_only {
-                            let tip = if self.protocol == Protocol::Rdp {
-                                "Type the local clipboard's text into the remote desktop"
-                            } else {
-                                "Send the local clipboard to the remote desktop"
-                            };
-                            if widgets::button(ui, icon::CLIPBOARD_TEXT, "Paste Clipboard").on_hover_text(tip).clicked() {
+                            if widgets::button(ui, icon::CLIPBOARD_TEXT, "Paste Clipboard")
+                                .on_hover_text("Send the local clipboard to the remote desktop")
+                                .clicked()
+                            {
                                 match arboard::Clipboard::new().and_then(|mut c| c.get_text()) {
                                     Ok(text) if !text.is_empty() => {
                                         self.paste(s, &text);
@@ -453,6 +446,15 @@ impl DesktopView {
             resp.request_focus();
         }
         let focused = resp.has_focus();
+        // RDP shares the clipboard both ways: offer the local text whenever the desktop gains focus.
+        if focused
+            && !self.had_focus
+            && let Some(Remote::Rdp(c)) = &self.client
+            && let Ok(text) = arboard::Clipboard::new().and_then(|mut c| c.get_text())
+            && !text.is_empty()
+        {
+            c.set_clipboard(text);
+        }
         if focused {
             ui.painter().rect_stroke(img, 0.0, egui::Stroke::new(1.0, Tokens::get(ui.ctx()).accent.gamma_multiply(0.6)), egui::StrokeKind::Outside);
             ui.memory_mut(|m| m.set_focus_lock_filter(id, egui::EventFilter { tab: true, horizontal_arrows: true, vertical_arrows: true, escape: true }));

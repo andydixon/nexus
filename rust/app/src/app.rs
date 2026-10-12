@@ -528,7 +528,7 @@ impl App {
                 }
             }
             Event::DesktopFrame { .. } => {}
-            Event::VncClipboard { text, .. } => self.remote_clipboard(&text),
+            Event::DesktopClipboard { text, .. } => self.remote_clipboard(&text),
         }
     }
 

@@ -241,7 +241,7 @@ impl Manager {
         let cb = self.terminal_callbacks(id, epoch);
         let (me, sid) = (self.clone(), id.to_string());
         let (me2, sid2) = (self.clone(), id.to_string());
-        let clip: clients::vnc::ClipboardFn = Arc::new(move |text| me2.emit(Event::VncClipboard { session: sid2.clone(), text }));
+        let clip: clients::vnc::ClipboardFn = Arc::new(move |text| me2.emit(Event::DesktopClipboard { session: sid2.clone(), text }));
         let c = connect_vnc_client(
             &host,
             port,
@@ -345,6 +345,7 @@ impl Manager {
         let password = self.secret_fn(id, &p.id, SecretKind::RdpPassword, rc.secret_mode, prompt)()?;
         let cb = self.terminal_callbacks(id, epoch);
         let (me, sid) = (self.clone(), id.to_string());
+        let (me2, sid2) = (self.clone(), id.to_string());
         let c = clients::rdp::Client::new(clients::rdp::Config {
             host,
             username: p.username.clone(),
@@ -357,6 +358,7 @@ impl Manager {
             check_cert,
             connect_timeout: timeout,
             on_frame: Arc::new(move || me.emit(Event::DesktopFrame { session: sid.clone() })),
+            on_clipboard: Arc::new(move |text| me2.emit(Event::DesktopClipboard { session: sid2.clone(), text })),
             on_error: cb.on_error,
             on_close: cb.on_close,
         });

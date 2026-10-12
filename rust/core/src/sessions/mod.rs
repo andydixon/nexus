@@ -124,7 +124,7 @@ pub enum Event {
         session: String,
     },
     /// The remote desktop's clipboard changed.
-    VncClipboard {
+    DesktopClipboard {
         session: String,
         text: String,
     },
