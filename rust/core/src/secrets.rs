@@ -111,8 +111,8 @@ struct VaultFile {
     salt: String,
     secrets: BTreeMap<String, String>,
     /// A known value sealed under the key, so even an empty vault can tell a wrong master
-    /// password. Absent in vaults written by Go or older builds; added on the next write.
-    #[serde(default, skip_serializing_if = "String::is_empty")]
+    /// password.
+    #[serde(default)]
     verifier: String,
 }
 
@@ -171,13 +171,15 @@ impl Vault {
         let vault: VaultFile = serde_json::from_slice(&std::fs::read(self.path())?)?;
         let salt = B64.decode(&vault.salt).map_err(|e| format!("secrets: corrupt vault salt: {e}"))?;
         let u = Unlocked { key: derive_key(password, &salt)?, vault };
-        // The verifier must open; without one (older vaults) one entry must decrypt, and an empty
-        // vault accepts any password, as in Go.
-        let check = if u.vault.verifier.is_empty() { u.vault.secrets.values().next() } else { Some(&u.vault.verifier) };
-        if let Some(v) = check {
-            let data = B64.decode(v).unwrap_or_default();
-            open(&u.key, &data).map_err(|_| "secrets: incorrect master password or corrupt vault")?;
+        if u.vault.verifier.is_empty() {
+            return Err(format!(
+                "secrets: {} was made by an older version and can't be verified; remove it to create a new secret store",
+                self.path().display()
+            )
+            .into());
         }
+        let data = B64.decode(&u.vault.verifier).unwrap_or_default();
+        open(&u.key, &data).map_err(|_| "secrets: incorrect master password or corrupt vault")?;
         *self.state.lock() = Some(u);
         Ok(())
     }
@@ -204,9 +206,6 @@ impl Vault {
         let u = st.as_mut().ok_or("secrets: vault is locked")?;
         let enc = B64.encode(seal(&u.key, value.as_bytes()));
         u.vault.secrets.insert(key.to_string(), enc);
-        if u.vault.verifier.is_empty() {
-            u.vault.verifier = verifier(&u.key);
-        }
         self.save(u)
     }
 
@@ -353,17 +352,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn reads_go_vault_fixture() {
-        let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/vault");
-        let v = Vault::new(dir);
-        assert!(v.is_initialised());
-        assert!(v.unlock("wrong").is_err());
-        v.unlock("correct horse battery staple").unwrap();
-        assert_eq!(v.get("profile:00000000-0000-0000-0000-000000000001:password").unwrap(), "s3cret-ssh");
-        assert_eq!(v.get("profile:00000000-0000-0000-0000-000000000001:totp").unwrap(), "JBSWY3DPEHPK3PXP");
-    }
-
-    #[test]
     fn vault_round_trip() {
         let dir = std::env::temp_dir().join(format!("nexus-vault-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
@@ -378,7 +366,7 @@ mod tests {
     }
 
     #[test]
-    fn empty_vault_rejects_a_wrong_password_and_old_vaults_gain_a_verifier() {
+    fn empty_vault_rejects_a_wrong_password_and_unverifiable_vaults_are_refused() {
         let dir = std::env::temp_dir().join(format!("nexus-vault-verifier-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         let v = Vault::new(dir.clone());
@@ -386,20 +374,13 @@ mod tests {
         v.lock();
         assert!(v.unlock("typo").is_err(), "an empty vault must not accept any password");
         v.unlock("pw").unwrap();
-        // A vault from Go/older builds (no verifier) keeps working and gains one on write.
+        v.lock();
+        // A vault without a verifier (older format) is refused rather than trusted.
         let path = dir.join(VAULT_FILE);
         let mut f: serde_json::Value = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
         f.as_object_mut().unwrap().remove("verifier");
         std::fs::write(&path, f.to_string()).unwrap();
-        v.lock();
-        v.unlock("anything").unwrap();
-        v.lock();
-        v.unlock("pw").unwrap();
-        v.set("a", "1").unwrap();
-        v.lock();
-        assert!(std::fs::read_to_string(&path).unwrap().contains("verifier"));
-        assert!(v.unlock("typo").is_err());
-        v.unlock("pw").unwrap();
+        assert!(v.unlock("pw").unwrap_err().to_string().contains("older version"));
         std::fs::remove_dir_all(dir).unwrap();
     }
 
