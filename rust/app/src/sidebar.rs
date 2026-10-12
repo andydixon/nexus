@@ -185,7 +185,7 @@ fn local_row(app: &mut App, ui: &mut Ui) {
 fn row(app: &mut App, ui: &mut Ui, p: &Profile, section: &str) {
     let t = Tokens::get(ui.ctx());
     let selected = app.sidebar.selected.contains(&p.id);
-    let (r, resp) = ui.allocate_exact_size(vec2(ui.available_width(), 34.0), Sense::click());
+    let (r, resp) = ui.allocate_exact_size(vec2(ui.available_width(), 40.0), Sense::click());
     let r = r.shrink2(vec2(6.0, 1.0));
     if selected {
         ui.painter().rect_filled(r, 6.0, t.row_selected);
@@ -203,9 +203,13 @@ fn row(app: &mut App, ui: &mut Ui, p: &Profile, section: &str) {
     let name = if p.display_name.is_empty() { &p.host } else { &p.display_name };
     let text_r = Rect::from_min_max(r.min + vec2(24.0, 0.0), r.max - vec2(46.0, 0.0));
     let painter = ui.painter().with_clip_rect(text_r);
-    painter.text(text_r.left_top() + vec2(0.0, 3.0), Align2::LEFT_TOP, name, egui::FontId::proportional(13.0), t.text);
+    // Name, then a clear gap, then user@host; sized from the name's real row height so the two
+    // lines never crowd each other.
+    let name_font = egui::FontId::proportional(13.0);
+    let name_h = ui.fonts_mut(|f| f.row_height(&name_font));
+    painter.text(text_r.left_top() + vec2(0.0, 4.0), Align2::LEFT_TOP, name, name_font, t.text);
     let sub = if p.username.is_empty() || p.protocol == nexus_core::models::Protocol::Serial { p.host.clone() } else { format!("{}@{}", p.username, p.host) };
-    painter.text(text_r.left_bottom() - vec2(0.0, 3.0), Align2::LEFT_BOTTOM, sub, egui::FontId::proportional(11.0), t.text_faint);
+    painter.text(text_r.left_top() + vec2(0.0, 4.0 + name_h + 3.0), Align2::LEFT_TOP, sub, egui::FontId::proportional(11.0), t.text_faint);
     ui.painter().text(r.right_center() - vec2(8.0, 0.0), Align2::RIGHT_CENTER, protocol_badge(p.protocol), theme::semibold(9.0), col);
     if p.favourite {
         ui.painter().text(r.right_center() - vec2(36.0, 0.0), Align2::RIGHT_CENTER, "★", egui::FontId::proportional(11.0), t.warning);
