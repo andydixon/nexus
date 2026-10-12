@@ -418,6 +418,10 @@ pub struct RdpConfig {
     /// Trust policy for the server's TLS certificate (pinned like an SSH host key).
     #[serde(deserialize_with = "lenient")]
     pub host_key_policy: HostKeyPolicy,
+    /// RD Gateway (`host` or `host:port`, HTTPS); empty connects without one. Basic auth only.
+    pub gateway_host: String,
+    pub gateway_username: String,
+    pub gateway_secret_mode: SecretMode,
     /// "none", "socks5" or "http"; the password is a stored secret.
     pub proxy_type: String,
     pub proxy_host: String,

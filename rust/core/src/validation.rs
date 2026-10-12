@@ -334,6 +334,16 @@ pub fn validate_rdp_config(cfg: &RdpConfig) -> Result<(), ValidationErrors> {
         }
         t => errs.add("rdp.proxyType", format!("unsupported proxy type {t:?}")),
     }
+    if !cfg.gateway_host.trim().is_empty() {
+        let host = cfg.gateway_host.trim().rsplit_once(':').filter(|(_, p)| p.parse::<u16>().is_ok()).map_or(cfg.gateway_host.trim(), |(h, _)| h);
+        errs.check("rdp.gatewayHost", validate_host(host));
+        if cfg.gateway_username.trim().is_empty() {
+            errs.add("rdp.gatewayUsername", "the gateway needs a username");
+        }
+        if cfg.ssh_tunnel || !matches!(cfg.proxy_type.as_str(), "" | "none") {
+            errs.add("rdp.gatewayHost", "use a gateway, a proxy or an SSH tunnel — only one");
+        }
+    }
     let share = cfg.shared_folder.trim();
     if !share.is_empty() && !std::path::Path::new(share).is_dir() {
         errs.add("rdp.sharedFolder", "the shared folder must be an existing folder");

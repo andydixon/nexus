@@ -20,6 +20,7 @@ members = ["."]
 picky = { path = "../vendor/picky" }
 sspi = { path = "../vendor/sspi" }
 ironrdp-session = { path = "../vendor/ironrdp-session" }
+ironrdp-mstsgu = { path = "../vendor/ironrdp-mstsgu" }
 
 [profile.release]
 debug = 1

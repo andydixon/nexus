@@ -739,6 +739,19 @@ impl ProfileEditor {
                 check(ui, "Resize With Tab", &mut c.dynamic_resolution, "Ask the server to match the tab's size as it changes");
             }
         });
+        section(ui, "RD Gateway", |ui| {
+            text(ui, "Gateway", &mut c.gateway_host, "gateway.example.com (empty: none)");
+            err(ui, errs, "rdp.gatewayHost");
+            if !c.gateway_host.trim().is_empty() {
+                text(ui, "Gateway Username", &mut c.gateway_username, "DOMAIN\\user");
+                err(ui, errs, "rdp.gatewayUsername");
+                mode(ui, "Gateway Password Storage", &mut c.gateway_secret_mode);
+                if c.gateway_secret_mode == SecretMode::Saved {
+                    secret(ui, "Gateway Password", secrets, SecretKind::RdpGatewayPassword, "Leave blank to keep the saved password");
+                }
+                widgets::hint(ui, "Experimental: gateways that accept Basic authentication over HTTPS (the gateway's certificate is verified).");
+            }
+        });
         section(ui, "Proxy", |ui| {
             combo_s(ui, "Proxy Type", &mut c.proxy_type, &[("none", "None (direct connection)"), ("socks5", "SOCKS5"), ("http", "HTTP CONNECT")]);
             err(ui, errs, "rdp.proxyType");

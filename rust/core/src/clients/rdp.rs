@@ -467,6 +467,34 @@ fn copy_rect(image: &DecodedImage, fb: &mut Framebuffer, left: u16, top: u16, ri
     fb.dirty = true;
 }
 
+/// A transport through an RD Gateway (MS-TSGU over HTTPS WebSocket, Basic authentication). The
+/// gateway's certificate is verified against the web PKI. The async gateway stream is bridged to
+/// a loopback socket so the blocking RDP client can use it like any other connection.
+pub fn gateway_dial(endpoint: String, user: String, password: zeroize::Zeroizing<String>, server: String, port: u16) -> Dial {
+    Arc::new(move || {
+        let endpoint = if endpoint.contains(':') { endpoint.clone() } else { format!("{endpoint}:443") };
+        let target = ironrdp_mstsgu::GwConnectTarget {
+            gw_endpoint: endpoint,
+            gw_user: user.clone(),
+            gw_pass: password.to_string(),
+            server: server.clone(),
+            server_port: port,
+        };
+        let (gw, _) = super::rt()
+            .block_on(ironrdp_mstsgu::GwClient::connect(&target, "Nexus Terminal"))
+            .map_err(|e| format!("RD Gateway {}: {}", target.gw_endpoint, error_chain(&e)))?;
+        let (client, server_end) = super::ssh::loopback_pair()?;
+        server_end.set_nonblocking(true)?;
+        super::rt().spawn(async move {
+            if let Ok(mut local) = tokio::net::TcpStream::from_std(server_end) {
+                let mut gw = gw;
+                let _ = tokio::io::copy_bidirectional(&mut local, &mut gw).await;
+            }
+        });
+        Ok(client)
+    })
+}
+
 /// `SHA256:<unpadded base64>` of the certificate, the format SSH host keys use.
 pub fn fingerprint(cert_der: &[u8]) -> String {
     use base64::Engine;
@@ -544,10 +572,14 @@ impl connector::sspi::network_client::NetworkClient for NoNetwork {
     }
 }
 
-/// Connector errors carry their cause in a chain; surface the useful part.
+/// IronRDP errors carry their cause in a chain; surface the useful part.
 fn describe(e: &connector::ConnectorError) -> String {
+    error_chain(e)
+}
+
+fn error_chain(e: &dyn std::error::Error) -> String {
     let mut s = e.to_string();
-    let mut src = std::error::Error::source(e);
+    let mut src = e.source();
     while let Some(c) = src {
         s = format!("{s}: {c}");
         src = c.source();

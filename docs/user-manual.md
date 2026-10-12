@@ -166,6 +166,7 @@ Use SSH tunnelling for VNC whenever possible. If a VNC profile has no tunnel, Ne
 
 - **RDP**: domain (optional), password storage mode, **Certificate Policy** and **Allow servers without NLA**. The username, host and port (3389) are the profile's own.
 - **Display**: **Scale to Fit**, a fixed **Width** and **Height** (0 × 0 fits the tab) and **Resize With Tab**.
+- **RD Gateway** (experimental): reach the desktop through a Remote Desktop Gateway (`host` or `host:port`) with its own username and password. The gateway's certificate must be valid for its name (public CA); only gateways that accept Basic authentication over HTTPS work.
 - **Proxy**: **SOCKS5** or **HTTP CONNECT**, with an optional username and password.
 - **Devices**: **Play Remote Audio**; **Redirect Printer**, which adds a *Nexus Terminal* printer on the remote desktop whose jobs are saved as PostScript files in your Downloads folder (up to 256 MiB per job); and on Linux and macOS a **Shared Folder** that appears on the remote desktop as a drive named Nexus. The server can read and change everything in that folder and nothing outside it: paths that try to leave it (`..`, or symlinks pointing elsewhere) are refused.
 - **SSH Tunnel**: carry RDP through SSH, as for VNC. Use either a proxy or a tunnel, not both.

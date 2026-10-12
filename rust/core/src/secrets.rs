@@ -34,12 +34,13 @@ pub enum SecretKind {
     RdpPassword,
     RdpSshPassword,
     RdpSshPassphrase,
+    RdpGatewayPassword,
 }
 
 impl SecretKind {
     /// Every kind, so deleting a profile can purge them all from the keychain. A new variant
     /// must be added here as well as to `as_str`.
-    pub const ALL: [SecretKind; 15] = [
+    pub const ALL: [SecretKind; 16] = [
         Self::Password,
         Self::Passphrase,
         Self::Totp,
@@ -55,6 +56,7 @@ impl SecretKind {
         Self::RdpPassword,
         Self::RdpSshPassword,
         Self::RdpSshPassphrase,
+        Self::RdpGatewayPassword,
     ];
 
     /// The storage name, shared with the Go app.
@@ -75,6 +77,7 @@ impl SecretKind {
             Self::RdpPassword => "rdp-password",
             Self::RdpSshPassword => "rdp-ssh-password",
             Self::RdpSshPassphrase => "rdp-ssh-passphrase",
+            Self::RdpGatewayPassword => "rdp-gateway-password",
         }
     }
 

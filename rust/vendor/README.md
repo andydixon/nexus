@@ -7,6 +7,7 @@ IronRDP release includes the fix it carries.
 |---|---|---|
 | `picky` | 7.0.0-rc.25 (crates.io) | `=x.y.z-rc.N` RustCrypto pins relaxed to `^x.y.z-rc.N` (so the stable releases russh uses satisfy them); one unused import removed. |
 | `sspi` | 0.21.3 (crates.io) | Same pin relaxation. |
+| `ironrdp-mstsgu` | 0.0.1 (crates.io) | RD Gateway client. Upstream connects with `ironrdp-tls`, which accepts any certificate, and then sends Basic credentials; the patch verifies the gateway against the web PKI (rustls/ring + webpki-roots). Its `assert!`s and unchecked length subtractions on gateway packets become errors, and the RDP server's port is passed through instead of a fixed 3389. |
 | `ironrdp-session` | 0.11.0 (crates.io) | Upstream fixes not yet released: #1486 "preserve bitmap source stride" (commit `80bb81b344`, applied as-is) and the RDP6 orientation flip from #1524 (`8f1737a287`). Without them xrdp desktops render sheared and upside-down tile by tile. |
 
 Why: IronRDP pins `picky = "=7.0.0-rc.25"`, which pins `curve25519-dalek = "=5.0.0-rc.1"` and

@@ -315,12 +315,17 @@ impl Manager {
     ) -> Result<Arc<clients::rdp::Client>> {
         let timeout = Duration::from_secs(p.connect_timeout.max(1) as u64);
         let host = p.host.clone();
-        let dial: clients::rdp::Dial = match tunnel {
-            Some(t) => {
+        let gateway = (!rc.gateway_host.trim().is_empty()).then(|| rc.gateway_host.trim().to_string());
+        let dial: clients::rdp::Dial = match (tunnel, gateway) {
+            (_, Some(gw)) => {
+                let pw = self.secret_fn(id, &p.id, SecretKind::RdpGatewayPassword, rc.gateway_secret_mode, prompt.clone())()?;
+                clients::rdp::gateway_dial(gw, rc.gateway_username.clone(), pw, host.clone(), port)
+            }
+            (Some(t), None) => {
                 let h = host.clone();
                 Arc::new(move || t.open_tunnel(&h, port))
             }
-            None => {
+            (None, None) => {
                 let proxy = clients::proxy::Proxy {
                     kind: rc.proxy_type.clone(),
                     host: rc.proxy_host.clone(),

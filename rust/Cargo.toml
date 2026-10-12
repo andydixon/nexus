@@ -22,3 +22,4 @@ lto = "thin"
 picky = { path = "vendor/picky" }
 sspi = { path = "vendor/sspi" }
 ironrdp-session = { path = "vendor/ironrdp-session" }
+ironrdp-mstsgu = { path = "vendor/ironrdp-mstsgu" }
