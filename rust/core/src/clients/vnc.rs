@@ -17,6 +17,10 @@ pub use super::irc::{Connector, ReadWrite};
 use super::{CloseFn, ErrorFn};
 
 const READ_POLL: Duration = Duration::from_millis(50);
+/// Largest desktop accepted from the server (64 Mpx = 256 MiB of RGBA; an 8K display is 33 Mpx).
+const MAX_FB_PIXELS: usize = 64 << 20;
+/// Largest single compressed rectangle (ZRLE) read from the server.
+const MAX_ZRLE_BYTES: usize = 64 << 20;
 
 pub type FrameFn = Arc<dyn Fn() + Send + Sync>;
 pub type ResizeFn = Arc<dyn Fn(u16, u16) + Send + Sync>;
@@ -78,6 +82,14 @@ impl Framebuffer {
         let mut rgba = vec![0u8; width as usize * height as usize * 4];
         rgba.as_chunks_mut::<4>().0.iter_mut().for_each(|p| p[3] = 255);
         Framebuffer { width, height, rgba, dirty: true }
+    }
+
+    /// A framebuffer of a server-announced size, refusing sizes that would exhaust memory.
+    fn new_checked(width: u16, height: u16) -> crate::Result<Framebuffer> {
+        if width == 0 || height == 0 || width as usize * height as usize > MAX_FB_PIXELS {
+            return Err(format!("unsupported desktop size {width}x{height}").into());
+        }
+        Ok(Framebuffer::new(width, height))
     }
 
     fn check(&self, x: u16, y: u16, w: u16, h: u16) -> crate::Result<()> {
@@ -270,7 +282,7 @@ impl Client {
     fn run(&self, io: Box<dyn ReadWrite>, out_rx: Receiver<Vec<u8>>) -> crate::Result<()> {
         let mut r = BufReader::with_capacity(1 << 16, Conn { io, out_rx });
         let (w, h) = self.handshake(&mut r)?;
-        let mut local = Framebuffer::new(w, h);
+        let mut local = Framebuffer::new_checked(w, h)?;
         *self.fb.lock().unwrap_or_else(|e| e.into_inner()) = local.clone();
         (self.cfg.on_resize)(w, h);
         {
@@ -545,7 +557,7 @@ fn read_update(r: &mut impl Read, fb: &mut Framebuffer, dec: &mut Decoders) -> c
                 }
                 // ExtendedDesktopSize y is the status; non-zero answers a SetDesktopSize we never send.
                 if enc == -223 || y == 0 {
-                    *fb = Framebuffer::new(w, ht);
+                    *fb = Framebuffer::new_checked(w, ht)?;
                     resized = true;
                 }
                 continue;
@@ -575,6 +587,9 @@ fn read_update(r: &mut impl Read, fb: &mut Framebuffer, dec: &mut Decoders) -> c
             7 => tight(r, fb, dec, x, y, w, ht)?,
             16 => {
                 let len = read_u32(r)? as usize;
+                if len > MAX_ZRLE_BYTES {
+                    return Err(format!("ZRLE rectangle of {len} bytes exceeds {MAX_ZRLE_BYTES}").into());
+                }
                 let data = read_n(r, len)?;
                 inflate(&mut dec.zrle, &data, &mut dec.buf)?;
                 zrle(&dec.buf, fb, x, y, w, ht)?;
@@ -1037,5 +1052,23 @@ mod tests {
     #[test]
     fn apple_only_security_is_explained() {
         assert!(unsupported_security(&[30, 33]).contains("Apple Remote Desktop"));
+    }
+
+    #[test]
+    fn server_sizes_and_rect_lengths_are_bounded() {
+        assert!(Framebuffer::new_checked(7680, 4320).is_ok());
+        assert!(Framebuffer::new_checked(0, 10).is_err());
+        assert!(Framebuffer::new_checked(u16::MAX, u16::MAX).is_err());
+        // A DesktopSize pseudo-rect announcing a 65535x65535 desktop is refused before allocating.
+        let mut m = vec![0, 0, 1];
+        rect(&mut m, 0, 0, u16::MAX, u16::MAX, -223);
+        let mut fb = Framebuffer::new(4, 4);
+        let mut dec = Decoders::default();
+        assert!(read_update(&mut &m[..], &mut fb, &mut dec).unwrap_err().to_string().contains("unsupported desktop size"));
+        // A ZRLE rect claiming 4 GiB of data is refused before allocating.
+        let mut m = vec![0, 0, 1];
+        rect(&mut m, 0, 0, 4, 4, 16);
+        m.extend_from_slice(&u32::MAX.to_be_bytes());
+        assert!(read_update(&mut &m[..], &mut fb, &mut dec).unwrap_err().to_string().contains("exceeds"));
     }
 }

@@ -268,7 +268,11 @@ impl GithubView {
         });
         match action {
             Some(Action::Zip(r)) => self.download(s, &r),
-            Some(Action::Visit(url)) if !url.is_empty() => ui.ctx().open_url(egui::OpenUrl::new_tab(url)),
+            Some(Action::Visit(url)) if !url.is_empty() => {
+                if !widgets::open_web_url(ui.ctx(), &url) {
+                    s.error("The repository link is not a web address");
+                }
+            }
             Some(Action::Copy(url)) => {
                 ui.ctx().copy_text(url);
                 s.info("URL copied");

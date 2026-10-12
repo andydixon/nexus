@@ -559,8 +559,11 @@ impl Settings {
                             });
                         });
                     }
-                    if !info.release_url.is_empty() && widgets::button(ui, icon::ARROW_SQUARE_OUT, "View release").clicked() {
-                        ui.ctx().open_url(egui::OpenUrl::new_tab(&info.release_url));
+                    if widgets::is_web_url(&info.release_url)
+                        && widgets::button(ui, icon::ARROW_SQUARE_OUT, "View release").clicked()
+                        && !widgets::open_web_url(ui.ctx(), &info.release_url)
+                    {
+                        s.error("The release link is not a web address");
                     }
                 } else {
                     ui.label(RichText::new("You are running the latest version.").color(t.success));

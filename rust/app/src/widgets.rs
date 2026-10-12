@@ -125,6 +125,24 @@ pub fn group(n: u64) -> String {
     out
 }
 
+/// Whether `url` is a plain web link. Links that arrive from the network (update manifests,
+/// GitHub API responses) are only handed to the system opener when they are http(s), so a
+/// hostile or spoofed server can't launch `file:`, `ssh:` or custom-scheme handlers.
+pub fn is_web_url(url: &str) -> bool {
+    let u = url.trim();
+    (u.len() > 8 && u[..8].eq_ignore_ascii_case("https://")) || (u.len() > 7 && u[..7].eq_ignore_ascii_case("http://"))
+}
+
+/// Opens `url` in the browser if it is a web link; returns false (and opens nothing) otherwise.
+pub fn open_web_url(ctx: &egui::Context, url: &str) -> bool {
+    if !is_web_url(url) {
+        eprintln!("refusing to open non-web URL {url:?}");
+        return false;
+    }
+    ctx.open_url(egui::OpenUrl::new_tab(url.trim()));
+    true
+}
+
 pub fn human_size(n: u64) -> String {
     const U: [&str; 5] = ["B", "KiB", "MiB", "GiB", "TiB"];
     let mut v = n as f64;
@@ -141,5 +159,15 @@ mod tests {
     #[test]
     fn helpers() {
         assert_eq!(super::group(1234567), "1,234,567");
+    }
+
+    #[test]
+    fn only_web_urls_are_opened() {
+        for ok in ["https://dixon.cx/downloads/nexus/", "http://localhost:3000/x", " HTTPS://Example.com "] {
+            assert!(super::is_web_url(ok), "{ok}");
+        }
+        for bad in ["", "https://", "file:///etc/passwd", "ssh://evil", "javascript:alert(1)", "ms-msdt:/id x", "ftp://host/", "//host/path"] {
+            assert!(!super::is_web_url(bad), "{bad}");
+        }
     }
 }
