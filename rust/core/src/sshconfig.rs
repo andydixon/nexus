@@ -175,6 +175,23 @@ fn is_trueish(v: &str) -> bool {
 mod tests {
     use super::*;
 
+    #[test]
+    fn hostile_configs_never_panic() {
+        let mut n = crate::Noise::new(0x55c);
+        let words: &[&[u8]] =
+            &[b"Host ", b"HostName ", b"Port ", b"User ", b"ProxyJump ", b"IdentityFile ", b"Match ", b"*", b"=", b"\n", b"\"", b" ", b"a@b:22,", b"99999"];
+        for _ in 0..3000 {
+            let mut text = Vec::new();
+            for _ in 0..n.below(40) {
+                text.extend_from_slice(words[n.below(words.len())]);
+            }
+            text.extend(n.bytes(20, b" \t\n="));
+            if let Ok(blocks) = parse(&String::from_utf8_lossy(&text)) {
+                let _ = to_profiles(&blocks, "f");
+            }
+        }
+    }
+
     const TEST_CONFIG: &str = "# Test SSH config
 
 Host *

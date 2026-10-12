@@ -1053,6 +1053,23 @@ mod tests {
     use std::net::TcpListener;
 
     #[test]
+    fn hostile_lines_never_panic() {
+        let client = Client::new(Config::default());
+        client.st().nick = "me".into();
+        client.handle_message(&parse_line(":me!u@h JOIN #a").unwrap());
+        let mut n = crate::Noise::new(0x1bc);
+        for _ in 0..5000 {
+            let raw = n.bytes(120, b":!@# ,;=\x01\x02\x03\x0f\x16\x1d\x1fme#aJOINPARTKICKPRIVMSGNOTICE3534330011234567890");
+            let line = String::from_utf8_lossy(&raw);
+            if let Some(m) = parse_line(&line) {
+                client.handle_message(&m);
+                let e = Event { kind: "message".into(), target: m.param(0).into(), from: m.source.clone(), text: m.last().into(), ..Default::default() };
+                let _ = crate::ircformat::format_event(&e, "12:00");
+            }
+        }
+    }
+
+    #[test]
     fn remember_room_membership_tracks_confirmed_channels() {
         let updates = Arc::new(Mutex::new(Vec::new()));
         let log = updates.clone();

@@ -323,6 +323,19 @@ mod tests {
     use std::time::Duration;
 
     #[test]
+    fn hostile_negotiation_never_panics() {
+        let c = TelnetClient::new(&Profile::new(crate::models::Protocol::Telnet), Callbacks::noop(), None);
+        let mut n = crate::Noise::new(0x7e1);
+        let mut pending = Vec::new();
+        for _ in 0..5000 {
+            // IAC, SE, SB, WILL, WONT, DO, DONT and the options the client handles.
+            let chunk = n.bytes(64, &[255, 240, 250, 251, 252, 253, 254, 1, 3, 24, 31, 32, 0, b'a']);
+            c.inner.process(&mut pending, &chunk);
+            assert!(pending.len() <= 16 << 10, "pending must stay bounded");
+        }
+    }
+
+    #[test]
     fn line_endings() {
         let cases = [
             (LineEnding::Crlf, "a\nb\r\nc\rd", "a\r\nb\r\nc\r\nd"),

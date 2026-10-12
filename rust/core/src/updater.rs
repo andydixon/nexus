@@ -145,6 +145,15 @@ fn leading_int(s: Option<&&str>) -> i64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn hostile_manifests_never_panic() {
+        let mut n = crate::Noise::new(0x9d);
+        for _ in 0..5000 {
+            let body = n.bytes(200, br#"{}[]":,0123456789.vlatestVersionreleaseURL"#);
+            let _ = parse_manifest(&body, "1.2.3");
+        }
+    }
     use std::io::Write;
 
     /// Serves one HTTP response on a random local port; returns its URL.

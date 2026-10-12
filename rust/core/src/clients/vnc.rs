@@ -867,6 +867,44 @@ mod tests {
     use std::net::TcpListener;
 
     #[test]
+    fn hostile_updates_never_panic() {
+        use flate2::{Compress, Compression, FlushCompress};
+        let mut n = crate::Noise::new(0x5eed);
+        let (mut fb, mut dec) = (Framebuffer::new(32, 32), Decoders::default());
+        let mut z = Compress::new(Compression::fast(), true);
+        let mut decoded = [0usize; 2]; // successful ZRLE / other updates
+        for _ in 0..3000 {
+            let enc: i32 = [0, 1, 5, 7, 16, -223, -224, -308, 99][n.below(9)];
+            let dim = |n: &mut crate::Noise| n.below(40) as u16;
+            let (x, y, w, h) = (dim(&mut n), dim(&mut n), dim(&mut n), dim(&mut n));
+            let mut msg = vec![0, 0, 1];
+            for v in [x, y, w, h] {
+                msg.extend_from_slice(&v.to_be_bytes());
+            }
+            msg.extend_from_slice(&enc.to_be_bytes());
+            let body = n.bytes(600, &[0, 1, 2, 0xff, 0x80, 0x10, 0x1f]);
+            if enc == 16 {
+                // ZRLE: random tiles behind a real zlib stream, so the decoder itself is reached.
+                let mut out = Vec::with_capacity(body.len() * 2 + 64);
+                z.compress_vec(&body, &mut out, FlushCompress::Sync).unwrap();
+                msg.extend_from_slice(&(out.len() as u32).to_be_bytes());
+                msg.extend_from_slice(&out);
+            } else {
+                msg.extend_from_slice(&body);
+            }
+            match read_update(&mut &msg[..], &mut fb, &mut dec) {
+                Ok(_) => decoded[(enc != 16) as usize] += 1,
+                // The persistent zlib streams may have desynchronised; start them afresh.
+                Err(_) => (dec, z) = (Decoders::default(), Compress::new(Compression::fast(), true)),
+            }
+            if fb.width as usize * fb.height as usize > 1 << 20 {
+                fb = Framebuffer::new(32, 32);
+            }
+        }
+        assert!(decoded.iter().all(|&d| d > 0), "the harness must reach the decoders: {decoded:?}");
+    }
+
+    #[test]
     fn des_response_matches_known_vector() {
         // openssl enc -des-ecb -K 0e86ceceeef64e26 (bit-reversed "password") over "0123456789abcdef".
         let got = vnc_auth_response("password", b"0123456789abcdef");
