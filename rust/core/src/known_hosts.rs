@@ -11,6 +11,8 @@ use russh::keys::{HashAlg, PublicKey};
 
 /// `key_type` of a certificate-authority row.
 pub const CA_KEY_TYPE: &str = "@cert-authority";
+/// Longest host pattern accepted (OpenSSH's own line limit is 8 KiB; real patterns are tiny).
+pub const MAX_PATTERN_LEN: usize = 1024;
 
 #[derive(Debug, Default, PartialEq)]
 pub struct Parsed {
@@ -35,6 +37,7 @@ pub fn parse(text: &str) -> Parsed {
             continue;
         };
         match marker {
+            Some("@cert-authority") if hosts.len() > MAX_PATTERN_LEN => out.skipped += 1,
             Some("@cert-authority") => out.authorities.push((hosts.to_string(), key)),
             Some(_) => out.skipped += 1,
             None if hosts.starts_with('|') => out.skipped += 1,
@@ -116,14 +119,34 @@ pub fn pattern_matches(patterns: &str, host: &str, port: u16) -> bool {
     matched
 }
 
+/// Wildcard match with `*` and `?`, iterative and linear in `|p| + |s|` per star (the classic
+/// two-pointer algorithm), so a pattern of a million stars or `*a*a*a…` can't recurse or
+/// backtrack exponentially. Patterns come from imported files and typed input.
 fn glob(p: &str, s: &str) -> bool {
-    match (p.chars().next(), s.chars().next()) {
-        (None, None) => true,
-        (Some('*'), _) => glob(&p[1..], s) || (!s.is_empty() && glob(p, &s[s.chars().next().unwrap().len_utf8()..])),
-        (Some('?'), Some(c)) => glob(&p[1..], &s[c.len_utf8()..]),
-        (Some(a), Some(b)) if a == b => glob(&p[a.len_utf8()..], &s[b.len_utf8()..]),
-        _ => false,
+    let (p, s): (Vec<char>, Vec<char>) = (p.chars().collect(), s.chars().collect());
+    let (mut pi, mut si) = (0, 0);
+    let mut star: Option<(usize, usize)> = None;
+    while si < s.len() {
+        match p.get(pi) {
+            Some('*') => {
+                star = Some((pi, si));
+                pi += 1;
+            }
+            Some(&c) if c == '?' || c == s[si] => {
+                pi += 1;
+                si += 1;
+            }
+            _ => match star {
+                Some((sp, ss)) => {
+                    pi = sp + 1;
+                    si = ss + 1;
+                    star = Some((sp, ss + 1));
+                }
+                None => return false,
+            },
+        }
     }
+    p[pi..].iter().all(|&c| c == '*')
 }
 
 /// CA keys trusted for `host:port`.
@@ -178,6 +201,29 @@ mod tests {
         assert!(pattern_matches(pats, "jump.a.example", 2200));
         assert!(!pattern_matches(pats, "jump.ab.example", 2200));
         assert!(!pattern_matches(pats, "corp.example", 22));
+    }
+
+    #[test]
+    fn hostile_patterns_match_in_linear_time() {
+        // The old recursive matcher overflowed the stack on a long run of stars and went
+        // exponential on `*a*a*a…b`; both must now be instant (and run on a small stack).
+        let t = std::thread::Builder::new()
+            .stack_size(256 << 10)
+            .spawn(|| {
+                let start = std::time::Instant::now();
+                assert!(pattern_matches(&"*".repeat(200_000), "db.corp", 22));
+                assert!(!pattern_matches("*a*a*a*a*a*a*a*a*a*a*b", &"a".repeat(253), 22));
+                assert!(pattern_matches("*a*a*a*b?", &format!("{}bx", "a".repeat(253)), 22));
+                assert!(!pattern_matches("a*c", "ab", 22) && pattern_matches("a*", "a", 22) && !pattern_matches("a?", "a", 22));
+                start.elapsed()
+            })
+            .unwrap()
+            .join()
+            .unwrap();
+        assert!(t < std::time::Duration::from_millis(500), "{t:?}");
+        // Over-long CA patterns in an imported file are skipped rather than stored.
+        let p = parse(&format!("@cert-authority {} {}\n", "*".repeat(MAX_PATTERN_LEN + 1), ed()));
+        assert!(p.authorities.is_empty() && p.skipped == 1);
     }
 
     #[test]

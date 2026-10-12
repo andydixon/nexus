@@ -20,6 +20,16 @@ use zeroize::Zeroizing;
 const MAX_PRIVATE_KEY_BYTES: u64 = 1 << 20;
 /// Bounds what `run_command` buffers, so a hostile server can't stream unlimited output into memory.
 const MAX_COMMAND_OUTPUT_BYTES: usize = 1 << 20;
+/// How long `run_command` waits for a command to finish.
+const COMMAND_TIMEOUT: Duration = Duration::from_secs(30);
+/// Keyboard-interactive rounds answered before giving up on the method.
+const MAX_KBD_INTERACTIVE_ROUNDS: usize = 10;
+/// Extra handshake time allowed for the host-key prompt (see `credentials::host_key_check`).
+const HOST_KEY_PROMPT_SECS: u64 = 60;
+/// Remote forwards listen on the server's loopback unless told otherwise, as `ssh -R` does; an
+/// empty bind host used to mean every interface, exposing the forwarded service to the server's
+/// whole network wherever `GatewayPorts` is on.
+const REMOTE_BIND_DEFAULT: &str = "localhost";
 
 /// What a host-key decision needs. The manager's checker consults the known-hosts table and,
 /// per policy, prompts the user; it returns Err with the reason to reject.
@@ -61,6 +71,9 @@ struct Handler {
     port: u16,
     check: HostKeyCheck,
     shared: Arc<Shared>,
+    /// Whether this is the final hop. Only the target may open agent-forward and remote-forward
+    /// channels; a jump host never asked for either and must not get them (as `ssh -J` behaves).
+    target: bool,
     /// Certificate authorities trusted for this host (from `@cert-authority` known-hosts rows).
     cas: Vec<PublicKey>,
 }
@@ -123,7 +136,7 @@ impl client::Handler for Handler {
         _session: &mut client::Session,
     ) -> std::result::Result<(), Self::Error> {
         let dest = self.shared.remote_targets.lock().get(&(connected_address.to_string(), connected_port)).cloned();
-        let Some((host, port)) = dest else {
+        let Some((host, port)) = dest.filter(|_| self.target) else {
             reply.reject(russh::ChannelOpenFailure::AdministrativelyProhibited).await;
             return Ok(());
         };
@@ -143,7 +156,7 @@ impl client::Handler for Handler {
         reply: client::ChannelOpenHandle,
         _session: &mut client::Session,
     ) -> std::result::Result<(), Self::Error> {
-        if !self.shared.agent_forwarding.load(std::sync::atomic::Ordering::Relaxed) {
+        if !self.target || !self.shared.agent_forwarding.load(std::sync::atomic::Ordering::Relaxed) {
             reply.reject(russh::ChannelOpenFailure::AdministrativelyProhibited).await;
             return Ok(());
         }
@@ -348,7 +361,9 @@ async fn authenticate(h: &mut Handle<Handler>, a: Auth<'_>) -> Result<()> {
             "keyboard-interactive" => {
                 let Some(get) = a.password.clone() else { continue };
                 let mut resp = h.authenticate_keyboard_interactive_start(a.user, None).await?;
-                loop {
+                // A server can keep asking forever (harvesting TOTP codes, parking the connect
+                // thread on prompts); OpenSSH gives up after a handful of rounds too.
+                for _ in 0..MAX_KBD_INTERACTIVE_ROUNDS {
                     match resp {
                         client::KeyboardInteractiveAuthResponse::Success => return Ok(()),
                         client::KeyboardInteractiveAuthResponse::Failure { .. } => break,
@@ -469,11 +484,14 @@ impl SshClient {
         host: &str,
         port: u16,
         check: &HostKeyCheck,
+        target: bool,
     ) -> Result<Handle<Handler>> {
         let cas = crate::known_hosts::authorities_for(&self.authorities.lock(), host, port);
         let cfg = config(&self.sc(), !cas.is_empty());
-        let handler = Handler { host: host.into(), port, check: check.clone(), shared: self.shared.clone(), cas };
-        let timeout = Duration::from_secs(self.profile.connect_timeout.max(1) as u64);
+        let handler = Handler { host: host.into(), port, check: check.clone(), shared: self.shared.clone(), cas, target };
+        // The handshake may stop at the host-key prompt (up to 60 s): don't let the connect
+        // timeout expire underneath the user while they read a fingerprint.
+        let timeout = Duration::from_secs(self.profile.connect_timeout.max(1) as u64 + HOST_KEY_PROMPT_SECS);
         match tokio::time::timeout(timeout, client::connect_stream(cfg, stream, handler)).await {
             Err(_) => Err(format!("SSH handshake with {host}:{port} timed out").into()),
             Ok(Ok(h)) => Ok(h),
@@ -507,16 +525,16 @@ impl SshClient {
         };
         let mut handle = if sc.jump_hosts.is_empty() {
             let tcp = dial(&sc, &proxy_password, &p.host, port, timeout).await.map_err(|e| format!("SSH connection failed: {e}"))?;
-            self.handshake(tcp, &p.host, port, &check).await?
+            self.handshake(tcp, &p.host, port, &check, true).await?
         } else {
             let (prev, h) = self.via_jumps(&sc, &check, passphrase.clone(), timeout).await?;
-            let ch = prev
-                .channel_open_direct_tcpip(p.host.clone(), port as u32, "127.0.0.1", 0)
+            let ch = tokio::time::timeout(timeout, prev.channel_open_direct_tcpip(p.host.clone(), port as u32, "127.0.0.1", 0))
                 .await
+                .map_err(|_| format!("failed to dial target {}:{port} through jump hosts: timeout", p.host))?
                 .map_err(|e| format!("failed to dial target {}:{port} through jump hosts: {e}", p.host))?;
             self.hops.lock().extend(h);
             self.hops.lock().push(prev);
-            self.handshake(ch.into_stream(), &p.host, port, &check).await?
+            self.handshake(ch.into_stream(), &p.host, port, &check, true).await?
         };
 
         let cert = load_user_certificate(&sc.private_key_path);
@@ -600,14 +618,14 @@ impl SshClient {
                         .await
                         .map_err(|_| format!("failed to connect to jump host {i} ({host}:{jport}): timeout"))?
                         .map_err(|e| format!("failed to connect to jump host {i} ({host}:{jport}): {e}"))?;
-                    self.handshake(tcp, host, jport, check).await?
+                    self.handshake(tcp, host, jport, check, false).await?
                 }
                 Some(prev) => {
-                    let ch = prev
-                        .channel_open_direct_tcpip(host.clone(), jport as u32, "127.0.0.1", 0)
+                    let ch = tokio::time::timeout(timeout, prev.channel_open_direct_tcpip(host.clone(), jport as u32, "127.0.0.1", 0))
                         .await
+                        .map_err(|_| format!("failed to dial through jump host {i} ({host}:{jport}): timeout"))?
                         .map_err(|e| format!("failed to dial through jump host {i} ({host}:{jport}): {e}"))?;
-                    self.handshake(ch.into_stream(), host, jport, check).await?
+                    self.handshake(ch.into_stream(), host, jport, check, false).await?
                 }
             };
             authenticate(
@@ -652,11 +670,21 @@ impl SshClient {
         Ok(start.elapsed().as_millis() as i64)
     }
 
-    /// Runs a command on a separate channel and returns trimmed stdout.
+    /// Runs a command on a separate channel and returns trimmed stdout, giving up after
+    /// `COMMAND_TIMEOUT` so a server that never answers can't park the caller's thread.
     pub fn run_command(&self, command: &str) -> Result<String> {
         let h = self.handle()?;
         let command = command.to_string();
         rt().block_on(async move {
+            match tokio::time::timeout(COMMAND_TIMEOUT, Self::run_command_inner(h, command)).await {
+                Ok(r) => r,
+                Err(_) => Err("command timed out".into()),
+            }
+        })
+    }
+
+    async fn run_command_inner(h: Arc<Handle<Handler>>, command: String) -> Result<String> {
+        {
             let mut ch = h.channel_open_session().await.map_err(|e| format!("failed to open SSH session: {e}"))?;
             ch.exec(true, command.as_bytes()).await?;
             let mut out = vec![];
@@ -673,7 +701,7 @@ impl SshClient {
                 }
             }
             Ok(String::from_utf8_lossy(&out).trim().to_string())
-        })
+        }
     }
 
     pub fn is_connected(&self) -> bool {
@@ -733,7 +761,7 @@ impl SshClient {
                 tasks.lock().push(task.abort_handle());
             }
             ForwardDirection::Remote => {
-                let bind = if rule.bind_host.is_empty() { "0.0.0.0".to_string() } else { rule.bind_host.clone() };
+                let bind = if rule.bind_host.is_empty() { REMOTE_BIND_DEFAULT.to_string() } else { rule.bind_host.clone() };
                 let port = rt()
                     .block_on(h.tcpip_forward(bind.clone(), rule.bind_port as u32))
                     .map_err(|e| format!("remote forward: server listen on {bind}:{} failed: {e}", rule.bind_port))?;
@@ -756,7 +784,7 @@ impl SshClient {
             t.abort();
         }
         if f.rule.direction == ForwardDirection::Remote {
-            let bind = if f.rule.bind_host.is_empty() { "0.0.0.0".to_string() } else { f.rule.bind_host.clone() };
+            let bind = if f.rule.bind_host.is_empty() { REMOTE_BIND_DEFAULT.to_string() } else { f.rule.bind_host.clone() };
             self.shared.remote_targets.lock().retain(|(a, p), _| !(a == &bind && *p == f.rule.bind_port as u32));
             if let Ok(h) = self.handle() {
                 let port = f.rule.bind_port as u32;

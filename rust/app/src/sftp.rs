@@ -393,7 +393,9 @@ impl Sftp {
 
     fn download(&mut self, s: &Shared, session: &str, files: Vec<FileEntry>) {
         let targets: Vec<(FileEntry, PathBuf)> = if files.len() == 1 {
-            let Some(p) = rfd::FileDialog::new().set_file_name(&files[0].name).save_file() else {
+            // The name comes from the server: keep only a safe base name for the dialog's default.
+            let suggested = safe_sftp_upload_name(&files[0].name).unwrap_or_else(|_| "download".into());
+            let Some(p) = rfd::FileDialog::new().set_file_name(suggested).save_file() else {
                 return;
             };
             vec![(files[0].clone(), p)]

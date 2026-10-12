@@ -105,7 +105,7 @@ If you connect to a profile that already has a live session, Nexus Terminal asks
 - **Key & Passphrase**: choose a key from the suggestions (keys in `~/.ssh`), click **Browse**, or type a full path (`~` is not expanded). The editor checks that the file exists and is a private key.
 - **Host Verification**: the host key policy (see section 12).
 - **Jump Hosts**: one or more bastions, each with user, host, port and an optional key. Nexus Terminal tunnels through each hop in order.
-- **Port Forwarding**: local and remote forwards, each with a bind address and port, destination, label and an **Active** box to start it on connect.
+- **Port Forwarding**: local and remote forwards, each with a bind address and port, destination, label and an **Active** box to start it on connect. A remote forward with no bind address listens on the server's loopback only (as `ssh -R` does); set it to `0.0.0.0` to expose it to the server's network, which also needs `GatewayPorts` on the server.
 - **Startup**: a startup command and environment variables (`KEY=VALUE`, one per line).
 - **Login Script**: expect-style steps (see below).
 - **SSH Agent**: agent authentication and **Forward Agent to Remote** (like `ssh -A`).

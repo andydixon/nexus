@@ -873,7 +873,7 @@ mod tests {
             }
         }));
         let info = |fp: &str| HostKeyInfo { host: "h".into(), port: 22, key_type: "ssh-ed25519".into(), fingerprint: fp.into(), public_key_b64: "AAAA".into() };
-        let stored = |m: &Manager| m.store.get_known_host("h", 22).unwrap().map(|k| k.fingerprint);
+        let stored = |m: &Manager| m.store.get_known_host("h", 22, "ssh-ed25519").unwrap().map(|k| k.fingerprint);
         // Unknown key: accept once records nothing; accept & save records it.
         let check = m.host_key_check("s", HostKeyPolicy::Ask);
         answers.lock().push(HostKeyDecision::AcceptOnce);

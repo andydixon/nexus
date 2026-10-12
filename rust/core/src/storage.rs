@@ -273,14 +273,17 @@ impl Store {
         Ok(n)
     }
 
-    pub fn get_known_host(&self, host: &str, port: i64) -> Result<Option<KnownHost>> {
+    /// The stored key of this type for `host:port`. A host can have one key per type (an
+    /// imported known_hosts usually brings ed25519, RSA and ECDSA), and comparing the offered
+    /// key with a row of another type would look like a changed key.
+    pub fn get_known_host(&self, host: &str, port: i64, key_type: &str) -> Result<Option<KnownHost>> {
         Ok(self
             .db
             .lock()
             .query_row(
                 "SELECT id, host, port, key_type, fingerprint, public_key, first_seen, last_seen, trusted
-                 FROM known_hosts WHERE host = ? AND port = ?",
-                params![host, port],
+                 FROM known_hosts WHERE host = ? AND port = ? AND key_type = ?",
+                params![host, port, key_type],
                 scan_known_host,
             )
             .optional()?)
@@ -556,5 +559,34 @@ mod tests {
             self.updated_at = parse_time(&fmt_time(&self.updated_at));
             self
         }
+    }
+
+    #[test]
+    fn known_hosts_are_looked_up_per_key_type() {
+        let tmp = std::env::temp_dir().join(format!("nexus-kh-{}.db", std::process::id()));
+        let _ = std::fs::remove_file(&tmp);
+        let s = Store::open(&tmp).unwrap();
+        let n = now();
+        for (kt, fp) in [("ssh-ed25519", "SHA256:ed"), ("ssh-rsa", "SHA256:rsa")] {
+            s.save_known_host(&KnownHost {
+                id: String::new(),
+                host: "h".into(),
+                port: 22,
+                key_type: kt.into(),
+                fingerprint: fp.into(),
+                public_key: "AAAA".into(),
+                first_seen: n,
+                last_seen: n,
+                trusted: true,
+            })
+            .unwrap();
+        }
+        // An imported known_hosts brings several key types per host; the offered key is
+        // compared with the row of its own type, not whichever row comes first.
+        assert_eq!(s.get_known_host("h", 22, "ssh-rsa").unwrap().unwrap().fingerprint, "SHA256:rsa");
+        assert_eq!(s.get_known_host("h", 22, "ssh-ed25519").unwrap().unwrap().fingerprint, "SHA256:ed");
+        assert!(s.get_known_host("h", 22, "ecdsa-sha2-nistp256").unwrap().is_none());
+        drop(s);
+        let _ = std::fs::remove_file(tmp);
     }
 }

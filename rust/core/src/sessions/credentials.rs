@@ -108,7 +108,7 @@ impl Manager {
     pub fn host_key_check(self: &Arc<Self>, session: &str, policy: HostKeyPolicy) -> HostKeyCheck {
         let (me, sid) = (self.clone(), session.to_string());
         Arc::new(move |k: &HostKeyInfo| {
-            let stored = me.store.get_known_host(&k.host, k.port as i64).map_err(|e| format!("failed to query known hosts: {e}"))?;
+            let stored = me.store.get_known_host(&k.host, k.port as i64, &k.key_type).map_err(|e| format!("failed to query known hosts: {e}"))?;
             let save = || {
                 let n = now();
                 me.store

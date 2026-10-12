@@ -324,7 +324,7 @@ impl Service {
     /// Trusts an SSH certificate authority for hosts matching `pattern` (OpenSSH syntax).
     pub fn add_cert_authority(&self, pattern: &str, public_key: &str) -> Result<()> {
         let pattern = pattern.trim();
-        if pattern.is_empty() || pattern.contains(char::is_whitespace) {
+        if pattern.is_empty() || pattern.contains(char::is_whitespace) || pattern.len() > crate::known_hosts::MAX_PATTERN_LEN {
             return Err("the host pattern must be one word, e.g. *.example.com".into());
         }
         let key = russh::keys::PublicKey::from_openssh(public_key.trim()).map_err(|e| format!("not an OpenSSH public key: {e}"))?;
