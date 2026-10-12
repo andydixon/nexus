@@ -83,11 +83,21 @@ fn main() -> eframe::Result {
             }
             _ => {
                 println!(
-                    "usage: nexus-terminal [--theme pro|midnight|light] [--data-dir DIR] [--connect NAME]... [--open WINDOW] [--do PALETTE-COMMAND]... [--answer SECRET]... [--shot-delay MS] [--run-local CMD] [--screenshot out.png] [--size WxH] [--version]"
+                    "usage: nexus-terminal [--theme pro|midnight|light] [--data-dir DIR] [--connect NAME]... [--open WINDOW] [--do PALETTE-COMMAND]... [--answer SECRET]... (or NEXUS_ANSWERS=one-per-line) [--shot-delay MS] [--run-local CMD] [--screenshot out.png] [--size WxH] [--version]"
                 );
                 return Ok(());
             }
         }
+    }
+    // Automation answers: prefer NEXUS_ANSWERS (one per line), which stays out of the process list
+    // and shell history; it's removed so local shells don't inherit it.
+    if let Ok(v) = std::env::var("NEXUS_ANSWERS") {
+        opts.answers.extend(v.lines().map(String::from));
+        // SAFETY: still single-threaded here; no other thread can be reading the environment.
+        unsafe { std::env::remove_var("NEXUS_ANSWERS") };
+    }
+    if !opts.answers.is_empty() && opts.screenshot.is_none() {
+        eprintln!("warning: --answer/NEXUS_ANSWERS auto-fill credential prompts; they are meant for screenshot automation only");
     }
     let config = match data_dir {
         Some(d) => {
