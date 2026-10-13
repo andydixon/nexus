@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Andy Dixon
+
 //! RDP client on IronRDP: TLS with NLA (CredSSP), the server certificate pinned through the
 //! caller's host-key check, any transport the caller dials (direct, SOCKS5/HTTP proxy or an SSH
 //! tunnel), and the desktop decoded into the same RGBA framebuffer the VNC client uses. Like the

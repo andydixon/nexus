@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Andy Dixon
+
 //! Environment variables for terminal sessions: TERM and a UTF-8 character locale.
 
 use std::collections::BTreeMap;

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Andy Dixon
+
 //! State shared by the main window and every feature module: the service, cached profiles and
 //! preferences, open tabs, toasts, and a request queue features use to ask the app to act.
 

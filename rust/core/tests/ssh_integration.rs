@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Andy Dixon
+
 //! End-to-end SSH tests against a throwaway OpenSSH server run as the current user. Skipped
 //! (passing) when `sshd`/`ssh-keygen` aren't installed.
 

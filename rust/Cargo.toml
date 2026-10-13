@@ -6,6 +6,9 @@ exclude = ["fuzz"]
 [workspace.package]
 version = "3.0.2"
 edition = "2024"
+license = "AGPL-3.0-only"
+authors = ["Andy Dixon <andy@dixon.cx>"]
+repository = "https://github.com/andydixon/nexus"
 
 [profile.dev.package."*"]
 opt-level = 2

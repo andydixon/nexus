@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Andy Dixon
+
 //! Outbound proxies (SOCKS5, HTTP CONNECT) for the clients that dial TCP themselves: SSH and RDP.
 //! Blocking; async callers run it on a blocking thread.
 

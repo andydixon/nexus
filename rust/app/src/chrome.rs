@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Andy Dixon
+
 //! Window chrome: custom title bar, status bar, command palette, credential and host-key
 //! prompts, the main window's modal dialogs, toasts and resize edges.
 

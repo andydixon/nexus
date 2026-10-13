@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Andy Dixon
+
 //! How a session is drawn. Terminal-style protocols share `TermView`; the rest have their own.
 
 use crate::desktop_view::DesktopView;

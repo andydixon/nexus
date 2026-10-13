@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Andy Dixon
+
 //! Profile sync through a folder the user picks (a cloud drive, a network share, a git checkout):
 //! one encrypted file, `nexus-profiles.nexus`, in the export format (Argon2id + AES-256-GCM) under
 //! a sync password. Each side merges profile by profile — the newer `updated_at` wins — and

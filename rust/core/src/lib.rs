@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Andy Dixon
+
 //! nexus-core: everything in Nexus Terminal that isn't drawing — storage, secrets, protocol
 //! clients and the session manager. The egui app is one client of this crate.
 

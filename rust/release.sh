@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Andy Dixon
 # release.sh — build and package Nexus Terminal release artefacts with cargo.
 #
 # Produces, under build/releases/<version>/ (repo root):
@@ -66,18 +68,18 @@ for target in "${TARGETS[@]}"; do
             NEXUS_BIN="$bin" packaging/macos/build-app.sh
             rm -rf "$OUT/$base.app"
             cp -R target/macos/NexusTerminal.app "$OUT/$base.app"
-            (cd "$OUT" && rm -f "$base.zip" && zip -qry "$base.zip" "$base.app")
+            (cd "$OUT" && rm -f "$base.zip" && zip -qry "$base.zip" "$base.app" && zip -qj "$base.zip" "$ROOT/LICENSE")
             ;;
         windows)
             cp "$bin.exe" "$OUT/$base.exe"
-            (cd "$OUT" && rm -f "$base.zip" && zip -qj "$base.zip" "$base.exe")
+            (cd "$OUT" && rm -f "$base.zip" && zip -qj "$base.zip" "$base.exe" "$ROOT/LICENSE")
             ;;
         *)
             cp "$bin" "$OUT/$base"
             strip "$OUT/$base" 2>/dev/null || true
             stage="$(mktemp -d)"
             cp "$OUT/$base" "$stage/nexus-terminal"
-            cp packaging/linux/nexus-terminal.desktop packaging/linux/install.sh "$stage/"
+            cp packaging/linux/nexus-terminal.desktop packaging/linux/install.sh "$ROOT/LICENSE" "$stage/"
             mkdir -p "$stage/app/assets/icon" && cp app/assets/icon/icon-256.png app/assets/icon/icon-512.png "$stage/app/assets/icon/"
             sed -i 's|\$HERE/../../app|$HERE/app|; s|\$HERE/../../target/release/nexus-terminal|$HERE/nexus-terminal|' "$stage/install.sh"
             (cd "$stage" && rm -f "$OUT/$base.zip" && zip -qr "$OUT/$base.zip" .)

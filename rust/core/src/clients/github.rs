@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Andy Dixon
+
 //! Lightweight GitHub REST client for repository metadata and archive downloads. Works with
 //! github.com and GitHub Enterprise via a configurable API base URL.
 

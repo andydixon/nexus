@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Andy Dixon
+
 //! Telnet client (port of Go `internal/telnetclient`): RFC 854/855 option negotiation (ECHO, SGA,
 //! TTYPE, NAWS; everything else refused), IAC escaping, line-ending conversion, ISO 8859-1 output
 //! encoding and BRK. Go read but never acted on `lineMode`, and neither do we.

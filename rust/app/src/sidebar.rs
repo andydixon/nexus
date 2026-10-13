@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Andy Dixon
+
 //! The connection sidebar: Local Machine, Favourites, Recent, folders, Ungrouped; fuzzy search;
 //! click to connect, Ctrl/Cmd-click to multi-select, double-click to edit; bulk actions.
 

@@ -2,6 +2,9 @@
 name = "nexus-core"
 version.workspace = true
 edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
 
 [features]
 # Exposes parser entry points for rust/fuzz (cargo-fuzz).

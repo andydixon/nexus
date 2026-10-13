@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Andy Dixon
+
 //! Per-protocol connect: SSH, GitHub, IRC, VNC and RDP, and the SSH tunnels they can use.
 
 use super::*;

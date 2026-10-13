@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Andy Dixon
+
 //! Snippet library window and the {{variable}} prompt (port of snippets.js).
 
 use crate::state::{Request, Shared};

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Andy Dixon
+
 //! Credential resolution (saved, session-only, ask-every-time), prompts and host-key checks.
 
 use super::*;

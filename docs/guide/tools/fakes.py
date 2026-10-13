@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Andy Dixon
 """Tiny fake servers for the user-guide screenshots: RAW sensor feed (42023), IRC (42667),
 GitHub API (42080) and a VNC desktop (42900). Stdlib only. Runs until killed."""
 

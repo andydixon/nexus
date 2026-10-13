@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Andy Dixon
+
 //! Profile editor (right dock): create and edit every protocol's settings. A port of the
 //! `profiles.js` drawer plus the Serial protocol. Switching protocol keeps the common fields
 //! (including the group), and list editors keep unsaved edits.

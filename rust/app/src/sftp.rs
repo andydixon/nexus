@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Andy Dixon
+
 //! SFTP browser (right dock), the file-drop dialog and the remote directory picker.
 //! Every SFTP call blocks on the network, so it runs on a worker thread; results come back
 //! through `inbox` and are applied on the UI thread at the start of the next frame.

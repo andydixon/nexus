@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Andy Dixon
+
 //! Profile export/import: encrypted `.nexus` and plain JSON.
 
 use crate::settings::{Job, poll};

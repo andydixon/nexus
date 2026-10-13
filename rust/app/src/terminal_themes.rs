@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Andy Dixon
+
 //! The 11 terminal colour schemes, generated from the web build's themes.js.
 
 pub struct TermTheme {

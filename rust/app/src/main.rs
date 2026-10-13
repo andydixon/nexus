@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Andy Dixon
+
 //! Nexus Terminal: SSH, Telnet, RAW TCP, Serial, VNC, IRC, GitHub and local terminals in one
 //! native window. `nexus-terminal [--theme pro|midnight|light] [--screenshot out.png] [--size WxH]`.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]

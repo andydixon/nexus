@@ -1,4 +1,6 @@
 #!/bin/sh
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Andy Dixon
 # Build NexusTerminal.app, a macOS application bundle. Run on a Mac with Xcode command-line tools:
 #
 #   rust/packaging/macos/build-app.sh            # universal (Apple Silicon + Intel) if both
@@ -44,6 +46,7 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/NexusTerminal"
 chmod +x "$APP/Contents/MacOS/NexusTerminal"
 cp "$HERE/NexusTerminal.icns" "$APP/Contents/Resources/NexusTerminal.icns"
+cp "$HERE/../../../LICENSE" "$APP/Contents/Resources/LICENSE"
 sed "s/__VERSION__/$VERSION/g" "$HERE/Info.plist" > "$APP/Contents/Info.plist"
 printf 'APPL????' > "$APP/Contents/PkgInfo"
 

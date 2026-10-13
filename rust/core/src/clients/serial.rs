@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Andy Dixon
+
 //! Serial client (new protocol, no Go original) on the `serialport` crate. The device path is
 //! `Profile::host`, line settings come from `Profile::serial`. Same conventions as the other
 //! clients: blocking `connect`, an own reader thread, `on_close` exactly once (unplug included).

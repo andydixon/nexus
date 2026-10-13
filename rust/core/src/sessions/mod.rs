@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Andy Dixon
+
 //! The session manager: one entry per open tab, each owning a protocol client. A port of
 //! internal/sessions — same lifecycle, reconnect backoff, login scripts, recording hooks and
 //! credential resolution — reporting to the UI through `Event`s.

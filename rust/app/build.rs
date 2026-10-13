@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Andy Dixon
+
 //! Embeds the icon and version info into the Windows executable.
 fn main() {
     println!("cargo:rerun-if-changed=../packaging/windows/nexus.ico");

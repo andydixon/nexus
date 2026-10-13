@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Andy Dixon
+
 //! Session recording in asciicast v2 (https://docs.asciinema.org/manual/asciicast/v2/): a JSON
 //! header line, then one `[elapsed_secs, type, data]` array per line. Same files as the Go app.
 

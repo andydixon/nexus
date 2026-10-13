@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Andy Dixon
+
 //! The main window: title bar, connection sidebar, tab strip and workspace (terminals, split
 //! panes, protocol viewers), right dock (SFTP or the profile editor), status bar, command
 //! palette, prompts and toasts. Session events from nexus-core are drained here every frame.

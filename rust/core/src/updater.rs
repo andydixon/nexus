@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Andy Dixon
+
 //! Update checks against a self-hosted manifest. Check-only: nothing is downloaded or installed.
 //! The launch-time check honours `AppPreferences::check_for_updates`. Calls block; run them off
 //! the UI thread.

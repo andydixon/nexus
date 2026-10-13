@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Andy Dixon
+
 //! Local shell in a PTY (forkpty on Unix, ConPTY on Windows), a port of internal/localshell.
 
 use super::Callbacks;

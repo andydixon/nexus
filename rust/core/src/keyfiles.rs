@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Andy Dixon
+
 //! SSH key file helpers that need no SSH crypto: spotting private keys, listing `~/.ssh`, and
 //! sanitising key and upload file names.
 

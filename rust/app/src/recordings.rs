@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Andy Dixon
+
 //! Recordings browser and playback window (port of the RecordingManager in recordings.js).
 
 use crate::state::Shared;

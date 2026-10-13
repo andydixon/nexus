@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Andy Dixon
+
 //! Split panes: a binary tree of sessions inside one tab. A new split starts as a placeholder
 //! pane offering Local Machine and the saved connections; ✕ on a pane promotes its sibling.
 

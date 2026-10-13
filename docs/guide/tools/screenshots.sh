@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Andy Dixon
 # Regenerates docs/guide/img/*.png: a throwaway sshd (ForceCommand, never a login shell),
 # fake RAW/IRC/GitHub/VNC servers, a demo data directory, then one headless app run per shot.
 # Needs: xvfb-run, sshd, ssh-keygen, python3, ImageMagick. Usage: docs/guide/tools/screenshots.sh [shot...]

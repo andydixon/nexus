@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Andy Dixon
+
 //! GitHub repository browser: owner groups of repo cards with ZIP download and Visit. Port of
 //! `github.js`.
 

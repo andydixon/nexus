@@ -1,4 +1,6 @@
 #!/bin/sh
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Andy Dixon
 # Install Nexus Terminal for the current user so it appears in the app launcher.
 # Usage: rust/packaging/linux/install.sh [path/to/nexus-terminal]   (default: target/release/nexus-terminal)
 set -eu

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Andy Dixon
+
 //! Finds the OSC sequences the VT parser ignores but Nexus uses: OSC 133 (shell integration
 //! marks: prompt, command, output, finished with exit status) and OSC 7 (the shell's working
 //! directory). Sequences may be split across reads, so the scanner keeps state between chunks.

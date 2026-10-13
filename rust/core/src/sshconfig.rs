@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Andy Dixon
+
 //! Parses OpenSSH `~/.ssh/config` Host blocks into SSH profiles. Supports HostName, Port, User,
 //! IdentityFile, ProxyJump (first hop), ForwardAgent and Compression. Match blocks, wildcard-only
 //! hosts, Include and `%h`-style tokens are ignored, as in the Go app.

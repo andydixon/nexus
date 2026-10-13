@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Andy Dixon
+
 //! Native VNC (RFB 3.3/3.7/3.8) client: None and VNC Authentication, Raw, CopyRect, Hextile, ZRLE
 //! and Tight (zlib + JPEG), plus the DesktopSize, ExtendedDesktopSize and LastRect pseudo-encodings.
 //!

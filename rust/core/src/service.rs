@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Andy Dixon
+
 //! The app-facing API (a port of internal/api.Service minus the Wails plumbing): profiles,
 //! sessions, credentials, known hosts, preferences, snippets, import/export, SSH keys, updates.
 //! File dialogs live in the UI; methods here take paths.

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Andy Dixon
+
 //! OpenSSH `known_hosts` interchange and SSH certificate authorities.
 //!
 //! Imported host keys become ordinary known-host rows. `@cert-authority` lines become rows with

@@ -1,4 +1,6 @@
 <?php
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Andy Dixon
 // Query parameters may arrive as arrays (?arch[]=x); treat anything but a string as absent.
 $param = function ($name) { return isset($_GET[$name]) && is_string($_GET[$name]) ? $_GET[$name] : ''; };
 $platform = $param('platform');

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Andy Dixon
+
 //! SSH Key Manager window: key pairs in ~/.ssh — copy public key, delete, generate (in-process, OpenSSH format).
 
 use crate::settings::{Job, poll};

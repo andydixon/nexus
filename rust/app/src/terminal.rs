@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Andy Dixon
+
 //! TermView: an alacritty_terminal grid drawn with egui's painter. Bytes from a session go
 //! straight into the VT parser; keystrokes, paste, mouse reports and terminal replies come back
 //! out through `TermResponse` for the app to send to the session (and broadcast targets).

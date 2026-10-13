@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Andy Dixon
+
 //! Remote desktop viewer for VNC and RDP: the remote framebuffer as a texture, with mouse,
 //! keyboard and clipboard input. Input is expressed in X keysyms and VNC pointer masks (VNC's own
 //! terms); `Remote` translates them for RDP. Toolbar after the web build's `vnc.js` (status,

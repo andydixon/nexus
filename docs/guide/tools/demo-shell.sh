@@ -1,4 +1,6 @@
 #!/bin/bash
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright (C) 2026 Andy Dixon
 # ForceCommand for the throwaway screenshot sshd: never a login shell (no ~/.profile, no byobu).
 DEMO_HOME=$1 SFTP_SERVER=$2
 export LC_ALL=C.UTF-8

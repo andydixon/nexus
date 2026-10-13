@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Andy Dixon
+
 //! The tab strip and the workspace under it: the active tab's session (or its split panes),
 //! terminal find bar and connection overlays.
 

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Andy Dixon
+
 //! SQLite persistence: profiles, known hosts, preferences, audit log, snippets and IRC channel
 //! state. The schema and migration files are the Go app's, so existing databases open unchanged.
 
