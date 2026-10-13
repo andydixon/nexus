@@ -206,7 +206,7 @@ fn open_error(path: &str, e: &serialport::Error) -> crate::Error {
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[cfg(unix)]
+    #[cfg(target_os = "linux")]
     use std::sync::mpsc;
 
     #[test]
