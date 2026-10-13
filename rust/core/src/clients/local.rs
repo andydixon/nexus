@@ -60,7 +60,8 @@ impl LocalShell {
             .map_err(|e| format!("failed to start shell {:?}: {e}", self.shell))?;
         let mut cmd = CommandBuilder::new(&self.shell);
         cmd.env_clear();
-        let env = crate::terminalenv::local_shell_env(std::env::vars().map(|(k, v)| format!("{k}={v}")).collect());
+        // `vars()` panics on a non-UTF-8 entry (a launcher can plant one); skip those instead.
+        let env = crate::terminalenv::local_shell_env(std::env::vars_os().filter_map(|(k, v)| Some(format!("{}={}", k.to_str()?, v.to_str()?))).collect());
         for kv in env {
             if let Some((k, v)) = kv.split_once('=') {
                 cmd.env(k, v);

@@ -48,6 +48,11 @@ struct State {
     local_echo: bool,
     cols: u16,
     rows: u16,
+    /// Options we have agreed to perform (WILL) and the peer has agreed to (DO), so a request
+    /// for a state we're already in isn't answered (RFC 854 forbids it; answering unconditionally
+    /// lets a hostile or naive peer drive an endless DONT/WONT ping-pong at line rate).
+    us: std::collections::HashSet<u8>,
+    him: std::collections::HashSet<u8>,
 }
 
 impl TelnetClient {
@@ -56,7 +61,7 @@ impl TelnetClient {
     pub fn new(profile: &Profile, cb: Callbacks, on_debug: Option<DebugFn>) -> TelnetClient {
         let cfg = profile.telnet.clone().unwrap_or_default();
         let encoding = if cfg.encoding.is_empty() { "utf-8".to_string() } else { cfg.encoding.clone() };
-        let state = State { local_echo: cfg.local_echo, cols: 80, rows: 24 };
+        let state = State { local_echo: cfg.local_echo, cols: 80, rows: 24, us: Default::default(), him: Default::default() };
         TelnetClient {
             inner: Arc::new(Inner {
                 conn: Arc::new(TcpConn::new(cb.on_error, cb.on_close)),
@@ -193,14 +198,18 @@ impl Inner {
     fn handle_do(&self, opt: u8) {
         self.debug(format!("received DO {opt}"));
         match opt {
-            OPT_TERM_TYPE | OPT_SGA => self.negotiate(WILL, opt),
-            OPT_NAWS => {
+            OPT_TERM_TYPE | OPT_SGA | OPT_NAWS => {
+                if !self.state.lock().us.insert(opt) {
+                    return;
+                }
                 self.negotiate(WILL, opt);
-                let (cols, rows) = {
-                    let st = self.state.lock();
-                    (st.cols, st.rows)
-                };
-                let _ = self.send_naws(cols, rows);
+                if opt == OPT_NAWS {
+                    let (cols, rows) = {
+                        let st = self.state.lock();
+                        (st.cols, st.rows)
+                    };
+                    let _ = self.send_naws(cols, rows);
+                }
             }
             _ => self.negotiate(WONT, opt),
         }
@@ -208,17 +217,23 @@ impl Inner {
 
     fn handle_dont(&self, opt: u8) {
         self.debug(format!("received DONT {opt}"));
-        self.negotiate(WONT, opt);
+        if self.state.lock().us.remove(&opt) {
+            self.negotiate(WONT, opt);
+        }
     }
 
     fn handle_will(&self, opt: u8) {
         self.debug(format!("received WILL {opt}"));
         match opt {
-            OPT_ECHO => {
+            OPT_ECHO | OPT_SGA => {
+                if !self.state.lock().him.insert(opt) {
+                    return;
+                }
                 self.negotiate(DO, opt);
-                self.state.lock().local_echo = false;
+                if opt == OPT_ECHO {
+                    self.state.lock().local_echo = false;
+                }
             }
-            OPT_SGA => self.negotiate(DO, opt),
             _ => self.negotiate(DONT, opt),
         }
     }
@@ -228,7 +243,9 @@ impl Inner {
         if opt == OPT_ECHO {
             self.state.lock().local_echo = true;
         }
-        self.negotiate(DONT, opt);
+        if self.state.lock().him.remove(&opt) {
+            self.negotiate(DONT, opt);
+        }
     }
 
     fn process_subnegotiation(&self, payload: &[u8]) {
@@ -251,9 +268,17 @@ impl Inner {
 
     fn send_naws(&self, cols: u16, rows: u16) -> crate::Result<()> {
         self.debug(format!("sending NAWS: {cols}x{rows}"));
-        let [c0, c1] = cols.to_be_bytes();
-        let [r0, r1] = rows.to_be_bytes();
-        self.conn.write(&[IAC, SB, OPT_NAWS, c0, c1, r0, r1, IAC, SE])
+        // 0xFF inside the subnegotiation must be doubled (RFC 1073), or a 255-column window
+        // sends a bare IAC the server parses as a command.
+        let mut msg = vec![IAC, SB, OPT_NAWS];
+        for b in cols.to_be_bytes().into_iter().chain(rows.to_be_bytes()) {
+            msg.push(b);
+            if b == IAC {
+                msg.push(IAC);
+            }
+        }
+        msg.extend_from_slice(&[IAC, SE]);
+        self.conn.write(&msg)
     }
 
     fn debug(&self, msg: String) {
@@ -344,6 +369,38 @@ mod tests {
             c.inner.process(&mut pending, &chunk);
             assert!(pending.len() <= 16 << 10, "pending must stay bounded");
         }
+    }
+
+    #[test]
+    fn negotiation_replies_only_on_state_change() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let profile = Profile { host: "127.0.0.1".into(), port: listener.local_addr().unwrap().port() as i64, ..Profile::new(crate::models::Protocol::Telnet) };
+        let client = TelnetClient::new(&profile, Callbacks::noop(), None);
+        client.connect().unwrap();
+        let (mut srv, _) = listener.accept().unwrap();
+        srv.set_read_timeout(Some(Duration::from_millis(500))).unwrap();
+        // DONT/WONT for options that are already off, and repeated WILL/DO, get no reply;
+        // only the first WILL SGA and the first DO SGA are answered.
+        let mut flood = vec![];
+        for _ in 0..100 {
+            flood.extend_from_slice(&[IAC, DONT, 1, IAC, WONT, 1, IAC, WILL, OPT_SGA, IAC, DO, OPT_SGA]);
+        }
+        srv.write_all(&flood).unwrap();
+        let mut got = vec![];
+        let mut buf = [0u8; 4096];
+        while let Ok(n) = srv.read(&mut buf) {
+            if n == 0 {
+                break;
+            }
+            got.extend_from_slice(&buf[..n]);
+        }
+        assert_eq!(got, [IAC, DO, OPT_SGA, IAC, WILL, OPT_SGA]);
+        // A 255-column window doubles the 0xFF inside the NAWS subnegotiation.
+        srv.write_all(&[IAC, DO, OPT_NAWS]).unwrap();
+        let _ = read_n(&mut srv, 3 + 9);
+        client.resize(255, 24).unwrap();
+        assert_eq!(read_n(&mut srv, 10), [IAC, SB, OPT_NAWS, 0, 255, 255, 0, 24, IAC, SE]);
+        client.close();
     }
 
     #[test]

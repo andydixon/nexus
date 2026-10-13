@@ -105,22 +105,31 @@ pub(crate) fn dial(host: &str, port: i64, timeout_secs: i64) -> (String, std::io
 /// reports `read error: …` then closes; `close` is idempotent and fires `on_close` once).
 pub(crate) struct TcpConn {
     stream: parking_lot::Mutex<Option<std::net::TcpStream>>,
+    /// A second handle on the socket, so `close` can shut it down without waiting for the
+    /// stream lock (a write blocked on a peer that stopped reading holds that lock).
+    shutdown: parking_lot::Mutex<Option<std::net::TcpStream>>,
     on_error: ErrorFn,
     on_close: CloseFn,
 }
 
+/// Longest a single write may block on a peer that has stopped reading; the writes happen on
+/// the UI thread (keystrokes) and on the reader thread (negotiation replies).
+const WRITE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
+
 impl TcpConn {
     pub(crate) fn new(on_error: ErrorFn, on_close: CloseFn) -> TcpConn {
-        TcpConn { stream: parking_lot::Mutex::new(None), on_error, on_close }
+        TcpConn { stream: parking_lot::Mutex::new(None), shutdown: parking_lot::Mutex::new(None), on_error, on_close }
     }
 
     pub(crate) fn connect(self: &Arc<Self>, stream: std::net::TcpStream, mut on_read: impl FnMut(&[u8]) + Send + 'static) -> crate::Result<()> {
         let mut reader = stream.try_clone()?;
+        let _ = stream.set_write_timeout(Some(WRITE_TIMEOUT));
         {
             let mut guard = self.stream.lock();
             if guard.is_some() {
                 return Err("already connected".into());
             }
+            *self.shutdown.lock() = stream.try_clone().ok();
             *guard = Some(stream);
         }
         let me = self.clone();
@@ -161,6 +170,9 @@ impl TcpConn {
     }
 
     pub(crate) fn close(&self) {
+        if let Some(s) = self.shutdown.lock().take() {
+            let _ = s.shutdown(std::net::Shutdown::Both);
+        }
         let taken = self.stream.lock().take();
         if let Some(s) = taken {
             let _ = s.shutdown(std::net::Shutdown::Both);

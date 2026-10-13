@@ -461,23 +461,39 @@ impl Conn {
     }
 }
 
+impl Conn {
+    /// Writes queued input (keys, pointer, clipboard) and notices a local close. Runs after every
+    /// read, not only on read timeouts, so a server that streams without pause can't starve
+    /// our output or keep a closed tab's connection alive.
+    fn pump_out(&mut self) -> std::io::Result<()> {
+        let mut wrote = false;
+        loop {
+            match self.out_rx.try_recv() {
+                Ok(msg) => {
+                    self.io.write_all(&msg)?;
+                    wrote = true;
+                }
+                Err(TryRecvError::Empty) => break,
+                Err(TryRecvError::Disconnected) => return Err(std::io::Error::other("closed")),
+            }
+        }
+        if wrote { self.io.flush() } else { Ok(()) }
+    }
+}
+
 impl Read for Conn {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
         loop {
             match self.io.read(buf) {
                 Ok(0) => return Err(std::io::Error::new(ErrorKind::UnexpectedEof, "connection closed by server")),
-                Ok(n) => return Ok(n),
+                Ok(n) => {
+                    self.pump_out()?;
+                    return Ok(n);
+                }
                 Err(e) if matches!(e.kind(), ErrorKind::WouldBlock | ErrorKind::TimedOut | ErrorKind::Interrupted) => {}
                 Err(e) => return Err(e),
             }
-            loop {
-                match self.out_rx.try_recv() {
-                    Ok(msg) => self.io.write_all(&msg)?,
-                    Err(TryRecvError::Empty) => break,
-                    Err(TryRecvError::Disconnected) => return Err(std::io::Error::other("closed")),
-                }
-            }
-            self.io.flush()?;
+            self.pump_out()?;
         }
     }
 }
@@ -523,18 +539,42 @@ impl Default for Decoders {
     }
 }
 
-/// Inflates one server chunk (which ends at a sync flush) into `out`.
-fn inflate(z: &mut Decompress, mut input: &[u8], out: &mut Vec<u8>) -> crate::Result<()> {
+/// Inflates one server chunk (which ends at a sync flush) into `out`, refusing to grow past
+/// `max_out`: the caller knows how many bytes a rectangle can legitimately need, and a zlib bomb
+/// would otherwise expand a few hundred KiB from the wire into gigabytes.
+fn inflate(z: &mut Decompress, mut input: &[u8], out: &mut Vec<u8>, max_out: usize) -> crate::Result<()> {
     out.clear();
     loop {
-        out.reserve(64 << 10);
+        if out.len() > max_out {
+            return Err(format!("compressed rectangle inflates past {max_out} bytes").into());
+        }
+        // Never ask for more room than the cap allows (plus one byte to detect overflow).
+        out.reserve((64 << 10).min(max_out + 1 - out.len()));
         let (i0, o0) = (z.total_in(), z.total_out());
         z.decompress_vec(input, out, FlushDecompress::Sync).map_err(|e| format!("zlib: {e}"))?;
         input = &input[(z.total_in() - i0) as usize..];
         let stalled = z.total_in() == i0 && z.total_out() == o0;
+        if out.len() > max_out {
+            return Err(format!("compressed rectangle inflates past {max_out} bytes").into());
+        }
         if (input.is_empty() && out.len() < out.capacity()) || stalled {
             return Ok(());
         }
+    }
+}
+
+/// A rectangle's decoded size can't exceed this, whatever the encoding: raw pixels plus, per
+/// 64×64 ZRLE tile, a subencoding byte and a 128-entry palette.
+fn max_inflated(w: usize, h: usize) -> usize {
+    let tiles = w.div_ceil(64) * h.div_ceil(64);
+    w * h * 4 + tiles * (1 + 128 * 4)
+}
+
+/// Returns a decode scratch buffer to a modest size after a big rectangle, so one large update
+/// doesn't pin hundreds of MiB for the rest of the session.
+fn shrink_scratch(buf: &mut Vec<u8>) {
+    if buf.capacity() > (8 << 20) {
+        *buf = Vec::new();
     }
 }
 
@@ -592,8 +632,9 @@ fn read_update(r: &mut impl Read, fb: &mut Framebuffer, dec: &mut Decoders) -> c
                     return Err(format!("ZRLE rectangle of {len} bytes exceeds {MAX_ZRLE_BYTES}").into());
                 }
                 let data = read_n(r, len)?;
-                inflate(&mut dec.zrle, &data, &mut dec.buf)?;
+                inflate(&mut dec.zrle, &data, &mut dec.buf, max_inflated(w as usize, ht as usize))?;
                 zrle(&dec.buf, fb, x, y, w, ht)?;
+                shrink_scratch(&mut dec.buf);
             }
             e => return Err(format!("unsupported encoding {e}").into()),
         }
@@ -770,7 +811,7 @@ fn tight(r: &mut impl Read, fb: &mut Framebuffer, dec: &mut Decoders, x: u16, y:
     } else {
         let len = compact_len(r)?;
         let compressed = read_n(r, len)?;
-        inflate(&mut dec.tight[(ctl >> 4 & 3) as usize], &compressed, &mut dec.buf)?;
+        inflate(&mut dec.tight[(ctl >> 4 & 3) as usize], &compressed, &mut dec.buf, size)?;
         std::mem::take(&mut dec.buf)
     };
     if data.len() < size {
@@ -877,6 +918,25 @@ pub fn fuzz_updates(data: &[u8]) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn inflate_refuses_zlib_bombs() {
+        use flate2::{Compress, Compression, FlushCompress};
+        // 64 MiB of zeros compresses to ~64 KiB; a 4x4 rectangle may only need a few hundred bytes.
+        let mut z = Compress::new(Compression::best(), true);
+        let mut wire = Vec::with_capacity(1 << 20);
+        z.compress_vec(&vec![0u8; 64 << 20], &mut wire, FlushCompress::Sync).unwrap();
+        let (mut d, mut out) = (Decompress::new(true), Vec::new());
+        assert!(inflate(&mut d, &wire, &mut out, max_inflated(4, 4)).is_err());
+        assert!(out.capacity() < 1 << 20, "never grew far past the cap: {}", out.capacity());
+        // A legitimate rectangle still inflates.
+        let mut z = Compress::new(Compression::fast(), true);
+        let mut wire = Vec::with_capacity(4096);
+        z.compress_vec(&[7u8; 64], &mut wire, FlushCompress::Sync).unwrap();
+        let (mut d, mut out) = (Decompress::new(true), Vec::new());
+        inflate(&mut d, &wire, &mut out, max_inflated(4, 4)).unwrap();
+        assert_eq!(out, [7u8; 64]);
+    }
     use std::net::TcpListener;
 
     #[test]
