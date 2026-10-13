@@ -446,15 +446,9 @@ impl DesktopView {
             resp.request_focus();
         }
         let focused = resp.has_focus();
-        // RDP shares the clipboard both ways: offer the local text whenever the desktop gains focus.
-        if focused
-            && !self.had_focus
-            && let Some(Remote::Rdp(c)) = &self.client
-            && let Ok(text) = arboard::Clipboard::new().and_then(|mut c| c.get_text())
-            && !text.is_empty()
-        {
-            c.set_clipboard(text);
-        }
+        // The local clipboard goes to the remote desktop only on an explicit paste (Ctrl/Cmd+V or
+        // Paste Clipboard). Offering it whenever the desktop gained focus let any server read
+        // whatever was last copied (a password, a token) without the user pasting anything.
         if focused {
             ui.painter().rect_stroke(img, 0.0, egui::Stroke::new(1.0, Tokens::get(ui.ctx()).accent.gamma_multiply(0.6)), egui::StrokeKind::Outside);
             ui.memory_mut(|m| m.set_focus_lock_filter(id, egui::EventFilter { tab: true, horizontal_arrows: true, vertical_arrows: true, escape: true }));

@@ -259,8 +259,10 @@ impl Client {
     fn run(&self, mut framed: Framed<Tls>, result: ConnectionResult, rx: Receiver<Input>) -> Result<()> {
         framed.get_inner_mut().0.sock.set_read_timeout(Some(POLL))?;
         let size = result.desktop_size;
-        let mut image = DecodedImage::new(PixelFormat::RgbA32, size.width, size.height);
+        // Check the server-chosen size before DecodedImage allocates it (65535² is 16 GiB, and
+        // an allocation failure aborts the whole app rather than failing this session).
         *self.fb.lock() = Framebuffer::new_checked(size.width, size.height)?;
+        let mut image = DecodedImage::new(PixelFormat::RgbA32, size.width, size.height);
         let factory = result.activation_factory;
         let mut stage = ActiveStageBuilder {
             static_channels: result.static_channels,
@@ -349,8 +351,8 @@ impl Client {
                             if let ConnectionActivationState::Finalized { desktop_size, share_id, enable_server_pointer, pointer_software_rendering } =
                                 seq.connection_activation_state()
                             {
-                                image = DecodedImage::new(PixelFormat::RgbA32, desktop_size.width, desktop_size.height);
                                 *self.fb.lock() = Framebuffer::new_checked(desktop_size.width, desktop_size.height)?;
+                                image = DecodedImage::new(PixelFormat::RgbA32, desktop_size.width, desktop_size.height);
                                 stage.set_fastpath_processor(
                                     fast_path::ProcessorBuilder {
                                         io_channel_id: seq.io_channel_id(),

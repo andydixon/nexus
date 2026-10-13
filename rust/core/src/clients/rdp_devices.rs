@@ -25,6 +25,11 @@ use std::path::{Path, PathBuf};
 
 /// A print job may not grow past this (a hostile server could otherwise fill the disk).
 const MAX_PRINT_JOB: u64 = 256 << 20;
+/// Print jobs open at once; each holds a file descriptor.
+const MAX_OPEN_PRINT_JOBS: usize = 4;
+/// Largest drive read served in one request. The server picks the length (a u32), and the
+/// native backend allocates it before reading; Windows clients never ask for more than ~1 MiB.
+const MAX_DRIVE_READ: u32 = 8 << 20;
 
 /// Called with the file a finished print job was saved to.
 pub type PrintedFn = std::sync::Arc<dyn Fn(PathBuf) + Send + Sync>;
@@ -69,9 +74,16 @@ impl Spool {
     fn handle(&mut self, req: PrinterIoRequest) -> PduResult<Vec<SvcMessage>> {
         let pdu = match req {
             PrinterIoRequest::Create(r) => {
-                let name = format!("Nexus print {}.ps", chrono::Local::now().format("%Y-%m-%d %H.%M.%S"));
-                let path = self.dir.join(name);
-                match std::fs::File::create(&path) {
+                // A fresh file per job: two jobs in the same second used to share (and truncate)
+                // one file, and an existing file of that name was overwritten.
+                let stamp = chrono::Local::now().format("%Y-%m-%d %H.%M.%S");
+                let path = self.dir.join(format!("Nexus print {stamp} #{}.ps", self.next_id));
+                let file = if self.jobs.len() >= MAX_OPEN_PRINT_JOBS {
+                    Err(std::io::Error::other("too many print jobs open"))
+                } else {
+                    std::fs::OpenOptions::new().write(true).create_new(true).open(&path)
+                };
+                match file {
                     Ok(f) => {
                         let id = self.next_id;
                         self.next_id += 1;
@@ -220,7 +232,11 @@ impl ConfinedDrive {
 
 impl ConfinedDrive {
     #[cfg(unix)]
-    fn handle(&mut self, req: ServerDriveIoRequest) -> PduResult<Vec<SvcMessage>> {
+    fn handle(&mut self, mut req: ServerDriveIoRequest) -> PduResult<Vec<SvcMessage>> {
+        if let ServerDriveIoRequest::DeviceReadRequest(r) = &mut req {
+            // A short read is valid RDPDR; the server asks again for the rest.
+            r.length = r.length.min(MAX_DRIVE_READ);
+        }
         let ok = match &req {
             ServerDriveIoRequest::ServerCreateDriveRequest(r) => self.allowed(&r.path),
             ServerDriveIoRequest::ServerDriveQueryDirectoryRequest(r) => r.initial_query == 0 || self.allowed(r.path.trim_end_matches('*')),
@@ -283,6 +299,15 @@ mod tests {
         dev.handle_printer_io_request(write(3, b"x")).unwrap();
         assert_eq!(dev.printer.as_ref().unwrap().jobs[&3].2, MAX_PRINT_JOB);
         assert_eq!(printed.lock().len(), 1);
+        dev.handle_printer_io_request(close(3)).unwrap();
+        // Jobs started in the same second get their own files, and only a few may be open at once.
+        for _ in 0..(MAX_OPEN_PRINT_JOBS + 3) {
+            dev.handle_printer_io_request(create()).unwrap();
+        }
+        let jobs = &dev.printer.as_ref().unwrap().jobs;
+        assert_eq!(jobs.len(), MAX_OPEN_PRINT_JOBS);
+        let paths: std::collections::HashSet<_> = jobs.values().map(|j| j.1.clone()).collect();
+        assert_eq!(paths.len(), MAX_OPEN_PRINT_JOBS);
         std::fs::remove_dir_all(dir).unwrap();
     }
 
