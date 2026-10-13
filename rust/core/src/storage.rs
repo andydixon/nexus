@@ -17,6 +17,7 @@ const MIGRATIONS: &[(i64, &str)] = &[
     (6, include_str!("../migrations/006_irc_channel_state.sql")),
     (7, include_str!("../migrations/007_serial_protocol.sql")),
     (8, include_str!("../migrations/008_rdp_protocol.sql")),
+    (9, include_str!("../migrations/009_purge_legacy_secrets.sql")),
 ];
 
 const PROFILE_COLS: &str = "id, display_name, description, protocol, host, port, username,
@@ -118,22 +119,49 @@ fn scan_snippet(r: &Row) -> rusqlite::Result<Snippet> {
 
 impl Store {
     pub fn open(path: &Path) -> Result<Store> {
+        // Owner-only from the first byte (the data folder is 0700 too, but the file may be copied
+        // or backed up on its own).
+        #[cfg(unix)]
+        if !path.exists() {
+            use std::os::unix::fs::OpenOptionsExt;
+            std::fs::OpenOptions::new().write(true).create_new(true).mode(0o600).open(path).map_err(|e| format!("storage: failed to create database: {e}"))?;
+        }
         let db = Connection::open(path).map_err(|e| format!("storage: failed to open database: {e}"))?;
         db.busy_timeout(std::time::Duration::from_secs(5))?;
         db.pragma_update(None, "journal_mode", "WAL")?;
+        // Deleted rows (edited profiles, removed audit entries) are zeroed rather than left in
+        // free pages.
+        db.pragma_update(None, "secure_delete", "ON")?;
+        #[cfg(unix)]
+        for suffix in ["", "-wal", "-shm"] {
+            let mut p = path.as_os_str().to_owned();
+            p.push(suffix);
+            let _ = std::fs::set_permissions(&p, std::os::unix::fs::PermissionsExt::from_mode(0o600));
+        }
         let s = Store { db: Mutex::new(db) };
         s.migrate().map_err(|e| format!("storage: migration failed: {e}"))?;
         Ok(s)
     }
 
+    /// Applies pending migrations, each in its own transaction: several rebuild a table
+    /// (create new, copy, DROP old, rename), and a crash between the DROP and the rename used to
+    /// leave a database that failed to open on every later launch.
     fn migrate(&self) -> Result<()> {
-        let db = self.db.lock();
+        let mut db = self.db.lock();
         db.execute_batch("CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)")?;
         let current: i64 = db.query_row("SELECT COALESCE(MAX(version), 0) FROM schema_version", [], |r| r.get(0))?;
         for (ver, sql) in MIGRATIONS {
             if *ver > current {
-                db.execute_batch(sql).map_err(|e| format!("failed to apply migration {ver:03}: {e}"))?;
+                let tx = db.transaction()?;
+                tx.execute_batch(sql).map_err(|e| format!("failed to apply migration {ver:03}: {e}"))?;
+                tx.commit()?;
             }
+        }
+        if current < 9 && current > 0 {
+            // Migration 009 removed plaintext secrets; rewrite the file so their pages go too.
+            // In WAL mode the rewrite lands in the WAL; checkpoint it into the main file and
+            // truncate the WAL so neither keeps the old pages.
+            let _ = db.execute_batch("VACUUM; PRAGMA wal_checkpoint(TRUNCATE);");
         }
         Ok(())
     }
@@ -558,6 +586,51 @@ mod tests {
             self.created_at = parse_time(&fmt_time(&self.created_at));
             self.updated_at = parse_time(&fmt_time(&self.updated_at));
             self
+        }
+    }
+
+    #[test]
+    fn a_failed_migration_rolls_back_and_legacy_secrets_are_purged() {
+        let tmp = std::env::temp_dir().join(format!("nexus-mig-{}.db", std::process::id()));
+        let _ = std::fs::remove_file(&tmp);
+        let s = Store::open(&tmp).unwrap();
+        let mut p = Profile::new(crate::models::Protocol::Ssh);
+        p.id = "legacy".into();
+        p.display_name = "old".into();
+        p.host = "h".into();
+        s.create_profile(&p).unwrap();
+        {
+            // Put the database back at version 8 with a Go-era ssh_config carrying secrets.
+            let db = s.db.lock();
+            db.execute_batch(
+                "UPDATE profiles SET ssh_config = json_set(ssh_config, '$.proxyPassword', 'hunter2', '$.totpSecret', 'JBSWY3DP') WHERE id = 'legacy';
+                 DELETE FROM schema_version WHERE version = 9;",
+            )
+            .unwrap();
+        }
+        drop(s);
+        let s = Store::open(&tmp).unwrap();
+        let raw: String = s.db.lock().query_row("SELECT ssh_config FROM profiles WHERE id = 'legacy'", [], |r| r.get(0)).unwrap();
+        assert!(!raw.contains("hunter2") && !raw.contains("JBSWY3DP"), "{raw}");
+        for suffix in ["", "-wal"] {
+            let bytes = std::fs::read(format!("{}{suffix}", tmp.display())).unwrap_or_default();
+            assert!(!String::from_utf8_lossy(&bytes).contains("hunter2"), "old secret left in nexus.db{suffix}");
+        }
+        // A migration that fails part-way leaves nothing behind.
+        let mut db = s.db.lock();
+        let tx = db.transaction().unwrap();
+        assert!(tx.execute_batch("CREATE TABLE half (x); SELECT * FROM no_such_table;").is_err());
+        drop(tx);
+        assert!(db.prepare("SELECT * FROM half").is_err(), "rolled back");
+        drop(db);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            assert_eq!(std::fs::metadata(&tmp).unwrap().permissions().mode() & 0o777, 0o600);
+        }
+        drop(s);
+        for suffix in ["", "-wal", "-shm"] {
+            let _ = std::fs::remove_file(format!("{}{suffix}", tmp.display()));
         }
     }
 

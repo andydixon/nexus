@@ -60,6 +60,10 @@ pub fn validate_profile(p: &Profile) -> Result<(), ValidationErrors> {
     let mut errs = ValidationErrors::default();
     if p.id.trim().is_empty() {
         errs.add("id", "profile ID must not be empty");
+    } else if p.id.len() > 64 || !p.id.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.')) {
+        // Ids name keychain/vault entries (`profile:<id>:<kind>`): a crafted id containing `:`
+        // could shadow or purge another profile's credentials.
+        errs.add("id", "profile ID may only contain letters, digits, '-', '_' and '.'");
     }
     if p.display_name.trim().is_empty() {
         errs.add("displayName", "display name must not be empty");
@@ -155,6 +159,12 @@ pub fn validate_host(host: &str) -> Result<(), ValidationError> {
     if h.contains([' ', '\t', '\n', '\r']) {
         return err("host", "host must not contain whitespace");
     }
+    if h.chars().any(is_control) {
+        return err("host", "host must not contain control characters");
+    }
+    if h.len() > 253 {
+        return err("host", "host is too long");
+    }
     if h.contains("://") {
         return err("host", "host must not include a URI scheme");
     }
@@ -206,8 +216,8 @@ pub fn validate_ssh_config(cfg: &SshConfig) -> Result<(), ValidationErrors> {
     }
     for (i, jh) in cfg.jump_hosts.iter().enumerate() {
         let prefix = format!("ssh.jumpHosts[{i}]");
-        if jh.host.trim().is_empty() {
-            errs.add(format!("{prefix}.host"), "jump host address must not be empty");
+        if let Err(e) = validate_host(&jh.host) {
+            errs.add(format!("{prefix}.host"), format!("jump host: {}", e.message));
         }
         if !(1..=65535).contains(&jh.port) {
             errs.add(format!("{prefix}.port"), "jump host port must be between 1 and 65535");
@@ -224,8 +234,13 @@ pub fn validate_ssh_config(cfg: &SshConfig) -> Result<(), ValidationErrors> {
         if !(1..=65535).contains(&pf.dest_port) {
             errs.add(format!("{prefix}.destPort"), "destination port must be between 1 and 65535");
         }
-        if pf.dest_host.trim().is_empty() {
-            errs.add(format!("{prefix}.destHost"), "destination host must not be empty");
+        if let Err(e) = validate_host(&pf.dest_host) {
+            errs.add(format!("{prefix}.destHost"), format!("destination: {}", e.message));
+        }
+        if !pf.bind_host.trim().is_empty()
+            && let Err(e) = validate_host(&pf.bind_host)
+        {
+            errs.add(format!("{prefix}.bindHost"), format!("bind address: {}", e.message));
         }
     }
     errs.into_result()
@@ -625,5 +640,22 @@ mod tests {
             let c = IrcConfig { auto_join_rooms: rooms.iter().map(|r| r.to_string()).collect(), ..ok.clone() };
             assert!(validate_irc_config(&c).is_err(), "{rooms:?}");
         }
+    }
+
+    #[test]
+    fn hosts_and_ids_reject_control_characters_and_separators() {
+        assert!(validate_host("a\0b").is_err() && validate_host("a\x1bb").is_err());
+        assert!(validate_host(&"a".repeat(254)).is_err() && validate_host("db.example.com").is_ok() && validate_host("::1").is_ok());
+        let mut p = Profile::new(Protocol::Ssh);
+        p.display_name = "x".into();
+        p.host = "h".into();
+        p.username = "u".into();
+        assert!(validate_profile(&p).is_ok(), "a generated id is valid");
+        for bad in ["victim:password", "../x", "a b", &"a".repeat(65)] {
+            p.id = bad.into();
+            assert!(validate_profile(&p).is_err(), "{bad:?}");
+        }
+        p.id = "rdp-test_1.a".into();
+        assert!(validate_profile(&p).is_ok());
     }
 }
