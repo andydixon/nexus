@@ -1,6 +1,8 @@
 <?php
-$platform = isset($_GET['platform']) ? $_GET['platform'] : '';
-$arch = isset($_GET['arch']) ? $_GET['arch'] : '';
+// Query parameters may arrive as arrays (?arch[]=x); treat anything but a string as absent.
+$param = function ($name) { return isset($_GET[$name]) && is_string($_GET[$name]) ? $_GET[$name] : ''; };
+$platform = $param('platform');
+$arch = $param('arch');
 $platform = preg_replace('/[^a-z0-9_-]/i', '', $platform);
 $arch = preg_replace('/[^a-z0-9_-]/i', '', $arch);
 
@@ -13,7 +15,8 @@ if ($platform && $arch) {
 }
 
 $accept = isset($_SERVER['HTTP_ACCEPT']) ? $_SERVER['HTTP_ACCEPT'] : '';
-$format = isset($_GET['format']) ? strtolower($_GET['format']) : '';
+$format = strtolower($param('format'));
+header('X-Content-Type-Options: nosniff');
 
 $wantsJson = $format === 'json' || strpos($accept, 'application/json') !== false;
 $wantsVersion = $format === 'version';
