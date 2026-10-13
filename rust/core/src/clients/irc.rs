@@ -24,7 +24,12 @@ const READ_POLL: Duration = Duration::from_millis(50);
 const PING_DELAY: Duration = Duration::from_secs(20);
 const PING_TIMEOUT: Duration = Duration::from_secs(60);
 const PING_GRACE: Duration = Duration::from_secs(30);
-const MAX_LINE_BYTES: usize = 1 << 20;
+/// IRC lines are 512 bytes plus up to 8 KiB of IRCv3 tags; anything far longer is hostile.
+const MAX_LINE_BYTES: usize = 64 << 10;
+/// Channels the client keeps state for; a server can't grow it past this with spoofed self-JOINs.
+const MAX_CHANNELS: usize = 500;
+/// Capability names gathered from a multi-line CAP LS.
+const MAX_CAPS: usize = 1000;
 /// Users tracked per channel; a hostile server can't grow the client past this.
 const MAX_CHANNEL_USERS: usize = 10_000;
 
@@ -563,7 +568,7 @@ impl Client {
         };
         // IRCv3 capability negotiation; servers without it ignore the command and register as usual.
         write(&mut stream, "CAP LS 302")?;
-        if !self.cfg.server_pass.is_empty() {
+        if !self.cfg.server_pass.is_empty() && self.credentials_allowed("server password") {
             write(&mut stream, &encode("PASS", &[&self.cfg.server_pass]))?;
         }
         write(&mut stream, &encode("NICK", &[&self.cfg.nick]))?;
@@ -720,8 +725,23 @@ impl Client {
         }
     }
 
+    /// Passwords (PASS, SASL PLAIN, NickServ) only go over an encrypted or local connection:
+    /// TLS, an SSH tunnel, or a loopback server. Otherwise they're held back and the Server tab
+    /// says why, rather than putting the password on the wire in the clear.
+    fn credentials_allowed(&self, what: &str) -> bool {
+        if sends_credentials_safely(&self.cfg) {
+            return true;
+        }
+        self.emit(Event {
+            kind: "error".into(),
+            text: format!("{what} not sent: the connection isn't encrypted (turn on TLS or an SSH tunnel)"),
+            ..Default::default()
+        });
+        false
+    }
+
     fn identify_with_nickserv(&self) {
-        if !self.cfg.nickserv_identify || self.cfg.nickserv_password.is_empty() {
+        if !self.cfg.nickserv_identify || self.cfg.nickserv_password.is_empty() || !self.credentials_allowed("NickServ identify") {
             return;
         }
         let body = if self.cfg.nickserv_account.is_empty() {
@@ -781,16 +801,22 @@ impl Client {
     fn handle_cap(&self, m: &Message) {
         let sub = m.param(1).to_ascii_uppercase();
         let caps: Vec<&str> = m.last().split_whitespace().map(|c| c.split('=').next().unwrap_or(c)).collect();
-        let want_sasl = !self.cfg.sasl_account.is_empty();
+        let want_sasl = !self.cfg.sasl_account.is_empty() && self.credentials_allowed("SASL login");
+        if self.st().connected && sub == "LS" {
+            return; // negotiation is over; a late LS can only grow state
+        }
         match sub.as_str() {
             // A multi-line LS list ("CAP * LS * :…") continues; act on the last line.
             "LS" if m.params.len() >= 4 && m.param(2) == "*" => {
-                self.st().caps_offered.extend(caps.iter().map(|c| c.to_string()));
+                let mut st = self.st();
+                let room = MAX_CAPS.saturating_sub(st.caps_offered.len());
+                st.caps_offered.extend(caps.iter().take(room).map(|c| c.to_string()));
             }
             "LS" => {
                 let offered: Vec<String> = {
                     let mut st = self.st();
-                    st.caps_offered.extend(caps.iter().map(|c| c.to_string()));
+                    let room = MAX_CAPS.saturating_sub(st.caps_offered.len());
+                    st.caps_offered.extend(caps.iter().take(room).map(|c| c.to_string()));
                     std::mem::take(&mut st.caps_offered)
                 };
                 let mut req = vec![];
@@ -830,6 +856,9 @@ impl Client {
         let from = m.source.clone();
         let me = self.is_me(&from);
         if !me && !self.tracks(&room) {
+            return;
+        }
+        if me && !self.tracks(&room) && self.st().channels.len() >= MAX_CHANNELS {
             return;
         }
         if !from.is_empty() {
@@ -1155,9 +1184,43 @@ pub fn fuzz_lines(data: &[u8]) {
     }
 }
 
+/// See [`Client::credentials_allowed`].
+fn sends_credentials_safely(cfg: &Config) -> bool {
+    let h = cfg.server.trim_start_matches('[').trim_end_matches(']');
+    cfg.use_tls || cfg.connector.is_some() || h.eq_ignore_ascii_case("localhost") || h.parse::<std::net::IpAddr>().is_ok_and(|ip| ip.is_loopback())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn credentials_need_tls_a_tunnel_or_loopback() {
+        let c = |server: &str, use_tls: bool| Config { server: server.into(), use_tls, ..Default::default() };
+        assert!(!sends_credentials_safely(&c("irc.libera.chat", false)));
+        assert!(sends_credentials_safely(&c("irc.libera.chat", true)));
+        assert!(
+            sends_credentials_safely(&c("127.0.0.1", false)) && sends_credentials_safely(&c("localhost", false)) && sends_credentials_safely(&c("::1", false))
+        );
+        let tunnelled = Config { connector: Some(Arc::new(|| Err("unused".into()))), ..c("irc.example", false) };
+        assert!(sends_credentials_safely(&tunnelled));
+    }
+
+    #[test]
+    fn spoofed_self_joins_and_cap_floods_are_bounded() {
+        let client = Client::new(Config::default());
+        client.st().nick = "me".into();
+        let feed = |l: &str| client.handle_message(&parse_line(l).unwrap());
+        for i in 0..(MAX_CHANNELS + 200) {
+            feed(&format!(":me!u@h JOIN #r{i}"));
+        }
+        assert_eq!(client.st().channels.len(), MAX_CHANNELS);
+        assert_eq!(client.st().room_names.len(), MAX_CHANNELS);
+        for _ in 0..50 {
+            feed(&format!(":srv CAP * LS * :{}", "x ".repeat(100)));
+        }
+        assert!(client.st().caps_offered.len() <= MAX_CAPS);
+    }
     use std::io::{BufRead, BufReader};
     use std::net::TcpListener;
 

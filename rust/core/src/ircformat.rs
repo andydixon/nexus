@@ -224,10 +224,10 @@ fn strip_terminal_escapes(value: &str) -> String {
                 s.push_str(&rest[..pos]);
                 rest = &body[end..];
             }
-            None => {
-                s.push_str(&rest[..pos + 2]);
-                rest = body;
-            }
+            // No terminator anywhere after this OSC, so none after any later OSC either:
+            // keep the rest as is. (Advancing two bytes and searching again was quadratic, and
+            // one hostile 1 MiB line of "\x1b]" froze the UI for minutes.)
+            None => break,
         }
     }
     s.push_str(rest);
@@ -423,6 +423,14 @@ mod tests {
     #[test]
     fn plain_text_strips_formatting() {
         assert_eq!(plain_text("\x02bold\x02 \x0304red\x03"), "bold red");
+    }
+
+    #[test]
+    fn unterminated_osc_runs_are_linear() {
+        let start = std::time::Instant::now();
+        let out = plain_text(&"\x1b]".repeat(500_000));
+        assert!(start.elapsed() < std::time::Duration::from_secs(2), "{:?}", start.elapsed());
+        assert!(!out.contains('\x1b'));
     }
 
     #[test]

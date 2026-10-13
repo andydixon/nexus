@@ -108,6 +108,8 @@ pub(crate) struct TcpConn {
     /// A second handle on the socket, so `close` can shut it down without waiting for the
     /// stream lock (a write blocked on a peer that stopped reading holds that lock).
     shutdown: parking_lot::Mutex<Option<std::net::TcpStream>>,
+    /// Set before the socket is shut down, so the reader doesn't report our own close as an error.
+    closing: std::sync::atomic::AtomicBool,
     on_error: ErrorFn,
     on_close: CloseFn,
 }
@@ -118,7 +120,7 @@ const WRITE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
 
 impl TcpConn {
     pub(crate) fn new(on_error: ErrorFn, on_close: CloseFn) -> TcpConn {
-        TcpConn { stream: parking_lot::Mutex::new(None), shutdown: parking_lot::Mutex::new(None), on_error, on_close }
+        TcpConn { stream: parking_lot::Mutex::new(None), shutdown: parking_lot::Mutex::new(None), closing: Default::default(), on_error, on_close }
     }
 
     pub(crate) fn connect(self: &Arc<Self>, stream: std::net::TcpStream, mut on_read: impl FnMut(&[u8]) + Send + 'static) -> crate::Result<()> {
@@ -130,6 +132,7 @@ impl TcpConn {
                 return Err("already connected".into());
             }
             *self.shutdown.lock() = stream.try_clone().ok();
+            self.closing.store(false, std::sync::atomic::Ordering::SeqCst);
             *guard = Some(stream);
         }
         let me = self.clone();
@@ -147,7 +150,7 @@ impl TcpConn {
                     Err(e) => e.to_string(),
                 };
                 // A local close also ends the read; Go reported that as an error too, we don't.
-                if me.is_connected() {
+                if me.is_connected() && !me.closing.load(std::sync::atomic::Ordering::SeqCst) {
                     (me.on_error)(format!("read error: {err}"));
                     me.close();
                 }
@@ -170,6 +173,7 @@ impl TcpConn {
     }
 
     pub(crate) fn close(&self) {
+        self.closing.store(true, std::sync::atomic::Ordering::SeqCst);
         if let Some(s) = self.shutdown.lock().take() {
             let _ = s.shutdown(std::net::Shutdown::Both);
         }
