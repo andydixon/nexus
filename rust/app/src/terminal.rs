@@ -280,11 +280,18 @@ impl TermView {
             return;
         }
         let decoded = (|| {
-            let mut r = image::ImageReader::new(std::io::Cursor::new(data)).with_guessed_format().ok()?;
+            let reader = || image::ImageReader::new(std::io::Cursor::new(data)).with_guessed_format().ok();
+            // Read the header first: refuse anything larger than the per-terminal image budget
+            // before decoding, since the decoder's own limits don't bound every internal buffer.
+            let (w, h) = reader()?.into_dimensions().ok()?;
+            if w as usize * h as usize > MAX_IMAGE_PIXELS {
+                return None;
+            }
+            let mut r = reader()?;
             let mut limits = image::Limits::default();
             limits.max_image_width = Some(8192);
             limits.max_image_height = Some(8192);
-            limits.max_alloc = Some(256 << 20);
+            limits.max_alloc = Some((MAX_IMAGE_PIXELS * 4) as u64);
             r.limits(limits);
             Some(r.decode().ok()?.to_rgba8())
         })();
@@ -707,9 +714,11 @@ impl TermView {
     }
 
     /// Pastes `text`, or hands it back in `out.confirm_paste` when `confirm_paste` is set and the
-    /// newlines would run each line immediately (no bracketed paste).
+    /// paste could act by itself without bracketed paste: newlines run lines, and other control
+    /// characters do too (readline's C-o runs the line, C-d exits, ESC drives key macros).
     pub fn paste(&mut self, text: &str, out: &mut TermResponse) {
-        if self.confirm_paste && !self.term.mode().contains(TermMode::BRACKETED_PASTE) && text.contains(['\n', '\r']) {
+        let acts = text.chars().any(|c| c.is_control() && c != '\t');
+        if self.confirm_paste && !self.term.mode().contains(TermMode::BRACKETED_PASTE) && acts {
             out.confirm_paste = Some(text.into());
             return;
         }
@@ -871,8 +880,8 @@ impl TermView {
             return Some(link);
         }
         let (text, cols) = self.line_text(point.line);
-        let re = regex::Regex::new(URL_RE).ok()?;
-        re.find_iter(&text).find_map(|m| {
+        static RE: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| regex::Regex::new(URL_RE).expect("URL_RE is valid"));
+        RE.find_iter(&text).find_map(|m| {
             let start = text[..m.start()].chars().count();
             let end = start + m.as_str().chars().count() - 1;
             (cols.get(start)? <= &point.column.0 && cols.get(end)? >= &point.column.0).then(|| m.as_str().to_string())
@@ -1226,10 +1235,37 @@ mod tests {
         let mut out = TermResponse::default();
         t.paste("one line", &mut out);
         assert_eq!(out.input, b"one line");
+        // Control characters that act without a newline need the prompt too (C-o runs the line).
+        let mut out = TermResponse::default();
+        t.paste("curl x|sh\x0f", &mut out);
+        assert!(out.input.is_empty() && out.confirm_paste.is_some());
+        let mut out = TermResponse::default();
+        t.paste("a\tb", &mut out);
+        assert_eq!(out.input, b"a\tb", "a tab is fine");
         t.feed(b"\x1b[?2004h");
         let mut out = TermResponse::default();
         t.paste("a\nb", &mut out);
         assert!(out.confirm_paste.is_none() && out.input.starts_with(b"\x1b[200~"), "bracketed paste needs no prompt");
+    }
+
+    #[test]
+    fn oversized_inline_images_are_refused_before_decoding() {
+        use std::io::Cursor;
+        let png = |w: u32, h: u32| {
+            let mut v = Vec::new();
+            image::RgbaImage::new(w, h).write_to(&mut Cursor::new(&mut v), image::ImageFormat::Png).unwrap();
+            v
+        };
+        let b64 = |d: &[u8]| {
+            use base64::Engine;
+            base64::engine::general_purpose::STANDARD.encode(d)
+        };
+        let mut t = TermView::new(1000, 14.0, CursorStyle::Block);
+        // 8192x8192 is within the decoder's dimension limits but over the 32 Mpx budget.
+        t.feed(format!("\x1b]1337;File=inline=1:{}\x07", b64(&png(8192, 8192))).as_bytes());
+        assert!(t.images.is_empty());
+        t.feed(format!("\x1b]1337;File=inline=1:{}\x07", b64(&png(64, 64))).as_bytes());
+        assert_eq!(t.images.len(), 1);
     }
 
     #[test]

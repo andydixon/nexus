@@ -931,7 +931,13 @@ pub fn dialogs(app: &mut App, ctx: &egui::Context) {
         }
         Dialog::ConfirmPaste { session, text } => {
             let lines = text.lines().count();
-            let preview: String = text.lines().take(12).collect::<Vec<_>>().join("\n");
+            // Control characters other than newline/tab act on their own; show them.
+            let preview: String = text
+                .lines()
+                .take(12)
+                .map(|l| l.chars().flat_map(|c| if c.is_control() && c != '\t' { c.escape_debug().collect::<Vec<_>>() } else { vec![c] }).collect::<String>())
+                .collect::<Vec<_>>()
+                .join("\n");
             modal(ctx, "confirm-paste", 480.0, |ui| {
                 ui.label(RichText::new("Paste multiple lines?").font(theme::semibold(15.0)));
                 widgets::hint(ui, &format!("{lines} line(s) will run as commands as soon as they are pasted:"));

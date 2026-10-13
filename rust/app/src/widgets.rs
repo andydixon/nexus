@@ -129,8 +129,11 @@ pub fn group(n: u64) -> String {
 /// GitHub API responses) are only handed to the system opener when they are http(s), so a
 /// hostile or spoofed server can't launch `file:`, `ssh:` or custom-scheme handlers.
 pub fn is_web_url(url: &str) -> bool {
-    let u = url.trim();
-    (u.len() > 8 && u[..8].eq_ignore_ascii_case("https://")) || (u.len() > 7 && u[..7].eq_ignore_ascii_case("http://"))
+    // Compare bytes: slicing the `str` at 7/8 panics when that offset falls inside a multi-byte
+    // character, and these strings come from the network (hovering a hostile OSC 8 link).
+    let u = url.trim().as_bytes();
+    let starts = |p: &[u8]| u.len() > p.len() && u[..p.len()].eq_ignore_ascii_case(p);
+    starts(b"https://") || starts(b"http://")
 }
 
 /// Opens `url` in the browser if it is a web link; returns false (and opens nothing) otherwise.
@@ -166,7 +169,20 @@ mod tests {
         for ok in ["https://dixon.cx/downloads/nexus/", "http://localhost:3000/x", " HTTPS://Example.com "] {
             assert!(super::is_web_url(ok), "{ok}");
         }
-        for bad in ["", "https://", "file:///etc/passwd", "ssh://evil", "javascript:alert(1)", "ms-msdt:/id x", "ftp://host/", "//host/path"] {
+        assert!(super::is_web_url("http://über.example/"));
+        for bad in [
+            "",
+            "https://",
+            "file:///etc/passwd",
+            "ssh://evil",
+            "javascript:alert(1)",
+            "ms-msdt:/id x",
+            "ftp://host/",
+            "//host/path",
+            "mailto:ü@x",
+            "http:/üüü",
+            "ftp://é",
+        ] {
             assert!(!super::is_web_url(bad), "{bad}");
         }
     }

