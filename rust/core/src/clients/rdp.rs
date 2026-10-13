@@ -205,6 +205,7 @@ impl Client {
         }
         if self.cfg.shared_folder.is_some() || self.cfg.printer.is_some() {
             let mut devices = super::rdp_devices::Devices::default();
+            #[cfg_attr(not(unix), allow(unused_mut))]
             let mut drives = vec![];
             #[cfg(unix)]
             if let Some((folder, name)) = &self.cfg.shared_folder {

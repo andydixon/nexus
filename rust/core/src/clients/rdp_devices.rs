@@ -14,9 +14,11 @@ use ironrdp::core::impl_as_any;
 use ironrdp::pdu::PduResult;
 use ironrdp::rdpdr::RdpdrBackend;
 use ironrdp::rdpdr::pdu::RdpdrPdu;
+#[cfg(unix)]
+use ironrdp::rdpdr::pdu::efs::FileInformationClass;
 use ironrdp::rdpdr::pdu::efs::{
     ClientDriveQueryDirectoryResponse, ClientDriveSetInformationResponse, DeviceCloseResponse, DeviceControlRequest, DeviceCreateResponse, DeviceIoResponse,
-    DeviceWriteResponse, FileInformationClass, Information, NtStatus, PrinterIoRequest, ServerDeviceAnnounceResponse, ServerDriveIoRequest,
+    DeviceWriteResponse, Information, NtStatus, PrinterIoRequest, ServerDeviceAnnounceResponse, ServerDriveIoRequest,
 };
 use ironrdp::rdpdr::pdu::esc::{ScardCall, ScardIoCtlCode};
 use ironrdp::svc::SvcMessage;
@@ -24,7 +26,9 @@ use ironrdp::svc::SvcMessage;
 use ironrdp_rdpdr_native::backend::NixRdpdrBackend;
 use std::collections::HashMap;
 use std::io::Write;
-use std::path::{Path, PathBuf};
+#[cfg(unix)]
+use std::path::Path;
+use std::path::PathBuf;
 
 /// A print job may not grow past this (a hostile server could otherwise fill the disk).
 const MAX_PRINT_JOB: u64 = 256 << 20;
@@ -32,6 +36,7 @@ const MAX_PRINT_JOB: u64 = 256 << 20;
 const MAX_OPEN_PRINT_JOBS: usize = 4;
 /// Largest drive read served in one request. The server picks the length (a u32), and the
 /// native backend allocates it before reading; Windows clients never ask for more than ~1 MiB.
+#[cfg(unix)]
 const MAX_DRIVE_READ: u32 = 8 << 20;
 
 /// Called with the file a finished print job was saved to.
@@ -151,7 +156,7 @@ impl RdpdrBackend for Devices {
         if let Some(d) = &mut self.drive {
             return d.handle(req);
         }
-        ConfinedDrive::refuse(req)
+        refuse_drive_io(req)
     }
 
     fn handle_printer_io_request(&mut self, req: PrinterIoRequest) -> PduResult<Vec<SvcMessage>> {
@@ -164,14 +169,35 @@ impl RdpdrBackend for Devices {
     }
 }
 
+/// Answers a drive request with a refusal (no shared folder, or a path outside it).
+fn refuse_drive_io(req: ServerDriveIoRequest) -> PduResult<Vec<SvcMessage>> {
+    tracing::warn!("RDP server asked for a path outside the shared folder; refused");
+    let pdu = match req {
+        ServerDriveIoRequest::ServerCreateDriveRequest(r) => RdpdrPdu::DeviceCreateResponse(DeviceCreateResponse {
+            device_io_reply: DeviceIoResponse::new(r.device_io_request, NtStatus::ACCESS_DENIED),
+            file_id: 0,
+            information: Information::empty(),
+        }),
+        ServerDriveIoRequest::ServerDriveQueryDirectoryRequest(r) => RdpdrPdu::ClientDriveQueryDirectoryResponse(ClientDriveQueryDirectoryResponse {
+            device_io_reply: DeviceIoResponse::new(r.device_io_request, NtStatus::NO_MORE_FILES),
+            buffer: None,
+        }),
+        ServerDriveIoRequest::ServerDriveSetInformationRequest(r) => RdpdrPdu::ClientDriveSetInformationResponse(
+            ClientDriveSetInformationResponse::new(&r, NtStatus::ACCESS_DENIED).map_err(|e| ironrdp::pdu::encode_err!(e))?,
+        ),
+        _ => return Ok(vec![]),
+    };
+    Ok(vec![SvcMessage::from(pdu)])
+}
+
+#[cfg(unix)]
 #[derive(Debug)]
 struct ConfinedDrive {
-    #[cfg(unix)]
     inner: NixRdpdrBackend,
-    #[cfg_attr(not(unix), allow(dead_code))]
     base: PathBuf,
 }
 
+#[cfg(unix)]
 impl ConfinedDrive {
     pub fn new(folder: &Path) -> std::io::Result<ConfinedDrive> {
         let base = folder.canonicalize()?;
@@ -211,28 +237,9 @@ impl ConfinedDrive {
             }
         }
     }
-
-    fn refuse(req: ServerDriveIoRequest) -> PduResult<Vec<SvcMessage>> {
-        tracing::warn!("RDP server asked for a path outside the shared folder; refused");
-        let pdu = match req {
-            ServerDriveIoRequest::ServerCreateDriveRequest(r) => RdpdrPdu::DeviceCreateResponse(DeviceCreateResponse {
-                device_io_reply: DeviceIoResponse::new(r.device_io_request, NtStatus::ACCESS_DENIED),
-                file_id: 0,
-                information: Information::empty(),
-            }),
-            ServerDriveIoRequest::ServerDriveQueryDirectoryRequest(r) => RdpdrPdu::ClientDriveQueryDirectoryResponse(ClientDriveQueryDirectoryResponse {
-                device_io_reply: DeviceIoResponse::new(r.device_io_request, NtStatus::NO_MORE_FILES),
-                buffer: None,
-            }),
-            ServerDriveIoRequest::ServerDriveSetInformationRequest(r) => RdpdrPdu::ClientDriveSetInformationResponse(
-                ClientDriveSetInformationResponse::new(&r, NtStatus::ACCESS_DENIED).map_err(|e| ironrdp::pdu::encode_err!(e))?,
-            ),
-            _ => return Ok(vec![]),
-        };
-        Ok(vec![SvcMessage::from(pdu)])
-    }
 }
 
+#[cfg(unix)]
 impl ConfinedDrive {
     #[cfg(unix)]
     fn handle(&mut self, mut req: ServerDriveIoRequest) -> PduResult<Vec<SvcMessage>> {
@@ -250,7 +257,7 @@ impl ConfinedDrive {
             // Everything else names a file by an id that a checked create handed out.
             _ => true,
         };
-        if ok { self.inner.handle_drive_io_request(req) } else { Self::refuse(req) }
+        if ok { self.inner.handle_drive_io_request(req) } else { refuse_drive_io(req) }
     }
 }
 
@@ -314,6 +321,7 @@ mod tests {
         std::fs::remove_dir_all(dir).unwrap();
     }
 
+    #[cfg(unix)]
     #[test]
     fn server_paths_stay_inside_the_share() {
         let root = std::env::temp_dir().join(format!("nexus-drive-{}", std::process::id()));

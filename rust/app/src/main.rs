@@ -175,15 +175,14 @@ fn init_logging(data_dir: &std::path::Path) {
 /// files, and on Linux the process is non-dumpable (also blocks ptrace attach by other processes
 /// of the same user). Debug builds skip this so they can still be debugged.
 fn harden_process() {
-    if cfg!(debug_assertions) {
-        return;
-    }
     #[cfg(unix)]
-    // SAFETY: plain syscalls on this process with valid arguments; failure is harmless.
-    unsafe {
-        let none = libc::rlimit { rlim_cur: 0, rlim_max: 0 };
-        libc::setrlimit(libc::RLIMIT_CORE, &none);
-        #[cfg(target_os = "linux")]
-        libc::prctl(libc::PR_SET_DUMPABLE, 0, 0, 0, 0);
+    if !cfg!(debug_assertions) {
+        // SAFETY: plain syscalls on this process with valid arguments; failure is harmless.
+        unsafe {
+            let none = libc::rlimit { rlim_cur: 0, rlim_max: 0 };
+            libc::setrlimit(libc::RLIMIT_CORE, &none);
+            #[cfg(target_os = "linux")]
+            libc::prctl(libc::PR_SET_DUMPABLE, 0, 0, 0, 0);
+        }
     }
 }

@@ -171,6 +171,9 @@ impl LocalShell {
         }
     }
 
+    /// macOS has no cheap cwd lookup (it's an `lsof` run), so the directory is sampled after Enter:
+    /// the first output after Enter is usually the shell echoing the command, before a `cd` has
+    /// run, so sample shortly afterwards and again once the command has had time to finish.
     fn capture_cwd_in_background(self: &Arc<Self>) {
         let Some(pid) = self.state.lock().0.as_ref().and_then(|r| r.pid) else { return };
         if self.capturing.swap(true, Ordering::SeqCst) {
@@ -178,9 +181,12 @@ impl LocalShell {
         }
         let me = self.clone();
         std::thread::spawn(move || {
-            // A failed lookup (the shell already exited) keeps the last known directory.
-            if let Some(dir) = process_cwd(pid).filter(|d| d.is_dir()) {
-                me.state.lock().1 = dir;
+            for delay in [150, 850] {
+                std::thread::sleep(std::time::Duration::from_millis(delay));
+                // A failed lookup (the shell already exited) keeps the last known directory.
+                if let Some(dir) = process_cwd(pid).filter(|d| d.is_dir()) {
+                    me.state.lock().1 = dir;
+                }
             }
             me.capturing.store(false, Ordering::SeqCst);
         });
@@ -223,6 +229,11 @@ mod tests {
             std::thread::sleep(Duration::from_millis(20));
         }
         sh.resize(100, 30).unwrap();
+        // macOS samples the directory shortly after a command runs (Linux reads it live).
+        while sh.working_directory() != std::path::Path::new("/") {
+            assert!(t.elapsed() < Duration::from_secs(5), "cwd still {:?}", sh.working_directory());
+            std::thread::sleep(Duration::from_millis(20));
+        }
         sh.write(b"exit\n").unwrap();
         while *closed.lock() == 0 {
             assert!(t.elapsed() < Duration::from_secs(5));
