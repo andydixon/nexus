@@ -72,7 +72,15 @@ for target in "${TARGETS[@]}"; do
             ;;
         windows)
             cp "$bin.exe" "$OUT/$base.exe"
-            (cd "$OUT" && rm -f "$base.zip" && zip -qj "$base.zip" "$base.exe" "$ROOT/LICENSE")
+            # GitHub's Windows runners have 7-Zip but no zip.
+            if command -v zip >/dev/null; then
+                (cd "$OUT" && rm -f "$base.zip" && zip -qj "$base.zip" "$base.exe" "$ROOT/LICENSE")
+            elif command -v 7z >/dev/null; then
+                (cd "$OUT" && rm -f "$base.zip" && cp "$ROOT/LICENSE" LICENSE && 7z a -tzip -bso0 -bsp0 "$base.zip" "$base.exe" LICENSE && rm -f LICENSE)
+            else
+                (cd "$OUT" && rm -f "$base.zip" && cp "$ROOT/LICENSE" LICENSE &&
+                    powershell -NoProfile -NonInteractive -Command "Compress-Archive -Path '$base.exe','LICENSE' -DestinationPath '$base.zip' -Force" && rm -f LICENSE)
+            fi
             ;;
         *)
             cp "$bin" "$OUT/$base"
