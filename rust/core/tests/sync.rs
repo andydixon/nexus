@@ -29,6 +29,8 @@ fn profiles_follow_edits_and_deletes_across_machines() {
     p.host = "web.example".into();
     p.username = "me".into();
     let p = a.create_profile(p).unwrap();
+    let pw_key = nexus_core::secrets::SecretKind::Password.key(&p.id);
+    a.secrets.set_checked(&pw_key, "hunter2").unwrap();
     assert!(a.sync_profiles().unwrap().pushed);
     assert_eq!(b.sync_profiles().unwrap().pulled, 1);
     assert_eq!(b.profiles()[0].host, "web.example");
@@ -40,6 +42,9 @@ fn profiles_follow_edits_and_deletes_across_machines() {
     b.sync_profiles().unwrap();
     assert_eq!(a.sync_profiles().unwrap().pulled, 1);
     assert_eq!(a.profiles()[0].host, "web2.example");
+    // A's saved password was for web.example; the synced copy points elsewhere, so it's forgotten
+    // rather than sent to the new host without asking.
+    assert!(a.secrets.get(&pw_key).is_none());
 
     a.delete_profile(&p.id).unwrap();
     a.sync_profiles().unwrap();

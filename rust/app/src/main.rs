@@ -99,8 +99,11 @@ fn main() -> eframe::Result {
         // SAFETY: still single-threaded here; no other thread can be reading the environment.
         unsafe { std::env::remove_var("NEXUS_ANSWERS") };
     }
+    // They answer every credential prompt in order (and --answer is visible in the process list),
+    // so they're only honoured for screenshot runs.
     if !opts.answers.is_empty() && opts.screenshot.is_none() {
-        eprintln!("warning: --answer/NEXUS_ANSWERS auto-fill credential prompts; they are meant for screenshot automation only");
+        eprintln!("--answer/NEXUS_ANSWERS only work together with --screenshot (they auto-fill credential prompts)");
+        std::process::exit(2);
     }
     let config = match data_dir {
         Some(d) => {

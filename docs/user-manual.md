@@ -180,7 +180,7 @@ The viewer works like the VNC one: click the desktop to give it keyboard focus, 
 ### IRC
 
 - **IRC**: nick, real name, **Use TLS** (port 6697 for most TLS networks) and an optional server password.
-- **SASL**: log in during registration with SASL PLAIN (account defaults to your nick), which most networks now expect; use TLS or an SSH tunnel so the password isn't sent in the clear. If the network doesn't offer SASL or rejects the login, the Server tab says so and the connection carries on.
+- **SASL**: log in during registration with SASL PLAIN (account defaults to your nick), which most networks now expect; Nexus Terminal only sends it (or a server or NickServ password) over TLS, an SSH tunnel or to a server on this machine; on a plain connection the Server tab says the password was held back. If the network doesn't offer SASL or rejects the login, the Server tab says so and the connection carries on.
 - **NickServ**: identify on connect, with an optional account name and password.
 - **Rooms**: rooms to join automatically, one per line or comma-separated. Networks that support IRCv3 server-time stamp messages with the time they were sent, so replayed history shows its real times.
 - **SSH Tunnel** and **Reconnection** settings.
@@ -435,7 +435,8 @@ Connections, disconnections, profile changes, credential access, imports and exp
 - for a profile changed on both sides, the more recent change wins;
 - a profile deleted on one machine is deleted on the others (unless it was edited after the deletion);
 - saved passwords, keys and tokens are never synced; each machine keeps its own in its keychain or vault. Values that a login script `send`s (including a password typed after a `wait "Password:"`) are part of the profile and do travel, as they do in an export;
-- timestamps in the shared file are never trusted beyond the local clock, so a file edited to claim a future date can't override later local changes.
+- timestamps in the shared file are never trusted beyond the local clock, so a file edited to claim a future date can't override later local changes;
+- if a synced (or imported) profile now points at a different host, user, GitHub API URL or RD Gateway, this machine forgets the credentials it had saved for it and asks again, rather than sending them to the new destination.
 
 
 - **Encrypted export**: **File → Export profiles…**, the sidebar footer, the command palette, or **Export…** on a profile's right-click menu. Choose the profiles, set a password and save a `.nexus` file. Credentials saved in the keychain or vault are not included.

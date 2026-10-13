@@ -112,6 +112,32 @@ impl Service {
         Ok(d)
     }
 
+    /// Saved credentials are keyed by profile id. When a profile arriving from a sync folder or
+    /// an import keeps the id but points somewhere else (another host, user, GitHub API or RD
+    /// Gateway), the saved password/token would be sent there without a prompt; forget them so
+    /// the user is asked again.
+    fn forget_credentials_if_retargeted(&self, old: &Profile, new: &Profile, via: &str) {
+        let target = |p: &Profile| {
+            (
+                p.host.trim().to_ascii_lowercase(),
+                p.port,
+                p.username.trim().to_string(),
+                p.github.as_ref().map(|g| g.base_url.trim().to_ascii_lowercase()),
+                p.rdp.as_ref().map(|r| (r.gateway_host.trim().to_ascii_lowercase(), r.gateway_username.trim().to_string())),
+                p.ssh.as_ref().map(|s| s.jump_hosts.iter().map(|j| (j.host.trim().to_ascii_lowercase(), j.port, j.username.clone())).collect::<Vec<_>>()),
+            )
+        };
+        if target(old) != target(new) {
+            self.secrets.delete_profile(&old.id);
+            self.store.add_audit(
+                "secret.forget",
+                &old.id,
+                "",
+                &format!("Forgot saved credentials for {:?}: its {via} copy points at a different host or account", old.display_name),
+            );
+        }
+    }
+
     fn sync_tombstones(&self) -> std::collections::BTreeMap<String, Time> {
         self.store.setting(SYNC_DELETED).and_then(|j| serde_json::from_str(&j).ok()).unwrap_or_default()
     }
@@ -176,7 +202,13 @@ impl Service {
                 report.skipped += 1;
                 continue;
             }
-            let r = if self.store.get_profile(&p.id).is_ok() { self.store.update_profile(&p) } else { self.store.create_profile(&p) };
+            let r = match self.store.get_profile(&p.id) {
+                Ok(old) => {
+                    self.forget_credentials_if_retargeted(&old, &p, "sync");
+                    self.store.update_profile(&p)
+                }
+                Err(_) => self.store.create_profile(&p),
+            };
             match r {
                 Ok(()) => report.pulled += 1,
                 Err(_) => report.skipped += 1,
@@ -381,6 +413,9 @@ impl Service {
                 "skip" if exists => continue,
                 "overwrite" if exists => {
                     p.updated_at = now();
+                    if let Ok(old) = self.store.get_profile(&p.id) {
+                        self.forget_credentials_if_retargeted(&old, &p, "import");
+                    }
                     self.store.update_profile(&p).is_ok()
                 }
                 "duplicate" => {
