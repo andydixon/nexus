@@ -17,6 +17,44 @@ Nexus Terminal helps you manage many connections at once, keep terminal work org
 - Session recording (asciicast v2) and playback
 - Secure credential storage with the OS keychain first and an encrypted vault fallback
 
+## Install
+
+**macOS** (Homebrew):
+
+```sh
+brew install --cask andydixon/tap/nexusterminal
+```
+
+**Debian, Ubuntu** (22.04 and later):
+
+```sh
+sudo install -d -m 0755 /etc/apt/keyrings
+curl -fsSL https://repo.dixon.cx/dixon.gpg | sudo tee /etc/apt/keyrings/dixon.gpg >/dev/null
+echo "deb [signed-by=/etc/apt/keyrings/dixon.gpg] https://repo.dixon.cx/apt stable main" |
+    sudo tee /etc/apt/sources.list.d/dixon.list
+sudo apt update && sudo apt install nexusterminal
+```
+
+**Fedora, RHEL, openSUSE:**
+
+```sh
+sudo curl -fsSL -o /etc/yum.repos.d/dixon.repo https://repo.dixon.cx/rpm/dixon.repo
+sudo dnf install nexusterminal        # or: sudo zypper install nexusterminal
+```
+
+**Arch Linux:**
+
+```sh
+curl -fsSL https://repo.dixon.cx/dixon.asc | sudo pacman-key --add -
+sudo pacman-key --lsign-key C22FF7330668417C62C7A304CBC7951D7F2234D1
+printf '\n[dixon]\nServer = https://repo.dixon.cx/arch/$arch\n' | sudo tee -a /etc/pacman.conf
+sudo pacman -Sy nexusterminal
+```
+
+**Windows**, or any platform by hand: download a zip from
+[GitHub Releases](https://github.com/andydixon/nexus/releases) and check it against `SHA256SUMS`.
+Builds aren't code-signed yet, so macOS and Windows ask you to confirm the first launch.
+
 ## Quick start
 
 1. Launch Nexus Terminal.

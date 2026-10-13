@@ -16,7 +16,7 @@
 # The publish half is the same as in ../../../mapsize/packaging/repo.sh and friends: every index
 # is rebuilt over all packages in the repository, so other projects' packages are kept.
 #
-# Needs: gh (or curl), unzip, curl (for the pinned nfpm), docker, gpg, apt-ftparchive, flock.
+# Needs: curl, unzip, curl (for the pinned nfpm), docker, gpg, apt-ftparchive, flock.
 #   REPO_DIR        where the repository lives (default below)
 #   REPO_GNUPGHOME  GnuPG home holding the signing key (default below)
 #   ARCHS           package architectures (default: amd64 arm64)
@@ -31,12 +31,17 @@ LICENSE=AGPL-3.0-only
 ARCHS=${ARCHS:-"amd64 arm64"}
 # The binaries come from ubuntu-22.04 runners: glibc 2.35. Windowing, GL and audio libraries are
 # loaded at run time, so they're recommended rather than hard dependencies (any desktop has them).
-DEB_DEPENDS='"libc6 (>= 2.35)", "libgcc-s1", "zlib1g"'
-DEB_RECOMMENDS='"libxkbcommon0", "libwayland-client0", "libx11-6", "libxcursor1", "libxrandr2", "libxi6", "libgl1", "libegl1", "libasound2", "xdg-desktop-portal"'
-RPM_DEPENDS='"glibc >= 2.35", "libgcc", "zlib"'
-RPM_RECOMMENDS='"libxkbcommon", "libwayland-client", "libX11", "libXcursor", "libXrandr", "libXi", "mesa-libGL", "mesa-libEGL", "alsa-lib", "xdg-desktop-portal"'
-ARCH_DEPENDS='"glibc", "gcc-libs", "zlib", "libxkbcommon", "libglvnd"'
-ARCH_OPTDEPENDS='"wayland: Wayland sessions", "libx11: X11 sessions", "libxcursor: X11 sessions", "libxrandr: X11 sessions", "libxi: X11 sessions", "alsa-lib: RDP audio", "xdg-desktop-portal: file dialogs"'
+# ALSA is linked directly (RDP audio), so it's a hard dependency. libasound2t64 comes first: on
+# Ubuntu 24.04 and later plain libasound2 is only a virtual name, which apt may satisfy with the
+# OSS shim liboss4-salsa-asound2 (missing real ALSA symbols); older Debian falls through to it.
+DEB_DEPENDS='"libc6 (>= 2.35)", "libgcc-s1", "zlib1g", "libasound2t64 | libasound2"'
+DEB_RECOMMENDS='"libxkbcommon0", "libwayland-client0", "libx11-6", "libxcursor1", "libxrandr2", "libxi6", "libgl1", "libegl1", "xdg-desktop-portal"'
+RPM_DEPENDS='"glibc >= 2.35", "libgcc", "zlib", "alsa-lib"'
+RPM_RECOMMENDS='"libxkbcommon", "libwayland-client", "libX11", "libXcursor", "libXrandr", "libXi", "mesa-libGL", "mesa-libEGL", "xdg-desktop-portal"'
+ARCH_DEPENDS='"glibc", "gcc-libs", "zlib", "alsa-lib", "libxkbcommon", "libglvnd"'
+ARCH_SUGGESTS='"wayland", "libx11", "libxcursor", "libxrandr", "libxi", "xdg-desktop-portal"'
+# Package revision: bump to republish the same Nexus version with packaging fixes.
+PKGREL=${PKGREL:-1}
 # ----------------------------------------------------------------------------
 
 REPO_DIR=${REPO_DIR:-/home/andy/domains/repo.dixon.cx/public_html}
@@ -49,7 +54,7 @@ HERE=$(cd "$(dirname "$0")" && pwd)
 say() { echo "repo: $*" >&2; }
 die() { say "$*"; exit 1; }
 
-for tool in gh unzip curl docker gpg apt-ftparchive flock sha256sum; do
+for tool in unzip curl docker gpg apt-ftparchive flock sha256sum; do
 	command -v $tool >/dev/null || die "needs $tool"
 done
 [[ -d $REPO_DIR ]] || die "$REPO_DIR does not exist"
@@ -85,9 +90,10 @@ NFPM=$NFPM_DIR/nfpm
 # ---- fetch and verify the release binaries ---------------------------------
 say "fetching $TAG from github.com/$GITHUB"
 mkdir -p "$WORK/dl"
-patterns=(--pattern SHA256SUMS)
-for arch in $ARCHS; do patterns+=(--pattern "NexusTerminal-linux-$arch.zip"); done
-gh release download "$TAG" -R "$GITHUB" -D "$WORK/dl" "${patterns[@]}" || die "release $TAG has no Linux assets yet"
+base=https://github.com/$GITHUB/releases/download/$TAG
+for f in SHA256SUMS $(for arch in $ARCHS; do echo "NexusTerminal-linux-$arch.zip"; done); do
+	curl -fsSL -o "$WORK/dl/$f" "$base/$f" || die "release $TAG has no $f yet"
+done
 (cd "$WORK/dl" && grep -E "NexusTerminal-linux-($(tr ' ' '|' <<<"$ARCHS"))\.zip" SHA256SUMS | sha256sum -c --quiet) || die "checksum mismatch"
 
 # ---- package -----------------------------------------------------------------
@@ -104,7 +110,7 @@ for arch in $ARCHS; do
 	arch: $arch
 	platform: linux
 	version: $VERSION
-	release: 1
+	release: $PKGREL
 	section: net
 	maintainer: Andy Dixon <andy@dixon.cx>
 	description: |
@@ -144,15 +150,16 @@ for arch in $ARCHS; do
 	    recommends: [$RPM_RECOMMENDS]
 	  archlinux:
 	    depends: [$ARCH_DEPENDS]
+	    suggests: [$ARCH_SUGGESTS]
 	archlinux:
 	  packager: Andy Dixon <andy@dixon.cx>
-	  optdepends: [$ARCH_OPTDEPENDS]
 	rpm:
 	  signature:
 	    key_file: $WORK/signing.asc
 	EOF
 	for fmt in deb rpm archlinux; do
-		"$NFPM" pkg -f "$WORK/nfpm-$arch.yaml" -p $fmt -t "$WORK/out/" >/dev/null
+		"$NFPM" pkg -f "$WORK/nfpm-$arch.yaml" -p $fmt -t "$WORK/out/" >"$WORK/nfpm.log" 2>&1 ||
+			{ cat "$WORK/nfpm.log" >&2; die "nfpm $fmt for $arch failed"; }
 	done
 done
 
