@@ -992,9 +992,31 @@ impl eframe::App for App {
         self.screenshot.is_none()
     }
 
+    fn raw_input_hook(&mut self, _ctx: &egui::Context, raw: &mut egui::RawInput) {
+        if raw.events.iter().any(|e| matches!(e, egui::Event::WindowFocused(false))) {
+            // winit can miss mouse-up events when macOS hides or minimizes the window.
+            // Release egui's pointer buttons too, so every widget remains interactive on return.
+            let pos = raw.screen_rect.map_or(egui::pos2(-1000.0, -1000.0), |r| r.max + egui::vec2(100.0, 100.0));
+            for button in [egui::PointerButton::Primary, egui::PointerButton::Secondary, egui::PointerButton::Middle] {
+                raw.events.push(egui::Event::PointerButton { pos, button, pressed: false, modifiers: egui::Modifiers::default() });
+            }
+        }
+    }
+
     fn ui(&mut self, ui: &mut Ui, _frame: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
         let t = Tokens::get(&ctx);
+        // If the window is hidden or minimized during a drag, macOS may not deliver the
+        // matching mouse-up. Clear terminal-side pointer capture on every pane, including
+        // panes that are currently hidden behind another tab.
+        let lost_focus = ctx.input(|i| i.events.iter().any(|e| matches!(e, egui::Event::WindowFocused(false))));
+        if lost_focus {
+            for pane in self.s.panes.values_mut() {
+                if let crate::views::View::Terminal(term) = &mut pane.view {
+                    term.cancel_pointer_interaction();
+                }
+            }
+        }
         self.s.now = ctx.input(|i| i.time);
         self.drain_events();
         self.handle_requests();

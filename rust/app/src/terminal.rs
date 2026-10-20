@@ -396,6 +396,13 @@ impl TermView {
         self.focus_requested = true;
     }
 
+    /// A window can lose its mouse-up event when it is hidden or minimized mid-drag.
+    /// Drop the transient pointer state while keeping any text already selected.
+    pub fn cancel_pointer_interaction(&mut self) {
+        self.drag = None;
+        self.mouse_down = None;
+    }
+
     pub fn selection_text(&self) -> Option<String> {
         self.term.selection_to_string().filter(|s| !s.is_empty())
     }
@@ -780,13 +787,31 @@ impl TermView {
                         self.term.scroll_display(Scroll::Delta(n));
                     }
                 }
-                Event::PointerButton { pos, button, pressed, modifiers } if resp.rect.contains(*pos) => {
+                Event::PointerButton { pos, button, pressed, modifiers } => {
                     let b = match button {
                         PointerButton::Primary => 0,
                         PointerButton::Middle => 1,
                         PointerButton::Secondary => 2,
                         _ => continue,
                     };
+                    // A mouse-up outside this widget still ends a drag that began here.
+                    // Without this, the next pointer movement keeps extending the selection.
+                    let was_mouse_down = self.mouse_down == Some(b);
+                    if !*pressed {
+                        if b == 0 {
+                            self.drag = None;
+                        }
+                        if was_mouse_down {
+                            self.mouse_down = None;
+                        }
+                    }
+                    if !resp.rect.contains(*pos) {
+                        if !*pressed && was_mouse_down {
+                            let (c, r) = to_cell(*pos);
+                            out.input.extend(mouse_report(b, c, r, false, mode));
+                        }
+                        continue;
+                    }
                     if reporting && b != 2 || reporting && mode.contains(TermMode::MOUSE_MODE) && b == 2 && !*pressed {
                         let (c, r) = to_cell(*pos);
                         out.input.extend(mouse_report(b, c, r, *pressed, mode));
