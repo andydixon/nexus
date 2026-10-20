@@ -238,12 +238,25 @@ fn window_controls(ui: &mut Ui, area: Rect) {
         ui.painter().text(r.center(), Align2::CENTER_CENTER, glyph, egui::FontId::proportional(14.0), c);
         if resp.clicked() {
             match k {
-                0 => ctx.send_viewport_cmd(ViewportCommand::Minimized(true)),
+                0 => minimize_window(&ctx),
                 1 => ctx.send_viewport_cmd(ViewportCommand::Maximized(!max)),
                 _ => ctx.send_viewport_cmd(ViewportCommand::Close),
             }
         }
     }
+}
+
+/// `ViewportCommand::Minimized(true)` can leave eframe unresponsive after restore on macOS.
+/// Hiding the app follows the normal macOS app lifecycle and avoids that minimize event path.
+fn minimize_window(_ctx: &egui::Context) {
+    #[cfg(target_os = "macos")]
+    {
+        if let Some(mtm) = objc2::MainThreadMarker::new() {
+            objc2_app_kit::NSApplication::sharedApplication(mtm).hide(None);
+        }
+    }
+    #[cfg(not(target_os = "macos"))]
+    _ctx.send_viewport_cmd(ViewportCommand::Minimized(true));
 }
 
 /// Invisible window edges that resize the undecorated window.
