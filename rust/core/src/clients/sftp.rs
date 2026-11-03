@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: AGPL-3.0-only
-// Copyright (C) 2026 Andy Dixon
+// SPDX-License-Identifier: LicenseRef-Proprietary
+// Copyright (C) 2026 Andy Dixon t/a Uncomplex
 
 //! SFTP operations over an SSH session's subsystem (internal/sftpclient). Every call blocks the
 //! caller, so the UI runs them on worker threads.

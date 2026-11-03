@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: AGPL-3.0-only
-// Copyright (C) 2026 Andy Dixon
+// SPDX-License-Identifier: LicenseRef-Proprietary
+// Copyright (C) 2026 Andy Dixon t/a Uncomplex
 
 //! TermView: an alacritty_terminal grid drawn with egui's painter. Bytes from a session go
 //! straight into the VT parser; keystrokes, paste, mouse reports and terminal replies come back

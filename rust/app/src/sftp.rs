@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: AGPL-3.0-only
-// Copyright (C) 2026 Andy Dixon
+// SPDX-License-Identifier: LicenseRef-Proprietary
+// Copyright (C) 2026 Andy Dixon t/a Uncomplex
 
 //! SFTP browser (right dock), the file-drop dialog and the remote directory picker.
 //! Every SFTP call blocks on the network, so it runs on a worker thread; results come back

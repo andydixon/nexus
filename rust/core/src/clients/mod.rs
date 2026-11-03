@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: AGPL-3.0-only
-// Copyright (C) 2026 Andy Dixon
+// SPDX-License-Identifier: LicenseRef-Proprietary
+// Copyright (C) 2026 Andy Dixon t/a Uncomplex
 
 //! Protocol clients. Conventions, shared by every client so the session manager treats them alike:
 //! - `connect()` blocks the calling thread (the manager calls it from a worker thread, as Go

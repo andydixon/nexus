@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: AGPL-3.0-only
-// Copyright (C) 2026 Andy Dixon
+// SPDX-License-Identifier: LicenseRef-Proprietary
+// Copyright (C) 2026 Andy Dixon t/a Uncomplex
 
 //! Reopens the previous run's tabs and splits at launch: saved profiles reconnect, local shells
 //! start again in the directory they were in. The layout is saved whenever it changes (not only on

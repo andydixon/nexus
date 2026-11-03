@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: AGPL-3.0-only
-// Copyright (C) 2026 Andy Dixon
+// SPDX-License-Identifier: LicenseRef-Proprietary
+// Copyright (C) 2026 Andy Dixon t/a Uncomplex
 
 //! Finds the OSC sequences the VT parser ignores but Nexus uses: OSC 133 (shell integration
 //! marks: prompt, command, output, finished with exit status) and OSC 7 (the shell's working

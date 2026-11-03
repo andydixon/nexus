@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: AGPL-3.0-only
-// Copyright (C) 2026 Andy Dixon
+// SPDX-License-Identifier: LicenseRef-Proprietary
+// Copyright (C) 2026 Andy Dixon t/a Uncomplex
 
 //! IRC client: registration, PING/PONG, channel/user tracking, CTCP ACTION, NickServ identify,
 //! auto-join and the composer's /commands, reporting through typed `Event`s.

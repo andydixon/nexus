@@ -45,28 +45,29 @@ skip themselves when OpenSSH isn't installed.
 ## Release packages
 
 ```bash
-cd rust
-./release.sh                                            # this machine's platform
-NEXUS_RELEASE_TARGETS=linux/amd64,windows/amd64 ./release.sh
+scripts/build-all.sh                                          # every platform this host can build
+scripts/build-all.sh --platforms linux-x86_64,windows-x86_64 [--debug] [--keep-going]
 ```
 
-Artefacts land in `build/releases/<version>/` at the repo root:
+Same interface as the other Uncomplex apps. Platforms are `linux-x86_64`, `linux-aarch64`,
+`windows-x86_64`, `windows-aarch64`, `macos-aarch64` and `macos-x86_64`; ones this host can't build
+are reported as SKIPPED with the reason. Each lands in `dist/<platform>/`:
 
-- `NexusTerminal-<os>-<arch>.zip` — on macOS a universal-capable `.app` bundle
-  (`rust/packaging/macos/build-app.sh`), on Windows the `.exe` (icon and version info embedded,
-  GUI subsystem), on Linux the binary plus `install.sh` and a `.desktop` entry
-  (`rust/packaging/linux/install.sh` installs into `~/.local`).
+- `nexus-terminal-<version>-<platform>.zip` — on macOS `NexusTerminal.app`
+  (`rust/packaging/macos/build-app.sh`, icon and ad-hoc signature, `SIGN_IDENTITY` for a Developer ID),
+  on Windows `nexus-terminal.exe` (icon and version info embedded, GUI subsystem), on Linux the
+  binary plus `install.sh` and a `.desktop` entry (`install.sh` installs into `~/.local`).
 - `manifest-<os>-<arch>.json` and `version-<os>-<arch>.txt` for the update server
   (`updates/index.php`), in the same format as before.
 
 The version is `<latest tag>-<short commit>` unless `NEXUS_VERSION` is set. The update manifest
-URL is compiled in from `NEXUS_UPDATE_URL` (default in `release.sh`); `{platform}` and `{arch}` use
+URL is compiled in from `NEXUS_UPDATE_URL` (default in `scripts/build-all.sh`); `{platform}` and `{arch}` use
 the old Go names (`darwin`/`linux`/`windows`, `amd64`/`arm64`).
 
-Cross-building `windows/amd64` from Linux works with `x86_64-pc-windows-gnu` and mingw-w64.
-macOS bundles must be built on a Mac. CI (`.github/workflows/release-builds.yml`) builds every
-platform natively on GitHub runners and attaches the zips to tagged releases;
-`.github/workflows/ci.yml` runs tests and clippy on Linux, macOS and Windows.
+Cross-building `windows-x86_64` from Linux works with `x86_64-pc-windows-gnu` and mingw-w64.
+macOS bundles must be built on a Mac. `.github/workflows/release.yml` builds every platform
+natively on GitHub runners and attaches the zips (and `SHA256SUMS`) to `v*` tag releases;
+`.github/workflows/ci.yml` runs fmt, clippy and tests on Linux, macOS and Windows.
 
 ## Signing
 

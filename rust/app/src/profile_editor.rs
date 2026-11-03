@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: AGPL-3.0-only
-// Copyright (C) 2026 Andy Dixon
+// SPDX-License-Identifier: LicenseRef-Proprietary
+// Copyright (C) 2026 Andy Dixon t/a Uncomplex
 
 //! Profile editor (right dock): create and edit every protocol's settings. A port of the
 //! `profiles.js` drawer plus the Serial protocol. Switching protocol keeps the common fields

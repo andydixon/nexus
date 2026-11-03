@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: AGPL-3.0-only
-// Copyright (C) 2026 Andy Dixon
+// SPDX-License-Identifier: LicenseRef-Proprietary
+// Copyright (C) 2026 Andy Dixon t/a Uncomplex
 
 //! Field-level validation of profiles and their protocol configs. Enum-typed fields (secret modes,
 //! host-key policy, line endings, forward direction, protocol) can't hold invalid values in Rust,

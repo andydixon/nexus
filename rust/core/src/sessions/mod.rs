@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: AGPL-3.0-only
-// Copyright (C) 2026 Andy Dixon
+// SPDX-License-Identifier: LicenseRef-Proprietary
+// Copyright (C) 2026 Andy Dixon t/a Uncomplex
 
 //! The session manager: one entry per open tab, each owning a protocol client. A port of
 //! internal/sessions — same lifecycle, reconnect backoff, login scripts, recording hooks and

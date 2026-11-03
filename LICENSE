@@ -1,661 +1,837 @@
-                    GNU AFFERO GENERAL PUBLIC LICENSE
-                       Version 3, 19 November 2007
-
- Copyright (C) 2007 Free Software Foundation, Inc. <https://fsf.org/>
- Everyone is permitted to copy and distribute verbatim copies
- of this license document, but changing it is not allowed.
-
-                            Preamble
-
-  The GNU Affero General Public License is a free, copyleft license for
-software and other kinds of works, specifically designed to ensure
-cooperation with the community in the case of network server software.
-
-  The licenses for most software and other practical works are designed
-to take away your freedom to share and change the works.  By contrast,
-our General Public Licenses are intended to guarantee your freedom to
-share and change all versions of a program--to make sure it remains free
-software for all its users.
-
-  When we speak of free software, we are referring to freedom, not
-price.  Our General Public Licenses are designed to make sure that you
-have the freedom to distribute copies of free software (and charge for
-them if you wish), that you receive source code or can get it if you
-want it, that you can change the software or use pieces of it in new
-free programs, and that you know you can do these things.
-
-  Developers that use our General Public Licenses protect your rights
-with two steps: (1) assert copyright on the software, and (2) offer
-you this License which gives you legal permission to copy, distribute
-and/or modify the software.
-
-  A secondary benefit of defending all users' freedom is that
-improvements made in alternate versions of the program, if they
-receive widespread use, become available for other developers to
-incorporate.  Many developers of free software are heartened and
-encouraged by the resulting cooperation.  However, in the case of
-software used on network servers, this result may fail to come about.
-The GNU General Public License permits making a modified version and
-letting the public access it on a server without ever releasing its
-source code to the public.
-
-  The GNU Affero General Public License is designed specifically to
-ensure that, in such cases, the modified source code becomes available
-to the community.  It requires the operator of a network server to
-provide the source code of the modified version running there to the
-users of that server.  Therefore, public use of a modified version, on
-a publicly accessible server, gives the public access to the source
-code of the modified version.
-
-  An older license, called the Affero General Public License and
-published by Affero, was designed to accomplish similar goals.  This is
-a different license, not a version of the Affero GPL, but Affero has
-released a new version of the Affero GPL which permits relicensing under
-this license.
-
-  The precise terms and conditions for copying, distribution and
-modification follow.
-
-                       TERMS AND CONDITIONS
-
-  0. Definitions.
-
-  "This License" refers to version 3 of the GNU Affero General Public License.
-
-  "Copyright" also means copyright-like laws that apply to other kinds of
-works, such as semiconductor masks.
-
-  "The Program" refers to any copyrightable work licensed under this
-License.  Each licensee is addressed as "you".  "Licensees" and
-"recipients" may be individuals or organizations.
-
-  To "modify" a work means to copy from or adapt all or part of the work
-in a fashion requiring copyright permission, other than the making of an
-exact copy.  The resulting work is called a "modified version" of the
-earlier work or a work "based on" the earlier work.
-
-  A "covered work" means either the unmodified Program or a work based
-on the Program.
-
-  To "propagate" a work means to do anything with it that, without
-permission, would make you directly or secondarily liable for
-infringement under applicable copyright law, except executing it on a
-computer or modifying a private copy.  Propagation includes copying,
-distribution (with or without modification), making available to the
-public, and in some countries other activities as well.
-
-  To "convey" a work means any kind of propagation that enables other
-parties to make or receive copies.  Mere interaction with a user through
-a computer network, with no transfer of a copy, is not conveying.
-
-  An interactive user interface displays "Appropriate Legal Notices"
-to the extent that it includes a convenient and prominently visible
-feature that (1) displays an appropriate copyright notice, and (2)
-tells the user that there is no warranty for the work (except to the
-extent that warranties are provided), that licensees may convey the
-work under this License, and how to view a copy of this License.  If
-the interface presents a list of user commands or options, such as a
-menu, a prominent item in the list meets this criterion.
-
-  1. Source Code.
-
-  The "source code" for a work means the preferred form of the work
-for making modifications to it.  "Object code" means any non-source
-form of a work.
-
-  A "Standard Interface" means an interface that either is an official
-standard defined by a recognized standards body, or, in the case of
-interfaces specified for a particular programming language, one that
-is widely used among developers working in that language.
-
-  The "System Libraries" of an executable work include anything, other
-than the work as a whole, that (a) is included in the normal form of
-packaging a Major Component, but which is not part of that Major
-Component, and (b) serves only to enable use of the work with that
-Major Component, or to implement a Standard Interface for which an
-implementation is available to the public in source code form.  A
-"Major Component", in this context, means a major essential component
-(kernel, window system, and so on) of the specific operating system
-(if any) on which the executable work runs, or a compiler used to
-produce the work, or an object code interpreter used to run it.
-
-  The "Corresponding Source" for a work in object code form means all
-the source code needed to generate, install, and (for an executable
-work) run the object code and to modify the work, including scripts to
-control those activities.  However, it does not include the work's
-System Libraries, or general-purpose tools or generally available free
-programs which are used unmodified in performing those activities but
-which are not part of the work.  For example, Corresponding Source
-includes interface definition files associated with source files for
-the work, and the source code for shared libraries and dynamically
-linked subprograms that the work is specifically designed to require,
-such as by intimate data communication or control flow between those
-subprograms and other parts of the work.
-
-  The Corresponding Source need not include anything that users
-can regenerate automatically from other parts of the Corresponding
-Source.
-
-  The Corresponding Source for a work in source code form is that
-same work.
-
-  2. Basic Permissions.
-
-  All rights granted under this License are granted for the term of
-copyright on the Program, and are irrevocable provided the stated
-conditions are met.  This License explicitly affirms your unlimited
-permission to run the unmodified Program.  The output from running a
-covered work is covered by this License only if the output, given its
-content, constitutes a covered work.  This License acknowledges your
-rights of fair use or other equivalent, as provided by copyright law.
-
-  You may make, run and propagate covered works that you do not
-convey, without conditions so long as your license otherwise remains
-in force.  You may convey covered works to others for the sole purpose
-of having them make modifications exclusively for you, or provide you
-with facilities for running those works, provided that you comply with
-the terms of this License in conveying all material for which you do
-not control copyright.  Those thus making or running the covered works
-for you must do so exclusively on your behalf, under your direction
-and control, on terms that prohibit them from making any copies of
-your copyrighted material outside their relationship with you.
-
-  Conveying under any other circumstances is permitted solely under
-the conditions stated below.  Sublicensing is not allowed; section 10
-makes it unnecessary.
-
-  3. Protecting Users' Legal Rights From Anti-Circumvention Law.
-
-  No covered work shall be deemed part of an effective technological
-measure under any applicable law fulfilling obligations under article
-11 of the WIPO copyright treaty adopted on 20 December 1996, or
-similar laws prohibiting or restricting circumvention of such
-measures.
-
-  When you convey a covered work, you waive any legal power to forbid
-circumvention of technological measures to the extent such circumvention
-is effected by exercising rights under this License with respect to
-the covered work, and you disclaim any intention to limit operation or
-modification of the work as a means of enforcing, against the work's
-users, your or third parties' legal rights to forbid circumvention of
-technological measures.
-
-  4. Conveying Verbatim Copies.
-
-  You may convey verbatim copies of the Program's source code as you
-receive it, in any medium, provided that you conspicuously and
-appropriately publish on each copy an appropriate copyright notice;
-keep intact all notices stating that this License and any
-non-permissive terms added in accord with section 7 apply to the code;
-keep intact all notices of the absence of any warranty; and give all
-recipients a copy of this License along with the Program.
-
-  You may charge any price or no price for each copy that you convey,
-and you may offer support or warranty protection for a fee.
-
-  5. Conveying Modified Source Versions.
-
-  You may convey a work based on the Program, or the modifications to
-produce it from the Program, in the form of source code under the
-terms of section 4, provided that you also meet all of these conditions:
-
-    a) The work must carry prominent notices stating that you modified
-    it, and giving a relevant date.
-
-    b) The work must carry prominent notices stating that it is
-    released under this License and any conditions added under section
-    7.  This requirement modifies the requirement in section 4 to
-    "keep intact all notices".
-
-    c) You must license the entire work, as a whole, under this
-    License to anyone who comes into possession of a copy.  This
-    License will therefore apply, along with any applicable section 7
-    additional terms, to the whole of the work, and all its parts,
-    regardless of how they are packaged.  This License gives no
-    permission to license the work in any other way, but it does not
-    invalidate such permission if you have separately received it.
-
-    d) If the work has interactive user interfaces, each must display
-    Appropriate Legal Notices; however, if the Program has interactive
-    interfaces that do not display Appropriate Legal Notices, your
-    work need not make them do so.
-
-  A compilation of a covered work with other separate and independent
-works, which are not by their nature extensions of the covered work,
-and which are not combined with it such as to form a larger program,
-in or on a volume of a storage or distribution medium, is called an
-"aggregate" if the compilation and its resulting copyright are not
-used to limit the access or legal rights of the compilation's users
-beyond what the individual works permit.  Inclusion of a covered work
-in an aggregate does not cause this License to apply to the other
-parts of the aggregate.
-
-  6. Conveying Non-Source Forms.
-
-  You may convey a covered work in object code form under the terms
-of sections 4 and 5, provided that you also convey the
-machine-readable Corresponding Source under the terms of this License,
-in one of these ways:
-
-    a) Convey the object code in, or embodied in, a physical product
-    (including a physical distribution medium), accompanied by the
-    Corresponding Source fixed on a durable physical medium
-    customarily used for software interchange.
-
-    b) Convey the object code in, or embodied in, a physical product
-    (including a physical distribution medium), accompanied by a
-    written offer, valid for at least three years and valid for as
-    long as you offer spare parts or customer support for that product
-    model, to give anyone who possesses the object code either (1) a
-    copy of the Corresponding Source for all the software in the
-    product that is covered by this License, on a durable physical
-    medium customarily used for software interchange, for a price no
-    more than your reasonable cost of physically performing this
-    conveying of source, or (2) access to copy the
-    Corresponding Source from a network server at no charge.
-
-    c) Convey individual copies of the object code with a copy of the
-    written offer to provide the Corresponding Source.  This
-    alternative is allowed only occasionally and noncommercially, and
-    only if you received the object code with such an offer, in accord
-    with subsection 6b.
-
-    d) Convey the object code by offering access from a designated
-    place (gratis or for a charge), and offer equivalent access to the
-    Corresponding Source in the same way through the same place at no
-    further charge.  You need not require recipients to copy the
-    Corresponding Source along with the object code.  If the place to
-    copy the object code is a network server, the Corresponding Source
-    may be on a different server (operated by you or a third party)
-    that supports equivalent copying facilities, provided you maintain
-    clear directions next to the object code saying where to find the
-    Corresponding Source.  Regardless of what server hosts the
-    Corresponding Source, you remain obligated to ensure that it is
-    available for as long as needed to satisfy these requirements.
-
-    e) Convey the object code using peer-to-peer transmission, provided
-    you inform other peers where the object code and Corresponding
-    Source of the work are being offered to the general public at no
-    charge under subsection 6d.
-
-  A separable portion of the object code, whose source code is excluded
-from the Corresponding Source as a System Library, need not be
-included in conveying the object code work.
-
-  A "User Product" is either (1) a "consumer product", which means any
-tangible personal property which is normally used for personal, family,
-or household purposes, or (2) anything designed or sold for incorporation
-into a dwelling.  In determining whether a product is a consumer product,
-doubtful cases shall be resolved in favor of coverage.  For a particular
-product received by a particular user, "normally used" refers to a
-typical or common use of that class of product, regardless of the status
-of the particular user or of the way in which the particular user
-actually uses, or expects or is expected to use, the product.  A product
-is a consumer product regardless of whether the product has substantial
-commercial, industrial or non-consumer uses, unless such uses represent
-the only significant mode of use of the product.
-
-  "Installation Information" for a User Product means any methods,
-procedures, authorization keys, or other information required to install
-and execute modified versions of a covered work in that User Product from
-a modified version of its Corresponding Source.  The information must
-suffice to ensure that the continued functioning of the modified object
-code is in no case prevented or interfered with solely because
-modification has been made.
-
-  If you convey an object code work under this section in, or with, or
-specifically for use in, a User Product, and the conveying occurs as
-part of a transaction in which the right of possession and use of the
-User Product is transferred to the recipient in perpetuity or for a
-fixed term (regardless of how the transaction is characterized), the
-Corresponding Source conveyed under this section must be accompanied
-by the Installation Information.  But this requirement does not apply
-if neither you nor any third party retains the ability to install
-modified object code on the User Product (for example, the work has
-been installed in ROM).
-
-  The requirement to provide Installation Information does not include a
-requirement to continue to provide support service, warranty, or updates
-for a work that has been modified or installed by the recipient, or for
-the User Product in which it has been modified or installed.  Access to a
-network may be denied when the modification itself materially and
-adversely affects the operation of the network or violates the rules and
-protocols for communication across the network.
-
-  Corresponding Source conveyed, and Installation Information provided,
-in accord with this section must be in a format that is publicly
-documented (and with an implementation available to the public in
-source code form), and must require no special password or key for
-unpacking, reading or copying.
-
-  7. Additional Terms.
-
-  "Additional permissions" are terms that supplement the terms of this
-License by making exceptions from one or more of its conditions.
-Additional permissions that are applicable to the entire Program shall
-be treated as though they were included in this License, to the extent
-that they are valid under applicable law.  If additional permissions
-apply only to part of the Program, that part may be used separately
-under those permissions, but the entire Program remains governed by
-this License without regard to the additional permissions.
-
-  When you convey a copy of a covered work, you may at your option
-remove any additional permissions from that copy, or from any part of
-it.  (Additional permissions may be written to require their own
-removal in certain cases when you modify the work.)  You may place
-additional permissions on material, added by you to a covered work,
-for which you have or can give appropriate copyright permission.
-
-  Notwithstanding any other provision of this License, for material you
-add to a covered work, you may (if authorized by the copyright holders of
-that material) supplement the terms of this License with terms:
-
-    a) Disclaiming warranty or limiting liability differently from the
-    terms of sections 15 and 16 of this License; or
-
-    b) Requiring preservation of specified reasonable legal notices or
-    author attributions in that material or in the Appropriate Legal
-    Notices displayed by works containing it; or
-
-    c) Prohibiting misrepresentation of the origin of that material, or
-    requiring that modified versions of such material be marked in
-    reasonable ways as different from the original version; or
-
-    d) Limiting the use for publicity purposes of names of licensors or
-    authors of the material; or
-
-    e) Declining to grant rights under trademark law for use of some
-    trade names, trademarks, or service marks; or
-
-    f) Requiring indemnification of licensors and authors of that
-    material by anyone who conveys the material (or modified versions of
-    it) with contractual assumptions of liability to the recipient, for
-    any liability that these contractual assumptions directly impose on
-    those licensors and authors.
-
-  All other non-permissive additional terms are considered "further
-restrictions" within the meaning of section 10.  If the Program as you
-received it, or any part of it, contains a notice stating that it is
-governed by this License along with a term that is a further
-restriction, you may remove that term.  If a license document contains
-a further restriction but permits relicensing or conveying under this
-License, you may add to a covered work material governed by the terms
-of that license document, provided that the further restriction does
-not survive such relicensing or conveying.
-
-  If you add terms to a covered work in accord with this section, you
-must place, in the relevant source files, a statement of the
-additional terms that apply to those files, or a notice indicating
-where to find the applicable terms.
-
-  Additional terms, permissive or non-permissive, may be stated in the
-form of a separately written license, or stated as exceptions;
-the above requirements apply either way.
-
-  8. Termination.
-
-  You may not propagate or modify a covered work except as expressly
-provided under this License.  Any attempt otherwise to propagate or
-modify it is void, and will automatically terminate your rights under
-this License (including any patent licenses granted under the third
-paragraph of section 11).
-
-  However, if you cease all violation of this License, then your
-license from a particular copyright holder is reinstated (a)
-provisionally, unless and until the copyright holder explicitly and
-finally terminates your license, and (b) permanently, if the copyright
-holder fails to notify you of the violation by some reasonable means
-prior to 60 days after the cessation.
-
-  Moreover, your license from a particular copyright holder is
-reinstated permanently if the copyright holder notifies you of the
-violation by some reasonable means, this is the first time you have
-received notice of violation of this License (for any work) from that
-copyright holder, and you cure the violation prior to 30 days after
-your receipt of the notice.
-
-  Termination of your rights under this section does not terminate the
-licenses of parties who have received copies or rights from you under
-this License.  If your rights have been terminated and not permanently
-reinstated, you do not qualify to receive new licenses for the same
-material under section 10.
-
-  9. Acceptance Not Required for Having Copies.
-
-  You are not required to accept this License in order to receive or
-run a copy of the Program.  Ancillary propagation of a covered work
-occurring solely as a consequence of using peer-to-peer transmission
-to receive a copy likewise does not require acceptance.  However,
-nothing other than this License grants you permission to propagate or
-modify any covered work.  These actions infringe copyright if you do
-not accept this License.  Therefore, by modifying or propagating a
-covered work, you indicate your acceptance of this License to do so.
-
-  10. Automatic Licensing of Downstream Recipients.
-
-  Each time you convey a covered work, the recipient automatically
-receives a license from the original licensors, to run, modify and
-propagate that work, subject to this License.  You are not responsible
-for enforcing compliance by third parties with this License.
-
-  An "entity transaction" is a transaction transferring control of an
-organization, or substantially all assets of one, or subdividing an
-organization, or merging organizations.  If propagation of a covered
-work results from an entity transaction, each party to that
-transaction who receives a copy of the work also receives whatever
-licenses to the work the party's predecessor in interest had or could
-give under the previous paragraph, plus a right to possession of the
-Corresponding Source of the work from the predecessor in interest, if
-the predecessor has it or can get it with reasonable efforts.
-
-  You may not impose any further restrictions on the exercise of the
-rights granted or affirmed under this License.  For example, you may
-not impose a license fee, royalty, or other charge for exercise of
-rights granted under this License, and you may not initiate litigation
-(including a cross-claim or counterclaim in a lawsuit) alleging that
-any patent claim is infringed by making, using, selling, offering for
-sale, or importing the Program or any portion of it.
-
-  11. Patents.
-
-  A "contributor" is a copyright holder who authorizes use under this
-License of the Program or a work on which the Program is based.  The
-work thus licensed is called the contributor's "contributor version".
-
-  A contributor's "essential patent claims" are all patent claims
-owned or controlled by the contributor, whether already acquired or
-hereafter acquired, that would be infringed by some manner, permitted
-by this License, of making, using, or selling its contributor version,
-but do not include claims that would be infringed only as a
-consequence of further modification of the contributor version.  For
-purposes of this definition, "control" includes the right to grant
-patent sublicenses in a manner consistent with the requirements of
-this License.
-
-  Each contributor grants you a non-exclusive, worldwide, royalty-free
-patent license under the contributor's essential patent claims, to
-make, use, sell, offer for sale, import and otherwise run, modify and
-propagate the contents of its contributor version.
-
-  In the following three paragraphs, a "patent license" is any express
-agreement or commitment, however denominated, not to enforce a patent
-(such as an express permission to practice a patent or covenant not to
-sue for patent infringement).  To "grant" such a patent license to a
-party means to make such an agreement or commitment not to enforce a
-patent against the party.
-
-  If you convey a covered work, knowingly relying on a patent license,
-and the Corresponding Source of the work is not available for anyone
-to copy, free of charge and under the terms of this License, through a
-publicly available network server or other readily accessible means,
-then you must either (1) cause the Corresponding Source to be so
-available, or (2) arrange to deprive yourself of the benefit of the
-patent license for this particular work, or (3) arrange, in a manner
-consistent with the requirements of this License, to extend the patent
-license to downstream recipients.  "Knowingly relying" means you have
-actual knowledge that, but for the patent license, your conveying the
-covered work in a country, or your recipient's use of the covered work
-in a country, would infringe one or more identifiable patents in that
-country that you have reason to believe are valid.
-
-  If, pursuant to or in connection with a single transaction or
-arrangement, you convey, or propagate by procuring conveyance of, a
-covered work, and grant a patent license to some of the parties
-receiving the covered work authorizing them to use, propagate, modify
-or convey a specific copy of the covered work, then the patent license
-you grant is automatically extended to all recipients of the covered
-work and works based on it.
-
-  A patent license is "discriminatory" if it does not include within
-the scope of its coverage, prohibits the exercise of, or is
-conditioned on the non-exercise of one or more of the rights that are
-specifically granted under this License.  You may not convey a covered
-work if you are a party to an arrangement with a third party that is
-in the business of distributing software, under which you make payment
-to the third party based on the extent of your activity of conveying
-the work, and under which the third party grants, to any of the
-parties who would receive the covered work from you, a discriminatory
-patent license (a) in connection with copies of the covered work
-conveyed by you (or copies made from those copies), or (b) primarily
-for and in connection with specific products or compilations that
-contain the covered work, unless you entered into that arrangement,
-or that patent license was granted, prior to 28 March 2007.
-
-  Nothing in this License shall be construed as excluding or limiting
-any implied license or other defenses to infringement that may
-otherwise be available to you under applicable patent law.
-
-  12. No Surrender of Others' Freedom.
-
-  If conditions are imposed on you (whether by court order, agreement or
-otherwise) that contradict the conditions of this License, they do not
-excuse you from the conditions of this License.  If you cannot convey a
-covered work so as to satisfy simultaneously your obligations under this
-License and any other pertinent obligations, then as a consequence you may
-not convey it at all.  For example, if you agree to terms that obligate you
-to collect a royalty for further conveying from those to whom you convey
-the Program, the only way you could satisfy both those terms and this
-License would be to refrain entirely from conveying the Program.
-
-  13. Remote Network Interaction; Use with the GNU General Public License.
-
-  Notwithstanding any other provision of this License, if you modify the
-Program, your modified version must prominently offer all users
-interacting with it remotely through a computer network (if your version
-supports such interaction) an opportunity to receive the Corresponding
-Source of your version by providing access to the Corresponding Source
-from a network server at no charge, through some standard or customary
-means of facilitating copying of software.  This Corresponding Source
-shall include the Corresponding Source for any work covered by version 3
-of the GNU General Public License that is incorporated pursuant to the
-following paragraph.
-
-  Notwithstanding any other provision of this License, you have
-permission to link or combine any covered work with a work licensed
-under version 3 of the GNU General Public License into a single
-combined work, and to convey the resulting work.  The terms of this
-License will continue to apply to the part which is the covered work,
-but the work with which it is combined will remain governed by version
-3 of the GNU General Public License.
-
-  14. Revised Versions of this License.
-
-  The Free Software Foundation may publish revised and/or new versions of
-the GNU Affero General Public License from time to time.  Such new versions
-will be similar in spirit to the present version, but may differ in detail to
-address new problems or concerns.
-
-  Each version is given a distinguishing version number.  If the
-Program specifies that a certain numbered version of the GNU Affero General
-Public License "or any later version" applies to it, you have the
-option of following the terms and conditions either of that numbered
-version or of any later version published by the Free Software
-Foundation.  If the Program does not specify a version number of the
-GNU Affero General Public License, you may choose any version ever published
-by the Free Software Foundation.
-
-  If the Program specifies that a proxy can decide which future
-versions of the GNU Affero General Public License can be used, that proxy's
-public statement of acceptance of a version permanently authorizes you
-to choose that version for the Program.
-
-  Later license versions may give you additional or different
-permissions.  However, no additional obligations are imposed on any
-author or copyright holder as a result of your choosing to follow a
-later version.
-
-  15. Disclaimer of Warranty.
-
-  THERE IS NO WARRANTY FOR THE PROGRAM, TO THE EXTENT PERMITTED BY
-APPLICABLE LAW.  EXCEPT WHEN OTHERWISE STATED IN WRITING THE COPYRIGHT
-HOLDERS AND/OR OTHER PARTIES PROVIDE THE PROGRAM "AS IS" WITHOUT WARRANTY
-OF ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING, BUT NOT LIMITED TO,
-THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
-PURPOSE.  THE ENTIRE RISK AS TO THE QUALITY AND PERFORMANCE OF THE PROGRAM
-IS WITH YOU.  SHOULD THE PROGRAM PROVE DEFECTIVE, YOU ASSUME THE COST OF
-ALL NECESSARY SERVICING, REPAIR OR CORRECTION.
-
-  16. Limitation of Liability.
-
-  IN NO EVENT UNLESS REQUIRED BY APPLICABLE LAW OR AGREED TO IN WRITING
-WILL ANY COPYRIGHT HOLDER, OR ANY OTHER PARTY WHO MODIFIES AND/OR CONVEYS
-THE PROGRAM AS PERMITTED ABOVE, BE LIABLE TO YOU FOR DAMAGES, INCLUDING ANY
-GENERAL, SPECIAL, INCIDENTAL OR CONSEQUENTIAL DAMAGES ARISING OUT OF THE
-USE OR INABILITY TO USE THE PROGRAM (INCLUDING BUT NOT LIMITED TO LOSS OF
-DATA OR DATA BEING RENDERED INACCURATE OR LOSSES SUSTAINED BY YOU OR THIRD
-PARTIES OR A FAILURE OF THE PROGRAM TO OPERATE WITH ANY OTHER PROGRAMS),
-EVEN IF SUCH HOLDER OR OTHER PARTY HAS BEEN ADVISED OF THE POSSIBILITY OF
-SUCH DAMAGES.
-
-  17. Interpretation of Sections 15 and 16.
-
-  If the disclaimer of warranty and limitation of liability provided
-above cannot be given local legal effect according to their terms,
-reviewing courts shall apply local law that most closely approximates
-an absolute waiver of all civil liability in connection with the
-Program, unless a warranty or assumption of liability accompanies a
-copy of the Program in return for a fee.
-
-                     END OF TERMS AND CONDITIONS
-
-            How to Apply These Terms to Your New Programs
-
-  If you develop a new program, and you want it to be of the greatest
-possible use to the public, the best way to achieve this is to make it
-free software which everyone can redistribute and change under these terms.
-
-  To do so, attach the following notices to the program.  It is safest
-to attach them to the start of each source file to most effectively
-state the exclusion of warranty; and each file should have at least
-the "copyright" line and a pointer to where the full notice is found.
-
-    <one line to give the program's name and a brief idea of what it does.>
-    Copyright (C) <year>  <name of author>
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU Affero General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU Affero General Public License for more details.
-
-    You should have received a copy of the GNU Affero General Public License
-    along with this program.  If not, see <https://www.gnu.org/licenses/>.
-
-Also add information on how to contact you by electronic and paper mail.
-
-  If your software can interact with users remotely through a computer
-network, you should also make sure that it provides a way for users to
-get its source.  For example, if your program is a web application, its
-interface could display a "Source" link that leads users to an archive
-of the code.  There are many ways you could offer source, and different
-solutions will be better for different programs; see section 13 for the
-specific requirements.
-
-  You should also get your employer (if you work as a programmer) or school,
-if any, to sign a "copyright disclaimer" for the program, if necessary.
-For more information on this, and how to apply and follow the GNU AGPL, see
-<https://www.gnu.org/licenses/>.
+MASTER SOFTWARE LICENCE AND SERVICES AGREEMENT
+
+Governing law: England and Wales
+
+Version: [1.0]
+Effective date: 2026-11-03
+Software provider: Andy Dixon t/a Uncomplex
+Trading name: Uncomplex
+Contact email: legal@uncomplex.co.uk
+
+1. Introduction and scope
+
+1.1 Agreement
+
+This Master Software Licence and Services Agreement ("Agreement") governs the downloading, installation, access to and use of software, applications, online services, associated documentation and related functionality supplied by the Software Provider ("Provider", "we", "us" or "our").
+
+It applies to products made available free of charge, purchased through a one-off payment, licensed for a fixed period, supplied on a subscription basis, or provided for evaluation or trial purposes.
+
+The person or organisation acquiring or using a Product is referred to as the "Customer", "you" or "your".
+
+1.2 Products covered
+
+This Agreement may apply to, among other things:
+
+- Desktop and mobile software;
+- Web applications and cloud-hosted services;
+- Digital forensic and investigative tools;
+- Data recovery and storage utilities;
+- Text editors and development software;
+- File transfer, upload and management software;
+- Games and entertainment software;
+- Application programming interfaces and associated utilities;
+- Future software products and related services designated by the Provider.
+
+1.3 Contractual documents
+
+The Agreement consists of these general terms together with any applicable Product Schedule, accepted order, subscription details, service description or separately agreed written terms.
+
+An applicable Product Schedule may specify additional functionality, usage restrictions, technical requirements, service commitments and risk information.
+
+Where documents conflict, individually negotiated written terms take precedence, followed by the applicable Product Schedule, followed by this Agreement, unless expressly agreed otherwise.
+
+No provision takes precedence over mandatory rights or obligations imposed by applicable law.
+
+1.4 Consumer and business customers
+
+A "Consumer" is an individual acting wholly or mainly outside their trade, business, craft or profession.
+
+A "Business Customer" is any customer acting for purposes relating to their trade, business, craft or profession, including a company, partnership, public authority or individual acting in a business capacity.
+
+Clauses expressly marked "Business Customers only" do not apply to Consumers.
+
+1.5 Acceptance
+
+You accept this Agreement by expressly agreeing to it during purchase, registration, installation or account creation, or by another legally effective method of acceptance.
+
+Where a contract is formed before installation or first use, the terms made available and accepted at the time of contracting will apply.
+
+You should retain a copy of the Agreement.
+
+If you do not accept these terms, you should not acquire or use the relevant Product, subject to any rights you already have under applicable law.
+
+2. Licence grant
+
+2.1 Limited licence
+
+Subject to this Agreement and the applicable Product Schedule, the Provider grants you a limited, non-exclusive licence to install, access and use the Product for its documented purposes.
+
+The licence is non-transferable and non-sublicensable, except where expressly permitted by the applicable terms or required by law.
+
+2.2 Licence conditions
+
+The scope of your licence may be restricted by:
+
+- Licence duration or subscription period;
+- Number of authorised users or devices;
+- Permitted commercial or non-commercial use;
+- Licensed features or product editions;
+- Technical or operational limits;
+- Applicable geographic or organisational restrictions.
+
+Restrictions must be communicated before purchase where material.
+
+2.3 Ownership
+
+Unless expressly stated otherwise, the Product is licensed rather than sold.
+
+The Provider and its licensors retain ownership of their intellectual property in the Product. You retain ownership of your own data, documents and other content.
+
+2.4 Open-source components
+
+Components supplied under separate open-source licences remain subject to those licences.
+
+Nothing in this Agreement restricts rights expressly granted by an applicable open-source licence or rights that cannot lawfully be restricted.
+
+Where an entire Product is distributed under an open-source licence, that licence governs the rights granted under it.
+
+3. Authorised use and restrictions
+
+3.1 Lawful use
+
+You must use the Product lawfully and within the scope of your licence.
+
+You are responsible for ensuring that you have the necessary authority, permissions and legal basis to access, examine, modify, transfer, recover or process any systems, devices, files or information involved in your use of the Product.
+
+3.2 Prohibited activities
+
+Except where expressly permitted by law or the applicable licence, you must not:
+
+a. Use the Product for unlawful access to systems, devices, accounts or data.
+
+b. Use the Product to infringe intellectual property rights, privacy rights or other legal rights.
+
+c. Deliberately interfere with the security, availability or operation of systems or services without appropriate authorisation.
+
+d. Circumvent licence activation, access controls or technical restrictions unlawfully.
+
+e. Redistribute proprietary components beyond the rights granted by the applicable licence.
+
+f. Use hosted services to distribute malicious software, fraudulent material or unlawful content.
+
+g. Exceed documented service limits in a way that materially disrupts the Provider's infrastructure or other customers.
+
+h. Misrepresent, falsify or knowingly manipulate outputs in a manner intended to deceive others.
+
+3.3 Modifications
+
+Unauthorised modifications may affect functionality, compatibility, security and reliability.
+
+The Provider is not responsible for failures caused by modifications made without its authorisation, except to the extent that the failure is attributable to the Provider or liability otherwise arises under applicable law.
+
+This does not restrict lawful interoperability, security research, reverse engineering or modification rights where those rights cannot legally be excluded.
+
+3.4 Customer responsibility
+
+You are responsible for how you use the Product and for decisions made using its outputs.
+
+Where the Product assists with technical, investigative or operational decisions, you should apply appropriate professional judgement and independent verification.
+
+The Product does not transfer your legal responsibilities to the Provider.
+
+4. Performance, capabilities and advertised claims
+
+4.1 Internal testing
+
+Unless expressly identified otherwise, published performance measurements, accuracy statistics, compatibility figures, benchmarks, recovery rates and technical capabilities may be based on testing performed internally by the Provider.
+
+Such testing may use particular hardware, operating systems, configurations, datasets, workloads or environmental conditions.
+
+4.2 Variability of results
+
+Actual results may differ because of factors including:
+
+- Hardware and software configuration;
+- Data characteristics and condition;
+- Operating system and driver behaviour;
+- Storage media condition;
+- Network capacity and reliability;
+- Third-party dependencies;
+- User configuration and operating procedures;
+- Product version and external environmental conditions.
+
+4.3 No universal performance guarantee
+
+A benchmark, demonstration or example does not automatically constitute a guarantee that equivalent results will be achieved in all environments.
+
+Any expressly agreed performance commitment, contractual specification or applicable statutory requirement remains binding.
+
+4.4 Accuracy and interpretation
+
+The Provider does not represent that every analysis, classification, detection, conversion, recovery or generated output will be complete or error-free.
+
+Outputs may contain omissions, false positives, false negatives, inaccuracies or information requiring further verification.
+
+This provision does not excuse a failure to meet an expressly agreed specification, a misleading product description or a duty imposed by law.
+
+4.5 Accuracy of promotional information
+
+The Provider will take reasonable care to ensure that factual product claims are supported by appropriate evidence.
+
+Information about relevant testing conditions, limitations or assumptions will be made available where material to understanding advertised performance.
+
+5. Customer data and backups
+
+5.1 Customer ownership
+
+You retain ownership of your files, documents, evidence, databases, uploaded content and other information processed using the Product ("Customer Data").
+
+5.2 Permission to process
+
+Where necessary to provide a hosted Product, you grant the Provider a limited permission to store, transmit, process, reproduce and otherwise handle Customer Data solely to provide the contracted service and for other lawful purposes transparently described in the applicable terms and Privacy Notice.
+
+This permission does not transfer ownership of Customer Data.
+
+5.3 Backups and precautions
+
+You should maintain appropriate backups of important information.
+
+Before performing destructive, irreversible, investigative or recovery operations, you should take precautions appropriate to the risks and follow documented procedures.
+
+A Product should not be regarded as a replacement for a suitable backup or disaster recovery arrangement unless that functionality is expressly included in its specification.
+
+5.4 Data corruption and loss
+
+Software operations may involve risks of data loss, corruption, overwriting, incomplete processing or incompatibility.
+
+The Provider does not guarantee that every file or dataset can be preserved, recovered or restored.
+
+Responsibility for any loss caused by a breach of contract, negligence or other legally actionable conduct remains subject to the applicable liability provisions and mandatory law.
+
+5.5 Hosted data
+
+For Products involving hosted storage or processing, the applicable Product Schedule will describe relevant retention periods, export facilities, deletion procedures and any included backup or recovery functionality.
+
+The Provider will apply appropriate technical and organisational security measures having regard to the nature of the service and applicable legal obligations.
+
+6. Online services, availability and security
+
+6.1 Service availability
+
+Online services may occasionally be unavailable because of maintenance, technical faults, security incidents, infrastructure failures, connectivity problems or circumstances beyond the Provider's reasonable control.
+
+Unless a specific availability commitment is agreed, the Provider does not promise uninterrupted or continuous access.
+
+6.2 Reasonable service operation
+
+The Provider will operate the service in accordance with its contractual commitments and applicable legal duties.
+
+Where practicable, advance notice will be given of scheduled maintenance expected to materially affect availability.
+
+6.3 Third-party services
+
+A Product may depend on third-party infrastructure, operating systems, networks, libraries or services.
+
+The Provider cannot control every aspect of third-party systems, but remains responsible for its own contractual and legal obligations.
+
+6.4 Security limitations
+
+No software or online system can be guaranteed to be entirely free from vulnerabilities or security incidents.
+
+The Provider does not promise absolute security but will comply with its applicable security, contractual and data protection obligations.
+
+6.5 Incident response
+
+Security incidents will be assessed and handled in accordance with applicable law and the Provider's relevant contractual obligations.
+
+Where required, affected parties and regulators will be notified.
+
+7. Updates, changes and compatibility
+
+7.1 Updates
+
+The Provider may release updates, patches, enhancements and security fixes.
+
+Some updates may be necessary for security, continued compatibility or lawful operation.
+
+7.2 Compatibility
+
+Unless expressly stated in the relevant Product Schedule, the Provider does not undertake to maintain compatibility indefinitely with every operating system, device, hardware platform or third-party dependency.
+
+7.3 Material changes
+
+The Provider will not use this clause to remove material paid-for functionality or substantially reduce an agreed service without appropriate contractual justification.
+
+Where a material adverse change is proposed, affected customers will receive reasonable notice and, where required by law or the applicable contract, an appropriate right to cancel or obtain a remedy.
+
+7.4 End of support
+
+Product support and lifecycle commitments, where offered, will be described in the applicable Product Schedule.
+
+The Provider may discontinue support in accordance with those commitments and applicable law.
+
+8. Charges, free licences, trials and subscriptions
+
+8.1 Free Products
+
+Certain Products may be supplied without charge.
+
+A free licence does not automatically include technical support, hosted storage, continued development or future upgrades.
+
+Any applicable statutory rights remain unaffected.
+
+8.2 Paid Products
+
+Prices, licence duration, permitted use and included services will be communicated before purchase.
+
+A one-off purchase does not automatically include unlimited upgrades, support or cloud services unless expressly stated.
+
+8.3 Subscriptions
+
+For subscriptions, the Provider will disclose the billing period, applicable charges, renewal arrangements, minimum commitment and cancellation procedure before the Customer enters into the contract.
+
+Subscriptions renew only in accordance with the agreed terms and applicable law.
+
+8.4 Trials
+
+Trial licences may impose disclosed restrictions on duration, functionality, storage, usage or other resources.
+
+Unless expressly agreed, expiry of a free trial does not itself authorise the Provider to impose undisclosed charges.
+
+Any automatic conversion into a paid subscription must comply with applicable law and the information provided before registration.
+
+8.5 Cancellation
+
+Customers may cancel subscriptions using the cancellation arrangements disclosed at purchase and through the available account-management or customer-service facilities.
+
+Consumer cancellation rights will comply with applicable law, including statutory cooling-off rights, renewal requirements and refund entitlements.
+
+8.6 Failed payment
+
+Where payment is overdue, the Provider may suspend relevant paid functionality after providing appropriate notice and an opportunity to resolve the issue, except where more immediate action is justified.
+
+Any suspension remains subject to applicable legal obligations.
+
+8.7 Refunds
+
+Refunds will be provided where required by law or the applicable refund policy.
+
+Nothing in this Agreement excludes statutory rights to a refund, price reduction, repair, replacement, repeat performance or another applicable remedy.
+
+9. Consumer rights and warranties
+
+This clause applies to Consumers.
+
+9.1 Statutory protection
+
+Nothing in this Agreement removes or restricts your rights under applicable consumer protection law.
+
+Where the Consumer Rights Act 2015 applies, digital content must meet the relevant statutory requirements concerning satisfactory quality, fitness for purpose and correspondence with description.
+
+Services must be provided with reasonable care and skill.
+
+9.2 Technical limitations
+
+Software may contain defects or experience compatibility and performance limitations.
+
+However, this does not remove the Provider's responsibility to meet applicable statutory requirements.
+
+9.3 Remedies
+
+Where a Product does not meet applicable legal requirements, you may be entitled to remedies, including repair, replacement, price reduction, repeat performance, compensation or a refund, depending on the circumstances and the relevant legal provisions.
+
+9.4 Damage to devices or other digital content
+
+Where software causes damage to your device or other digital content in circumstances covered by section 46 of the Consumer Rights Act 2015, your statutory rights remain unaffected, including where the software was supplied free of charge.
+
+9.5 Cancellation rights
+
+Where statutory cancellation rights apply to a distance or off-premises contract, the Provider will comply with the relevant information, consent, cancellation and refund requirements.
+
+Supplying digital content immediately does not automatically remove a Consumer's cancellation rights. Any legally permitted loss of those rights requires the applicable consent, acknowledgement and confirmation process.
+
+9.6 Priority
+
+If any other provision of this Agreement conflicts with your mandatory consumer rights, those rights prevail.
+
+10. Business warranties and disclaimers
+
+This clause applies to Business Customers only.
+
+10.1 Contractual specification
+
+The Provider will supply the Product substantially in accordance with any express contractual specification, subject to the agreed limitations and dependencies.
+
+10.2 No additional performance warranty
+
+Except for express contractual commitments and obligations that cannot lawfully be excluded or restricted, the Product is supplied on an "as is" and "as available" basis.
+
+10.3 No guaranteed outcome
+
+The Provider does not warrant that:
+
+a. The Product will satisfy every requirement particular to the Business Customer.
+
+b. Operation will be uninterrupted or entirely error-free.
+
+c. All faults or vulnerabilities will be identified or corrected.
+
+d. Every analysis, investigation, restoration or recovery will succeed.
+
+e. Every supported third-party dependency will remain compatible indefinitely.
+
+f. The Product will achieve a particular commercial, legal, technical or investigative outcome.
+
+10.4 Implied terms
+
+To the extent legally permissible and reasonable under applicable law, terms and warranties that would otherwise be implied are excluded, except insofar as they cannot lawfully be excluded.
+
+10.5 Evaluation
+
+The Business Customer is responsible for assessing the suitability of the Product for its intended operational environment.
+
+Where relevant, the Business Customer should conduct appropriate acceptance testing, backup verification and risk assessment before relying on the Product for critical operations.
+
+11. Limitation of liability: Business Customers
+
+This clause applies to Business Customers only.
+
+11.1 Non-excludable liability
+
+Nothing in this Agreement excludes or restricts liability for:
+
+a. Death or personal injury caused by negligence.
+
+b. Fraud or fraudulent misrepresentation.
+
+c. Any other liability that cannot lawfully be excluded or restricted.
+
+11.2 Excluded commercial losses
+
+Subject to clause 11.1 and the requirements of applicable law, the Provider will not be liable to a Business Customer for:
+
+a. Loss of profits, revenue or anticipated savings.
+
+b. Loss of business opportunities or contracts.
+
+c. Loss of goodwill or reputation.
+
+d. Business interruption or loss of production.
+
+e. Indirect or consequential losses.
+
+These exclusions are intended to apply whether the specified commercial losses arise directly or indirectly, insofar as such exclusions are legally enforceable and reasonable in the circumstances.
+
+11.3 Direct loss
+
+Liability for direct, legally recoverable loss not excluded under clause 11.2, including recoverable direct costs of restoring damaged data, remains subject to the aggregate liability cap in clause 11.4.
+
+11.4 Aggregate liability cap
+
+Subject to clause 11.1, the Provider's total aggregate liability to the Business Customer arising from or relating to the relevant Product, whether in contract, tort (including negligence), breach of statutory duty or otherwise, shall not exceed the greater of:
+
+a. The total fees paid or payable by the Business Customer for that Product during the 12 months immediately preceding the event first giving rise to the claim; or
+
+b. £[BUSINESS LIABILITY FLOOR].
+
+This cap applies collectively to claims arising from the same or related events, rather than separately to each legal cause of action.
+
+11.5 Reasonableness
+
+The parties acknowledge that the allocation of commercial risk should be considered in light of the nature and price of the Product, any negotiated commitments, available remedies, insurance and the potential consequences of failure.
+
+This clause applies only insofar as it satisfies the requirements of applicable law, including the Unfair Contract Terms Act 1977.
+
+11.6 Mitigation
+
+Each party must take reasonable steps to mitigate losses it suffers.
+
+11.7 No exclusion of deliberate misconduct
+
+Nothing in this clause is intended to exclude liability for deliberate wrongdoing by the Provider where such exclusion would be unlawful.
+
+12. Limitation of liability: Consumers
+
+This clause applies to Consumers.
+
+12.1 No restriction of mandatory rights
+
+The Provider does not exclude or restrict liability where doing so would be unlawful or unfair under applicable consumer protection law.
+
+12.2 Foreseeable losses
+
+The Provider is responsible for foreseeable loss or damage caused by its breach of this Agreement or failure to exercise reasonable care and skill where liability arises under applicable law.
+
+Loss or damage is foreseeable where it was an obvious consequence of the breach or was reasonably contemplated by both parties when the contract was made.
+
+12.3 Unrelated business losses
+
+Products acquired by Consumers are supplied for private use unless otherwise agreed.
+
+The Provider is not responsible under a Consumer contract for losses arising exclusively from a separate trade, business or professional activity that was outside the purpose of the contract, subject to applicable law.
+
+12.4 No blanket exclusion
+
+No provision in this Agreement should be interpreted as excluding all responsibility for faulty software, defective digital content, negligent services or legally compensable damage.
+
+13. Misuse, responsibility and indemnification
+
+13.1 Misuse
+
+You are responsible for losses resulting from your unlawful conduct, deliberate misuse or breach of this Agreement to the extent recognised by applicable law.
+
+The Provider is not responsible for losses caused solely by such conduct where the Provider has not otherwise incurred legal responsibility.
+
+13.2 Business indemnity
+
+Business Customers only.
+
+The Business Customer shall indemnify the Provider against reasonable and properly substantiated losses, damages, liabilities and legal costs arising from third-party claims to the extent caused by:
+
+a. The Business Customer's unlawful use of the Product;
+
+b. The Business Customer's infringement of third-party rights through material it supplies or processes;
+
+c. The Business Customer's intentional misuse of the Product; or
+
+d. The Business Customer's material breach of the authorised-use restrictions.
+
+The indemnity does not apply to the extent that a claim arises from the Provider's own negligence, breach of contract, unlawful conduct or other legally attributable fault.
+
+13.3 Indemnity procedure
+
+The Provider will, where reasonably practicable:
+
+a. Notify the Business Customer promptly of a relevant claim.
+
+b. Provide reasonable information concerning the claim.
+
+c. Avoid incurring unnecessary or unreasonable costs.
+
+d. Allow the Business Customer appropriate involvement in the defence or settlement of the claim.
+
+No settlement imposing obligations on the Business Customer may be agreed without its prior consent, not to be unreasonably withheld.
+
+13.4 Consumer position
+
+Consumers are not subject to the business indemnity.
+
+Consumers remain responsible for their own unlawful conduct under applicable law, but are not required by this Agreement to provide an open-ended indemnity for third-party claims.
+
+14. Suspension and termination
+
+14.1 Suspension
+
+The Provider may suspend access where reasonably necessary to:
+
+a. Address a material security threat.
+
+b. Prevent serious misuse or unlawful activity.
+
+c. Protect the integrity or availability of a hosted service.
+
+d. Respond to a lawful requirement.
+
+e. Enforce a material contractual obligation following appropriate notice where practicable.
+
+14.2 Notice
+
+Where reasonable and lawful, the Provider will explain the reason for suspension and provide an opportunity to remedy the issue.
+
+Immediate suspension may occur where delay would create material security, legal or operational risks.
+
+14.3 Termination for breach
+
+Either party may terminate the Agreement for a material breach by the other party that cannot be remedied, or that remains unremedied after reasonable written notice and an opportunity to remedy it.
+
+14.4 Expiry
+
+Fixed-term licences and subscriptions may expire in accordance with their agreed terms.
+
+14.5 Consequences
+
+On termination or expiry, rights to use relevant proprietary Products may cease, subject to surviving licence rights, applicable law and any agreed post-termination access.
+
+14.6 Customer Data
+
+For hosted services, the applicable Product Schedule will describe the available data export and deletion arrangements.
+
+Where reasonably practicable, Customers will have an opportunity to retrieve their data before deletion, subject to legitimate security restrictions, legal obligations and the agreed service specification.
+
+14.7 Refunds
+
+Termination does not remove refund rights or other remedies arising under applicable law.
+
+15. Specialist software and higher-risk activities
+
+15.1 Additional schedules
+
+Products involving particular operational or legal risks may be subject to additional Product Schedules.
+
+15.2 Digital forensic tools
+
+Forensic software may assist with evidence acquisition, analysis, interpretation, reporting or preservation.
+
+Outputs may be incomplete, affected by environmental conditions or require independent validation.
+
+The Provider does not guarantee that a particular output will be accepted by a court, regulator or other decision-maker.
+
+Nothing in this clause excuses failure to meet an expressly agreed specification or applicable legal duty.
+
+15.3 Data recovery software
+
+The ability to recover data depends on factors including physical media condition, overwriting, encryption, file-system damage and storage technology.
+
+Recovery success is not guaranteed unless expressly agreed in respect of a defined operation or service.
+
+15.4 File handling and transfer
+
+File operations may be affected by permissions, interrupted transfers, storage failures, incompatible formats and other technical conditions.
+
+Customers should use documented verification and backup procedures where appropriate.
+
+15.5 Investigative and security-sensitive applications
+
+Customers must ensure that investigative activity, data acquisition and system examination are properly authorised.
+
+Possession of a licence does not itself grant authority to access third-party devices, systems or information.
+
+16. Intellectual property and user-generated content
+
+16.1 Provider intellectual property
+
+The Provider retains ownership of its proprietary software, documentation, trademarks and other protected materials.
+
+16.2 Customer work
+
+The Provider does not acquire ownership of documents, source code, creative works, investigative reports or other original materials created by a Customer using the Product merely because the Product was used in their creation.
+
+16.3 Uploaded materials
+
+Customers must have appropriate rights or authorisation to upload and process content using hosted services.
+
+16.4 Feedback
+
+Customers may voluntarily submit suggestions or reports.
+
+The Provider may use general suggestions to improve its Products, provided it does not thereby acquire ownership of Customer Data or confidential material or disregard applicable privacy or intellectual property obligations.
+
+17. Privacy and data protection
+
+17.1 Personal information
+
+Personal data will be handled in accordance with applicable data protection law, including the UK GDPR and Data Protection Act 2018 where relevant.
+
+17.2 Privacy Notice
+
+The Provider's Privacy Notice will explain the processing of personal data for which it acts as controller.
+
+17.3 Data processing agreements
+
+Where the Provider processes personal data on behalf of a Business Customer as a processor, the parties will enter into an appropriate Data Processing Agreement containing the terms required by applicable law.
+
+17.4 Statutory duties
+
+Nothing in this Agreement excludes statutory data protection duties or liabilities where exclusion is not legally permitted.
+
+17.5 Sensitive information
+
+Where a Product handles evidential, confidential, special-category or otherwise sensitive information, the relevant Product Schedule may impose additional security, access, handling and retention requirements.
+
+18. Events beyond reasonable control
+
+Neither party shall be liable for delay or non-performance caused by events genuinely beyond its reasonable control, except in relation to obligations that remain enforceable notwithstanding such events.
+
+A party relying on this clause must take reasonable steps to minimise disruption and resume performance.
+
+This clause does not automatically excuse failures caused by inadequate precautions, lack of reasonable care or circumstances within a party's control.
+
+Where a prolonged interruption materially defeats the purpose of an ongoing contract, the Customer may exercise any applicable contractual or statutory termination and refund rights.
+
+19. Changes to the Agreement
+
+19.1 Existing purchases
+
+The terms applicable to a completed purchase will not be retrospectively changed merely by publishing a revised Agreement.
+
+19.2 Continuing services
+
+The Provider may propose changes to terms governing continuing services for legitimate reasons, including legal compliance, security or changes in the delivery of those services.
+
+Material changes will be communicated with reasonable advance notice.
+
+19.3 Customer options
+
+Where changes materially disadvantage a Consumer, the Provider will provide appropriate cancellation and refund rights as required by law.
+
+Continued use will not automatically be treated as acceptance of a material contractual change where valid consent is legally required.
+
+20. General provisions
+
+20.1 Severability
+
+If a provision is found invalid or unenforceable, the remaining provisions will continue to apply so far as they can lawfully and practically operate independently.
+
+20.2 Entire agreement
+
+For Business Customers, this Agreement and the applicable contractual documents constitute the agreement between the parties concerning the relevant Product.
+
+Nothing in this clause excludes liability for fraudulent misrepresentation or restricts another remedy where doing so would be unlawful.
+
+This clause does not remove binding contractual statements or mandatory Consumer rights.
+
+20.3 No waiver
+
+Failure to enforce a provision immediately does not automatically waive the right to enforce it subsequently.
+
+20.4 Assignment
+
+Neither party may transfer its contractual obligations without any consent required by law or the Agreement.
+
+The Provider may transfer the Agreement as part of a legitimate business restructuring or sale where doing so does not materially prejudice the Customer's contractual or statutory rights.
+
+20.5 Third-party rights
+
+Unless expressly provided otherwise, no person other than a party to this Agreement may enforce it under the Contracts (Rights of Third Parties) Act 1999.
+
+This does not affect rights available independently of that Act.
+
+20.6 Notices and contact
+
+The Provider's contact details are set out at the beginning of this Agreement.
+
+Contractual notices may be delivered using the methods specified in the applicable Product Schedule, subject to any statutory requirements.
+
+21. Governing law and disputes
+
+21.1 Governing law
+
+This Agreement is governed by the laws of England and Wales, subject to mandatory legal protections that apply to a Consumer under applicable law.
+
+21.2 Business disputes
+
+For Business Customers, the courts of England and Wales shall have exclusive jurisdiction, except where a mandatory legal provision requires otherwise.
+
+21.3 Consumer disputes
+
+Consumers may exercise their rights to bring proceedings in courts available to them under applicable law.
+
+Nothing in this Agreement removes mandatory protections available to Consumers in their country of habitual residence where those protections apply.
+
+21.4 Informal resolution
+
+Before commencing proceedings, the parties are encouraged, but are not required, to attempt a reasonable informal resolution.
+
+This does not prevent urgent legal action or the exercise of statutory rights.
+
+SCHEDULE A — DIGITAL FORENSICS AND INVESTIGATIVE SOFTWARE
+
+This Schedule applies only to Products identified as forensic, investigative or evidential tools.
+
+A1. Intended purpose
+
+The Product is intended to assist suitably authorised users with specified investigative or technical tasks.
+
+It is not a substitute for professional training, appropriate forensic methodology, legal advice or independent evidential assessment.
+
+A2. Forensic accuracy
+
+Results may be affected by file-system behaviour, operating system artefacts, storage characteristics, incomplete evidence, damaged data, encryption, parsing limitations and software defects.
+
+The Provider does not warrant that every relevant artefact will be identified or that every result will be free from error.
+
+A3. Evidence verification
+
+The Customer is responsible for applying suitable procedures to verify the integrity, provenance and interpretation of evidence.
+
+Such procedures may include hashing, independent analysis, validation of timestamps, preservation of original data and appropriate audit records.
+
+A4. Evidential admissibility
+
+The Provider does not guarantee that a report, extracted artefact or other output will be admissible or accepted as conclusive evidence in legal or disciplinary proceedings.
+
+Admissibility and evidential weight depend on the relevant legal framework and circumstances.
+
+A5. Chain of custody
+
+Unless expressly included in the Product's documented functionality, the Product does not independently guarantee compliance with chain-of-custody requirements.
+
+The Customer is responsible for maintaining appropriate records of evidence handling.
+
+A6. Independent decisions
+
+Investigative decisions, formal allegations and conclusions should not be based solely on unverified software output where independent validation is reasonably necessary.
+
+A7. Lawful authority
+
+The Customer must possess the necessary authority to examine or process relevant systems and information.
+
+SCHEDULE B — DATA RECOVERY, STORAGE AND FILE OPERATIONS
+
+This Schedule applies to Products designed to recover, manipulate, convert, transfer, synchronise or manage data.
+
+B1. Recovery limitations
+
+Data recovery may be unsuccessful even where the Product operates as designed.
+
+No particular quantity, percentage or category of data is guaranteed to be recoverable unless expressly agreed.
+
+B2. Existing damage
+
+The Provider is not responsible for pre-existing storage damage, corruption or inaccessible information.
+
+B3. Operational precautions
+
+The Customer should follow applicable instructions concerning backup, source preservation, storage integrity and recovery destinations.
+
+Where appropriate, recovery operations should avoid writing to the original affected storage medium.
+
+B4. Storage and transfer
+
+Operations may be interrupted by hardware failure, network loss, permissions, resource exhaustion or third-party service limitations.
+
+B5. Verification
+
+The Customer should independently verify the completeness and integrity of important recovered or transferred data.
+
+B6. Liability
+
+This Schedule does not exclude liability for damage attributable to the Provider's own breach of contract, negligence or failure to meet applicable legal obligations.
+
+SCHEDULE C — HOSTED SERVICES AND FILE UPLOADS
+
+This Schedule applies to cloud-hosted software and hosted data-processing services.
+
+C1. Service description
+
+The applicable Product Schedule will identify:
+
+- Hosting and storage functionality;
+- Applicable storage and transfer limits;
+- Retention and deletion periods;
+- Backup and recovery commitments;
+- Security arrangements;
+- Data export facilities;
+- Technical support and service commitments.
+
+C2. Customer content
+
+The Customer remains responsible for having the rights and permissions necessary to upload and process content.
+
+C3. Service integrity
+
+The Provider will take reasonable measures to maintain service integrity and comply with agreed security commitments.
+
+C4. Content restrictions
+
+The Provider may restrict or remove content where reasonably necessary to comply with law, enforce lawful usage restrictions or address serious security threats.
+
+C5. Data retention and deletion
+
+Customer Data will be retained and deleted in accordance with the applicable Product Schedule, Privacy Notice, Data Processing Agreement and legal obligations.
+
+C6. Service termination
+
+Where practicable and legally permissible, customers will be given access to available export facilities before data is permanently deleted following termination.
+
+END OF MASTER SOFTWARE LICENCE AND SERVICES AGREEMENT

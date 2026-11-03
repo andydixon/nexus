@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: AGPL-3.0-only
-// Copyright (C) 2026 Andy Dixon
+// SPDX-License-Identifier: LicenseRef-Proprietary
+// Copyright (C) 2026 Andy Dixon t/a Uncomplex
 
 //! Design system: colour tokens, radii and typography (Inter for UI, JetBrains Mono for bytes).
 //! Widgets read `Tokens::get(ctx)` instead of hard-coding colours, so every theme applies

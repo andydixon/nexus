@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: AGPL-3.0-only
-// Copyright (C) 2026 Andy Dixon
+// SPDX-License-Identifier: LicenseRef-Proprietary
+// Copyright (C) 2026 Andy Dixon t/a Uncomplex
 
 //! Remote desktop viewer for VNC and RDP: the remote framebuffer as a texture, with mouse,
 //! keyboard and clipboard input. Input is expressed in X keysyms and VNC pointer masks (VNC's own

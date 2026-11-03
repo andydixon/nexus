@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: AGPL-3.0-only
-// Copyright (C) 2026 Andy Dixon
+// SPDX-License-Identifier: LicenseRef-Proprietary
+// Copyright (C) 2026 Andy Dixon t/a Uncomplex
 
 //! Settings window: General, Terminal, Security, Known Hosts, Help, About. Also the
 //! master-password dialog (strength meter + confirm) used to create or unlock the vault.
@@ -784,18 +784,12 @@ impl Settings {
     // --- About ----------------------------------------------------------------------------
 
     fn about(&mut self, ui: &mut Ui, s: &mut Shared) {
-        const SOURCE_URL: &str = "https://github.com/andydixon/nexus";
         let t = Tokens::get(ui.ctx());
         ui.add_space(8.0);
         ui.label(RichText::new("Nexus Terminal").font(theme::semibold(22.0)));
         ui.label(RichText::new(format!("Version {}", nexus_core::service::VERSION)).color(t.text_dim));
         ui.label(RichText::new("Developed by Andy Dixon - dixon.cx/nexus").color(t.text_faint));
-        ui.horizontal(|ui| {
-            ui.label(RichText::new("Free software under the GNU Affero General Public License v3. Source:").color(t.text_faint));
-            if ui.link("github.com/andydixon/nexus").clicked() {
-                widgets::open_web_url(ui.ctx(), SOURCE_URL);
-            }
-        });
+        ui.label(RichText::new("Proprietary software, © 2026 Andy Dixon t/a Uncomplex. See Help ▸ Licence.").color(t.text_faint));
         ui.add_space(8.0);
         for f in [
             "SSH, Telnet, RAW TCP, Serial, VNC, RDP, IRC, GitHub and local terminals",

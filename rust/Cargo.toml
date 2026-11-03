@@ -1,12 +1,12 @@
 [workspace]
 resolver = "3"
-members = ["core", "app"]
+members = ["core", "app", "licensing-client"]
 exclude = ["fuzz"]
 
 [workspace.package]
 version = "3.0.2"
 edition = "2024"
-license = "AGPL-3.0-only"
+license = "LicenseRef-Proprietary"
 authors = ["Andy Dixon <andy@dixon.cx>"]
 repository = "https://github.com/andydixon/nexus"
 

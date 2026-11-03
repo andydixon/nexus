@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: AGPL-3.0-only
-// Copyright (C) 2026 Andy Dixon
+// SPDX-License-Identifier: LicenseRef-Proprietary
+// Copyright (C) 2026 Andy Dixon t/a Uncomplex
 
 //! SSH client on russh: interactive PTY shell, the profile's auth chain (agent, public key,
 //! password, keyboard-interactive with TOTP), jump hosts, SOCKS5/HTTP proxies, local and remote

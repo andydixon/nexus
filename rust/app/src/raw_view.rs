@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: AGPL-3.0-only
-// Copyright (C) 2026 Andy Dixon
+// SPDX-License-Identifier: LicenseRef-Proprietary
+// Copyright (C) 2026 Andy Dixon t/a Uncomplex
 
 //! RAW TCP viewer: text / hex / split views of the capture, pause, clear, save, and a send bar.
 //! Port of the web build's `raw.js`. Sent data comes back through `Event::RawData` ("send"), so

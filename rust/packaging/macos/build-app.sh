@@ -1,6 +1,6 @@
 #!/bin/sh
-# SPDX-License-Identifier: AGPL-3.0-only
-# Copyright (C) 2026 Andy Dixon
+# SPDX-License-Identifier: LicenseRef-Proprietary
+# Copyright (C) 2026 Andy Dixon t/a Uncomplex
 # Build NexusTerminal.app, a macOS application bundle. Run on a Mac with Xcode command-line tools:
 #
 #   rust/packaging/macos/build-app.sh            # universal (Apple Silicon + Intel) if both
@@ -54,7 +54,10 @@ if command -v plutil >/dev/null; then plutil -lint "$APP/Contents/Info.plist"; f
 # Ad-hoc sign so Apple Silicon runs it. For distribution, sign with a Developer ID and notarize:
 #   codesign --force --options runtime --sign "Developer ID Application: …" NexusTerminal.app
 #   xcrun notarytool submit … --wait && xcrun stapler staple NexusTerminal.app
-if command -v codesign >/dev/null; then codesign --force --deep --sign - "$APP"; fi
+if command -v codesign >/dev/null; then
+  if [ -n "${SIGN_IDENTITY:-}" ]; then codesign --force --deep --options runtime --timestamp --sign "$SIGN_IDENTITY" "$APP"
+  else codesign --force --deep --sign - "$APP"; fi
+fi
 
 if [ "${1:-}" = "--dmg" ] && command -v hdiutil >/dev/null; then
   DMG="$OUT/NexusTerminal-$VERSION.dmg"

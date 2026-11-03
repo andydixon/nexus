@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: AGPL-3.0-only
-// Copyright (C) 2026 Andy Dixon
+// SPDX-License-Identifier: LicenseRef-Proprietary
+// Copyright (C) 2026 Andy Dixon t/a Uncomplex
 
 //! Credential storage: the OS keychain first, then an Argon2id + AES-256-GCM vault file that is
 //! byte-compatible with the Go app's `vault/vault.json`.

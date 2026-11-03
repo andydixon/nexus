@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: AGPL-3.0-only
-// Copyright (C) 2026 Andy Dixon
+// SPDX-License-Identifier: LicenseRef-Proprietary
+// Copyright (C) 2026 Andy Dixon t/a Uncomplex
 
 //! Trigger rules: match terminal output lines and notify / highlight / beep (port of triggers.js).
 //! Rules live in `triggers.json` in the data directory (the web build's localStorage rules are

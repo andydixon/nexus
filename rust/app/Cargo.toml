@@ -29,6 +29,9 @@ regex = "1"
 alacritty_terminal = "0.26.0"
 chrono = "0.4.45"
 arboard = "3.6.1"
+licensing-client = { path = "../licensing-client" }
+tokio = { version = "1", features = ["rt"] }
+webbrowser = "1"
 
 [build-dependencies]
 winresource = "0.1"

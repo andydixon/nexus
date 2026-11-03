@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# SPDX-License-Identifier: AGPL-3.0-only
-# Copyright (C) 2026 Andy Dixon
+# SPDX-License-Identifier: LicenseRef-Proprietary
+# Copyright (C) 2026 Andy Dixon t/a Uncomplex
 #
 # Publish a Nexus Terminal release as the `nexusterminal` package (.deb, .rpm and Arch) in the
 # signed apt, dnf and pacman repositories served at https://repo.dixon.cx.
@@ -27,7 +27,7 @@ PACKAGE=nexusterminal
 SUMMARY="Native desktop client for SSH, SFTP, Telnet, Serial, VNC, RDP, IRC and GitHub"
 HOMEPAGE=https://dixon.cx/nexus
 GITHUB=andydixon/nexus
-LICENSE=AGPL-3.0-only
+LICENSE=LicenseRef-Proprietary
 ARCHS=${ARCHS:-"amd64 arm64"}
 # The binaries come from ubuntu-22.04 runners: glibc 2.35. Windowing, GL and audio libraries are
 # loaded at run time, so they're recommended rather than hard dependencies (any desktop has them).
@@ -91,10 +91,16 @@ NFPM=$NFPM_DIR/nfpm
 say "fetching $TAG from github.com/$GITHUB"
 mkdir -p "$WORK/dl"
 base=https://github.com/$GITHUB/releases/download/$TAG
-for f in SHA256SUMS $(for arch in $ARCHS; do echo "NexusTerminal-linux-$arch.zip"; done); do
+# Release zips are nexus-terminal-<version>-linux-<x86_64|aarch64>.zip (scripts/build-all.sh).
+platform_of() { if [[ $1 == arm64 ]]; then echo linux-aarch64; else echo linux-x86_64; fi; }
+zip_of() { grep -oE "nexus-terminal-[^ ]*-$(platform_of "$1")\.zip" "$WORK/dl/SHA256SUMS" | head -1; }
+curl -fsSL -o "$WORK/dl/SHA256SUMS" "$base/SHA256SUMS" || die "release $TAG has no SHA256SUMS yet"
+for arch in $ARCHS; do
+	f=$(zip_of "$arch")
+	[[ -n $f ]] || die "release $TAG has no $(platform_of "$arch") zip"
 	curl -fsSL -o "$WORK/dl/$f" "$base/$f" || die "release $TAG has no $f yet"
+	(cd "$WORK/dl" && grep -F " $f" SHA256SUMS | sha256sum -c --quiet) || die "checksum mismatch: $f"
 done
-(cd "$WORK/dl" && grep -E "NexusTerminal-linux-($(tr ' ' '|' <<<"$ARCHS"))\.zip" SHA256SUMS | sha256sum -c --quiet) || die "checksum mismatch"
 
 # ---- package -----------------------------------------------------------------
 say "packaging $PACKAGE $VERSION for $ARCHS"
@@ -102,7 +108,9 @@ mkdir -p "$WORK/out"
 for arch in $ARCHS; do
 	src=$WORK/src-$arch
 	mkdir -p "$src"
-	unzip -q "$WORK/dl/NexusTerminal-linux-$arch.zip" -d "$src"
+	unzip -q "$WORK/dl/$(zip_of "$arch")" -d "$src"
+	src=$(echo "$src"/nexus-terminal-*/) # the zip's top folder
+	src=${src%/}
 	[[ -x $src/nexus-terminal ]] || die "no nexus-terminal binary in the $arch zip"
 	cp "$src/nexus-terminal.desktop" "$src/$PACKAGE.desktop"
 	cat >"$WORK/nfpm-$arch.yaml" <<-EOF

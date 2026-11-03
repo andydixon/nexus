@@ -108,13 +108,9 @@ See [docs/build-and-release.md](docs/build-and-release.md) for platform prerequi
 
 ## License
 
-Copyright (C) 2026 Andy Dixon.
-
-Nexus Terminal is free software: you can redistribute it and/or modify it under the terms of the
-[GNU Affero General Public License, version 3](LICENSE) as published by the Free Software
-Foundation. It is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
-without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-license for details.
+Nexus Terminal is proprietary software, copyright Andy Dixon t/a Uncomplex. Use is governed by the
+Master Software Licence and Services Agreement in [LICENSE](LICENSE) and requires a licence or trial
+activated through Help > Licence. Licensing questions: legal@uncomplex.co.uk.
 
 Third-party crates (including the patched copies in `rust/vendor/`) keep their own licenses,
 which are listed in each crate.

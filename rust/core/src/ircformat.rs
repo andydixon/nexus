@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: AGPL-3.0-only
-// Copyright (C) 2026 Andy Dixon
+// SPDX-License-Identifier: LicenseRef-Proprietary
+// Copyright (C) 2026 Andy Dixon t/a Uncomplex
 
 //! mIRC formatting (^B ^] ^^ ^_ ^V ^Q ^O ^C fg,bg ^D hex) to styled spans, the nick colour hash
 //! and the IRC event line layout. Ported from the Wails frontend's `irc.js`.

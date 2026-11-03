@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: AGPL-3.0-only
-// Copyright (C) 2026 Andy Dixon
+// SPDX-License-Identifier: LicenseRef-Proprietary
+// Copyright (C) 2026 Andy Dixon t/a Uncomplex
 
 //! The app-facing API (a port of internal/api.Service minus the Wails plumbing): profiles,
 //! sessions, credentials, known hosts, preferences, snippets, import/export, SSH keys, updates.
@@ -17,7 +17,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-/// The release version (`NEXUS_VERSION` from release.sh, e.g. "v1.2.0-abc1234"), else the crate version.
+/// The release version (`NEXUS_VERSION` from scripts/build-all.sh, e.g. "v1.2.0-abc1234"), else the crate version.
 pub const VERSION: &str = match option_env!("NEXUS_VERSION") {
     Some(v) => v,
     None => env!("CARGO_PKG_VERSION"),

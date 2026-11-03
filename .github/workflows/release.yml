@@ -1,0 +1,80 @@
+# Build and package every platform with scripts/build-all.sh; on a v* tag, attach the packages
+# to the GitHub release. Same shape in every Uncomplex app repo. Building runs dependency build
+# scripts, so it only gets a read token; publishing is a separate job that runs no project code.
+name: Release
+
+on:
+    push:
+        tags: ["v*"]
+    workflow_dispatch:
+
+permissions:
+    contents: read
+
+env:
+    CARGO_TERM_COLOR: always
+
+jobs:
+    build:
+        name: Build (${{ matrix.platform }})
+        runs-on: ${{ matrix.runner }}
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    - { platform: linux-x86_64, runner: ubuntu-22.04 }
+                    - { platform: linux-aarch64, runner: ubuntu-22.04-arm }
+                    - { platform: windows-x86_64, runner: windows-latest }
+                    - { platform: windows-aarch64, runner: windows-11-arm }
+                    - { platform: macos-aarch64, runner: macos-14 }
+                    - { platform: macos-x86_64, runner: macos-15-intel }
+        defaults:
+            run:
+                shell: bash
+        steps:
+            - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+              with:
+                  fetch-depth: 0
+                  persist-credentials: false
+            - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+            - name: Linux build dependencies
+              if: runner.os == 'Linux'
+              run: sudo apt-get update && sudo apt-get install -y libxkbcommon-dev libgl1-mesa-dev libx11-dev libxcursor-dev libxrandr-dev libxi-dev libwayland-dev libgtk-3-dev libasound2-dev openssh-server zip
+            - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+              with:
+                  key: ${{ matrix.platform }}
+                  workspaces: rust
+            - name: Build and package
+              run: scripts/build-all.sh --platforms ${{ matrix.platform }}
+            - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+              with:
+                  name: ${{ matrix.platform }}
+                  path: |
+                      dist/${{ matrix.platform }}/*.zip
+                      dist/${{ matrix.platform }}/manifest-*.json
+                      dist/${{ matrix.platform }}/version-*.txt
+                  if-no-files-found: error
+
+    publish:
+        name: Attach to GitHub release
+        needs: build
+        if: startsWith(github.ref, 'refs/tags/')
+        runs-on: ubuntu-22.04
+        permissions:
+            contents: write
+        steps:
+            - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+              with:
+                  path: artefacts
+                  merge-multiple: true
+            - name: Checksums
+              run: (cd artefacts && sha256sum *.zip > SHA256SUMS && cat SHA256SUMS)
+            - uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
+              with:
+                  files: |
+                      artefacts/*.zip
+                      artefacts/*.deb
+                      artefacts/*.AppImage
+                      artefacts/*.dmg
+                      artefacts/*-setup.exe
+                      artefacts/SHA256SUMS

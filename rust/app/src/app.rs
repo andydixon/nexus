@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: AGPL-3.0-only
-// Copyright (C) 2026 Andy Dixon
+// SPDX-License-Identifier: LicenseRef-Proprietary
+// Copyright (C) 2026 Andy Dixon t/a Uncomplex
 
 //! The main window: title bar, connection sidebar, tab strip and workspace (terminals, split
 //! panes, protocol viewers), right dock (SFTP or the profile editor), status bar, command
@@ -124,6 +124,8 @@ pub enum InputThen {
 
 pub struct App {
     pub s: Shared,
+    /// Licence window and background licensing client.
+    pub licence: crate::licence::Licence,
     /// The tab layout as last saved for restoring (see restore.rs), and when it was last checked.
     pub saved_layout: Option<String>,
     layout_checked: f64,
@@ -179,6 +181,9 @@ impl App {
         let theme = opts.theme.as_deref().and_then(ThemeKind::from_id).unwrap_or_else(|| theme_for(&s.prefs.theme));
         theme::apply(&cc.egui_ctx, theme);
         let mut app = App {
+            licence: crate::licence::Licence::new(&cc.egui_ctx, |url| {
+                let _ = webbrowser::open(url);
+            }),
             s,
             rx,
             theme,
@@ -1084,6 +1089,7 @@ impl eframe::App for App {
         self.triggers.ui(&ctx, &mut self.s);
         self.recordings.ui(&ctx, &mut self.s);
         chrome::dialogs(self, &ctx);
+        self.licence.show(&ctx, self.dialog.is_some());
         chrome::prompts(self, &ctx);
         chrome::palette(self, &ctx);
         chrome::toasts(self, &ctx);

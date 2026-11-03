@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: AGPL-3.0-only
-// Copyright (C) 2026 Andy Dixon
+// SPDX-License-Identifier: LicenseRef-Proprietary
+// Copyright (C) 2026 Andy Dixon t/a Uncomplex
 
 //! Password-encrypted profile exports: `[version 1][salt 32][nonce 12][AES-256-GCM ciphertext]`
 //! over a JSON bundle, with the vault's Argon2id parameters.

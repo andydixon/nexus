@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: AGPL-3.0-only
-// Copyright (C) 2026 Andy Dixon
+// SPDX-License-Identifier: LicenseRef-Proprietary
+// Copyright (C) 2026 Andy Dixon t/a Uncomplex
 
 //! Window chrome: custom title bar, status bar, command palette, credential and host-key
 //! prompts, the main window's modal dialogs, toasts and resize edges.
@@ -175,6 +175,9 @@ pub fn title_bar(app: &mut App, ui: &mut Ui) {
             ui.menu_button("Help", |ui| {
                 if item(ui, icon::BOOK_OPEN, "Help", "") {
                     app.settings.open(SettingsTab::Help);
+                }
+                if item(ui, icon::KEY, "Licence…", "") {
+                    app.licence.open = true;
                 }
                 if item(ui, icon::INFO, "About Nexus Terminal", "") {
                     app.settings.open(SettingsTab::About);
@@ -452,6 +455,7 @@ enum Cmd {
     Broadcast,
     Theme(ThemeKind),
     About,
+    Licence,
     Fullscreen,
     Sftp(String),
 }
@@ -510,6 +514,7 @@ fn commands(app: &App) -> Vec<(Cmd, String, &'static str, &'static str, String)>
         v.push((Cmd::Theme(k), format!("Theme: {}", k.label()), "Application", icon::PALETTE, String::new()));
     }
     v.push((Cmd::Fullscreen, "Toggle Full Screen".into(), "Application", icon::CORNERS_OUT, "F11".into()));
+    v.push((Cmd::Licence, "Licence…".into(), "Application", icon::KEY, String::new()));
     v.push((Cmd::About, "About Nexus Terminal".into(), "Application", icon::INFO, String::new()));
     if app.s.svc.secrets.vault.is_unlocked() {
         v.push((Cmd::Lock, "Lock Secret Store".into(), "Security", icon::LOCK, String::new()));
@@ -587,6 +592,7 @@ fn run(app: &mut App, ctx: &egui::Context, c: Cmd) {
         Cmd::Broadcast => app.toggle_broadcast(),
         Cmd::Theme(k) => set_theme(app, k),
         Cmd::About => app.settings.open(SettingsTab::About),
+        Cmd::Licence => app.licence.open = true,
         Cmd::Fullscreen => {
             let full = ctx.input(|i| i.viewport().fullscreen.unwrap_or(false));
             ctx.send_viewport_cmd(ViewportCommand::Fullscreen(!full));

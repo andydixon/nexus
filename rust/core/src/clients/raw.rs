@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: AGPL-3.0-only
-// Copyright (C) 2026 Andy Dixon
+// SPDX-License-Identifier: LicenseRef-Proprietary
+// Copyright (C) 2026 Andy Dixon t/a Uncomplex
 
 //! RAW TCP client (port of Go `internal/rawclient`): binary-safe send/receive, a capped history
 //! of sent ("send") and received ("recv") frames, JSON capture, and the hex/escape encoders the

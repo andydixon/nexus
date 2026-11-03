@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: AGPL-3.0-only
-// Copyright (C) 2026 Andy Dixon
+// SPDX-License-Identifier: LicenseRef-Proprietary
+// Copyright (C) 2026 Andy Dixon t/a Uncomplex
 
 //! IRC client view: room tabs, message log, composer and room/user lists. Port of `irc.js`;
 //! lines are `ircformat::format_event` spans drawn in the terminal theme's colours.
