@@ -17,7 +17,7 @@ For each password you choose: save it, remember it until you quit, or ask every 
 
 \begin{center}
 \begin{tikzpicture}[
-  box/.style={rounded corners=6pt, fill=#1!12, draw=#1!60, line width=0.6pt, minimum height=13mm, text width=40mm,
+  box/.style={rounded corners=3pt, fill=upanel, draw=urule, line width=0.5pt, minimum height=13mm, text width=40mm,
     align=center, font=\small},
   arr/.style={-latex, line width=0.8pt, color=muted}]
   \node[box=accent] (need) {\heavy A session needs\\a password};
@@ -57,14 +57,14 @@ Every password, passphrase, token or TOTP secret has its own setting:
 
 \begin{center}
 \begin{tabular}{@{}p{0.3\linewidth}p{0.3\linewidth}p{0.3\linewidth}@{}}
-  \begin{tcolorbox}[colback=green!8, boxrule=0pt, arc=6pt, fontupper=\small, height=33mm]
-    {\heavy\color{green!60!black}\iLock\ Save securely}\par\smallskip Stored in the keychain or vault and used automatically. Most convenient.
+  \begin{tcolorbox}[colback=upanel, colframe=uhair, boxrule=0.5pt, arc=3pt, fontupper=\small, height=33mm]
+    {\bfseries\color{uink}\iLock\ Save securely}\par\smallskip Stored in the keychain or vault and used automatically. Most convenient.
   \end{tcolorbox} &
-  \begin{tcolorbox}[colback=accent!8, boxrule=0pt, arc=6pt, fontupper=\small, height=33mm]
-    {\heavy\color{accent!80!black}\iClock\ Remember for this session}\par\smallskip Asked once, kept in memory, never written to disk.
+  \begin{tcolorbox}[colback=upanel, colframe=uhair, boxrule=0.5pt, arc=3pt, fontupper=\small, height=33mm]
+    {\bfseries\color{uink}\iClock\ Remember for this session}\par\smallskip Asked once, kept in memory, never written to disk.
   \end{tcolorbox} &
-  \begin{tcolorbox}[colback=amber!10, boxrule=0pt, arc=6pt, fontupper=\small, height=33mm]
-    {\heavy\color{amber!75!black}\iDetective\ Ask every time}\par\smallskip Asked on every single connection. Most paranoid.
+  \begin{tcolorbox}[colback=upanel, colframe=uhair, boxrule=0.5pt, arc=3pt, fontupper=\small, height=33mm]
+    {\bfseries\color{uink}\iDetective\ Ask every time}\par\smallskip Asked on every single connection. Most paranoid.
   \end{tcolorbox}
 \end{tabular}
 \end{center}

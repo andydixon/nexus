@@ -10,9 +10,9 @@
 
 \newcommand\shortcut[2]{#1 & #2\\}
 \newcommand\sheet[3]{%
-  \begin{tcolorbox}[enhanced, arc=8pt, boxrule=0pt, colback=#1!7, left=10pt, right=10pt, top=8pt, bottom=8pt,
+  \begin{tcolorbox}[enhanced, arc=3pt, boxrule=0.5pt, colframe=uhair, colback=upanel, left=10pt, right=10pt, top=8pt, bottom=8pt,
     before skip=0pt, after skip=10pt, fontupper=\small]
-  {\heavy\large\color{#1!85!black}#2}\par\vspace{4pt}
+  {\bfseries\large\color{uink}#2}\par\vspace{4pt}
   \renewcommand\arraystretch{1.5}\begin{tabularx}{\linewidth}{@{}X>{\raggedleft\arraybackslash}p{36mm}@{}}#3\end{tabularx}
   \end{tcolorbox}}
 
