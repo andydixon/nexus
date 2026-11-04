@@ -152,6 +152,8 @@ build() {
     if [ "$t" = aarch64-pc-windows-gnullvm ]; then
         export PATH="$LLVM_MINGW/bin:$PATH" WINDRES=aarch64-w64-mingw32-windres
         export CARGO_TARGET_AARCH64_PC_WINDOWS_GNULLVM_LINKER=aarch64-w64-mingw32-clang
+        # Static libunwind: otherwise the exe needs llvm-mingw's libunwind.dll, which Windows lacks.
+        export CARGO_TARGET_AARCH64_PC_WINDOWS_GNULLVM_RUSTFLAGS="-C target-feature=+crt-static"
     fi
     cargo_build "$t" $rel --locked || return 1
     out="$root/dist/$p"
