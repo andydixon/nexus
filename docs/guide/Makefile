@@ -1,6 +1,6 @@
 # Builds nexus-guide.pdf with LuaLaTeX (three passes so the contents and page references settle).
 # Needs LuaLaTeX and the Inter and Fira fonts from TeX Live (Debian/Ubuntu: texlive-luatex texlive-latex-extra
-# texlive-fonts-extra texlive-pictures). Layout: the uncomplex. user-guide format, see nexus-guide.sty.
+# texlive-fonts-extra texlive-pictures fonts-inter; Debian ships Inter only as Type 1). Layout: the uncomplex. user-guide format, see nexus-guide.sty.
 # Screenshots: tools/screenshots.sh (needs xvfb-run, sshd, python3).
 OUT ?= build
 nexus-guide.pdf: nexus-guide.tex nexus-guide.sty chapters/*.tex img/*
