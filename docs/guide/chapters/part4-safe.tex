@@ -83,6 +83,8 @@ Connections, disconnections, profile changes, credential access, imports and exp
 database. Secrets themselves never do. TOTP secrets live in the keychain or vault too, never in the profile.
 \end{sidequest}
 
+\donewhen{you know whether your passwords are in the OS keychain or the vault, and any master password is in your password manager.}
+
 % =========================================================================================
 \chapter{Host keys: is it really that server?}\label{ch:hostkeys}
 \chapmeta{3 minutes}{You'll understand the scary fingerprint dialog and what to do about it}
@@ -123,6 +125,8 @@ adds the CA's public key for a host pattern in OpenSSH style (\code{*.corp.examp
 covers must then show a certificate the CA signed, naming that host and in date. It's trusted without a prompt, and
 anything else is refused.
 
+\donewhen{you have checked a fingerprint and trusted the server, or refused one you could not vouch for.}
+
 % =========================================================================================
 \chapter{SSH keys}\label{ch:keys}
 \chapmeta{2 minutes}{You'll have a key pair without memorising ssh-keygen flags}
@@ -137,3 +141,6 @@ public key to the clipboard (ready to paste into GitHub or \code{authorized\_key
 Not sure which type? Pick Ed25519. It's small, fast and secure. Keys are generated inside Nexus Terminal and
 saved in the usual OpenSSH format, so \code{ssh} and \code{git} can use them too.
 \end{protip}
+
+\donewhen{you have a key pair and its public half is on the server.}
+

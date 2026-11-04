@@ -38,6 +38,8 @@ then click \ui{Save}.
 Nexus Terminal checks once at launch. If there's a newer version the status bar says \ui{Update available}; click it to
 see the release notes and a \ui{View release} button. Nothing downloads or installs behind your back.
 
+\donewhen{you know which page of \ui{Settings} holds the thing you wanted to change.}
+
 % =========================================================================================
 \chapter{Import and export}\label{ch:transfer}
 \chapmeta{3 minutes}{You'll back up your profiles, or copy them to another computer}
@@ -65,6 +67,8 @@ reads it back. Already have an \code{\textasciitilde/.ssh/config}? Import that t
 A JSON export with \ui{Include secrets} ticked has those login-script passwords in plain text. Use the encrypted \code{.nexus} export to
 move things between machines.
 \end{danger}
+
+\donewhen{an export of your profiles is somewhere safe.}
 
 % =========================================================================================
 \chapter{Moving house}\label{ch:move}
@@ -122,3 +126,6 @@ stored under the service name \code{NexusTerminal}.
 Start Nexus Terminal with \code{--data-dir /some/other/folder} and it uses that folder instead. Brilliant for
 experiments, demos and a portable install on a USB stick.
 \end{protip}
+
+\donewhen{a profile you add on one computer turns up on the other.}
+

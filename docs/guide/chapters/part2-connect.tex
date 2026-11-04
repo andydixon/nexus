@@ -104,6 +104,8 @@ For SSH sessions the status bar shows live latency, the round trip to the server
 in the hundreds and your typing feels sticky, it's the network, not you.
 \end{sidequest}
 
+\donewhen{you log in with a key, and any bastion or 2FA code is handled for you.}
+
 % =========================================================================================
 \chapter{Serial: cables and consoles}\label{ch:serial}
 \chapmeta{4 minutes}{You'll be talking to a switch, router or microcontroller over USB}
@@ -150,6 +152,8 @@ On Linux, add yourself to the \code{dialout} group (\code{uucp} on some distribu
 On a Mac, use the \code{/dev/cu.*} device, not \code{/dev/tty.*}.
 \end{protip}
 
+\donewhen{the device's console answers when you press \kbd{Enter}.}
+
 % =========================================================================================
 \chapter{Telnet and RAW TCP}\label{ch:raw}
 \chapmeta{4 minutes}{You'll poke at old kit and raw sockets without reaching for netcat}
@@ -193,6 +197,8 @@ Point a RAW profile at a web server on port 80 and send \code{HEAD / HTTP/1.0\te
 in \ui{Escaped} mode. Instant HTTP headers, no browser required.
 \end{quickwin}
 
+\donewhen{the device or port you were poking at answers you.}
+
 % =========================================================================================
 \chapter{VNC remote desktops}\label{ch:vnc}
 \chapmeta{4 minutes}{You'll see and drive a remote desktop, safely}
@@ -225,6 +231,8 @@ warns you and offers \ui{Connect Anyway}, \ui{Edit Profile} or \ui{Cancel}.
 Turn on \ui{VNC viewers may control screen with password} in macOS Screen Sharing settings. Nexus Terminal uses
 standard VNC password authentication, not Apple's own login method.
 \end{headsup}
+
+\donewhen{you can see the remote desktop and move its pointer.}
 
 % =========================================================================================
 \chapter{RDP: Windows desktops}\label{ch:rdp}
@@ -280,6 +288,8 @@ a drive called Nexus. The server can read and change that folder, and nothing ou
 Pick \emph{one} of: a \ui{Proxy} (SOCKS5 or HTTP CONNECT), an \ui{SSH Tunnel} (same as VNC), or an \ui{RD Gateway}
 (experimental: the gateway needs a proper public certificate and Basic authentication over HTTPS).
 
+\donewhen{the Windows desktop is open in a tab.}
+
 % =========================================================================================
 \chapter{IRC}\label{ch:irc}
 \chapmeta{3 minutes}{You'll be chatting in your project's channels from the same window as your servers}
@@ -304,6 +314,8 @@ Nick, server, rooms to join. Tabs for each room, \code{/commands} as you'd expec
   \item The side panel lists your rooms, a room browser with a filter (click to join) and who's in the current room.
 \end{itemize}
 
+\donewhen{you are in your channels and can see the conversation.}
+
 % =========================================================================================
 \chapter{GitHub}\label{ch:github}
 \chapmeta{2 minutes}{You'll see all your repositories, freshest first}
@@ -323,6 +335,8 @@ Paste a personal access token with the \code{repo} scope. Get a tidy, filterable
   \item Works with GitHub Enterprise: set \ui{API Base URL} to your server's API address. Refreshes every 60–3600 seconds.
 \end{itemize}
 
+\donewhen{your repositories are listed in a tab, freshest first.}
+
 % =========================================================================================
 \chapter{Your own computer}\label{ch:local}
 \chapmeta{1 minute}{You'll stop alt-tabbing to a separate terminal app}
@@ -331,3 +345,6 @@ Click \ui{Local Machine} for a shell on this computer. It uses your system's def
 another in \menu{Settings\then General\then Local shell} (\code{pwsh}, \code{zsh}, \code{fish}, whatever you fancy).
 
 \shot[0.86\linewidth]{local.png}{A local shell, with all the same terminal powers as SSH.}
+
+\donewhen{a \ui{Local Machine} tab is open with your usual shell.}
+

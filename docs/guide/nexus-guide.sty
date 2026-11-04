@@ -176,6 +176,8 @@
 \newcommand\uflushmeta{\ifx\ucmeta\empty\else
   \par\vspace{-4pt}{\small\color{umuted}\iClock\enspace\itshape\ucmeta}\par\vspace{4pt}\gdef\ucmeta{}\fi}
 \AddToHook{cmd/section/before}{\uflushmeta}
+% How you know you have finished: the last line of every chapter.
+\newcommand\donewhen[1]{\par\vspace{8pt}{\color{ugreen}\iCheck}\enspace\textbf{Done when} #1\par}
 
 % ---------------------------------------------------------------- screenshots
 % \shot[width]{file}{caption}: centred, no frame, caption after an image icon.
@@ -313,8 +315,8 @@
   \begin{tcolorbox}[colback=upanel,colframe=uhair,boxrule=0.5pt,arc=3pt,left=8pt,right=8pt,top=6pt,bottom=6pt]
   Nexus Terminal puts every remote session in one native window: SSH with keys, jump hosts and 2FA, serial
   consoles, remote desktops, IRC and GitHub, with your passwords kept in the OS keychain or an encrypted vault.
-  \textbf{Read in any order:} every chapter opens with a \textbf{TL;DR} and the time it takes, so you can find
-  the bit you need and get back to work.
+  \textbf{Read in any order:} every chapter opens with a \textbf{TL;DR} and ends with a \textbf{Done when}
+  check, so you always know when you can stop.
   \end{tcolorbox}
   \vfill
   {\color{uhair}\hrule height 0.4pt}
