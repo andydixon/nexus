@@ -22,8 +22,8 @@ cd "$root" || exit 1
 PRODUCT=nexus-terminal
 VERSION="${NEXUS_VERSION:-$(git describe --tags --abbrev=0 2>/dev/null || echo dev)-$(git rev-parse --short HEAD 2>/dev/null || echo unknown)}"
 export NEXUS_VERSION="$VERSION"
-export NEXUS_UPDATE_URL="${NEXUS_UPDATE_URL:-https://dixon.cx/downloads/nexus/manifest-{platform}-{arch}.json}"
-BASE_URL="${NEXUS_RELEASE_BASE_URL:-https://dixon.cx/downloads/nexus}"
+export NEXUS_UPDATE_URL="${NEXUS_UPDATE_URL:-https://uncomplex.co.uk/nexus/manifest-{platform}-{arch}.json}"
+BASE_URL="${NEXUS_RELEASE_BASE_URL:-https://uncomplex.co.uk/nexus}"
 target_dir="$root/rust/target"
 
 # rustup target add runs in rust/ so it reaches the toolchain rust-toolchain.toml pins.

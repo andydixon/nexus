@@ -788,7 +788,7 @@ impl Settings {
         ui.add_space(8.0);
         ui.label(RichText::new("Nexus Terminal").font(theme::semibold(22.0)));
         ui.label(RichText::new(format!("Version {}", nexus_core::service::VERSION)).color(t.text_dim));
-        ui.label(RichText::new("Developed by Andy Dixon - dixon.cx/nexus").color(t.text_faint));
+        ui.label(RichText::new("Developed by Andy Dixon - uncomplex.co.uk/nexus").color(t.text_faint));
         ui.label(RichText::new("Proprietary software, © 2026 Andy Dixon t/a Uncomplex. See Help ▸ Licence.").color(t.text_faint));
         ui.add_space(8.0);
         for f in [

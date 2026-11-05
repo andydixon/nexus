@@ -169,7 +169,7 @@ mod tests {
 
     #[test]
     fn only_web_urls_are_opened() {
-        for ok in ["https://dixon.cx/downloads/nexus/", "http://localhost:3000/x", " HTTPS://Example.com "] {
+        for ok in ["https://uncomplex.co.uk/nexus/", "http://localhost:3000/x", " HTTPS://Example.com "] {
             assert!(super::is_web_url(ok), "{ok}");
         }
         assert!(super::is_web_url("http://über.example/"));

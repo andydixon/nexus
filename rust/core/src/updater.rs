@@ -11,7 +11,7 @@ use std::io::Read;
 use std::time::Duration;
 
 /// Manifest URL template; expand with [`expand_update_url`].
-pub const DEFAULT_UPDATE_URL: &str = "https://dixon.cx/downloads/nexus/manifest-{platform}-{arch}.json";
+pub const DEFAULT_UPDATE_URL: &str = "https://uncomplex.co.uk/nexus/manifest-{platform}-{arch}.json";
 const USER_AGENT: &str = "NexusTerminal-UpdateChecker";
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
 const MAX_UPDATE_RESPONSE_BYTES: usize = 1 << 20;
