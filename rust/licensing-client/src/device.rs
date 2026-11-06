@@ -3,6 +3,7 @@
 use std::sync::Arc;
 
 use p256::ecdsa::{signature::Signer, Signature, SigningKey};
+use p256::elliptic_curve::Generate;
 use serde::Serialize;
 
 use crate::storage::{LicenseStorage, StorageError};
@@ -53,15 +54,8 @@ impl SoftwareKeyProvider {
 impl DeviceKeyProvider for SoftwareKeyProvider {
     fn create_key(&self, label: &str) -> Result<KeyHandle, DeviceError> {
         let label: String = label.chars().filter(|c| c.is_ascii_alphanumeric()).take(32).collect();
-        let h = KeyHandle(format!("{label}-{:016x}", getrandom::u64().expect("OS randomness")));
-        // Fresh bytes outside the scalar range (all zero or >= the group order) are rejected: retry.
-        let key = loop {
-            let mut b = [0u8; 32];
-            getrandom::fill(&mut b).expect("OS randomness");
-            if let Ok(k) = SigningKey::from_slice(&b) {
-                break k;
-            }
-        };
+        let h = KeyHandle(format!("{label}-{:016x}", getrandom::u64().expect("os rng")));
+        let key = SigningKey::try_generate_from_rng(&mut getrandom::SysRng).expect("os rng");
         self.storage.store_atomic(&format!("key-{}", h.0), &key.to_bytes())?;
         Ok(h)
     }

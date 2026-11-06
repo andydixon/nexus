@@ -238,17 +238,17 @@ impl LicenseClient {
         let status_path = format!("api/v1/activation-intents/{}", session.intent_id);
         loop {
             if self.inner.cfg.clock.now() >= session.expires_at {
-                return self.fail_activation(problem("INTENT_EXPIRED")).await;
+                return self.fail_activation(&session.key, problem("INTENT_EXPIRED")).await;
             }
             let req = self.inner.http.get(self.url(&status_path)?).bearer_auth(&session.secret);
             match self.send(req).await.and_then(|b| json::<StatusResponse>(&b)) {
                 Ok(s) if s.status == "approved" || s.status == "completed" => break,
                 Ok(s) if s.status == "pending" => {}
-                Ok(s) if s.status == "denied" => return self.fail_activation(problem("ACTIVATION_DENIED")).await,
-                Ok(s) if s.status == "expired" => return self.fail_activation(problem("INTENT_EXPIRED")).await,
-                Ok(s) => return self.fail_activation(LicenseError::Protocol(format!("unknown intent status {:?}", s.status))).await,
+                Ok(s) if s.status == "denied" => return self.fail_activation(&session.key, problem("ACTIVATION_DENIED")).await,
+                Ok(s) if s.status == "expired" => return self.fail_activation(&session.key, problem("INTENT_EXPIRED")).await,
+                Ok(s) => return self.fail_activation(&session.key, LicenseError::Protocol(format!("unknown intent status {:?}", s.status))).await,
                 Err(e) if e.is_transient() => {}
-                Err(e) => return self.fail_activation(e).await,
+                Err(e) => return self.fail_activation(&session.key, e).await,
             }
             tokio::time::sleep(session.poll_interval).await;
         }
@@ -280,7 +280,9 @@ impl LicenseClient {
         }
     }
 
-    async fn fail_activation(&self, e: LicenseError) -> Result<LicenseState, LicenseError> {
+    /// The intent is over (denied, expired or refused), so its never-registered key is dropped too.
+    async fn fail_activation(&self, key: &KeyHandle, e: LicenseError) -> Result<LicenseState, LicenseError> {
+        let _ = self.inner.cfg.key_provider.delete_key(key);
         let _g = self.inner.lock.lock().await;
         let mut p = self.load()?;
         let s = self.evaluate(&mut p);
@@ -361,11 +363,11 @@ impl LicenseClient {
                     Err(e) if e.is_transient() => {
                         let w = backoff;
                         backoff = (backoff * 2).min(MAX_BACKOFF_SECS);
-                        w + getrandom::u64().expect("OS randomness") % (w / 2 + 1)
+                        w + getrandom::u64().expect("os rng") % (w / 2 + 1)
                     }
                     _ => {
                         backoff = 60;
-                        RENEW_EVERY_SECS + getrandom::u64().expect("OS randomness") % 7200
+                        RENEW_EVERY_SECS + getrandom::u64().expect("os rng") % 7200
                     }
                 };
                 tokio::time::sleep(Duration::from_secs(wait)).await;
@@ -560,7 +562,7 @@ fn classify(e: reqwest::Error) -> LicenseError {
 
 fn uuid_v4() -> String {
     let mut b = [0u8; 16];
-    getrandom::fill(&mut b).expect("OS randomness");
+    getrandom::fill(&mut b).expect("os rng");
     b[6] = (b[6] & 0x0f) | 0x40;
     b[8] = (b[8] & 0x3f) | 0x80;
     let h: String = b.iter().map(|x| format!("{x:02x}")).collect();

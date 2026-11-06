@@ -70,8 +70,11 @@ impl LicenseStorage for FileStorage {
         let path = self.path(key)?;
         fs::create_dir_all(&self.dir)?;
         let tmp = self.dir.join(format!(".{key}.{}.tmp", std::process::id()));
+        // A leftover from a crashed run with the same pid is unlinked (never followed); create_new
+        // then refuses to write through a planted link when the process runs elevated.
+        let _ = fs::remove_file(&tmp);
         let mut opts = fs::OpenOptions::new();
-        opts.write(true).create(true).truncate(true);
+        opts.write(true).create_new(true);
         #[cfg(unix)]
         std::os::unix::fs::OpenOptionsExt::mode(&mut opts, 0o600);
         let mut f = opts.open(&tmp)?;
