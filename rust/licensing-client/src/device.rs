@@ -3,7 +3,6 @@
 use std::sync::Arc;
 
 use p256::ecdsa::{signature::Signer, Signature, SigningKey};
-use rand_core::{OsRng, RngCore};
 use serde::Serialize;
 
 use crate::storage::{LicenseStorage, StorageError};
@@ -54,14 +53,21 @@ impl SoftwareKeyProvider {
 impl DeviceKeyProvider for SoftwareKeyProvider {
     fn create_key(&self, label: &str) -> Result<KeyHandle, DeviceError> {
         let label: String = label.chars().filter(|c| c.is_ascii_alphanumeric()).take(32).collect();
-        let h = KeyHandle(format!("{label}-{:016x}", OsRng.next_u64()));
-        let key = SigningKey::random(&mut OsRng);
+        let h = KeyHandle(format!("{label}-{:016x}", getrandom::u64().expect("OS randomness")));
+        // Fresh bytes outside the scalar range (all zero or >= the group order) are rejected: retry.
+        let key = loop {
+            let mut b = [0u8; 32];
+            getrandom::fill(&mut b).expect("OS randomness");
+            if let Ok(k) = SigningKey::from_slice(&b) {
+                break k;
+            }
+        };
         self.storage.store_atomic(&format!("key-{}", h.0), &key.to_bytes())?;
         Ok(h)
     }
 
     fn public_key(&self, h: &KeyHandle) -> Result<Vec<u8>, DeviceError> {
-        Ok(self.load(h)?.verifying_key().to_encoded_point(false).as_bytes().to_vec())
+        Ok(self.load(h)?.verifying_key().to_sec1_point(false).as_bytes().to_vec())
     }
 
     fn sign(&self, h: &KeyHandle, message: &[u8]) -> Result<Vec<u8>, DeviceError> {

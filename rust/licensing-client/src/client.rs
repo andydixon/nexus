@@ -3,7 +3,6 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD as B64, Engine};
-use rand_core::{OsRng, RngCore};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use tokio::sync::{watch, Mutex};
 
@@ -362,11 +361,11 @@ impl LicenseClient {
                     Err(e) if e.is_transient() => {
                         let w = backoff;
                         backoff = (backoff * 2).min(MAX_BACKOFF_SECS);
-                        w + OsRng.next_u64() % (w / 2 + 1)
+                        w + getrandom::u64().expect("OS randomness") % (w / 2 + 1)
                     }
                     _ => {
                         backoff = 60;
-                        RENEW_EVERY_SECS + OsRng.next_u64() % 7200
+                        RENEW_EVERY_SECS + getrandom::u64().expect("OS randomness") % 7200
                     }
                 };
                 tokio::time::sleep(Duration::from_secs(wait)).await;
@@ -561,7 +560,7 @@ fn classify(e: reqwest::Error) -> LicenseError {
 
 fn uuid_v4() -> String {
     let mut b = [0u8; 16];
-    OsRng.fill_bytes(&mut b);
+    getrandom::fill(&mut b).expect("OS randomness");
     b[6] = (b[6] & 0x0f) | 0x40;
     b[8] = (b[8] & 0x3f) | 0x80;
     let h: String = b.iter().map(|x| format!("{x:02x}")).collect();
